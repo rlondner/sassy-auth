@@ -36,6 +36,13 @@
       "^@/(.*)$": "<rootDir>/$1",
       "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts"
     },
-    "transformIgnorePatterns": ["node_modules/(?!(@sassy-auth)/)"]
+    "transformIgnorePatterns": ["node_modules/(?!(@sassy-auth)/)"],
+    "globals": {
+      "ts-jest": {
+        "tsconfig": {
+          "jsx": "react-jsx"
+        }
+      }
+    }
   }
 }
