@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Post,
   Query,
+  Redirect,
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -42,6 +43,7 @@ export class TokenController {
    * BetterAuth session, issues an authorization code, and returns redirect info.
    */
   @Get('oauth/authorize')
+  @Redirect()
   async oauthAuthorize(
     @Query('client_id') clientId: string,
     @Query('redirect_uri') redirectUri: string,
@@ -130,20 +132,23 @@ export class TokenController {
     }
 
     // 2. Resolve sa_user from identifier
-    const identifierType = detectIdentifierType(dto.identifier);
-    let betterAuthEmail: string;
-    let saUser: {
+    type SaUserWithOrg = {
       id: number;
       publicId: string;
       betterAuthUserId: string;
       org: { publicId: string; appId: number };
-    } | null;
+      betterAuthUser: { email: string };
+    };
+
+    const identifierType = detectIdentifierType(dto.identifier);
+    let betterAuthEmail: string;
+    let saUser: Omit<SaUserWithOrg, 'betterAuthUser'> | null;
 
     if (identifierType === 'email') {
       const found = await prisma.saUser.findFirst({
         where: { betterAuthUser: { email: dto.identifier } },
         include: { org: true, betterAuthUser: true },
-      });
+      }) as SaUserWithOrg | null;
       if (!found) throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
       betterAuthEmail = dto.identifier;
       saUser = found;
@@ -151,22 +156,27 @@ export class TokenController {
       const found = await prisma.saUser.findFirst({
         where: { username: dto.identifier },
         include: { org: true, betterAuthUser: true },
-      }) as (typeof saUser & { betterAuthUser: { email: string } }) | null;
+      }) as SaUserWithOrg | null;
       if (!found) throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
-      betterAuthEmail = (found as unknown as { betterAuthUser: { email: string } }).betterAuthUser.email;
+      betterAuthEmail = found.betterAuthUser.email;
       saUser = found;
     } else {
       // phone
       const found = await prisma.saUser.findFirst({
         where: { phoneNumber: dto.identifier },
         include: { org: true, betterAuthUser: true },
-      }) as (typeof saUser & { betterAuthUser: { email: string } }) | null;
+      }) as SaUserWithOrg | null;
       if (!found) throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
-      betterAuthEmail = (found as unknown as { betterAuthUser: { email: string } }).betterAuthUser.email;
+      betterAuthEmail = found.betterAuthUser.email;
       saUser = found;
     }
 
-    // 3. Validate password against BetterAuth account table
+    // 3. Check org/app match BEFORE password validation
+    if (saUser.org.appId !== app.id) {
+      throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
+    }
+
+    // 4. Validate password against BetterAuth account table
     const account = await prisma.account.findFirst({
       where: {
         user: { email: betterAuthEmail },
@@ -179,11 +189,6 @@ export class TokenController {
     const valid = await compare(dto.password, account.password);
     if (!valid) {
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
-    }
-
-    // 4. Validate user's org is associated with the requested app
-    if (saUser.org.appId !== app.id) {
-      throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
     }
 
     // 5. Issue JWT

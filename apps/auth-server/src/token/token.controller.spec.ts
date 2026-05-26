@@ -3,8 +3,7 @@ import { TokenController } from './token.controller';
 import { TokenService } from './token.service';
 import { OauthService } from './oauth.service';
 import { SqidService } from '../common/sqid/sqid.service';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { Response } from 'express';
+import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -43,13 +42,6 @@ const mockSqidService = {
   encode: jest.fn((id: number) => `sqid-${id}`),
   decode: jest.fn((s: string) => parseInt(s.replace('sqid-', ''), 10)),
 };
-
-function makeResponse() {
-  const res = {
-    redirect: jest.fn(),
-  };
-  return res as unknown as Response;
-}
 
 describe('TokenController', () => {
   let controller: TokenController;
@@ -100,9 +92,6 @@ describe('TokenController', () => {
       });
       mockPrisma.account.findFirst.mockResolvedValue(account);
 
-      // mock bcryptjs.compare to return true so we get past auth check
-      jest.mock('bcryptjs', () => ({ compare: jest.fn().mockResolvedValue(true) }));
-
       await expect(
         controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
       ).rejects.toThrow(ForbiddenException);
@@ -111,10 +100,9 @@ describe('TokenController', () => {
     it('throws NotFoundException when app does not exist', async () => {
       mockPrisma.saApp.findUnique.mockResolvedValue(null);
 
-      const { NotFoundException } = await import('@nestjs/common');
       await expect(
         controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-99' }),
-      ).rejects.toThrow();
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
