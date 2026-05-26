@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── BetterAuth tables (managed by BetterAuth Prisma adapter) ──────────────────
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  sessions      Session[]
+  accounts      Account[]
+  saUser        SaUser?
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+}
+
+// ── SassyAuth tables ──────────────────────────────────────────────────────────
+
+model SaApp {
+  id          Int            @id @default(autoincrement())
+  publicId    String         @unique
+  name        String
+  url         String
+  isPlatform  Boolean        @default(false)
+  orgs        SaOrg[]
+  permissions SaPermission[]
+  roles       SaRole[]
+}
+
+model SaOrg {
+  id         Int      @id @default(autoincrement())
+  publicId   String   @unique
+  name       String
+  appId      Int
+  app        SaApp    @relation(fields: [appId], references: [id])
+  isPlatform Boolean  @default(false)
+  users      SaUser[]
+}
+
+model SaUser {
+  id               Int                @id @default(autoincrement())
+  publicId         String             @unique
+  betterAuthUserId String             @unique
+  betterAuthUser   User               @relation(fields: [betterAuthUserId], references: [id])
+  orgId            Int
+  org              SaOrg              @relation(fields: [orgId], references: [id])
+  firstName        String
+  lastName         String
+  phoneNumber      String?
+  username         String?
+  roles            SaUserRole[]
+  directPermissions SaUserPermission[]
+}
+
+model SaPermission {
+  id       Int                @id @default(autoincrement())
+  publicId String             @unique
+  name     String             @unique
+  appId    Int
+  app      SaApp              @relation(fields: [appId], references: [id])
+  roles    SaRolePermission[]
+  users    SaUserPermission[]
+}
+
+model SaRole {
+  id          Int                @id @default(autoincrement())
+  publicId    String             @unique
+  name        String
+  appId       Int
+  app         SaApp              @relation(fields: [appId], references: [id])
+  permissions SaRolePermission[]
+  users       SaUserRole[]
+}
+
+model SaRolePermission {
+  roleId       Int
+  permissionId Int
+  role         SaRole       @relation(fields: [roleId], references: [id])
+  permission   SaPermission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model SaUserRole {
+  userId Int
+  roleId Int
+  user   SaUser @relation(fields: [userId], references: [id])
+  role   SaRole @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model SaUserPermission {
+  userId       Int
+  permissionId Int
+  user         SaUser       @relation(fields: [userId], references: [id])
+  permission   SaPermission @relation(fields: [permissionId], references: [id])
+
+  @@id([userId, permissionId])
+}
