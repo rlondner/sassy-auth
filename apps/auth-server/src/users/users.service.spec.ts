@@ -186,4 +186,35 @@ describe('UsersService', () => {
       await expect(service.createUser('ba-caller', dto)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('updateUser', () => {
+    it('updates allowed fields and returns the updated user', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saUser.update.mockResolvedValue(
+        makeSaUser({ firstName: 'Alicia', status: 'inactive' }),
+      );
+      const result = await service.updateUser('ba-caller', 'usr1', { firstName: 'Alicia', status: 'inactive' });
+      expect(result.firstName).toBe('Alicia');
+      expect(result.status).toBe('inactive');
+    });
+
+    it('throws NotFoundException when user not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.updateUser('ba-caller', 'usr1', {})).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('deleteUser', () => {
+    it('deletes the user', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saUser.delete.mockResolvedValue(undefined);
+      await expect(service.deleteUser('ba-caller', 'usr1')).resolves.toBeUndefined();
+      expect(mockPrisma.saUser.delete).toHaveBeenCalledWith({ where: { publicId: 'usr1' } });
+    });
+
+    it('throws NotFoundException when user not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.deleteUser('ba-caller', 'usr1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });

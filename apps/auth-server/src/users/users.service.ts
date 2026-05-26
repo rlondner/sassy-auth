@@ -172,8 +172,36 @@ export class UsersService {
       inviteUrl: `${baseUrl}/accept-invite?token=${invitation.token}`,
     };
   }
-  async updateUser(_callerBaId: string, _publicId: string, _dto: UpdateUserDto): Promise<never> { throw new Error('not implemented'); }
-  async deleteUser(_callerBaId: string, _publicId: string): Promise<void> { throw new Error('not implemented'); }
+  async updateUser(callerBaId: string, publicId: string, dto: UpdateUserDto) {
+    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
+      await checkPermission(callerBaId, 'org.users.manage');
+    });
+
+    const existing = await prisma.saUser.findUnique({ where: { publicId } });
+    if (!existing) throw new NotFoundException();
+
+    const updated = await prisma.saUser.update({
+      where: { publicId },
+      data: {
+        ...(dto.firstName !== undefined && { firstName: dto.firstName }),
+        ...(dto.lastName !== undefined && { lastName: dto.lastName }),
+        ...(dto.phoneNumber !== undefined && { phoneNumber: dto.phoneNumber }),
+        ...(dto.username !== undefined && { username: dto.username }),
+        ...(dto.status !== undefined && { status: dto.status }),
+      },
+      include: USER_INCLUDE,
+    });
+    return formatUser(updated);
+  }
+
+  async deleteUser(callerBaId: string, publicId: string): Promise<void> {
+    await checkPermission(callerBaId, 'platform.users.manage');
+
+    const existing = await prisma.saUser.findUnique({ where: { publicId } });
+    if (!existing) throw new NotFoundException();
+
+    await prisma.saUser.delete({ where: { publicId } });
+  }
   async assignRole(_callerBaId: string, _publicId: string, _dto: AssignRoleDto): Promise<void> { throw new Error('not implemented'); }
   async removeRole(_callerBaId: string, _publicId: string, _rolePublicId: string): Promise<void> { throw new Error('not implemented'); }
   async resendInvitation(_callerBaId: string, _userPublicId: string): Promise<never> { throw new Error('not implemented'); }
