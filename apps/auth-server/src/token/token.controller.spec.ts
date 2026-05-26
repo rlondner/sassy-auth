@@ -20,6 +20,9 @@ jest.mock('../auth/auth.config', () => ({
 jest.mock('bcryptjs', () => ({ compare: jest.fn().mockResolvedValue(true) }));
 
 import { prisma } from '@sassy-auth/db';
+import { auth } from '../auth/auth.config';
+
+const mockGetSession = auth.api.getSession as jest.Mock;
 
 const mockPrisma = prisma as unknown as {
   saApp: { findUnique: jest.Mock };
@@ -103,6 +106,63 @@ describe('TokenController', () => {
       await expect(
         controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-99' }),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // ── GET /api/token/oauth/authorize ───────────────────────────────────────
+
+  describe('oauthAuthorize', () => {
+    const app = { id: 10, publicId: 'sqid-10', isPlatform: false };
+    const fakeSession = { user: { id: 'ba-user-1', email: 'user@example.com' } };
+    const saUser = {
+      id: 1,
+      publicId: 'sqid-1',
+      betterAuthUserId: 'ba-user-1',
+      orgId: 5,
+      org: { id: 5, publicId: 'sqid-5', appId: 10 },
+    };
+
+    it('returns redirect url with code when session is valid and org matches', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockGetSession.mockResolvedValue(fakeSession);
+      mockPrisma.saUser.findFirst.mockResolvedValue(saUser);
+      mockOauthService.generateCode.mockReturnValue('test-code-abc');
+
+      const fakeReq = { headers: {} } as unknown as import('express').Request;
+      const result = await controller.oauthAuthorize(
+        'sqid-10',
+        'https://app.example.com/callback',
+        'csrf-state',
+        fakeReq,
+      );
+
+      expect(result).toMatchObject({ statusCode: 302 });
+      expect(result.url).toContain('code=test-code-abc');
+      expect(result.url).toContain('state=csrf-state');
+    });
+
+    it('throws UnauthorizedException when session is null', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockGetSession.mockResolvedValue(null);
+
+      const fakeReq = { headers: {} } as unknown as import('express').Request;
+      await expect(
+        controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', '', fakeReq),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('throws ForbiddenException when user org does not match app', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, id: 10 });
+      mockGetSession.mockResolvedValue(fakeSession);
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        ...saUser,
+        org: { id: 5, publicId: 'sqid-5', appId: 999 }, // wrong app
+      });
+
+      const fakeReq = { headers: {} } as unknown as import('express').Request;
+      await expect(
+        controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', '', fakeReq),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

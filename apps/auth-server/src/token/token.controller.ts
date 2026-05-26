@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -51,7 +52,12 @@ export class TokenController {
     @Req() req: Request,
   ) {
     // Validate app exists
-    const numericId = this.sqidService.decode(clientId);
+    let numericId: number;
+    try {
+      numericId = this.sqidService.decode(clientId);
+    } catch {
+      throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
+    }
     const app = await prisma.saApp.findUnique({ where: { id: numericId } });
     if (!app) {
       throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
@@ -125,7 +131,12 @@ export class TokenController {
   @Post('direct/login')
   async directLogin(@Body() dto: DirectLoginDto) {
     // 1. Validate app exists
-    const appNumericId = this.sqidService.decode(dto.appId);
+    let appNumericId: number;
+    try {
+      appNumericId = this.sqidService.decode(dto.appId);
+    } catch {
+      throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+    }
     const app = await prisma.saApp.findUnique({ where: { id: appNumericId } });
     if (!app) {
       throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
