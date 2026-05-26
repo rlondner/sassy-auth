@@ -1,0 +1,253 @@
+<h2>Data Model: Entity Relationship Diagram</h2>
+<p class="subtitle">BetterAuth owns the grey tables · SassyAuth owns the blue tables · Lines show foreign keys</p>
+
+<style>
+  .erd {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    padding: 8px 0;
+  }
+  .erd-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .erd-group-label {
+    width: 100%;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #888;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #333;
+    margin-bottom: 4px;
+  }
+  .entity {
+    border-radius: 8px;
+    overflow: hidden;
+    min-width: 200px;
+    max-width: 240px;
+    font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .entity-header {
+    padding: 8px 12px;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+  }
+  .entity-body {
+    padding: 6px 0;
+  }
+  .field {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 12px;
+    gap: 12px;
+  }
+  .field:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  .field-name {
+    color: #e0e0e0;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  .field-type {
+    color: #888;
+    font-size: 11px;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+  .pk { color: #f0c040; }
+  .fk { color: #7ec8e3; }
+  .opt { color: #aaa; }
+
+  /* BetterAuth = grey */
+  .ba .entity-header { background: #3a3a3a; color: #ccc; }
+  .ba .entity { background: #2a2a2a; border: 1px solid #444; }
+
+  /* SassyAuth = blue */
+  .sa .entity-header { background: #1a3a5c; color: #7ec8e3; }
+  .sa .entity { background: #1a2535; border: 1px solid #2a4a6a; }
+
+  .rel-section {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .rel-section h3 { margin: 0 0 8px; font-size: 13px; color: #999; }
+  .rel-row {
+    font-family: monospace;
+    font-size: 12px;
+    color: #ccc;
+    padding: 3px 0;
+    border-bottom: 1px solid #222;
+  }
+  .rel-row:last-child { border-bottom: none; }
+  .arrow { color: #7ec8e3; margin: 0 6px; }
+  .rel-label { color: #888; margin-left: 8px; font-size: 11px; }
+</style>
+
+<div class="erd">
+
+  <div class="erd-group ba">
+    <div class="erd-group-label">BetterAuth (managed by BetterAuth Prisma adapter)</div>
+
+    <div class="entity">
+      <div class="entity-header">user</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">String PK</span></div>
+        <div class="field"><span class="field-name">name</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name">email</span><span class="field-type">String unique</span></div>
+        <div class="field"><span class="field-name">emailVerified</span><span class="field-type">Boolean</span></div>
+        <div class="field"><span class="field-name opt">image</span><span class="field-type">String?</span></div>
+        <div class="field"><span class="field-name">createdAt</span><span class="field-type">DateTime</span></div>
+        <div class="field"><span class="field-name">updatedAt</span><span class="field-type">DateTime</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">session</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">String PK</span></div>
+        <div class="field"><span class="field-name">token</span><span class="field-type">String unique</span></div>
+        <div class="field"><span class="field-name fk">userId</span><span class="field-type">FK→user</span></div>
+        <div class="field"><span class="field-name">expiresAt</span><span class="field-type">DateTime</span></div>
+        <div class="field"><span class="field-name opt">ipAddress</span><span class="field-type">String?</span></div>
+        <div class="field"><span class="field-name opt">userAgent</span><span class="field-type">String?</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">account</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">String PK</span></div>
+        <div class="field"><span class="field-name">providerId</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name">accountId</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name fk">userId</span><span class="field-type">FK→user</span></div>
+        <div class="field"><span class="field-name opt">password</span><span class="field-type">String?</span></div>
+        <div class="field"><span class="field-name opt">accessToken</span><span class="field-type">String?</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">verification</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">String PK</span></div>
+        <div class="field"><span class="field-name">identifier</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name">value</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name">expiresAt</span><span class="field-type">DateTime</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="erd-group sa">
+    <div class="erd-group-label">SassyAuth (owned by SassyAuth)</div>
+
+    <div class="entity">
+      <div class="entity-header">sa_app</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">Int PK autoincr</span></div>
+        <div class="field"><span class="field-name">publicId</span><span class="field-type">String unique (Sqid)</span></div>
+        <div class="field"><span class="field-name">name</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name">url</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name">isPlatform</span><span class="field-type">Boolean default false</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">sa_org</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">Int PK autoincr</span></div>
+        <div class="field"><span class="field-name">publicId</span><span class="field-type">String unique (Sqid)</span></div>
+        <div class="field"><span class="field-name">name</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name fk">appId</span><span class="field-type">FK→sa_app</span></div>
+        <div class="field"><span class="field-name">isPlatform</span><span class="field-type">Boolean default false</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">sa_user</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">Int PK autoincr</span></div>
+        <div class="field"><span class="field-name">publicId</span><span class="field-type">String unique (Sqid)</span></div>
+        <div class="field"><span class="field-name fk">betterAuthUserId</span><span class="field-type">FK→user unique</span></div>
+        <div class="field"><span class="field-name fk">orgId</span><span class="field-type">FK→sa_org</span></div>
+        <div class="field"><span class="field-name">firstName</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name">lastName</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name opt">phoneNumber</span><span class="field-type">String?</span></div>
+        <div class="field"><span class="field-name opt">username</span><span class="field-type">String?</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">sa_permission</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">Int PK autoincr</span></div>
+        <div class="field"><span class="field-name">publicId</span><span class="field-type">String unique (Sqid)</span></div>
+        <div class="field"><span class="field-name">name</span><span class="field-type">String unique</span></div>
+        <div class="field"><span class="field-name fk">appId</span><span class="field-type">FK→sa_app</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">sa_role</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name pk">id</span><span class="field-type">Int PK autoincr</span></div>
+        <div class="field"><span class="field-name">publicId</span><span class="field-type">String unique (Sqid)</span></div>
+        <div class="field"><span class="field-name">name</span><span class="field-type">String</span></div>
+        <div class="field"><span class="field-name fk">appId</span><span class="field-type">FK→sa_app</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">sa_role_permission</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name fk pk">roleId</span><span class="field-type">FK→sa_role</span></div>
+        <div class="field"><span class="field-name fk pk">permissionId</span><span class="field-type">FK→sa_permission</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">sa_user_role</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name fk pk">userId</span><span class="field-type">FK→sa_user</span></div>
+        <div class="field"><span class="field-name fk pk">roleId</span><span class="field-type">FK→sa_role</span></div>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">sa_user_permission</div>
+      <div class="entity-body">
+        <div class="field"><span class="field-name fk pk">userId</span><span class="field-type">FK→sa_user</span></div>
+        <div class="field"><span class="field-name fk pk">permissionId</span><span class="field-type">FK→sa_permission</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="rel-section">
+    <h3>Key Relationships</h3>
+    <div class="rel-row">sa_user.betterAuthUserId <span class="arrow">→</span> user.id <span class="rel-label">1:1 — links SassyAuth profile to BetterAuth identity</span></div>
+    <div class="rel-row">sa_user.orgId <span class="arrow">→</span> sa_org.id <span class="rel-label">N:1 — user belongs to exactly one org</span></div>
+    <div class="rel-row">sa_org.appId <span class="arrow">→</span> sa_app.id <span class="rel-label">N:1 — org is scoped to one app</span></div>
+    <div class="rel-row">sa_permission.appId <span class="arrow">→</span> sa_app.id <span class="rel-label">N:1 — permissions scoped per app (platform app = platform perms)</span></div>
+    <div class="rel-row">sa_role.appId <span class="arrow">→</span> sa_app.id <span class="rel-label">N:1 — roles scoped per app, reusable across orgs of same app</span></div>
+    <div class="rel-row">sa_role_permission <span class="arrow">→</span> role + permission <span class="rel-label">M:N — roles bundle permissions</span></div>
+    <div class="rel-row">sa_user_role <span class="arrow">→</span> user + role <span class="rel-label">M:N — users assigned roles (additive)</span></div>
+    <div class="rel-row">sa_user_permission <span class="arrow">→</span> user + permission <span class="rel-label">M:N — direct permission grants (additive)</span></div>
+  </div>
+
+  <div class="rel-section">
+    <h3>Bootstrap: Platform App &amp; Org</h3>
+    <div class="rel-row">On first run, seed: <span style="color:#7ec8e3">sa_app { isPlatform: true, name: "SassyAuth", url: "..." }</span></div>
+    <div class="rel-row">Then seed: <span style="color:#7ec8e3">sa_org { isPlatform: true, name: "Platform", appId: platformApp.id }</span></div>
+    <div class="rel-row">Platform permissions (e.g. platform.orgs.manage) seeded with <span style="color:#7ec8e3">appId = platformApp.id</span> — immutable</div>
+  </div>
+
+</div>

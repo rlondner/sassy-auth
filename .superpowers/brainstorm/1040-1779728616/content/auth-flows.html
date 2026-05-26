@@ -1,0 +1,245 @@
+<h2>Auth Flows</h2>
+<p class="subtitle">Two flows depending on whether the app is first-party or third-party</p>
+
+<style>
+  .flows {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .flow-box {
+    flex: 1;
+    min-width: 320px;
+    background: #1a2535;
+    border: 1px solid #2a4a6a;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .flow-header {
+    background: #1a3a5c;
+    color: #7ec8e3;
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .flow-header .flow-sub {
+    font-size: 11px;
+    color: #aaa;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+  .flow-body {
+    padding: 16px;
+  }
+  .step {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+  .step-num {
+    min-width: 24px;
+    height: 24px;
+    background: #2a4a6a;
+    color: #7ec8e3;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-content {
+    font-size: 13px;
+    color: #ccc;
+    line-height: 1.5;
+  }
+  .step-content .actor {
+    font-weight: 700;
+    color: #e0e0e0;
+  }
+  .step-content code {
+    background: #0d1a2a;
+    color: #7ec8e3;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
+  .arrow-down {
+    text-align: center;
+    color: #2a4a6a;
+    font-size: 18px;
+    margin: -4px 0 2px 36px;
+  }
+  .flow-note {
+    margin-top: 12px;
+    padding: 8px 10px;
+    background: #0d1a2a;
+    border-left: 3px solid #2a4a6a;
+    font-size: 12px;
+    color: #888;
+    border-radius: 0 4px 4px 0;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  .tag-oauth { background: #1a3a1a; color: #6ecf6e; }
+  .tag-direct { background: #3a2a1a; color: #cfaf6e; }
+
+  .divider {
+    height: 1px;
+    background: #2a4a6a;
+    margin: 12px 0;
+    opacity: 0.4;
+  }
+
+  .login-methods {
+    margin-top: 16px;
+    background: #111b27;
+    border: 1px solid #1e3a54;
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .login-methods h3 {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 10px;
+  }
+  .method-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .method-item {
+    background: #1a2535;
+    border: 1px solid #2a4a6a;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #ccc;
+  }
+  .method-item .method-name {
+    font-weight: 700;
+    color: #7ec8e3;
+    margin-bottom: 2px;
+  }
+</style>
+
+<div class="flows">
+
+  <div class="flow-box">
+    <div class="flow-header">
+      OAuth2 Authorization Code Flow
+      <div class="flow-sub">For third-party / external resource servers</div>
+    </div>
+    <div class="flow-body">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content"><span class="actor">Resource server</span> redirects user to SassyAuth:<br>
+        <code>GET /api/auth/oauth/authorize?client_id=&lt;appPublicId&gt;&amp;redirect_uri=...&amp;state=...</code></div>
+      </div>
+      <div class="arrow-down">↓</div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content"><span class="actor">SassyAuth</span> shows hosted login UI. User authenticates (password, social, magic link, OTP).</div>
+      </div>
+      <div class="arrow-down">↓</div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content"><span class="actor">SassyAuth</span> validates user belongs to an org associated with the requesting app. Issues short-lived <code>code</code>, redirects back:<br>
+        <code>GET &lt;redirect_uri&gt;?code=...&amp;state=...</code></div>
+      </div>
+      <div class="arrow-down">↓</div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content"><span class="actor">Resource server</span> exchanges code for JWT:<br>
+        <code>POST /api/auth/oauth/token</code><br>
+        Body: <code>code, client_id, client_secret, redirect_uri</code></div>
+      </div>
+      <div class="arrow-down">↓</div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content"><span class="actor">SassyAuth</span> resolves effective permissions (roles + direct grants), returns signed RS256 JWT with <code>permissions</code>, <code>org</code>, <code>aud</code> claims.</div>
+      </div>
+
+      <div class="flow-note">Resource server verifies JWT using SassyAuth's public key from <code>GET /api/auth/jwks</code> — no round-trip to SassyAuth needed per request.</div>
+    </div>
+  </div>
+
+  <div class="flow-box">
+    <div class="flow-header">
+      Direct Login Flow
+      <div class="flow-sub">For first-party apps tightly coupled to SassyAuth</div>
+    </div>
+    <div class="flow-body">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content"><span class="actor">First-party app</span> POSTs credentials directly:<br>
+        <code>POST /api/auth/direct/login</code><br>
+        Body: <code>{ identifier, password, appId }</code></div>
+      </div>
+      <div class="arrow-down">↓</div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content"><span class="actor">SassyAuth</span> authenticates via BetterAuth, validates user's org is associated with <code>appId</code>.</div>
+      </div>
+      <div class="arrow-down">↓</div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content"><span class="actor">SassyAuth</span> resolves effective permissions, returns signed RS256 JWT directly in the response body — no redirect.</div>
+      </div>
+
+      <div class="flow-note">Also used for <strong>Platform Admin login</strong> to the SassyAuth Management UI — the management UI is itself a first-party app.</div>
+
+      <div class="divider"></div>
+
+      <div class="step">
+        <div class="step-num">★</div>
+        <div class="step-content"><strong>Passwordless variants</strong> work the same way — the identifier step triggers a magic link or 6-digit OTP sent to email/phone. The code is exchanged for the same JWT at step 3.</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="login-methods">
+  <h3>Supported Login Methods (both flows)</h3>
+  <div class="method-grid">
+    <div class="method-item">
+      <div class="method-name">Password</div>
+      Username, email, or phone + password
+    </div>
+    <div class="method-item">
+      <div class="method-name">Magic Link</div>
+      Email link, single-use, time-limited
+    </div>
+    <div class="method-item">
+      <div class="method-name">Email / SMS OTP</div>
+      6-digit code sent to email or phone
+    </div>
+    <div class="method-item">
+      <div class="method-name">Social Providers</div>
+      Google · Microsoft · Apple · GitHub
+    </div>
+  </div>
+</div>

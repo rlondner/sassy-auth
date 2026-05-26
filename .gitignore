@@ -3,3 +3,5 @@ dist/
 .env
 *.env.local
 .turbo/
+.superpowers/brainstorm/1040-1779728616/state/server-stopped
+.superpowers/brainstorm/1040-1779728616/state/server.pid

@@ -6,15 +6,17 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
-    "db:seed": "ts-node src/seed.ts"
+    "db:generate": "dotenv -e ../../.env.local -- prisma generate",
+    "db:migrate": "dotenv -e ../../.env.local -- prisma migrate dev",
+    "db:push": "dotenv -e ../../.env.local -- prisma db push",
+    "db:seed": "dotenv -e ../../.env.local -- ts-node ../../apps/auth-server/src/seed/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.14.0"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
+    "dotenv-cli": "^8.0.0",
     "prisma": "^5.14.0",
     "typescript": "^5.4.0",
     "ts-node": "^10.9.0"
