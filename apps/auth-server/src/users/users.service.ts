@@ -202,7 +202,32 @@ export class UsersService {
 
     await prisma.saUser.delete({ where: { publicId } });
   }
-  async assignRole(_callerBaId: string, _publicId: string, _dto: AssignRoleDto): Promise<void> { throw new Error('not implemented'); }
-  async removeRole(_callerBaId: string, _publicId: string, _rolePublicId: string): Promise<void> { throw new Error('not implemented'); }
+  async assignRole(callerBaId: string, userPublicId: string, dto: AssignRoleDto): Promise<void> {
+    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
+      await checkPermission(callerBaId, 'org.users.manage');
+    });
+
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const role = await prisma.saRole.findUnique({ where: { publicId: dto.roleId } });
+    if (!role) throw new NotFoundException('Role not found');
+
+    await prisma.saUserRole.create({ data: { userId: user.id, roleId: role.id } });
+  }
+
+  async removeRole(callerBaId: string, userPublicId: string, rolePublicId: string): Promise<void> {
+    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
+      await checkPermission(callerBaId, 'org.users.manage');
+    });
+
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const role = await prisma.saRole.findUnique({ where: { publicId: rolePublicId } });
+    if (!role) throw new NotFoundException('Role not found');
+
+    await prisma.saUserRole.delete({ where: { userId_roleId: { userId: user.id, roleId: role.id } } });
+  }
   async resendInvitation(_callerBaId: string, _userPublicId: string): Promise<never> { throw new Error('not implemented'); }
 }

@@ -217,4 +217,39 @@ describe('UsersService', () => {
       await expect(service.deleteUser('ba-caller', 'usr1')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('assignRole', () => {
+    it('creates a SaUserRole link', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1' });
+      mockPrisma.saUserRole.create.mockResolvedValue(undefined);
+      await expect(service.assignRole('ba-caller', 'usr1', { roleId: 'role1' })).resolves.toBeUndefined();
+      expect(mockPrisma.saUserRole.create).toHaveBeenCalledWith({
+        data: { userId: 1, roleId: 5 },
+      });
+    });
+
+    it('throws NotFoundException when user not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.assignRole('ba-caller', 'usr1', { roleId: 'role1' })).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException when role not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValue(null);
+      await expect(service.assignRole('ba-caller', 'usr1', { roleId: 'bad' })).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('removeRole', () => {
+    it('deletes the SaUserRole link', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1' });
+      mockPrisma.saUserRole.delete.mockResolvedValue(undefined);
+      await expect(service.removeRole('ba-caller', 'usr1', 'role1')).resolves.toBeUndefined();
+      expect(mockPrisma.saUserRole.delete).toHaveBeenCalledWith({
+        where: { userId_roleId: { userId: 1, roleId: 5 } },
+      });
+    });
+  });
 });
