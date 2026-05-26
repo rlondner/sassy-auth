@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        "on-surface": "#0b1c30",
+        "on-surface-variant": "#464555",
+        "inverse-surface": "#213145",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-low": "#eff4ff",
+        "surface-container": "#e5eeff",
+        "surface-container-high": "#dce9ff",
+        "surface-container-highest": "#d3e4fe",
+        "outline-variant": "#c7c4d8",
+        "outline": "#777587",
+        "primary": "#3525cd",
+        "primary-container": "#4f46e5",
+        "on-primary": "#ffffff",
+        "on-primary-fixed": "#0f0069",
+        "primary-fixed": "#e2dfff",
+        "on-secondary-fixed-variant": "#3f465c",
+        "surface-bright": "#f8f9ff",
+        "error": "#ba1a1a",
+        "error-container": "#ffdad6",
+        "on-error-container": "#93000a",
+      },
+      fontFamily: { sans: ['Manrope', 'sans-serif'] },
+    }
+  }
+}
+</script>
+<style>
+body { font-family: 'Manrope', sans-serif; background: #f0f2ff; }
+.material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-smoothing: antialiased; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.annotation { position: absolute; background: #1e40af; color: white; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; white-space: nowrap; z-index: 20; }
+.annotation::after { content: ''; position: absolute; }
+</style>
+</head>
+<body class="p-6">
+
+<div class="mb-6">
+  <h1 style="font-size:20px;font-weight:700;color:#0b1c30;margin-bottom:4px;">Section 3: Users Page + Drawers</h1>
+  <p style="font-size:13px;color:#464555;">Annotated component breakdown — hover rows to see interactions</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SCREEN 1: Users Table (no drawer open)                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div style="margin-bottom:8px;font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.06em;">① /users — Full Table View</div>
+<div class="relative" style="display:flex;height:420px;border:1px solid #c7c4d8;border-radius:6px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:32px;">
+
+  <!-- Sidebar -->
+  <nav style="width:200px;background:#213145;display:flex;flex-direction:column;flex-shrink:0;">
+    <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <div style="font-size:14px;font-weight:700;color:#f8f9ff;">SassyAuth</div>
+      <div style="font-size:10px;color:#777587;text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">Admin Console</div>
+    </div>
+    <!-- Language switcher -->
+    <div style="padding:8px 12px;display:flex;align-items:center;gap:6px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <span class="material-symbols-outlined" style="font-size:16px;color:#c7c4d8;">language</span>
+      <span style="font-size:11px;font-weight:700;color:#c7c4d8;letter-spacing:0.05em;">EN</span>
+      <span class="material-symbols-outlined" style="font-size:14px;color:#777587;">expand_more</span>
+    </div>
+    <ul style="flex:1;padding:8px 0;display:flex;flex-direction:column;gap:1px;">
+      <li style="display:flex;align-items:center;gap:10px;padding:10px 16px;color:#9ba3b8;font-size:12px;font-weight:600;cursor:pointer;">
+        <span class="material-symbols-outlined" style="font-size:18px;">apps</span> Apps
+      </li>
+      <li style="display:flex;align-items:center;gap:10px;padding:10px 16px;color:#9ba3b8;font-size:12px;font-weight:600;cursor:pointer;">
+        <span class="material-symbols-outlined" style="font-size:18px;">corporate_fare</span> Orgs
+      </li>
+      <li style="display:flex;align-items:center;gap:10px;padding:10px 16px;color:#e2dfff;font-size:12px;font-weight:700;cursor:pointer;border-left:2px solid #3525cd;background:rgba(53,37,205,0.15);">
+        <span class="material-symbols-outlined fill" style="font-size:18px;color:#c3c0ff;">group</span> Users
+      </li>
+      <li style="display:flex;align-items:center;gap:10px;padding:10px 16px;color:#9ba3b8;font-size:12px;font-weight:600;cursor:pointer;">
+        <span class="material-symbols-outlined" style="font-size:18px;">verified_user</span> Roles
+      </li>
+      <li style="display:flex;align-items:center;gap:10px;padding:10px 16px;color:#9ba3b8;font-size:12px;font-weight:600;cursor:pointer;">
+        <span class="material-symbols-outlined" style="font-size:18px;">vpn_key</span> Permissions
+      </li>
+    </ul>
+    <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.08);padding:10px 16px;display:flex;align-items:center;gap:8px;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#3525cd;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">SA</div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#e2dfff;">System Admin</div>
+        <div style="font-size:10px;color:#777587;">admin@sassy.io</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <div style="flex:1;display:flex;flex-direction:column;background:#f8f9ff;min-width:0;">
+    <!-- Header -->
+    <header style="height:52px;background:#fff;border-bottom:1px solid #c7c4d8;display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0;">
+      <div style="font-size:16px;font-weight:700;color:#0b1c30;">Users</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <!-- Search -->
+        <div style="position:relative;">
+          <span class="material-symbols-outlined" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:16px;color:#777587;">search</span>
+          <input style="padding:5px 10px 5px 28px;border:1px solid #c7c4d8;border-radius:4px;font-size:12px;color:#0b1c30;background:#f8f9ff;width:180px;outline:none;font-family:Manrope;" placeholder="Search users…"/>
+        </div>
+        <!-- Filter -->
+        <button style="padding:5px 8px;border:1px solid #c7c4d8;border-radius:4px;background:#fff;display:flex;align-items:center;gap:4px;font-size:12px;color:#464555;cursor:pointer;">
+          <span class="material-symbols-outlined" style="font-size:16px;">filter_list</span>
+        </button>
+        <!-- Add User -->
+        <button style="padding:5px 14px;background:#3525cd;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:Manrope;">
+          <span class="material-symbols-outlined" style="font-size:14px;">add</span> Add User
+        </button>
+      </div>
+    </header>
+
+    <!-- Table -->
+    <div style="flex:1;overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#eff4ff;">
+            <th style="padding:10px 20px;text-align:left;font-size:11px;font-weight:700;color:#464555;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #c7c4d8;">User</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#464555;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #c7c4d8;">Status</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#464555;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #c7c4d8;">Org</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#464555;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #c7c4d8;">Last Login</th>
+            <th style="padding:10px 20px;text-align:right;font-size:11px;font-weight:700;color:#464555;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #c7c4d8;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Row 1 — active, highlighted (as if hovered) -->
+          <tr style="border-bottom:1px solid #e5eeff;background:#e5eeff;position:relative;cursor:pointer;">
+            <td style="padding:10px 20px;display:flex;align-items:center;gap:10px;">
+              <div style="position:relative;">
+                <div style="width:32px;height:32px;border-radius:50%;background:#dce9ff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#3525cd;border:1px solid #c7c4d8;flex-shrink:0;">AS</div>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#0b1c30;">Alice Smith</div>
+                <div style="font-size:11px;color:#464555;">alice@example.com</div>
+              </div>
+            </td>
+            <td style="padding:10px 12px;">
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;background:#dce9ff;font-size:11px;font-weight:700;color:#3525cd;">
+                <span style="width:6px;height:6px;border-radius:50%;background:#3525cd;display:inline-block;"></span> Active
+              </span>
+            </td>
+            <td style="padding:10px 12px;font-size:12px;color:#464555;">Platform</td>
+            <td style="padding:10px 12px;font-size:12px;color:#464555;">2 mins ago</td>
+            <td style="padding:10px 20px;text-align:right;">
+              <button style="background:none;border:none;cursor:pointer;padding:4px;color:#777587;display:inline-flex;align-items:center;">
+                <span class="material-symbols-outlined" style="font-size:18px;">more_vert</span>
+              </button>
+            </td>
+          </tr>
+          <!-- Row 2 — pending -->
+          <tr style="border-bottom:1px solid #e5eeff;background:#fff;cursor:pointer;">
+            <td style="padding:10px 20px;display:flex;align-items:center;gap:10px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:#e5eeff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#3f465c;border:1px solid #c7c4d8;flex-shrink:0;">BJ</div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#0b1c30;">Bob Jones</div>
+                <div style="font-size:11px;color:#464555;">bob@example.com</div>
+              </div>
+            </td>
+            <td style="padding:10px 12px;">
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;background:#fef3c7;font-size:11px;font-weight:700;color:#92400e;">
+                <span style="width:6px;height:6px;border-radius:50%;background:#d97706;display:inline-block;"></span> Pending
+              </span>
+            </td>
+            <td style="padding:10px 12px;font-size:12px;color:#464555;">Acme Corp</td>
+            <td style="padding:10px 12px;font-size:12px;color:#464555;">Never</td>
+            <td style="padding:10px 20px;text-align:right;">
+              <button style="background:none;border:none;cursor:pointer;padding:4px;color:#777587;">
+                <span class="material-symbols-outlined" style="font-size:18px;">more_vert</span>
+              </button>
+            </td>
+          </tr>
+          <!-- Row 3 — inactive -->
+          <tr style="border-bottom:1px solid #e5eeff;background:#fff;cursor:pointer;">
+            <td style="padding:10px 20px;display:flex;align-items:center;gap:10px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:#e5eeff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#3f465c;border:1px solid #c7c4d8;flex-shrink:0;">CD</div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#0b1c30;">Charlie Davis</div>
+                <div style="font-size:11px;color:#464555;">charlie@example.com</div>
+              </div>
+            </td>
+            <td style="padding:10px 12px;">
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;background:#ffdad6;font-size:11px;font-weight:700;color:#93000a;">
+                <span style="width:6px;height:6px;border-radius:50%;background:#ba1a1a;display:inline-block;"></span> Inactive
+              </span>
+            </td>
+            <td style="padding:10px 12px;font-size:12px;color:#464555;">Globex</td>
+            <td style="padding:10px 12px;font-size:12px;color:#464555;">14 days ago</td>
+            <td style="padding:10px 20px;text-align:right;">
+              <button style="background:none;border:none;cursor:pointer;padding:4px;color:#777587;">
+                <span class="material-symbols-outlined" style="font-size:18px;">more_vert</span>
+              </button>
+            </td>
+          </tr>
+          <tr style="border-bottom:1px solid #e5eeff;background:#fff;cursor:pointer;">
+            <td style="padding:10px 20px;display:flex;align-items:center;gap:10px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:#e5eeff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#3f465c;border:1px solid #c7c4d8;flex-shrink:0;">SJ</div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#0b1c30;">Sarah Jenkins</div>
+                <div style="font-size:11px;color:#464555;">sjenkins@innovate.co</div>
+              </div>
+            </td>
+            <td style="padding:10px 12px;">
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;background:#dce9ff;font-size:11px;font-weight:700;color:#3525cd;">
+                <span style="width:6px;height:6px;border-radius:50%;background:#3525cd;display:inline-block;"></span> Active
+              </span>
+            </td>
+            <td style="padding:10px 12px;font-size:12px;color:#464555;">Innovate Co</td>
+            <td style="padding:10px 12px;font-size:12px;color:#464555;">1 hour ago</td>
+            <td style="padding:10px 20px;text-align:right;">
+              <button style="background:none;border:none;cursor:pointer;padding:4px;color:#777587;">
+                <span class="material-symbols-outlined" style="font-size:18px;">more_vert</span>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Annotations -->
+  <div class="annotation" style="top:8px;left:8px;">SideNav — AdminShell layout</div>
+  <div class="annotation" style="top:8px;left:214px;">Language switcher — scans messages/*.json</div>
+  <div class="annotation" style="top:60px;right:8px;">shadcn Sheet → UserViewDrawer on row click</div>
+  <div class="annotation" style="top:115px;left:214px;">DataTable — shadcn Table + TanStack sorting/filtering</div>
+  <div class="annotation" style="top:170px;left:214px;">StatusBadge — 3 variants: active / pending / inactive</div>
+  <div class="annotation" style="top:230px;right:8px;">DropdownMenu — Edit, Reset Password, Deactivate, Delete</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SCREEN 2: View Drawer open                                  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div style="margin-bottom:8px;font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.06em;">② Row click → UserViewDrawer (shadcn Sheet, right side)</div>
+<div class="relative" style="display:flex;height:460px;border:1px solid #c7c4d8;border-radius:6px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:32px;">
+
+  <!-- Sidebar (condensed) -->
+  <nav style="width:200px;background:#213145;flex-shrink:0;"></nav>
+
+  <!-- Table (dimmed) -->
+  <div style="flex:1;background:#f8f9ff;opacity:0.35;display:flex;flex-direction:column;">
+    <div style="height:52px;background:#fff;border-bottom:1px solid #c7c4d8;"></div>
+    <div style="height:40px;background:#eff4ff;border-bottom:1px solid #c7c4d8;"></div>
+    <div style="height:52px;border-bottom:1px solid #e5eeff;"></div>
+    <div style="height:52px;border-bottom:1px solid #e5eeff;background:#e5eeff;"></div>
+    <div style="height:52px;border-bottom:1px solid #e5eeff;"></div>
+  </div>
+
+  <!-- Drawer -->
+  <div style="position:absolute;right:0;top:0;bottom:0;width:52%;background:#fff;border-left:1px solid #c7c4d8;box-shadow:-6px 0 24px rgba(0,0,0,0.1);display:flex;flex-direction:column;z-index:10;">
+    <!-- Drawer header -->
+    <div style="padding:14px 20px;border-bottom:1px solid #c7c4d8;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#0b1c30;">Alice Smith</div>
+        <div style="font-size:11px;color:#464555;">alice@example.com</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button style="padding:5px 12px;border:1px solid #c7c4d8;border-radius:4px;background:#fff;font-size:12px;font-weight:600;color:#0b1c30;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:Manrope;">
+          <span class="material-symbols-outlined" style="font-size:14px;">lock_reset</span> Reset Password
+        </button>
+        <button style="padding:5px 12px;background:#3525cd;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:Manrope;">
+          <span class="material-symbols-outlined" style="font-size:14px;">edit</span> Edit
+        </button>
+        <button style="background:none;border:none;cursor:pointer;padding:2px;color:#777587;">
+          <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Profile card -->
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+      <div style="background:#fff;border:1px solid #c7c4d8;border-radius:6px;overflow:hidden;margin-bottom:14px;">
+        <div style="height:56px;background:linear-gradient(to right,#2c4fe8,#4c249f);"></div>
+        <div style="padding:10px 16px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="display:flex;gap:12px;margin-top:-24px;">
+              <div style="width:48px;height:48px;background:#dbeafe;border:3px solid #fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#3525cd;flex-shrink:0;">AS</div>
+              <div style="padding-top:24px;">
+                <div style="font-size:14px;font-weight:700;color:#0b1c30;">Alice Smith</div>
+                <div style="font-size:11px;color:#464555;display:flex;align-items:center;gap:4px;margin-top:1px;">
+                  <span class="material-symbols-outlined" style="font-size:13px;">mail</span> alice@example.com
+                </div>
+              </div>
+            </div>
+            <div style="padding-top:8px;">
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;background:#dce9ff;font-size:11px;font-weight:700;color:#3525cd;">
+                <span style="width:6px;height:6px;border-radius:50%;background:#3525cd;display:inline-block;"></span> Active
+              </span>
+            </div>
+          </div>
+          <!-- Info grid -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px;">
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#777587;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">First Name</div>
+              <div style="font-size:13px;font-weight:600;color:#0b1c30;">Alice</div>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#777587;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Last Name</div>
+              <div style="font-size:13px;font-weight:600;color:#0b1c30;">Smith</div>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#777587;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">User ID</div>
+              <code style="font-size:11px;background:#eff4ff;color:#464555;padding:2px 6px;border-radius:3px;">qR7sT1</code>
+            </div>
+          </div>
+          <!-- Account status box -->
+          <div style="background:#f8f9ff;border:1px solid #e5eeff;border-radius:6px;padding:10px;margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <div style="font-size:10px;color:#777587;margin-bottom:1px;">Last Login</div>
+              <div style="font-size:12px;font-weight:600;color:#0b1c30;">Today at 09:42 AM</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#777587;margin-bottom:1px;">Created</div>
+              <div style="font-size:12px;font-weight:600;color:#0b1c30;">Oct 12, 2022</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Org & Access section -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:700;color:#0b1c30;">Organization &amp; Access</div>
+        <button style="font-size:11px;font-weight:700;color:#3525cd;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:3px;font-family:Manrope;">
+          <span class="material-symbols-outlined" style="font-size:14px;">add</span> Grant Access
+        </button>
+      </div>
+      <div style="background:#fff;border:1px solid #c7c4d8;border-radius:6px;padding:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid #e5eeff;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:28px;height:28px;background:#eff4ff;border-radius:4px;display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:16px;color:#3525cd;">corporate_fare</span>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:5px;">
+                <div style="font-size:13px;font-weight:700;color:#0b1c30;">Platform</div>
+                <span style="font-size:9px;font-weight:700;background:#e5eeff;color:#464555;padding:1px 5px;border-radius:2px;text-transform:uppercase;letter-spacing:0.04em;">Primary</span>
+              </div>
+              <code style="font-size:10px;color:#777587;">xK2pLn</code>
+            </div>
+          </div>
+          <span class="material-symbols-outlined" style="font-size:18px;color:#c7c4d8;cursor:pointer;">more_vert</span>
+        </div>
+        <!-- Roles + permissions grid -->
+        <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:12px;">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#777587;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Assigned Roles</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#eff4ff;border:1px solid #e5eeff;border-radius:4px;font-size:12px;font-weight:600;color:#3525cd;">
+                <span style="width:6px;height:6px;border-radius:50%;background:#3525cd;flex-shrink:0;"></span> Platform Admin
+              </div>
+            </div>
+          </div>
+          <div style="border-left:1px solid #e5eeff;padding-left:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <div style="font-size:10px;font-weight:700;color:#777587;text-transform:uppercase;letter-spacing:0.04em;">Effective Permissions</div>
+              <span style="font-size:10px;font-weight:700;background:#e5eeff;color:#464555;padding:1px 6px;border-radius:3px;">6 Total</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;">
+              <div style="display:flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid #e5eeff;border-radius:3px;font-size:10px;color:#464555;">
+                <span class="material-symbols-outlined" style="font-size:11px;color:#3525cd;">check</span>platform.users.manage
+              </div>
+              <div style="display:flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid #e5eeff;border-radius:3px;font-size:10px;color:#464555;">
+                <span class="material-symbols-outlined" style="font-size:11px;color:#3525cd;">check</span>platform.orgs.manage
+              </div>
+              <div style="display:flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid #e5eeff;border-radius:3px;font-size:10px;color:#464555;">
+                <span class="material-symbols-outlined" style="font-size:11px;color:#3525cd;">check</span>platform.apps.manage
+              </div>
+              <div style="display:flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid #e5eeff;border-radius:3px;font-size:10px;color:#464555;background:#eff4ff;">
+                <span class="material-symbols-outlined" style="font-size:11px;color:#777587;">add</span>+ 3 more
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Annotations -->
+  <div class="annotation" style="top:8px;right:8px;">shadcn Sheet — slides in, overlay dims table</div>
+  <div class="annotation" style="top:60px;right:8px;">Profile card: avatar, status badge, ID, timestamps</div>
+  <div class="annotation" style="top:220px;right:8px;">Org card: roles + effective permissions per org</div>
+  <div class="annotation" style="top:340px;right:8px;">GET /api/users/{id}/roles + /effective-permissions</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SCREEN 3: Create Drawer                                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div style="margin-bottom:8px;font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.06em;">③ "Add User" → UserCreateDrawer (same shadcn Sheet)</div>
+<div class="relative" style="display:flex;height:420px;border:1px solid #c7c4d8;border-radius:6px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom:16px;">
+
+  <nav style="width:200px;background:#213145;flex-shrink:0;"></nav>
+  <div style="flex:1;background:#f8f9ff;opacity:0.35;"></div>
+
+  <!-- Create Drawer -->
+  <div style="position:absolute;right:0;top:0;bottom:0;width:52%;background:#fff;border-left:1px solid #c7c4d8;box-shadow:-6px 0 24px rgba(0,0,0,0.1);display:flex;flex-direction:column;z-index:10;">
+    <div style="padding:14px 20px;border-bottom:1px solid #c7c4d8;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#0b1c30;">New User</div>
+        <div style="font-size:11px;color:#464555;">Add a user and assign initial org + role.</div>
+      </div>
+      <span class="material-symbols-outlined" style="font-size:20px;color:#777587;cursor:pointer;">close</span>
+    </div>
+    <form style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;">
+      <!-- Basic Info section -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#777587;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e5eeff;padding-bottom:5px;margin-bottom:10px;">Basic Information</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#0b1c30;display:block;margin-bottom:3px;">First Name</label>
+            <input style="width:100%;padding:7px 10px;border:1px solid #c7c4d8;border-radius:4px;font-size:12px;color:#0b1c30;font-family:Manrope;box-sizing:border-box;" placeholder="e.g. Jane"/>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#0b1c30;display:block;margin-bottom:3px;">Last Name</label>
+            <input style="width:100%;padding:7px 10px;border:1px solid #c7c4d8;border-radius:4px;font-size:12px;color:#0b1c30;font-family:Manrope;box-sizing:border-box;" placeholder="e.g. Doe"/>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:11px;font-weight:700;color:#0b1c30;display:block;margin-bottom:3px;">Email Address</label>
+          <input style="width:100%;padding:7px 10px;border:1px solid #c7c4d8;border-radius:4px;font-size:12px;color:#0b1c30;font-family:Manrope;box-sizing:border-box;" placeholder="jane.doe@example.com" type="email"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#777587;display:block;margin-bottom:3px;">Username <span style="font-weight:400;">(optional)</span></label>
+            <input style="width:100%;padding:7px 10px;border:1px solid #c7c4d8;border-radius:4px;font-size:12px;color:#0b1c30;font-family:Manrope;box-sizing:border-box;" placeholder="janedoe99"/>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#777587;display:block;margin-bottom:3px;">Phone <span style="font-weight:400;">(optional)</span></label>
+            <input style="width:100%;padding:7px 10px;border:1px solid #c7c4d8;border-radius:4px;font-size:12px;color:#0b1c30;font-family:Manrope;box-sizing:border-box;" placeholder="+1 555 000 0000" type="tel"/>
+          </div>
+        </div>
+      </div>
+      <!-- Access section -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#777587;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e5eeff;padding-bottom:5px;margin-bottom:10px;">Access &amp; Permissions</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#0b1c30;display:block;margin-bottom:3px;">Organization</label>
+            <select style="width:100%;padding:7px 10px;border:1px solid #c7c4d8;border-radius:4px;font-size:12px;color:#0b1c30;font-family:Manrope;background:#fff;box-sizing:border-box;">
+              <option>Select org…</option>
+              <option>Platform</option>
+              <option>Acme Corp</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#0b1c30;display:block;margin-bottom:3px;">Role</label>
+            <select style="width:100%;padding:7px 10px;border:1px solid #c7c4d8;border-radius:4px;font-size:12px;color:#0b1c30;font-family:Manrope;background:#fff;box-sizing:border-box;">
+              <option>Select role…</option>
+              <option>Platform Admin</option>
+              <option>Org Admin</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </form>
+    <!-- Footer actions -->
+    <div style="padding:12px 20px;border-top:1px solid #c7c4d8;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;">
+      <button style="padding:7px 16px;border:1px solid #c7c4d8;border-radius:4px;background:#fff;font-size:12px;font-weight:700;color:#0b1c30;cursor:pointer;font-family:Manrope;">Cancel</button>
+      <button style="padding:7px 16px;background:#3525cd;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Manrope;">Create User</button>
+    </div>
+  </div>
+
+  <!-- Annotations -->
+  <div class="annotation" style="top:8px;right:8px;">Same shadcn Sheet component, different content</div>
+  <div class="annotation" style="top:120px;right:8px;">Server Action → POST /api/users</div>
+  <div class="annotation" style="top:240px;right:8px;">Orgs + roles loaded server-side, passed as props</div>
+  <div class="annotation" style="top:360px;right:8px;">On success: close drawer, revalidatePath('/users')</div>
+</div>
+
+</body>
+</html>
