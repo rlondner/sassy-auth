@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
@@ -114,7 +115,62 @@ export class UsersService {
 
     return { userId: publicId, permissions: Array.from(names).sort() };
   }
-  async createUser(_callerBaId: string, _dto: CreateUserDto): Promise<never> { throw new Error('not implemented'); }
+  async createUser(callerBaId: string, dto: CreateUserDto) {
+    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
+      await checkPermission(callerBaId, 'org.users.manage');
+    });
+
+    const org = await prisma.saOrg.findUnique({ where: { publicId: dto.orgId } });
+    if (!org) throw new NotFoundException('Org not found');
+
+    const baUserId = crypto.randomUUID();
+    const now = new Date();
+
+    await prisma.user.create({
+      data: {
+        id: baUserId,
+        name: `${dto.firstName} ${dto.lastName}`,
+        email: dto.email,
+        emailVerified: false,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    const saUserPublicId = this.sqids.encode(Date.now() % 1_000_000);
+    const saUser = await prisma.saUser.create({
+      data: {
+        publicId: saUserPublicId,
+        betterAuthUserId: baUserId,
+        orgId: org.id,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        phoneNumber: dto.phoneNumber ?? null,
+        username: dto.username ?? null,
+        status: 'pending',
+      },
+      include: USER_INCLUDE,
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const invitePublicId = this.sqids.encode((Date.now() + 1) % 1_000_000);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const invitation = await prisma.saInvitation.create({
+      data: {
+        publicId: invitePublicId,
+        token,
+        userId: saUser.id,
+        expiresAt,
+      },
+    });
+
+    const baseUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    return {
+      user: formatUser(saUser),
+      inviteUrl: `${baseUrl}/accept-invite?token=${invitation.token}`,
+    };
+  }
   async updateUser(_callerBaId: string, _publicId: string, _dto: UpdateUserDto): Promise<never> { throw new Error('not implemented'); }
   async deleteUser(_callerBaId: string, _publicId: string): Promise<void> { throw new Error('not implemented'); }
   async assignRole(_callerBaId: string, _publicId: string, _dto: AssignRoleDto): Promise<void> { throw new Error('not implemented'); }

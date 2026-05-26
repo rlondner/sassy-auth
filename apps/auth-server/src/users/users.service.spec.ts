@@ -142,4 +142,45 @@ describe('UsersService', () => {
       await expect(service.getEffectivePermissions('ba-caller', 'usr1')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('createUser', () => {
+    const dto = {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      email: 'jane@example.com',
+      orgId: 'org1',
+      username: undefined,
+      phoneNumber: undefined,
+    };
+
+    beforeEach(() => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 2, publicId: 'org1' });
+      mockPrisma.user.create.mockResolvedValue({ id: 'ba-jane' });
+      mockPrisma.saUser.create.mockResolvedValue({
+        ...makeSaUser({ publicId: 'usr2', firstName: 'Jane', lastName: 'Doe', status: 'pending' }),
+        id: 2,
+        betterAuthUser: { email: 'jane@example.com' },
+      });
+      mockPrisma.saInvitation.create.mockResolvedValue({
+        token: 'abc123token',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+    });
+
+    it('creates a BetterAuth user, SaUser, and invitation token', async () => {
+      const result = await service.createUser('ba-caller', dto);
+      expect(mockPrisma.user.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.saUser.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ firstName: 'Jane', status: 'pending' }) }),
+      );
+      expect(mockPrisma.saInvitation.create).toHaveBeenCalledTimes(1);
+      expect(result.user.id).toBe('usr2');
+      expect(result.inviteUrl).toContain('abc123token');
+    });
+
+    it('throws NotFoundException when org not found', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(null);
+      await expect(service.createUser('ba-caller', dto)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });
