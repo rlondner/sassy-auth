@@ -43,31 +43,33 @@ export class InvitationsService {
     const now = new Date();
     const baUserId = inv.user.betterAuthUser.id;
 
-    await prisma.account.create({
-      data: {
-        id: crypto.randomUUID(),
-        accountId: baUserId,
-        providerId: 'credential',
-        userId: baUserId,
-        password: hashed,
-        createdAt: now,
-        updatedAt: now,
-      },
-    });
+    await prisma.$transaction(async (tx) => {
+      await tx.account.create({
+        data: {
+          id: crypto.randomUUID(),
+          accountId: baUserId,
+          providerId: 'credential',
+          userId: baUserId,
+          password: hashed,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
 
-    await prisma.saUser.update({
-      where: { id: inv.user.id },
-      data: { status: 'active' },
-    });
+      await tx.saUser.update({
+        where: { id: inv.user.id },
+        data: { status: 'active' },
+      });
 
-    await prisma.user.update({
-      where: { id: baUserId },
-      data: { emailVerified: true, updatedAt: now },
-    });
+      await tx.user.update({
+        where: { id: baUserId },
+        data: { emailVerified: true, updatedAt: now },
+      });
 
-    await prisma.saInvitation.update({
-      where: { id: inv.id },
-      data: { usedAt: now },
+      await tx.saInvitation.update({
+        where: { id: inv.id },
+        data: { usedAt: now },
+      });
     });
   }
 }

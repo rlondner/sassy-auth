@@ -8,6 +8,7 @@ jest.mock('@sassy-auth/db', () => ({
     saUser: { update: jest.fn() },
     user: { update: jest.fn() },
     account: { create: jest.fn() },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -17,6 +18,7 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saUser: { update: jest.Mock };
   user: { update: jest.Mock };
   account: { create: jest.Mock };
+  $transaction: jest.Mock;
 };
 
 const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -46,6 +48,7 @@ describe('InvitationsService', () => {
     }).compile();
     service = module.get(InvitationsService);
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(mockPrisma));
   });
 
   describe('validateToken', () => {
