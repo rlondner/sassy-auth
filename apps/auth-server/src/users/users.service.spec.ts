@@ -252,4 +252,24 @@ describe('UsersService', () => {
       });
     });
   });
+
+  describe('resendInvitation', () => {
+    it('invalidates old tokens and creates a new invitation', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'pending' }));
+      mockPrisma.saInvitation.updateMany.mockResolvedValue(undefined);
+      mockPrisma.saInvitation.create.mockResolvedValue({ token: 'newtoken123', expiresAt: new Date() });
+
+      const result = await service.resendInvitation('ba-caller', 'usr1');
+      expect(mockPrisma.saInvitation.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ userId: 1, usedAt: null }) }),
+      );
+      expect(result.inviteUrl).toContain('newtoken123');
+    });
+
+    it('throws BadRequestException when user is already active', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'active' }));
+      const { BadRequestException } = await import('@nestjs/common');
+      await expect(service.resendInvitation('ba-caller', 'usr1')).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
 });

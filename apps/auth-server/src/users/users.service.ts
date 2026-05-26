@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { checkPermission } from '../common/permissions/check-permission';
@@ -229,5 +229,30 @@ export class UsersService {
 
     await prisma.saUserRole.delete({ where: { userId_roleId: { userId: user.id, roleId: role.id } } });
   }
-  async resendInvitation(_callerBaId: string, _userPublicId: string): Promise<never> { throw new Error('not implemented'); }
+  async resendInvitation(callerBaId: string, userPublicId: string) {
+    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
+      await checkPermission(callerBaId, 'org.users.manage');
+    });
+
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.status !== 'pending') throw new BadRequestException('User is not pending — invitation cannot be resent');
+
+    // Expire all existing unused tokens for this user
+    await prisma.saInvitation.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { expiresAt: new Date(0) },
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const publicId = crypto.randomUUID().slice(0, 12);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const invitation = await prisma.saInvitation.create({
+      data: { publicId, token, userId: user.id, expiresAt },
+    });
+
+    const baseUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    return { inviteUrl: `${baseUrl}/accept-invite?token=${invitation.token}` };
+  }
 }
