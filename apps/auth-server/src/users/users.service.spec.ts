@@ -5,6 +5,7 @@ import { SqidService } from '../common/sqid/sqid.service';
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
+    $transaction: jest.fn(),
     saUser: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -27,6 +28,7 @@ jest.mock('../common/permissions/check-permission', () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
+  $transaction: jest.Mock;
   saUser: {
     findMany: jest.Mock;
     findUnique: jest.Mock;
@@ -67,6 +69,7 @@ describe('UsersService', () => {
     }).compile();
     service = module.get(UsersService);
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation((fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma));
   });
 
   describe('listUsers', () => {

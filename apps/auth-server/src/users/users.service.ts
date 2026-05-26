@@ -125,44 +125,45 @@ export class UsersService {
 
     const baUserId = crypto.randomUUID();
     const now = new Date();
-
-    await prisma.user.create({
-      data: {
-        id: baUserId,
-        name: `${dto.firstName} ${dto.lastName}`,
-        email: dto.email,
-        emailVerified: false,
-        createdAt: now,
-        updatedAt: now,
-      },
-    });
-
-    const saUserPublicId = this.sqids.encode(Date.now() % 1_000_000);
-    const saUser = await prisma.saUser.create({
-      data: {
-        publicId: saUserPublicId,
-        betterAuthUserId: baUserId,
-        orgId: org.id,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        phoneNumber: dto.phoneNumber ?? null,
-        username: dto.username ?? null,
-        status: 'pending',
-      },
-      include: USER_INCLUDE,
-    });
-
     const token = crypto.randomBytes(32).toString('hex');
-    const invitePublicId = this.sqids.encode((Date.now() + 1) % 1_000_000);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const invitation = await prisma.saInvitation.create({
-      data: {
-        publicId: invitePublicId,
-        token,
-        userId: saUser.id,
-        expiresAt,
-      },
+    const { saUser, invitation } = await prisma.$transaction(async (tx) => {
+      await tx.user.create({
+        data: {
+          id: baUserId,
+          name: `${dto.firstName} ${dto.lastName}`,
+          email: dto.email,
+          emailVerified: false,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      const createdSaUser = await tx.saUser.create({
+        data: {
+          publicId: baUserId.slice(0, 12),
+          betterAuthUserId: baUserId,
+          orgId: org.id,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          phoneNumber: dto.phoneNumber ?? null,
+          username: dto.username ?? null,
+          status: 'pending',
+        },
+        include: USER_INCLUDE,
+      });
+
+      const createdInvitation = await tx.saInvitation.create({
+        data: {
+          publicId: baUserId.slice(12, 24),
+          token,
+          userId: createdSaUser.id,
+          expiresAt,
+        },
+      });
+
+      return { saUser: createdSaUser, invitation: createdInvitation };
     });
 
     const baseUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
