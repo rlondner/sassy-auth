@@ -1,0 +1,41 @@
+{
+  "name": "@sassy-auth/admin",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@sassy-auth/ui": "workspace:*",
+    "next": "^15.0.0",
+    "next-intl": "^3.26.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "ts-jest": "^29.2.0",
+    "typescript": "^5.4.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": ["@testing-library/jest-dom"],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1",
+      "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts"
+    },
+    "transformIgnorePatterns": ["node_modules/(?!(@sassy-auth)/)"]
+  }
+}
