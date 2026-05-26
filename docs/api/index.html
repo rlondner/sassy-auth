@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SassyAuth API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin: 0; background: #1a1a2e; }
+
+    /* Dark theme overrides */
+    .swagger-ui { filter: invert(1) hue-rotate(180deg); }
+    .swagger-ui .highlight-code,
+    .swagger-ui .microlight { filter: invert(1) hue-rotate(180deg); }
+
+    /* Header */
+    #sassy-header {
+      background: #0f0f1a;
+      border-bottom: 1px solid #2a2a4a;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #sassy-header h1 {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #7ec8e3;
+      letter-spacing: -0.02em;
+    }
+    #sassy-header .badge {
+      font-family: monospace;
+      font-size: 11px;
+      background: #1a3a5c;
+      color: #7ec8e3;
+      border: 1px solid #2a4a6a;
+      border-radius: 4px;
+      padding: 2px 8px;
+    }
+    #sassy-header .note {
+      margin-left: auto;
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      color: #666;
+    }
+    #sassy-header .note a { color: #7ec8e3; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div id="sassy-header">
+    <h1>SassyAuth API</h1>
+    <span class="badge">v1.0.0</span>
+    <span class="note">
+      BetterAuth routes (<code>/api/auth/*</code>) are not listed here — see
+      <a href="https://www.better-auth.com/docs" target="_blank">BetterAuth docs</a>
+    </span>
+  </div>
+
+  <div id="swagger-ui"></div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: './openapi.yaml',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      presets: [
+        SwaggerUIBundle.presets.apis,
+        SwaggerUIBundle.SwaggerUIStandalonePreset
+      ],
+      layout: 'BaseLayout',
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 2,
+      docExpansion: 'list',
+      tryItOutEnabled: true,
+      filter: true,
+      persistAuthorization: true,
+    });
+  </script>
+</body>
+</html>

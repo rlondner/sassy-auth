@@ -1,0 +1,1091 @@
+openapi: 3.0.3
+info:
+  title: SassyAuth API
+  description: |
+    Multi-tenant authentication and authorization server built on BetterAuth.
+
+    ## Authentication
+    Management API routes use **session cookies** issued by BetterAuth (`/api/auth/*`).
+    Resource server token endpoints use **app credentials** (`client_id` / `client_secret`).
+
+    ## Public IDs
+    All entity identifiers exposed in the API are **Sqid-encoded public IDs** (e.g. `"Uk3"`, `"mB9x"`).
+    Numeric internal IDs are never exposed.
+
+    ## Route prefixes
+    - `/api/auth/*` — handled by BetterAuth (sign-in, sign-up, social OAuth, magic link, OTP, sessions)
+    - `/api/token/*` — custom NestJS token issuance and JWKS
+    - `/api/apps`, `/api/orgs`, `/api/users`, `/api/permissions`, `/api/roles` — management APIs
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Token
+    description: JWT issuance for resource servers (OAuth2 + direct login)
+  - name: Apps
+    description: Manage resource server registrations
+  - name: Orgs
+    description: Manage tenant organizations
+  - name: Users
+    description: Manage users, role assignments, and direct permission grants
+  - name: Permissions
+    description: Manage app-scoped permissions
+  - name: Roles
+    description: Manage app-scoped roles and their permission assignments
+
+security:
+  - cookieAuth: []
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Session cookie issued by BetterAuth after sign-in via `/api/auth/sign-in/*`
+    clientCredentials:
+      type: http
+      scheme: basic
+      description: HTTP Basic — `client_id` as username, `client_secret` as password
+
+  schemas:
+    # ─── Entities ────────────────────────────────────────────────────────────
+
+    App:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Public ID (Sqid)
+          example: "Uk3mB9"
+        name:
+          type: string
+          example: "Invoicing App"
+        url:
+          type: string
+          example: "https://invoicing.example.com"
+        isPlatform:
+          type: boolean
+          description: True only for the built-in SassyAuth platform app
+          example: false
+      required: [id, name, url, isPlatform]
+
+    Org:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "xK2pLn"
+        name:
+          type: string
+          example: "Acme Corp"
+        appId:
+          type: string
+          description: Public ID of the associated app
+          example: "Uk3mB9"
+        isPlatform:
+          type: boolean
+          example: false
+      required: [id, name, appId, isPlatform]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "qR7sT1"
+        firstName:
+          type: string
+          example: "Alice"
+        lastName:
+          type: string
+          example: "Smith"
+        email:
+          type: string
+          format: email
+          example: "alice@example.com"
+        phoneNumber:
+          type: string
+          nullable: true
+          example: "+15551234567"
+        username:
+          type: string
+          nullable: true
+          example: "alice_s"
+        orgId:
+          type: string
+          description: Public ID of the user's organization
+          example: "xK2pLn"
+      required: [id, firstName, lastName, email, orgId]
+
+    Permission:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "pW4vHj"
+        name:
+          type: string
+          example: "invoices.create"
+        appId:
+          type: string
+          example: "Uk3mB9"
+      required: [id, name, appId]
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "rN6cYm"
+        name:
+          type: string
+          example: "sales_manager"
+        appId:
+          type: string
+          example: "Uk3mB9"
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+          description: Permissions assigned to this role
+      required: [id, name, appId]
+
+    EffectivePermissions:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: "qR7sT1"
+        permissions:
+          type: array
+          items:
+            type: string
+          description: Flat union of role permissions and direct grants
+          example: ["invoices.create", "reports.read", "sales_manager"]
+      required: [userId, permissions]
+
+    TokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: RS256-signed JWT for use with resource servers
+          example: "eyJhbGciOiJSUzI1NiJ9..."
+        expiresIn:
+          type: integer
+          description: Seconds until expiration (3600 = 1 hour)
+          example: 3600
+      required: [token, expiresIn]
+
+    JwksResponse:
+      type: object
+      description: JSON Web Key Set — standard JWKS document for RS256 public key
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            properties:
+              kty: { type: string, example: "RSA" }
+              use: { type: string, example: "sig" }
+              alg: { type: string, example: "RS256" }
+              kid: { type: string, example: "sassy-auth-2026" }
+              n:   { type: string, description: "RSA modulus (base64url)" }
+              e:   { type: string, example: "AQAB" }
+      required: [keys]
+
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 403
+        message:
+          type: string
+          example: "USER_ORG_MISMATCH"
+        error:
+          type: string
+          example: "Forbidden"
+      required: [statusCode, message, error]
+
+    # ─── Request bodies ───────────────────────────────────────────────────────
+
+    CreateAppRequest:
+      type: object
+      properties:
+        name: { type: string, example: "Invoicing App" }
+        url:  { type: string, example: "https://invoicing.example.com" }
+      required: [name, url]
+
+    UpdateAppRequest:
+      type: object
+      properties:
+        name: { type: string }
+        url:  { type: string }
+
+    CreateOrgRequest:
+      type: object
+      properties:
+        name:  { type: string, example: "Acme Corp" }
+        appId: { type: string, example: "Uk3mB9" }
+      required: [name, appId]
+
+    UpdateOrgRequest:
+      type: object
+      properties:
+        name: { type: string }
+
+    CreateUserRequest:
+      type: object
+      properties:
+        firstName:   { type: string, example: "Alice" }
+        lastName:    { type: string, example: "Smith" }
+        email:       { type: string, format: email, example: "alice@example.com" }
+        orgId:       { type: string, example: "xK2pLn" }
+        password:    { type: string, format: password, example: "s3cur3P@ss" }
+        phoneNumber: { type: string, nullable: true, example: "+15551234567" }
+        username:    { type: string, nullable: true, example: "alice_s" }
+      required: [firstName, lastName, email, orgId, password]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        firstName:   { type: string }
+        lastName:    { type: string }
+        phoneNumber: { type: string, nullable: true }
+        username:    { type: string, nullable: true }
+
+    CreatePermissionRequest:
+      type: object
+      properties:
+        name:  { type: string, example: "invoices.create" }
+        appId: { type: string, example: "Uk3mB9" }
+      required: [name, appId]
+
+    UpdatePermissionRequest:
+      type: object
+      properties:
+        name: { type: string }
+
+    CreateRoleRequest:
+      type: object
+      properties:
+        name:  { type: string, example: "sales_manager" }
+        appId: { type: string, example: "Uk3mB9" }
+      required: [name, appId]
+
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name: { type: string }
+
+    AssignPermissionRequest:
+      type: object
+      properties:
+        permissionId: { type: string, example: "pW4vHj" }
+      required: [permissionId]
+
+    AssignRoleRequest:
+      type: object
+      properties:
+        roleId: { type: string, example: "rN6cYm" }
+      required: [roleId]
+
+    DirectLoginRequest:
+      type: object
+      properties:
+        identifier:
+          type: string
+          description: Email address, phone number, or username
+          example: "alice@example.com"
+        password:
+          type: string
+          format: password
+        appId:
+          type: string
+          description: Public ID of the app to authenticate against
+          example: "Uk3mB9"
+      required: [identifier, password, appId]
+
+    OAuthTokenRequest:
+      type: object
+      properties:
+        grant_type:
+          type: string
+          enum: [authorization_code]
+        code:
+          type: string
+        redirect_uri:
+          type: string
+        client_id:
+          type: string
+        client_secret:
+          type: string
+      required: [grant_type, code, redirect_uri, client_id, client_secret]
+
+  responses:
+    Unauthorized:
+      description: Missing or expired session
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { statusCode: 401, message: "Unauthorized", error: "Unauthorized" }
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { statusCode: 404, message: "Not Found", error: "Not Found" }
+
+  parameters:
+    AppId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: App public ID (Sqid)
+      example: "Uk3mB9"
+    OrgId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Org public ID (Sqid)
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: User public ID (Sqid)
+    PermissionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Permission public ID (Sqid)
+    RoleId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Role public ID (Sqid)
+
+# ─── Paths ─────────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── Token ────────────────────────────────────────────────────────────────────
+
+  /api/token/jwks:
+    get:
+      tags: [Token]
+      summary: Get JWKS public key
+      description: Returns the RS256 public key as a standard JSON Web Key Set. Resource servers should cache this and use it to verify JWTs locally.
+      security: []
+      responses:
+        '200':
+          description: JWKS document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JwksResponse' }
+
+  /api/token/oauth/authorize:
+    get:
+      tags: [Token]
+      summary: OAuth2 authorization endpoint
+      description: |
+        Initiates the OAuth2 authorization code flow. The resource server redirects the user here.
+        SassyAuth presents the hosted login UI. On success, redirects to `redirect_uri` with `code` and `state`.
+      security: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema: { type: string }
+          description: App public ID (Sqid)
+        - name: redirect_uri
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+          description: Opaque value to prevent CSRF
+        - name: response_type
+          in: query
+          required: true
+          schema: { type: string, enum: [code] }
+      responses:
+        '302':
+          description: Redirect to hosted login UI (unauthenticated) or back to redirect_uri (authenticated)
+          headers:
+            Location:
+              schema: { type: string }
+        '400':
+          description: Invalid client_id or redirect_uri
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/token/oauth/token:
+    post:
+      tags: [Token]
+      summary: Exchange authorization code for JWT
+      description: |
+        Exchanges the short-lived authorization code for a signed RS256 JWT.
+        The JWT contains the user's effective permissions, org, and app audience.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/OAuthTokenRequest' }
+          application/json:
+            schema: { $ref: '#/components/schemas/OAuthTokenRequest' }
+      responses:
+        '200':
+          description: JWT issued successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400':
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: User not authorized for this app
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                orgMismatch:
+                  value: { statusCode: 403, message: "USER_ORG_MISMATCH", error: "Forbidden" }
+                appNotFound:
+                  value: { statusCode: 403, message: "APP_NOT_FOUND", error: "Forbidden" }
+
+  /api/token/direct/login:
+    post:
+      tags: [Token]
+      summary: Direct login — returns JWT immediately
+      description: |
+        First-party login flow. Authenticates the user via BetterAuth and returns a signed JWT
+        directly in the response body. Used by tightly-coupled first-party apps and the SassyAuth
+        Management UI itself.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DirectLoginRequest' }
+      responses:
+        '200':
+          description: JWT issued successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: User not authorized for this app
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                orgMismatch:
+                  value: { statusCode: 403, message: "USER_ORG_MISMATCH", error: "Forbidden" }
+                userNotFound:
+                  value: { statusCode: 403, message: "USER_NOT_FOUND", error: "Forbidden" }
+
+  # ── Apps ─────────────────────────────────────────────────────────────────────
+
+  /api/apps:
+    get:
+      tags: [Apps]
+      summary: List all apps
+      description: Requires `platform.apps.manage` permission.
+      responses:
+        '200':
+          description: List of apps
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/App' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Apps]
+      summary: Create an app
+      description: Requires `platform.apps.manage` permission.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAppRequest' }
+      responses:
+        '201':
+          description: App created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/App' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/apps/{id}:
+    parameters:
+      - $ref: '#/components/parameters/AppId'
+    get:
+      tags: [Apps]
+      summary: Get an app
+      description: Requires `platform.apps.manage` permission.
+      responses:
+        '200':
+          description: App details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/App' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Apps]
+      summary: Update an app
+      description: Requires `platform.apps.manage` permission. The platform app cannot be updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAppRequest' }
+      responses:
+        '200':
+          description: Updated app
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/App' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Apps]
+      summary: Delete an app
+      description: Requires `platform.apps.manage` permission. The platform app cannot be deleted.
+      responses:
+        '204':
+          description: App deleted
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Orgs ─────────────────────────────────────────────────────────────────────
+
+  /api/orgs:
+    get:
+      tags: [Orgs]
+      summary: List orgs
+      description: |
+        `platform.orgs.manage` — returns all orgs across all apps.
+        `org.users.manage` — returns only the caller's own org.
+      responses:
+        '200':
+          description: List of orgs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Org' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Orgs]
+      summary: Create an org
+      description: Requires `platform.orgs.manage` permission.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrgRequest' }
+      responses:
+        '201':
+          description: Org created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Org' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/orgs/{id}:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    get:
+      tags: [Orgs]
+      summary: Get an org
+      description: Requires `platform.orgs.manage` or `org.users.manage` (own org only).
+      responses:
+        '200':
+          description: Org details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Org' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Orgs]
+      summary: Update an org
+      description: Requires `platform.orgs.manage` permission. The platform org cannot be updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateOrgRequest' }
+      responses:
+        '200':
+          description: Updated org
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Org' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Orgs]
+      summary: Delete an org
+      description: Requires `platform.orgs.manage` permission. The platform org cannot be deleted.
+      responses:
+        '204':
+          description: Org deleted
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Users ────────────────────────────────────────────────────────────────────
+
+  /api/users:
+    get:
+      tags: [Users]
+      summary: List users
+      description: |
+        `platform.users.manage` — returns all users across all orgs.
+        `org.users.manage` — returns only users in the caller's org.
+      parameters:
+        - name: orgId
+          in: query
+          schema: { type: string }
+          description: Filter by org public ID
+        - name: appId
+          in: query
+          schema: { type: string }
+          description: Filter by app public ID
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      summary: Create a user
+      description: |
+        `platform.users.manage` — can assign user to any org.
+        `org.users.manage` — can only create users in the caller's own org.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUserRequest' }
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Users]
+      summary: Get a user
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Users]
+      summary: Update a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateUserRequest' }
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Users]
+      summary: Delete a user
+      responses:
+        '204':
+          description: User deleted
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/users/{id}/effective-permissions:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Users]
+      summary: Get user's effective permissions
+      description: Returns the union of all role permissions and direct grants for the user.
+      responses:
+        '200':
+          description: Effective permissions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EffectivePermissions' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/users/{id}/roles:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Users]
+      summary: List roles assigned to a user
+      responses:
+        '200':
+          description: Assigned roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Users]
+      summary: Assign a role to a user
+      description: Requires `platform.users.manage` or `org.users.manage` (own org only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignRoleRequest' }
+      responses:
+        '204':
+          description: Role assigned
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/users/{id}/roles/{roleId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+      - name: roleId
+        in: path
+        required: true
+        schema: { type: string }
+        description: Role public ID to remove
+    delete:
+      tags: [Users]
+      summary: Remove a role from a user
+      responses:
+        '204':
+          description: Role removed
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/users/{id}/permissions:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Users]
+      summary: List direct permission grants on a user
+      description: Returns only directly-granted permissions, not those inherited via roles.
+      responses:
+        '200':
+          description: Direct permission grants
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Permission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Users]
+      summary: Grant a permission directly to a user
+      description: Requires `platform.users.manage` or `org.permissions.manage` (own org only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignPermissionRequest' }
+      responses:
+        '204':
+          description: Permission granted
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/users/{id}/permissions/{permissionId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+      - name: permissionId
+        in: path
+        required: true
+        schema: { type: string }
+        description: Permission public ID to revoke
+    delete:
+      tags: [Users]
+      summary: Revoke a direct permission from a user
+      responses:
+        '204':
+          description: Permission revoked
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Permissions ───────────────────────────────────────────────────────────────
+
+  /api/permissions:
+    get:
+      tags: [Permissions]
+      summary: List permissions
+      description: |
+        `platform.permissions.manage` — returns all permissions including platform permissions.
+        `org.permissions.manage` — returns only permissions for the caller's org's app.
+      parameters:
+        - name: appId
+          in: query
+          schema: { type: string }
+          description: Filter by app public ID
+      responses:
+        '200':
+          description: List of permissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Permission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Permissions]
+      summary: Create an app permission
+      description: |
+        Requires `platform.permissions.manage` or `org.permissions.manage`.
+        Platform permissions (`platform.*`, `org.*`) cannot be created via this endpoint — they are seeded at boot.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePermissionRequest' }
+      responses:
+        '201':
+          description: Permission created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Permission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/permissions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PermissionId'
+    get:
+      tags: [Permissions]
+      summary: Get a permission
+      responses:
+        '200':
+          description: Permission details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Permission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Permissions]
+      summary: Update an app permission
+      description: Platform permissions are immutable and cannot be updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePermissionRequest' }
+      responses:
+        '200':
+          description: Updated permission
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Permission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Permissions]
+      summary: Delete an app permission
+      description: Platform permissions are immutable and cannot be deleted.
+      responses:
+        '204':
+          description: Permission deleted
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Roles ─────────────────────────────────────────────────────────────────────
+
+  /api/roles:
+    get:
+      tags: [Roles]
+      summary: List roles
+      description: |
+        `platform.permissions.manage` — returns all roles.
+        `org.permissions.manage` — returns only roles for the caller's org's app.
+      parameters:
+        - name: appId
+          in: query
+          schema: { type: string }
+          description: Filter by app public ID
+      responses:
+        '200':
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Roles]
+      summary: Create a role
+      description: Requires `platform.permissions.manage` or `org.permissions.manage`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateRoleRequest' }
+      responses:
+        '201':
+          description: Role created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/roles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RoleId'
+    get:
+      tags: [Roles]
+      summary: Get a role
+      responses:
+        '200':
+          description: Role details with assigned permissions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Roles]
+      summary: Update a role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateRoleRequest' }
+      responses:
+        '200':
+          description: Updated role
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Roles]
+      summary: Delete a role
+      responses:
+        '204':
+          description: Role deleted
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/roles/{id}/permissions:
+    parameters:
+      - $ref: '#/components/parameters/RoleId'
+    post:
+      tags: [Roles]
+      summary: Add a permission to a role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignPermissionRequest' }
+      responses:
+        '204':
+          description: Permission added to role
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/roles/{id}/permissions/{permissionId}:
+    parameters:
+      - $ref: '#/components/parameters/RoleId'
+      - name: permissionId
+        in: path
+        required: true
+        schema: { type: string }
+        description: Permission public ID to remove from role
+    delete:
+      tags: [Roles]
+      summary: Remove a permission from a role
+      responses:
+        '204':
+          description: Permission removed from role
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
