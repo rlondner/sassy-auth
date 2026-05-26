@@ -100,4 +100,46 @@ describe('UsersService', () => {
       await expect(service.getUser('ba-caller', 'usr1')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('getUserRoles', () => {
+    it('returns roles assigned to the user', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue({
+        ...makeSaUser(),
+        roles: [
+          { role: { publicId: 'role1', name: 'Platform Admin', app: { publicId: 'app1' }, permissions: [] } },
+        ],
+      });
+      const result = await service.getUserRoles('ba-caller', 'usr1');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('role1');
+      expect(result[0].name).toBe('Platform Admin');
+    });
+
+    it('throws NotFoundException when user not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.getUserRoles('ba-caller', 'usr1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('getEffectivePermissions', () => {
+    it('returns deduplicated union of role and direct permissions', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue({
+        ...makeSaUser(),
+        roles: [
+          { role: { permissions: [{ permission: { name: 'users:read' } }, { permission: { name: 'users:write' } }] } },
+        ],
+        directPermissions: [
+          { permission: { name: 'users:read' } },  // duplicate
+          { permission: { name: 'billing:manage' } },
+        ],
+      });
+      const result = await service.getEffectivePermissions('ba-caller', 'usr1');
+      expect(result.permissions).toEqual(['billing:manage', 'users:read', 'users:write']);
+    });
+
+    it('throws NotFoundException when user not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.getEffectivePermissions('ba-caller', 'usr1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });

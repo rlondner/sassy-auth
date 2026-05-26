@@ -65,9 +65,55 @@ export class UsersService {
     return formatUser(user);
   }
 
-  // Stubs — implemented in subsequent tasks
-  async getUserRoles(_callerBaId: string, _publicId: string): Promise<never> { throw new Error('not implemented'); }
-  async getEffectivePermissions(_callerBaId: string, _publicId: string): Promise<never> { throw new Error('not implemented'); }
+  async getUserRoles(callerBaId: string, publicId: string) {
+    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
+      await checkPermission(callerBaId, 'org.users.manage');
+    });
+
+    const user = await prisma.saUser.findUnique({
+      where: { publicId },
+      include: {
+        roles: {
+          include: {
+            role: { include: { app: { select: { publicId: true } }, permissions: { include: { permission: true } } } },
+          },
+        },
+      },
+    });
+    if (!user) throw new NotFoundException();
+
+    return user.roles.map((ur) => ({
+      id: ur.role.publicId,
+      name: ur.role.name,
+      appId: ur.role.app.publicId,
+      permissions: ur.role.permissions.map((rp) => ({
+        id: rp.permission.publicId,
+        name: rp.permission.name,
+        appId: ur.role.app.publicId,
+      })),
+    }));
+  }
+
+  async getEffectivePermissions(callerBaId: string, publicId: string) {
+    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
+      await checkPermission(callerBaId, 'org.users.manage');
+    });
+
+    const user = await prisma.saUser.findUnique({
+      where: { publicId },
+      include: {
+        roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        directPermissions: { include: { permission: true } },
+      },
+    });
+    if (!user) throw new NotFoundException();
+
+    const names = new Set<string>();
+    user.roles.forEach((ur) => ur.role.permissions.forEach((rp) => names.add(rp.permission.name)));
+    user.directPermissions.forEach((up) => names.add(up.permission.name));
+
+    return { userId: publicId, permissions: Array.from(names).sort() };
+  }
   async createUser(_callerBaId: string, _dto: CreateUserDto): Promise<never> { throw new Error('not implemented'); }
   async updateUser(_callerBaId: string, _publicId: string, _dto: UpdateUserDto): Promise<never> { throw new Error('not implemented'); }
   async deleteUser(_callerBaId: string, _publicId: string): Promise<void> { throw new Error('not implemented'); }
