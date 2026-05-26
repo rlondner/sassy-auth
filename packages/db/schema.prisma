@@ -103,10 +103,25 @@ model SaUser {
   status           UserStatus         @default(pending)
   roles            SaUserRole[]
   directPermissions SaUserPermission[]
+  invitations       SaInvitation[]
 
   @@index([orgId])
   @@index([username])
   @@index([phoneNumber])
+}
+
+model SaInvitation {
+  id        Int       @id @default(autoincrement())
+  publicId  String    @unique
+  token     String    @unique
+  userId    Int
+  user      SaUser    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
 }
 
 model SaPermission {
