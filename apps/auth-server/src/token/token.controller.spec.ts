@@ -1,0 +1,153 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { TokenController } from './token.controller';
+import { TokenService } from './token.service';
+import { OauthService } from './oauth.service';
+import { SqidService } from '../common/sqid/sqid.service';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { Response } from 'express';
+
+jest.mock('@sassy-auth/db', () => ({
+  prisma: {
+    saApp: { findUnique: jest.fn() },
+    saUser: { findUnique: jest.fn(), findFirst: jest.fn() },
+    account: { findFirst: jest.fn() },
+  },
+}));
+
+jest.mock('../auth/auth.config', () => ({
+  auth: { api: { getSession: jest.fn() } },
+}));
+
+jest.mock('bcryptjs', () => ({ compare: jest.fn().mockResolvedValue(true) }));
+
+import { prisma } from '@sassy-auth/db';
+
+const mockPrisma = prisma as unknown as {
+  saApp: { findUnique: jest.Mock };
+  saUser: { findUnique: jest.Mock; findFirst: jest.Mock };
+  account: { findFirst: jest.Mock };
+};
+
+const mockTokenService = {
+  issueJwt: jest.fn(),
+  getJwks: jest.fn(),
+  resolvePermissions: jest.fn(),
+};
+
+const mockOauthService = {
+  generateCode: jest.fn(),
+  exchangeCode: jest.fn(),
+};
+
+const mockSqidService = {
+  encode: jest.fn((id: number) => `sqid-${id}`),
+  decode: jest.fn((s: string) => parseInt(s.replace('sqid-', ''), 10)),
+};
+
+function makeResponse() {
+  const res = {
+    redirect: jest.fn(),
+  };
+  return res as unknown as Response;
+}
+
+describe('TokenController', () => {
+  let controller: TokenController;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [TokenController],
+      providers: [
+        { provide: TokenService, useValue: mockTokenService },
+        { provide: OauthService, useValue: mockOauthService },
+        { provide: SqidService, useValue: mockSqidService },
+      ],
+    }).compile();
+    controller = module.get(TokenController);
+    jest.clearAllMocks();
+  });
+
+  // ── GET /api/token/jwks ───────────────────────────────────────────────────
+
+  describe('getJwks', () => {
+    it('returns jwks from TokenService', () => {
+      const jwks = { keys: [{ kty: 'RSA' }] };
+      mockTokenService.getJwks.mockReturnValue(jwks);
+      expect(controller.getJwks()).toEqual(jwks);
+    });
+  });
+
+  // ── POST /api/token/direct/login ─────────────────────────────────────────
+
+  describe('directLogin', () => {
+    const app = { id: 10, publicId: 'sqid-10', isPlatform: false };
+    const baUser = { id: 'ba-1', email: 'user@example.com' };
+    const saUser = {
+      id: 1,
+      publicId: 'sqid-1',
+      betterAuthUserId: 'ba-1',
+      orgId: 5,
+      org: { id: 5, publicId: 'sqid-5', appId: 10 },
+    };
+    const account = { password: 'hashed', providerId: 'credential' };
+
+    it('throws ForbiddenException (USER_ORG_MISMATCH) when user org does not match app', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, id: 10 });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        ...saUser,
+        org: { id: 5, publicId: 'sqid-5', appId: 999 }, // different app
+        betterAuthUser: baUser,
+      });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+
+      // mock bcryptjs.compare to return true so we get past auth check
+      jest.mock('bcryptjs', () => ({ compare: jest.fn().mockResolvedValue(true) }));
+
+      await expect(
+        controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws NotFoundException when app does not exist', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+
+      const { NotFoundException } = await import('@nestjs/common');
+      await expect(
+        controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-99' }),
+      ).rejects.toThrow();
+    });
+  });
+
+  // ── POST /api/token/oauth/token ───────────────────────────────────────────
+
+  describe('oauthToken', () => {
+    it('returns access_token when code is valid', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+      });
+      const saUser = {
+        id: 1,
+        publicId: 'sqid-1',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      };
+      mockPrisma.saUser.findFirst.mockResolvedValue(saUser);
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10' });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+
+      const result = await controller.oauthToken({
+        code: 'valid-code',
+        client_id: 'sqid-10',
+        client_secret: 'secret',
+        redirect_uri: 'https://app.example.com/callback',
+      });
+
+      expect(result).toEqual({
+        access_token: 'oauth.jwt.token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      });
+    });
+  });
+});
