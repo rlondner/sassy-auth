@@ -1,0 +1,95 @@
+{
+  "nav": {
+    "apps": "Apps",
+    "orgs": "Orgs",
+    "users": "Users",
+    "roles": "Roles",
+    "permissions": "Permissions",
+    "support": "Support",
+    "signOut": "Sign Out",
+    "directory": "Directory",
+    "accessControl": "Access Control"
+  },
+  "users": {
+    "title": "Users",
+    "search": "Search users\u2026",
+    "addUser": "Add User",
+    "columns": {
+      "user": "User",
+      "status": "Status",
+      "org": "Org",
+      "lastLogin": "Last Login",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "pending": "Pending",
+      "inactive": "Inactive"
+    },
+    "noResults": "No users found.",
+    "drawer": {
+      "viewTitle": "User Details",
+      "createTitle": "New User",
+      "createSubtitle": "Add a user and assign initial org + role.",
+      "basicInfo": "Basic Information",
+      "accessPerms": "Access & Permissions",
+      "create": "Create User & Generate Invite",
+      "cancel": "Cancel",
+      "done": "Done",
+      "edit": "Edit",
+      "save": "Save",
+      "resetPassword": "Reset Password",
+      "grantAccess": "Grant Access",
+      "assignedRoles": "Assigned Roles",
+      "effectivePermissions": "Effective Permissions",
+      "nMorePermissions": "+ {count} more",
+      "inviteCreated": "User created \u2014 share this invitation link:",
+      "copyLink": "Copy Link",
+      "copied": "Copied!"
+    },
+    "fields": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "username": "Username",
+      "phone": "Phone Number",
+      "optional": "(optional)",
+      "org": "Organization",
+      "role": "Role",
+      "userId": "User ID",
+      "lastLogin": "Last Login",
+      "created": "Created",
+      "never": "Never",
+      "today": "Today at {time}",
+      "primary": "Primary"
+    },
+    "actions": {
+      "edit": "Edit",
+      "resetPassword": "Reset Password",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "delete": "Delete",
+      "resendInvitation": "Resend Invitation"
+    }
+  },
+  "login": {
+    "title": "Admin Console",
+    "subtitle": "Sign in to continue",
+    "email": "Email Address",
+    "password": "Password",
+    "submit": "Sign In",
+    "error": {
+      "invalidCredentials": "Invalid email or password.",
+      "inactive": "This account has been deactivated."
+    }
+  },
+  "acceptInvite": {
+    "title": "Set Your Password",
+    "subtitle": "Welcome, {firstName}. Choose a password to activate your account.",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "submit": "Activate Account",
+    "expired": "This invitation link has expired or is invalid. Contact your administrator for a new one.",
+    "success": "Account activated! You can now sign in."
+  }
+}

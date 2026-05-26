@@ -1,0 +1,95 @@
+{
+  "nav": {
+    "apps": "Applications",
+    "orgs": "Organisations",
+    "users": "Utilisateurs",
+    "roles": "R\u00f4les",
+    "permissions": "Permissions",
+    "support": "Assistance",
+    "signOut": "D\u00e9connexion",
+    "directory": "Annuaire",
+    "accessControl": "Contr\u00f4le d\u2019acc\u00e8s"
+  },
+  "users": {
+    "title": "Utilisateurs",
+    "search": "Rechercher des utilisateurs\u2026",
+    "addUser": "Ajouter un utilisateur",
+    "columns": {
+      "user": "Utilisateur",
+      "status": "Statut",
+      "org": "Organisation",
+      "lastLogin": "Derni\u00e8re connexion",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Actif",
+      "pending": "En attente",
+      "inactive": "Inactif"
+    },
+    "noResults": "Aucun utilisateur trouv\u00e9.",
+    "drawer": {
+      "viewTitle": "D\u00e9tails de l\u2019utilisateur",
+      "createTitle": "Nouvel utilisateur",
+      "createSubtitle": "Ajoutez un utilisateur et attribuez une organisation et un r\u00f4le.",
+      "basicInfo": "Informations g\u00e9n\u00e9rales",
+      "accessPerms": "Acc\u00e8s & Permissions",
+      "create": "Cr\u00e9er l\u2019utilisateur & g\u00e9n\u00e9rer l\u2019invitation",
+      "cancel": "Annuler",
+      "done": "Termin\u00e9",
+      "edit": "Modifier",
+      "save": "Enregistrer",
+      "resetPassword": "R\u00e9initialiser le mot de passe",
+      "grantAccess": "Accorder l\u2019acc\u00e8s",
+      "assignedRoles": "R\u00f4les attribu\u00e9s",
+      "effectivePermissions": "Permissions effectives",
+      "nMorePermissions": "+ {count} de plus",
+      "inviteCreated": "Utilisateur cr\u00e9\u00e9 \u2014 partagez ce lien d\u2019invitation\u00a0:",
+      "copyLink": "Copier le lien",
+      "copied": "Copi\u00e9\u00a0!"
+    },
+    "fields": {
+      "firstName": "Pr\u00e9nom",
+      "lastName": "Nom",
+      "email": "Adresse e-mail",
+      "username": "Nom d\u2019utilisateur",
+      "phone": "Num\u00e9ro de t\u00e9l\u00e9phone",
+      "optional": "(facultatif)",
+      "org": "Organisation",
+      "role": "R\u00f4le",
+      "userId": "Identifiant utilisateur",
+      "lastLogin": "Derni\u00e8re connexion",
+      "created": "Cr\u00e9\u00e9 le",
+      "never": "Jamais",
+      "today": "Aujourd\u2019hui \u00e0 {time}",
+      "primary": "Principal"
+    },
+    "actions": {
+      "edit": "Modifier",
+      "resetPassword": "R\u00e9initialiser le mot de passe",
+      "deactivate": "D\u00e9sactiver",
+      "activate": "Activer",
+      "delete": "Supprimer",
+      "resendInvitation": "Renvoyer l\u2019invitation"
+    }
+  },
+  "login": {
+    "title": "Console d\u2019administration",
+    "subtitle": "Connectez-vous pour continuer",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "submit": "Se connecter",
+    "error": {
+      "invalidCredentials": "E-mail ou mot de passe incorrect.",
+      "inactive": "Ce compte a \u00e9t\u00e9 d\u00e9sactiv\u00e9."
+    }
+  },
+  "acceptInvite": {
+    "title": "Choisissez votre mot de passe",
+    "subtitle": "Bienvenue, {firstName}. Choisissez un mot de passe pour activer votre compte.",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "submit": "Activer le compte",
+    "expired": "Ce lien d\u2019invitation a expir\u00e9 ou est invalide. Contactez votre administrateur pour en obtenir un nouveau.",
+    "success": "Compte activ\u00e9\u00a0! Vous pouvez maintenant vous connecter."
+  }
+}

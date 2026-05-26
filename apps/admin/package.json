@@ -31,7 +31,7 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "jsdom",
-    "setupFilesAfterEnv": ["@testing-library/jest-dom"],
+    "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts"
