@@ -218,6 +218,8 @@ Implemented with shadcn `Sheet` (side variant, ~52% viewport width).
 
 Same shadcn `Sheet` component, different content. Triggered by "Add User" in the header bar.
 
+**No password at creation time.** The admin never sets a password. Instead, the backend generates a unique invitation token and returns the invitation link. The admin copies it and shares it with the user (out of scope: email delivery). The user clicks the link, lands on `/accept-invite`, and sets their own password.
+
 **Structure:**
 
 ### Drawer header
@@ -230,7 +232,6 @@ Same shadcn `Sheet` component, different content. Triggered by "Add User" in the
 - First Name (required)
 - Last Name (required)
 - Email Address (required)
-- Initial Password (required) — admin sets a temporary password; user should change it on first login
 - Username (optional)
 - Phone Number (optional)
 
@@ -240,16 +241,37 @@ Same shadcn `Sheet` component, different content. Triggered by "Add User" in the
 
 ### Footer actions
 - Cancel (secondary) — closes drawer
-- Create User (primary) — submits Server Action
+- Create User & Generate Invite (primary) — submits Server Action
 
 **Server Action behavior:**
-1. Validates form fields (password min 8 chars)
-2. Calls `POST /api/users` with `{ firstName, lastName, email, orgId, password, username?, phoneNumber? }`
+1. Validates form fields
+2. Calls `POST /api/users` with `{ firstName, lastName, email, orgId, username?, phoneNumber? }` — no password
 3. Assigns the selected role via `POST /api/users/{id}/roles`
-4. On success: closes drawer, calls `revalidatePath('/users')` to refresh table
+4. On success: drawer transitions to a **confirmation state** showing:
+   - "User created — share this invitation link:" 
+   - The full invitation URL in a read-only input with a one-click copy button
+   - "Done" button closes drawer and calls `revalidatePath('/users')`
 5. On error: surfaces inline error message in drawer (e.g. email already exists)
 
-**New user status:** `active` on creation (admin provides an initial password). The `pending` status is reserved for a future invite-by-email flow where the user sets their own password.
+**New user status:** `pending` on creation (no credentials yet). Becomes `active` when the user accepts the invite and sets their password.
+
+### Resend Invitation
+
+The `···` dropdown on a `pending` user row includes a **"Resend Invitation"** action. This calls `POST /api/users/{id}/resend-invitation`, which:
+1. Invalidates all existing unused tokens for that user
+2. Generates a new `SaInvitation` token
+3. Returns the new invitation URL for display in a toast with a copy button
+
+### `/accept-invite` page (outside `(admin)` route group — unauthenticated)
+
+Route: `app/accept-invite/page.tsx`
+
+1. Reads `?token=` query param
+2. Calls `GET /api/invitations/{token}` — validates token, returns `{ firstName, email, expired: boolean }`
+3. If expired or invalid: shows error state with "Request a new invite" message
+4. If valid: shows "Set your password" form (password + confirm password)
+5. On submit: calls `POST /api/invitations/{token}/accept` with `{ password }`
+6. On success: BetterAuth creates the `Account` row with hashed password; `SaUser.status` → `active`; redirect to `/login`
 
 ---
 
@@ -361,31 +383,115 @@ The JWT issuance endpoints (`/api/token/*`) are for resource servers authenticat
 
 ---
 
-## 9. API Extensions Required
+## 9. Database Schema Changes (`packages/db/schema.prisma`)
 
-The existing `openapi.yaml` needs two additions:
+### Add `UserStatus` enum and `status` field to `SaUser`
 
-### Add `status` field to `User` schema
+`status` lives on `SaUser` (the SassyAuth extension), not on BetterAuth's `User` table.
+
+```prisma
+enum UserStatus {
+  active
+  pending
+  inactive
+}
+
+model SaUser {
+  // ... existing fields ...
+  status      UserStatus   @default(pending)
+  invitations SaInvitation[]
+}
+```
+
+### Add `SaInvitation` model
+
+```prisma
+model SaInvitation {
+  id        Int       @id @default(autoincrement())
+  publicId  String    @unique               // Sqid
+  token     String    @unique               // 32-byte cryptographically random hex — used in the URL
+  userId    Int
+  user      SaUser    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime                        // default: now + 7 days
+  usedAt    DateTime?                       // null = not yet accepted
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+```
+
+**Notes:**
+- The `token` is raw random bytes (e.g. `crypto.randomBytes(32).toString('hex')`) — never encrypted, never stored hashed. It is long enough (256 bits) to be unguessable and is transmitted only over HTTPS. It is single-use (`usedAt` set on acceptance) and expires after 7 days.
+- BetterAuth stores the hashed password in its `Account` table. At creation time no `Account` row is created for the user. The `POST /api/invitations/{token}/accept` endpoint calls BetterAuth's sign-up to create the `Account` row when the user sets their password.
+- A migration file must be added under `packages/db/migrations/`.
+
+---
+
+## 10. API Extensions Required
+
+The existing `openapi.yaml` requires the following additions:
+
+### `User` schema — add `status`
 ```yaml
 status:
   type: string
   enum: [active, pending, inactive]
   description: >
     active — signed up and enabled;
-    pending — invited by admin, has not registered yet;
+    pending — invited, has not accepted invite yet;
     inactive — disabled by admin
 ```
 
-- `GET /api/users` response includes `status`
-- `PATCH /api/users/{id}` accepts `status` in `UpdateUserRequest` (to activate/deactivate)
-- `POST /api/users` defaults to `pending` (admin-created users must set their own password)
+### `CreateUserRequest` — remove `password`
+`password` is no longer accepted. The backend generates the invitation token automatically.
+
+### `UpdateUserRequest` — add `status`
+```yaml
+status:
+  type: string
+  enum: [active, inactive]
+  description: Activate or deactivate the user. Cannot be set to pending via this endpoint.
+```
+
+### New: `Invitation` schema
+```yaml
+Invitation:
+  type: object
+  properties:
+    token:     { type: string }
+    inviteUrl: { type: string, description: "Full URL for the accept-invite page" }
+    expiresAt: { type: string, format: date-time }
+  required: [token, inviteUrl, expiresAt]
+```
+
+### New endpoints
+
+**`POST /api/users/{id}/resend-invitation`**
+- Requires `platform.users.manage` or `org.users.manage`
+- Invalidates all existing unused tokens for the user
+- Creates a new `SaInvitation`, returns `Invitation`
+- 400 if user is already `active` or `inactive`
+
+**`GET /api/invitations/{token}`**
+- Public (no auth required)
+- Returns `{ firstName, email, expired: boolean }`
+- 404 if token does not exist
+
+**`POST /api/invitations/{token}/accept`**
+- Public (no auth required)
+- Body: `{ password: string }` (min 8 chars)
+- Validates token not expired and not already used
+- Calls BetterAuth internally to create the `Account` credential row
+- Sets `SaUser.status = active`, `SaInvitation.usedAt = now()`, `User.emailVerified = true`
+- Returns 204 on success; 400 if token expired/used; 422 if password too weak
 
 ---
 
-## 10. Out of Scope (this spec)
+## 11. Out of Scope (this spec)
 
 - Apps, Orgs, Roles, Permissions management pages (same `packages/ui` components, separate specs)
-- Invite-by-email flow (pending → active transition)
+- Email delivery of invitation links (infrastructure TBD — link is displayed in UI for now)
 - Password reset email flow
 - Social provider management per user
 - Pagination / infinite scroll on the users table (can be added once real data volume is known)
