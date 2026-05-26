@@ -96,6 +96,10 @@ model SaUser {
   username         String?
   roles            SaUserRole[]
   directPermissions SaUserPermission[]
+
+  @@index([orgId])
+  @@index([username])
+  @@index([phoneNumber])
 }
 
 model SaPermission {
@@ -106,6 +110,8 @@ model SaPermission {
   app      SaApp              @relation(fields: [appId], references: [id])
   roles    SaRolePermission[]
   users    SaUserPermission[]
+
+  @@index([appId])
 }
 
 model SaRole {
@@ -116,13 +122,15 @@ model SaRole {
   app         SaApp              @relation(fields: [appId], references: [id])
   permissions SaRolePermission[]
   users       SaUserRole[]
+
+  @@index([appId])
 }
 
 model SaRolePermission {
   roleId       Int
   permissionId Int
-  role         SaRole       @relation(fields: [roleId], references: [id])
-  permission   SaPermission @relation(fields: [permissionId], references: [id])
+  role         SaRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   SaPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
 }
@@ -130,8 +138,8 @@ model SaRolePermission {
 model SaUserRole {
   userId Int
   roleId Int
-  user   SaUser @relation(fields: [userId], references: [id])
-  role   SaRole @relation(fields: [roleId], references: [id])
+  user   SaUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   SaRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
 }
@@ -139,8 +147,8 @@ model SaUserRole {
 model SaUserPermission {
   userId       Int
   permissionId Int
-  user         SaUser       @relation(fields: [userId], references: [id])
-  permission   SaPermission @relation(fields: [permissionId], references: [id])
+  user         SaUser       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   SaPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([userId, permissionId])
 }
