@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SassyAuth - User Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#dae2fd",
+                        "on-surface-variant": "#464555",
+                        "error-container": "#ffdad6",
+                        "secondary": "#565e74",
+                        "on-primary-fixed": "#0f0069",
+                        "inverse-surface": "#213145",
+                        "background": "#f8f9ff",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary-fixed-dim": "#c0c1ff",
+                        "surface-dim": "#cbdbf5",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "error": "#ba1a1a",
+                        "on-surface": "#0b1c30",
+                        "on-secondary-container": "#5c647a",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#777587",
+                        "primary-fixed": "#e2dfff",
+                        "tertiary": "#3130c0",
+                        "on-background": "#0b1c30",
+                        "on-error-container": "#93000a",
+                        "on-primary-container": "#dad7ff",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#c7c4d8",
+                        "surface-container-low": "#eff4ff",
+                        "surface": "#f8f9ff",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "surface-variant": "#d3e4fe",
+                        "secondary-fixed-dim": "#bec6e0",
+                        "on-tertiary-fixed-variant": "#2f2ebe",
+                        "secondary-fixed": "#dae2fd",
+                        "on-tertiary-fixed": "#07006c",
+                        "on-tertiary-container": "#d9d8ff",
+                        "surface-tint": "#4d44e3",
+                        "primary": "#3525cd",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-secondary-fixed-variant": "#3f465c",
+                        "on-secondary-fixed": "#131b2e",
+                        "surface-bright": "#f8f9ff",
+                        "on-error": "#ffffff",
+                        "inverse-primary": "#c3c0ff",
+                        "tertiary-container": "#4b4dd8",
+                        "primary-container": "#4f46e5",
+                        "surface-container-high": "#dce9ff",
+                        "surface-container": "#e5eeff",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#e1e0ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "pane-detail": "auto",
+                        "container-padding": "24px",
+                        "gutter": "1px",
+                        "stack-sm": "8px",
+                        "stack-lg": "32px",
+                        "pane-master": "380px",
+                        "stack-md": "16px",
+                        "pane-nav": "260px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "body-sm": ["Manrope"],
+                        "label-sm": ["Manrope"],
+                        "label-md": ["Manrope"],
+                        "headline-sm": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "body-md": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "700" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="bg-inverse-surface dark:bg-surface-container-lowest text-primary-fixed dark:text-primary font-label-md text-label-md w-pane-nav h-screen fixed left-0 top-0 border-r border-outline-variant flex flex-col h-full py-stack-md z-10">
+<div class="px-container-padding mb-stack-lg">
+<h1 class="font-headline-sm text-headline-sm text-surface-bright">SassyAuth</h1>
+<p class="font-body-sm text-body-sm text-on-secondary-fixed-variant mt-1">Admin Console</p>
+</div>
+<div class="px-container-padding mb-stack-md">
+<button class="w-full bg-primary text-on-primary rounded font-label-md text-label-md py-2 px-4 hover:bg-primary-container transition-colors duration-200 cursor-pointer active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                Invite Member
+            </button>
+</div>
+<ul class="flex-1 overflow-y-auto mt-stack-md">
+<!-- Inactive -->
+<li class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95 px-container-padding">
+<span class="material-symbols-outlined" data-icon="apps">apps</span>
+                Apps
+            </li>
+<!-- Inactive -->
+<li class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95 px-container-padding">
+<span class="material-symbols-outlined" data-icon="corporate_fare">corporate_fare</span>
+                Orgs
+            </li>
+<!-- Active -->
+<li class="text-primary-fixed border-l-2 border-primary-fixed pl-4 flex items-center gap-3 py-3 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95 px-container-padding bg-on-surface-variant/5">
+<span class="material-symbols-outlined" data-icon="group" data-weight="fill" style="font-variation-settings: 'FILL' 1;">group</span>
+                Users
+            </li>
+<!-- Inactive -->
+<li class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95 px-container-padding">
+<span class="material-symbols-outlined" data-icon="verified_user">verified_user</span>
+                Roles
+            </li>
+<!-- Inactive -->
+<li class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95 px-container-padding">
+<span class="material-symbols-outlined" data-icon="vpn_key">vpn_key</span>
+                Permissions
+            </li>
+</ul>
+<ul class="mt-auto border-t border-outline-variant/30 pt-stack-md">
+<li class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95 px-container-padding">
+<span class="material-symbols-outlined" data-icon="contact_support">contact_support</span>
+                Support
+            </li>
+<li class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95 px-container-padding">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                Sign Out
+            </li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-[260px] flex-1 flex flex-col h-screen bg-surface-container-lowest">
+<!-- Header -->
+<header class="h-16 border-b border-outline-variant flex items-center justify-between px-container-padding bg-surface-container-lowest sticky top-0 z-10">
+<h2 class="font-headline-md text-headline-md text-on-surface">Users</h2>
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+<input class="pl-9 pr-4 py-1.5 border border-outline-variant rounded font-body-sm text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none w-64 transition-all bg-surface-bright" placeholder="Search users..." type="text"/>
+</div>
+<button class="p-1.5 border border-outline-variant rounded text-on-surface-variant hover:text-primary hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+</button>
+<button class="bg-primary text-on-primary rounded font-label-md text-label-md py-1.5 px-4 hover:bg-primary-container transition-colors duration-200 cursor-pointer active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                    Add User
+                </button>
+</div>
+</header>
+<!-- Table Container -->
+<div class="flex-1 overflow-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low sticky top-0 z-0">
+<tr>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-container-padding border-b border-outline-variant font-semibold">User</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-semibold">Status</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-semibold">Role</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-semibold">Last Login</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-container-padding border-b border-outline-variant text-right font-semibold">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm text-on-surface">
+<!-- Row 1 -->
+<tr class="group hover:bg-surface-container-highest transition-colors border-b border-outline-variant/50 relative">
+<!-- Active indicator line -->
+<td class="absolute left-0 top-0 bottom-0 w-[2px] bg-transparent group-hover:bg-primary transition-colors"></td>
+<td class="py-3 px-container-padding flex items-center gap-3">
+<img alt="Avatar" class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A professional headshot of a young woman with dark hair in a sleek, modern office setting. The lighting is soft and natural, emphasizing a clean, corporate aesthetic consistent with a premium admin dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCz6ZkPLz1raih2Yd-RmKT7r3ZiuIHyyBer2ryyw3v-9yx4yLXnqtRapYD6CM3LcWXmXwnO44TcQLTu1FCB4ffUqszd8OVnSichHrKuffk2Z5XOOkRuxQBS82QNsC5OQkC1uVoN_aewYYc4p_puYEd50_siwZqnL7Y5gcmvdAXtbEK91chQIk1TZKsp03DLIkmA-bUidNyiBlekWt0eq_xY_Zxhz5iUvBZORTZh053pRq2OOkSQ9Gj1KmKnfLq3nCWO6YABzeG9F3V1"/>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-surface text-[14px]">Alice Smith</div>
+<div class="text-on-surface-variant text-[12px]">alice@example.com</div>
+</div>
+</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container-high text-primary font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                Active
+                            </span>
+</td>
+<td class="py-3 px-4 text-on-surface-variant">Admin</td>
+<td class="py-3 px-4 text-on-surface-variant">2 mins ago</td>
+<td class="py-3 px-container-padding text-right">
+<button class="text-outline hover:text-primary transition-colors p-1 rounded hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="group hover:bg-surface-container-highest transition-colors border-b border-outline-variant/50 relative">
+<td class="absolute left-0 top-0 bottom-0 w-[2px] bg-transparent group-hover:bg-primary transition-colors"></td>
+<td class="py-3 px-container-padding flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-primary border border-outline-variant flex items-center justify-center font-label-md text-label-md">BJ</div>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-surface text-[14px]">Bob Jones</div>
+<div class="text-on-surface-variant text-[12px]">bob@example.com</div>
+</div>
+</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container-high text-primary font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                Active
+                            </span>
+</td>
+<td class="py-3 px-4 text-on-surface-variant">Editor</td>
+<td class="py-3 px-4 text-on-surface-variant">1 hour ago</td>
+<td class="py-3 px-container-padding text-right">
+<button class="text-outline hover:text-primary transition-colors p-1 rounded hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="group hover:bg-surface-container-highest transition-colors border-b border-outline-variant/50 relative">
+<td class="absolute left-0 top-0 bottom-0 w-[2px] bg-transparent group-hover:bg-primary transition-colors"></td>
+<td class="py-3 px-container-padding flex items-center gap-3">
+<img alt="Avatar" class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A professional headshot of a middle-aged man with glasses in a sleek, modern office setting. The lighting is soft and natural, emphasizing a clean, corporate aesthetic consistent with a premium admin dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoRHZeo-QQGyW6H7nT5fC5X_vtkOOb68YvuuqDCtz7LIKD5NCTyMehc2UMN6FBWya1U15NwcucuSTkYFc4S-DXHKFs3uGR1UT0DRI9v2TzjyFlsbilLEplZ6p5600-rVlsGa7H6mnEpCtnzk4Ib31KCiInohW00LLAct7pxmmEc7o3pkIb601XU3QH1QDetD5fcMxqtnDHVZx2gpdyPcAxjo7Fdk2F0N3ZmFRkbiU68ODBc6O2KnDjjNzENL-WpgUfbcdfvB3FT7cj"/>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-surface text-[14px]">Charlie Davis</div>
+<div class="text-on-surface-variant text-[12px]">charlie@example.com</div>
+</div>
+</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                Inactive
+                            </span>
+</td>
+<td class="py-3 px-4 text-on-surface-variant">Viewer</td>
+<td class="py-3 px-4 text-on-surface-variant">2 days ago</td>
+<td class="py-3 px-container-padding text-right">
+<button class="text-outline hover:text-primary transition-colors p-1 rounded hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</main>
+</body></html>

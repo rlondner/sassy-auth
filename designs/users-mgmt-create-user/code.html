@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Create New User - SassyAuth</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary": "#ffffff",
+                      "secondary-container": "#dae2fd",
+                      "on-surface-variant": "#464555",
+                      "error-container": "#ffdad6",
+                      "secondary": "#565e74",
+                      "on-primary-fixed": "#0f0069",
+                      "inverse-surface": "#213145",
+                      "background": "#f8f9ff",
+                      "surface-container-highest": "#d3e4fe",
+                      "tertiary-fixed-dim": "#c0c1ff",
+                      "surface-dim": "#cbdbf5",
+                      "on-primary-fixed-variant": "#3323cc",
+                      "error": "#ba1a1a",
+                      "on-surface": "#0b1c30",
+                      "on-secondary-container": "#5c647a",
+                      "on-tertiary": "#ffffff",
+                      "outline": "#777587",
+                      "primary-fixed": "#e2dfff",
+                      "tertiary": "#3130c0",
+                      "on-background": "#0b1c30",
+                      "on-error-container": "#93000a",
+                      "on-primary-container": "#dad7ff",
+                      "surface-container-lowest": "#ffffff",
+                      "outline-variant": "#c7c4d8",
+                      "surface-container-low": "#eff4ff",
+                      "surface": "#f8f9ff",
+                      "primary-fixed-dim": "#c3c0ff",
+                      "surface-variant": "#d3e4fe",
+                      "secondary-fixed-dim": "#bec6e0",
+                      "on-tertiary-fixed-variant": "#2f2ebe",
+                      "secondary-fixed": "#dae2fd",
+                      "on-tertiary-fixed": "#07006c",
+                      "on-tertiary-container": "#d9d8ff",
+                      "surface-tint": "#4d44e3",
+                      "primary": "#3525cd",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-secondary-fixed-variant": "#3f465c",
+                      "on-secondary-fixed": "#131b2e",
+                      "surface-bright": "#f8f9ff",
+                      "on-error": "#ffffff",
+                      "inverse-primary": "#c3c0ff",
+                      "tertiary-container": "#4b4dd8",
+                      "primary-container": "#4f46e5",
+                      "surface-container-high": "#dce9ff",
+                      "surface-container": "#e5eeff",
+                      "on-primary": "#ffffff",
+                      "tertiary-fixed": "#e1e0ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "pane-detail": "auto",
+                      "container-padding": "24px",
+                      "gutter": "1px",
+                      "stack-sm": "8px",
+                      "stack-lg": "32px",
+                      "pane-master": "380px",
+                      "stack-md": "16px",
+                      "pane-nav": "260px"
+              },
+              "fontFamily": {
+                      "headline-md": [
+                              "Manrope"
+                      ],
+                      "headline-lg": [
+                              "Manrope"
+                      ],
+                      "body-sm": [
+                              "Manrope"
+                      ],
+                      "label-sm": [
+                              "Manrope"
+                      ],
+                      "label-md": [
+                              "Manrope"
+                      ],
+                      "headline-sm": [
+                              "Manrope"
+                      ],
+                      "body-lg": [
+                              "Manrope"
+                      ],
+                      "body-md": [
+                              "Manrope"
+                      ]
+              },
+              "fontSize": {
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "30px",
+                              {
+                                      "lineHeight": "36px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-sm": [
+                              "11px",
+                              {
+                                      "lineHeight": "14px",
+                                      "letterSpacing": "0.03em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-sm": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        body { background-color: #f8f9ff; } /* Base level 0 canvas */
+      </style>
+</head>
+<body class="text-on-surface antialiased flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-inverse-surface dark:bg-surface-container-lowest text-primary-fixed dark:text-primary font-label-md text-label-md w-pane-nav h-screen fixed left-0 top-0 border-r border-outline-variant flex flex-col h-full py-stack-md z-40 hidden md:flex">
+<div class="px-6 mb-8 flex flex-col gap-2">
+<h1 class="font-headline-sm text-headline-sm text-surface-bright">SassyAuth</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Admin Console</p>
+</div>
+<div class="flex-1 overflow-y-auto">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">apps</span>
+                        Apps
+                    </a>
+</li>
+<li>
+<a class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">corporate_fare</span>
+                        Orgs
+                    </a>
+</li>
+<li>
+<a class="text-primary-fixed border-l-2 border-primary-fixed pl-4 flex items-center gap-3 py-3 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95 bg-on-surface-variant/5" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+                        Users
+                    </a>
+</li>
+<li>
+<a class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">verified_user</span>
+                        Roles
+                    </a>
+</li>
+<li>
+<a class="text-on-secondary-fixed-variant flex items-center gap-3 py-3 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">vpn_key</span>
+                        Permissions
+                    </a>
+</li>
+</ul>
+</div>
+<div class="px-4 mt-auto pt-4 border-t border-outline-variant/20">
+<button class="w-full bg-primary text-on-primary py-2 px-4 rounded font-label-md text-label-md hover:bg-primary-container hover:text-on-primary-container transition-colors duration-200 mb-4 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                 Invite Member
+             </button>
+<ul class="flex flex-col gap-1">
+<li>
+<a class="text-on-secondary-fixed-variant flex items-center gap-3 py-2 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">contact_support</span>
+                        Support
+                    </a>
+</li>
+<li>
+<a class="text-on-secondary-fixed-variant flex items-center gap-3 py-2 pl-4 hover:bg-on-surface-variant/10 transition-all duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">logout</span>
+                        Sign Out
+                    </a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-[260px] flex flex-col min-h-screen bg-surface">
+<!-- Top Navigation Area (Mobile Only) -->
+<header class="md:hidden bg-surface-container-lowest border-b border-outline-variant w-full h-16 flex justify-between items-center px-container-padding sticky top-0 z-50">
+<div class="font-headline-sm text-headline-sm font-bold text-primary">SassyAuth</div>
+<button class="text-on-surface-variant"><span class="material-symbols-outlined">menu</span></button>
+</header>
+<!-- Detail Pane / Workspace -->
+<div class="flex-1 overflow-y-auto p-container-padding lg:p-10 flex justify-center items-start">
+<div class="w-full max-w-3xl bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden flex flex-col">
+<!-- Form Header -->
+<div class="border-b border-outline-variant p-6 bg-surface-container-lowest">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-1">Create New User</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Add a new user to the system and assign their initial roles.</p>
+</div>
+<!-- Form Body -->
+<form class="p-6 md:p-8 flex flex-col gap-stack-lg flex-1">
+<!-- Basic Info Section -->
+<div class="flex flex-col gap-stack-md">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest border-b border-outline-variant pb-2">Basic Information</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="firstName">First Name</label>
+<input class="form-input border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md bg-surface-container-lowest w-full transition-colors" id="firstName" name="firstName" placeholder="e.g. Jane" required="" type="text"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="lastName">Last Name</label>
+<input class="form-input border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md bg-surface-container-lowest w-full transition-colors" id="lastName" name="lastName" placeholder="e.g. Doe" required="" type="text"/>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="email">Email Address</label>
+<input class="form-input border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md bg-surface-container-lowest w-full transition-colors" id="email" name="email" placeholder="jane.doe@example.com" required="" type="email"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="username">Username <span class="text-on-surface-variant font-normal">(Optional)</span></label>
+<input class="form-input border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md bg-surface-container-lowest w-full transition-colors" id="username" name="username" placeholder="janedoe99" type="text"/>
+</div>
+</div>
+<div class="flex flex-col gap-1 max-w-md">
+<label class="font-label-md text-label-md text-on-surface" for="phone">Phone Number <span class="text-on-surface-variant font-normal">(Optional)</span></label>
+<input class="form-input border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md bg-surface-container-lowest w-full transition-colors" id="phone" name="phone" placeholder="+1 (555) 000-0000" type="tel"/>
+</div>
+</div>
+<!-- Organization & Role Section -->
+<div class="flex flex-col gap-stack-md pt-4">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest border-b border-outline-variant pb-2">Access &amp; Permissions</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="organization">Organization</label>
+<select class="form-select border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md bg-surface-container-lowest w-full transition-colors" id="organization" name="organization" required="">
+<option disabled="" selected="" value="">Select Organization</option>
+<option value="acme">Acme Corp</option>
+<option value="globex">Globex Corporation</option>
+<option value="soylent">Soylent Corp</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="role">System Role</label>
+<select class="form-select border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md bg-surface-container-lowest w-full transition-colors" id="role" name="role" required="">
+<option disabled="" selected="" value="">Select Role</option>
+<option value="admin">Administrator</option>
+<option value="manager">Manager</option>
+<option value="user">Standard User</option>
+<option value="viewer">Viewer</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Status Section -->
+<div class="flex flex-col gap-stack-md pt-4">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest border-b border-outline-variant pb-2">Account Status</h3>
+<div class="flex items-center gap-4">
+<label class="flex items-center cursor-pointer relative">
+<input checked="" class="sr-only peer" id="statusToggle" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+<span class="ml-3 font-body-md text-body-md text-on-surface" id="statusLabel">Active</span>
+</label>
+</div>
+</div>
+<!-- Form Actions (Sticky Bottom in a real app, but absolute here for card) -->
+<div class="mt-auto pt-8 flex justify-end gap-3 border-t border-outline-variant/50">
+<button class="px-4 py-2 font-label-md text-label-md text-on-surface border border-outline-variant rounded hover:bg-surface-container-low transition-colors duration-200" type="button">
+                            Cancel
+                        </button>
+<button class="px-6 py-2 font-label-md text-label-md text-on-primary bg-primary rounded hover:bg-primary-container hover:text-on-primary-container transition-colors duration-200" type="submit">
+                            Create User
+                        </button>
+</div>
+</form>
+</div>
+</div>
+</main>
+<script>
+        // Simple toggle logic for the label
+        const statusToggle = document.getElementById('statusToggle');
+        const statusLabel = document.getElementById('statusLabel');
+
+        statusToggle.addEventListener('change', (e) => {
+            if(e.target.checked) {
+                statusLabel.textContent = 'Active';
+            } else {
+                statusLabel.textContent = 'Inactive';
+            }
+        });
+    </script>
+</body></html>
