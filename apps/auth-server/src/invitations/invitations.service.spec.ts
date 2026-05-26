@@ -1,0 +1,105 @@
+import { Test } from '@nestjs/testing';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { InvitationsService } from './invitations.service';
+
+jest.mock('@sassy-auth/db', () => ({
+  prisma: {
+    saInvitation: { findUnique: jest.fn(), update: jest.fn() },
+    saUser: { update: jest.fn() },
+    user: { update: jest.fn() },
+    account: { create: jest.fn() },
+  },
+}));
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockPrisma = require('@sassy-auth/db').prisma as {
+  saInvitation: { findUnique: jest.Mock; update: jest.Mock };
+  saUser: { update: jest.Mock };
+  user: { update: jest.Mock };
+  account: { create: jest.Mock };
+};
+
+const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+const pastDate = new Date(Date.now() - 1000);
+
+const validInvitation = {
+  id: 1,
+  token: 'abc123',
+  usedAt: null,
+  expiresAt: futureDate,
+  user: {
+    id: 1,
+    publicId: 'usr1',
+    firstName: 'Jane',
+    status: 'pending',
+    betterAuthUserId: 'ba-jane',
+    betterAuthUser: { id: 'ba-jane', email: 'jane@example.com' },
+  },
+};
+
+describe('InvitationsService', () => {
+  let service: InvitationsService;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [InvitationsService],
+    }).compile();
+    service = module.get(InvitationsService);
+    jest.clearAllMocks();
+  });
+
+  describe('validateToken', () => {
+    it('returns user info for a valid, unexpired token', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(validInvitation);
+      const result = await service.validateToken('abc123');
+      expect(result.firstName).toBe('Jane');
+      expect(result.email).toBe('jane@example.com');
+      expect(result.expired).toBe(false);
+    });
+
+    it('returns expired:true for an expired token', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue({ ...validInvitation, expiresAt: pastDate });
+      const result = await service.validateToken('abc123');
+      expect(result.expired).toBe(true);
+    });
+
+    it('throws NotFoundException for unknown token', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(null);
+      await expect(service.validateToken('unknown')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('acceptInvitation', () => {
+    it('creates Account, activates SaUser, marks invitation used', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(validInvitation);
+      mockPrisma.account.create.mockResolvedValue(undefined);
+      mockPrisma.saUser.update.mockResolvedValue(undefined);
+      mockPrisma.user.update.mockResolvedValue(undefined);
+      mockPrisma.saInvitation.update.mockResolvedValue(undefined);
+
+      await expect(service.acceptInvitation('abc123', 'NewP@ss1')).resolves.toBeUndefined();
+
+      expect(mockPrisma.account.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ providerId: 'credential', userId: 'ba-jane' }),
+        }),
+      );
+      expect(mockPrisma.saUser.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'active' } }),
+      );
+      expect(mockPrisma.saInvitation.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ usedAt: expect.any(Date) }) }),
+      );
+    });
+
+    it('throws BadRequestException for expired token', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue({ ...validInvitation, expiresAt: pastDate });
+      await expect(service.acceptInvitation('abc123', 'NewP@ss1')).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws BadRequestException for already-used token', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue({ ...validInvitation, usedAt: new Date() });
+      await expect(service.acceptInvitation('abc123', 'NewP@ss1')).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+});
