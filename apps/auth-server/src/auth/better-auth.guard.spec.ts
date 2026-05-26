@@ -12,7 +12,7 @@ jest.mock('./auth.config', () => ({
 
 import { auth } from './auth.config';
 
-const mockGetSession = auth.api.getSession as jest.Mock;
+const mockGetSession = auth.api.getSession as unknown as jest.Mock;
 
 function makeContext(headers: Record<string, string> = {}): ExecutionContext {
   const request = { headers };

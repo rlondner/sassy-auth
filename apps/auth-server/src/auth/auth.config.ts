@@ -1,10 +1,11 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { magicLink } from 'better-auth/plugins';
-import { emailOtp } from 'better-auth/plugins';
+import { emailOTP } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 
-export const auth = betterAuth({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const auth: any = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
@@ -45,8 +46,8 @@ export const auth = betterAuth({
         console.log(`[magic-link] ${email} → ${url}`);
       },
     }),
-    emailOtp({
-      sendVerificationOTP: async ({ email, otp }) => {
+    emailOTP({
+      sendVerificationOTP: async ({ email, otp }: { email: string; otp: string }) => {
         console.log(`[email-otp] ${email} → ${otp}`);
       },
     }),
