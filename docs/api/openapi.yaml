@@ -119,7 +119,15 @@ components:
           type: string
           description: Public ID of the user's organization
           example: "xK2pLn"
-      required: [id, firstName, lastName, email, orgId]
+        status:
+          type: string
+          enum: [active, pending, inactive]
+          description: >
+            active — signed up and enabled;
+            pending — invited, not yet accepted;
+            inactive — disabled by admin
+          example: "active"
+      required: [id, firstName, lastName, email, orgId, status]
 
     Permission:
       type: object
@@ -246,10 +254,9 @@ components:
         lastName:    { type: string, example: "Smith" }
         email:       { type: string, format: email, example: "alice@example.com" }
         orgId:       { type: string, example: "xK2pLn" }
-        password:    { type: string, format: password, example: "s3cur3P@ss" }
         phoneNumber: { type: string, nullable: true, example: "+15551234567" }
         username:    { type: string, nullable: true, example: "alice_s" }
-      required: [firstName, lastName, email, orgId, password]
+      required: [firstName, lastName, email, orgId]
 
     UpdateUserRequest:
       type: object
@@ -258,6 +265,46 @@ components:
         lastName:    { type: string }
         phoneNumber: { type: string, nullable: true }
         username:    { type: string, nullable: true }
+        status:
+          type: string
+          enum: [active, inactive]
+          description: Activate or deactivate. Cannot be set to pending via this endpoint.
+
+    Invitation:
+      type: object
+      properties:
+        inviteUrl:
+          type: string
+          description: Full URL for the accept-invite page including token
+          example: "http://localhost:3001/accept-invite?token=abc123..."
+        expiresAt:
+          type: string
+          format: date-time
+      required: [inviteUrl, expiresAt]
+
+    CreateUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        inviteUrl:
+          type: string
+          example: "http://localhost:3001/accept-invite?token=abc123..."
+      required: [user, inviteUrl]
+
+    InvitationInfo:
+      type: object
+      properties:
+        firstName: { type: string, example: "Jane" }
+        email:     { type: string, format: email }
+        expired:   { type: boolean }
+      required: [firstName, email, expired]
+
+    AcceptInvitationRequest:
+      type: object
+      properties:
+        password: { type: string, format: password, minLength: 8 }
+      required: [password]
 
     CreatePermissionRequest:
       type: object
@@ -716,7 +763,7 @@ paths:
           description: User created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/User' }
+              schema: { $ref: '#/components/schemas/CreateUserResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -880,6 +927,77 @@ paths:
           description: Permission revoked
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/users/{id}/resend-invitation:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Users]
+      summary: Resend invitation to a pending user
+      description: Expires all existing tokens and generates a new one. Returns 400 if user is not pending.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: New invitation URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invitation' }
+        '400':
+          description: User is not in pending status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/invitations/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Users]
+      summary: Validate an invitation token
+      security: []
+      responses:
+        '200':
+          description: Token info
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationInfo' }
+        '404':
+          description: Token not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/invitations/{token}/accept:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [Users]
+      summary: Accept invitation and set password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcceptInvitationRequest' }
+      responses:
+        '204':
+          description: Password set, user activated
+        '400':
+          description: Token expired or already used
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ── Permissions ───────────────────────────────────────────────────────────────
