@@ -18,5 +18,8 @@
       "Bash(npx tsc:*)",
       "Bash(pnpm --filter @sassy-auth/db build)"
     ]
+  },
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
   }
 }
