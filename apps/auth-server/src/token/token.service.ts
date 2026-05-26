@@ -1,0 +1,95 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import * as jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
+import { prisma } from '@sassy-auth/db';
+import { TokenErrorCode } from '@sassy-auth/types';
+
+interface IssueJwtParams {
+  saUserId: number;
+  userPublicId: string;
+  orgPublicId: string;
+  appPublicId: string;
+}
+
+@Injectable()
+export class TokenService {
+  private readonly privateKey: string;
+  private readonly publicKey: string;
+
+  constructor() {
+    if (!process.env.RSA_PRIVATE_KEY || !process.env.RSA_PUBLIC_KEY) {
+      throw new Error('RSA_PRIVATE_KEY and RSA_PUBLIC_KEY env vars are required');
+    }
+    this.privateKey = Buffer.from(process.env.RSA_PRIVATE_KEY, 'base64').toString('utf-8');
+    this.publicKey = Buffer.from(process.env.RSA_PUBLIC_KEY, 'base64').toString('utf-8');
+  }
+
+  async resolvePermissions(saUserId: number): Promise<string[]> {
+    const user = await prisma.saUser.findUnique({
+      where: { id: saUserId },
+      include: {
+        roles: {
+          include: {
+            role: {
+              include: {
+                permissions: { include: { permission: true } },
+              },
+            },
+          },
+        },
+        directPermissions: { include: { permission: true } },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(TokenErrorCode.USER_NOT_FOUND);
+    }
+
+    const names = new Set<string>();
+
+    for (const ur of user.roles) {
+      for (const rp of ur.role.permissions) {
+        names.add(rp.permission.name);
+      }
+    }
+
+    for (const up of user.directPermissions) {
+      names.add(up.permission.name);
+    }
+
+    return Array.from(names).sort();
+  }
+
+  async issueJwt(params: IssueJwtParams): Promise<string> {
+    const permissions = await this.resolvePermissions(params.saUserId);
+    const issuer = process.env.BETTER_AUTH_URL ?? 'https://auth.example.com';
+    const now = Math.floor(Date.now() / 1000);
+
+    const payload = {
+      sub: params.userPublicId,
+      aud: params.appPublicId,
+      org: params.orgPublicId,
+      iss: issuer,
+      iat: now,
+      exp: now + 3600,
+      permissions,
+    };
+
+    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256' });
+  }
+
+  getJwks(): { keys: Record<string, unknown>[] } {
+    const keyObject = crypto.createPublicKey(this.publicKey);
+    const jwk = keyObject.export({ format: 'jwk' });
+    return {
+      keys: [
+        {
+          ...jwk,
+          alg: 'RS256',
+          use: 'sig',
+          kid: 'sassy-auth-1',
+        },
+      ],
+    };
+  }
+}
