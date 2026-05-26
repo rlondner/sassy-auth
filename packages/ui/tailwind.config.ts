@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
+  // Downstream apps must extend this array to include their own source paths
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
@@ -27,8 +28,8 @@ const config: Config = {
           foreground: 'var(--muted-foreground)',
         },
         accent: {
-          DEFAULT: 'var(--muted)',
-          foreground: 'var(--foreground)',
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
         },
         card: {
           DEFAULT: 'var(--card)',
