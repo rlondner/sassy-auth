@@ -4,6 +4,7 @@ import {
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { BetterAuthGuard } from '../auth/better-auth.guard';
+import { BETTER_AUTH_SESSION_COOKIE } from '../common/constants';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -14,7 +15,7 @@ function callerBaId(req: Request): string {
 }
 
 @ApiTags('Users')
-@ApiCookieAuth('better-auth.session_token')
+@ApiCookieAuth(BETTER_AUTH_SESSION_COOKIE)
 @UseGuards(BetterAuthGuard)
 @Controller('users')
 export class UsersController {
