@@ -1,5 +1,6 @@
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
+import { auth } from '../auth/auth.config';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -14,6 +15,27 @@ const PLATFORM_PERMISSIONS = [
   'org.users.manage',
   'org.permissions.manage',
 ] as const;
+
+const ADMIN_PASSWORD = 'Pass@word1234';
+
+type AdminGrant =
+  | { kind: 'direct'; permission: string }
+  | { kind: 'role'; role: string };
+
+const PLATFORM_ADMINS: ReadonlyArray<{
+  email: string;
+  firstName: string;
+  lastName: string;
+  grant: AdminGrant;
+}> = [
+  { email: 'u@sa.io', firstName: 'Users', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.users.manage' } },
+  { email: 'o@sa.io', firstName: 'Orgs',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.orgs.manage' } },
+  { email: 'a@sa.io', firstName: 'Apps',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.apps.manage' } },
+  { email: 'p@sa.io', firstName: 'Perms', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.permissions.manage' } },
+  { email: 's@sa.io', firstName: 'Super', lastName: 'Admin', grant: { kind: 'role',   role: 'Platform Super Admin' } },
+];
+
+const SUPER_ADMIN_ROLE_NAME = 'Platform Super Admin';
 
 async function main() {
   console.log('Seeding platform data...');
