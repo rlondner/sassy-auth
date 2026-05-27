@@ -164,24 +164,52 @@ describe('UsersService', () => {
     beforeEach(() => {
       mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 2, publicId: 'org1' });
       mockPrisma.user.create.mockResolvedValue({ id: 'ba-jane' });
+      // The stub publicId (tmp_*) is overwritten in the second update step.
       mockPrisma.saUser.create.mockResolvedValue({
+        ...makeSaUser({ publicId: 'tmp_ba-jane', firstName: 'Jane', lastName: 'Doe', status: 'pending' }),
+        id: 2,
+      });
+      mockPrisma.saUser.update.mockResolvedValue({
         ...makeSaUser({ publicId: 'usr2', firstName: 'Jane', lastName: 'Doe', status: 'pending' }),
         id: 2,
         betterAuthUser: { email: 'jane@example.com' },
       });
       mockPrisma.saInvitation.create.mockResolvedValue({
+        id: 5,
+        publicId: 'tmp_xyz',
         token: 'abc123token',
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
+      // Inv update returns the row with the encoded publicId
+      // (Sqid for id=5 — test-side, doesn't need to match exactly).
+      // jest.fn().mockResolvedValueOnce chain not needed since the
+      // service uses the .update result for both saUser and saInvitation.
     });
 
     it('creates a BetterAuth user, SaUser, and invitation token', async () => {
+      // Mock the saInvitation.update step to return a row that includes
+      // the final Sqid publicId + the token used in the URL.
+      // We use a fresh jest fn since saInvitation.update was not added
+      // to the prior mock map; add it manually for this branch.
+      (mockPrisma.saInvitation as unknown as { update?: jest.Mock }).update = jest.fn().mockResolvedValue({
+        id: 5,
+        publicId: 'inv5',
+        token: 'abc123token',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
       const result = await service.createUser('ba-caller', dto);
       expect(mockPrisma.user.create).toHaveBeenCalledTimes(1);
       expect(mockPrisma.saUser.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ firstName: 'Jane', status: 'pending' }) }),
       );
       expect(mockPrisma.saInvitation.create).toHaveBeenCalledTimes(1);
+      // The user.create publicId is rewritten via saUser.update with a Sqid.
+      expect(mockPrisma.saUser.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ publicId: expect.not.stringMatching(/^tmp_/) }),
+        }),
+      );
       expect(result.user.id).toBe('usr2');
       expect(result.inviteUrl).toContain('abc123token');
     });

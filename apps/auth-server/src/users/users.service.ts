@@ -144,9 +144,13 @@ export class UsersService {
         },
       });
 
-      const createdSaUser = await tx.saUser.create({
+      // Create with a temporary unique placeholder, then re-encode publicId
+      // from the autoincrement primary key via Sqids. Keeps publicId in the
+      // project's canonical encoding instead of a raw UUID slice.
+      const tempSaUserPublicId = `tmp_${baUserId}`;
+      const createdSaUserStub = await tx.saUser.create({
         data: {
-          publicId: baUserId.slice(0, 12),
+          publicId: tempSaUserPublicId,
           betterAuthUserId: baUserId,
           orgId: org.id,
           firstName: dto.firstName,
@@ -155,16 +159,25 @@ export class UsersService {
           username: dto.username ?? null,
           status: 'pending',
         },
+      });
+      const createdSaUser = await tx.saUser.update({
+        where: { id: createdSaUserStub.id },
+        data: { publicId: this.sqids.encode(createdSaUserStub.id) },
         include: USER_INCLUDE,
       });
 
-      const createdInvitation = await tx.saInvitation.create({
+      const tempInvitationPublicId = `tmp_${token}`;
+      const createdInvitationStub = await tx.saInvitation.create({
         data: {
-          publicId: baUserId.slice(12, 24),
+          publicId: tempInvitationPublicId,
           token,
           userId: createdSaUser.id,
           expiresAt,
         },
+      });
+      const createdInvitation = await tx.saInvitation.update({
+        where: { id: createdInvitationStub.id },
+        data: { publicId: this.sqids.encode(createdInvitationStub.id) },
       });
 
       return { saUser: createdSaUser, invitation: createdInvitation };
@@ -275,11 +288,22 @@ export class UsersService {
     });
 
     const token = crypto.randomBytes(32).toString('hex');
-    const publicId = crypto.randomUUID().slice(0, 12);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const invitation = await prisma.saInvitation.create({
-      data: { publicId, token, userId: user.id, expiresAt },
+    // Two-step create so publicId is a real Sqid encoded from the new row id.
+    const invitation = await prisma.$transaction(async (tx) => {
+      const stub = await tx.saInvitation.create({
+        data: {
+          publicId: `tmp_${token}`,
+          token,
+          userId: user.id,
+          expiresAt,
+        },
+      });
+      return tx.saInvitation.update({
+        where: { id: stub.id },
+        data: { publicId: this.sqids.encode(stub.id) },
+      });
     });
 
     this.logger.getWinstonLogger().info('Invitation resent', {
