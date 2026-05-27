@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SentryModule } from '@sentry/nestjs/setup';
 import { AuthModule } from './auth/auth.module';
 import { TokenModule } from './token/token.module';
 import { CommonModule } from './common/common.module';
@@ -8,6 +9,6 @@ import { OrgsModule } from './orgs/orgs.module';
 import { RolesModule } from './roles/roles.module';
 
 @Module({
-  imports: [CommonModule, AuthModule, TokenModule, UsersModule, InvitationsModule, OrgsModule, RolesModule],
+  imports: [SentryModule.forRoot(), CommonModule, AuthModule, TokenModule, UsersModule, InvitationsModule, OrgsModule, RolesModule],
 })
 export class AppModule {}
