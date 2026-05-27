@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { prisma } from '@sassy-auth/db';
+import { prisma, Prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { checkPermission } from '../common/permissions/check-permission';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -157,7 +157,7 @@ export class UsersService {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    let saUser: Awaited<ReturnType<typeof prisma.saUser.create>>;
+    let saUser: Prisma.SaUserGetPayload<{ include: typeof USER_INCLUDE }>;
     let invitation: Awaited<ReturnType<typeof prisma.saInvitation.create>>;
     try {
       ({ saUser, invitation } = await prisma.$transaction(async (tx) => {
