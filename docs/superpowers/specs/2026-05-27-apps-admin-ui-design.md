@@ -15,7 +15,7 @@ Ship a working `/apps` page in `apps/admin` so a platform admin can list, create
 
 - **Server**: new NestJS `AppsModule` (`AppsController` + `AppsService`) on `auth-server` exposing `GET / POST / PATCH / DELETE /api/apps`. All endpoints gated by `platform.apps.manage` via the existing `checkPermission()` helper.
 - **Server**: new `GET /api/me/permissions` endpoint returning the caller's effective permission names. Lives outside `AppsModule` (shared concern — possibly `auth/` or a new `me/` module).
-- **Server**: self-delete guard on `DELETE /api/users/:publicId` — caller cannot delete their own SaUser.
+- **Server**: self-delete guard on `DELETE /api/users/:id` — caller cannot delete their own SaUser.
 - **Schema**: `@unique` constraint on `SaApp.name`. New Prisma migration.
 - **Admin UI**: `/apps` route matching the Users-page pattern. Server component fetches data + permissions; renders either the table or an access-denied panel.
 - **Admin UI**: list (full-width table with server-side pagination, debounced server-side search, copy-to-clipboard on sqid, row action menu, platform-app badge), View drawer, Create drawer, Edit drawer.
