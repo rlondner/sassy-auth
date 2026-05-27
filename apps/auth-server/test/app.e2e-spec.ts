@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
-import * as request from 'supertest';
-import * as jwt from 'jsonwebtoken';
+import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import express from 'express';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -9,7 +9,8 @@ import { toNodeHandler } from 'better-auth/node';
 import { prisma } from '@sassy-auth/db';
 import { AppModule } from '../src/app.module';
 import { auth } from '../src/auth/auth.config';
-import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { SentryExceptionFilter } from '../src/common/filters/sentry-exception.filter';
+import { LoggerService } from '../src/common/logger/logger.service';
 
 // Generate RS256 key pair for the test run
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -43,7 +44,7 @@ describe('SassyAuth E2E', () => {
     app = moduleRef.createNestApplication(new ExpressAdapter(expressApp));
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    app.useGlobalFilters(new HttpExceptionFilter());
+    app.useGlobalFilters(new SentryExceptionFilter(new LoggerService()));
     await app.init();
 
     httpServer = app.getHttpServer();

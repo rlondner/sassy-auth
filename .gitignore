@@ -35,3 +35,4 @@ designs/apps-mgmt/apps-mgmt-list-view-metrics.zip
 designs/apps-mgmt/apps-mgmt-list-view.zip
 designs/apps-mgmt/apps-mgmt-preview_en.zip
 designs/apps-mgmt/apps-mgmt-preview_fr.zip
+apps/auth-server/.env
