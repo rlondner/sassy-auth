@@ -43,11 +43,11 @@ describe('RequestIdMiddleware', () => {
   });
 
   it('rejects an inbound X-Request-Id longer than 128 chars', () => {
-    mockReq.headers = { 'x-request-id': 'a'.repeat(200) };
+    mockReq.headers = { 'x-request-id': 'a'.repeat(129) };
 
     middleware.use(mockReq as Request, mockRes as Response, next);
 
-    expect(mockReq['requestId']).not.toBe('a'.repeat(200));
+    expect(mockReq['requestId']).not.toBe('a'.repeat(129));
     expect((mockReq['requestId'] as string).length).toBeLessThanOrEqual(128);
   });
 
