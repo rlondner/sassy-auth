@@ -46,8 +46,9 @@ async function bootstrap() {
     const betterAuthDoc = await auth.api.generateOpenAPISchema();
     mergedDoc = mergeOpenApiDocs(nestDoc, betterAuthDoc);
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     loggerService.warn(
-      `Failed to fetch BetterAuth OpenAPI schema; serving Nest-only spec. ${(err as Error).message}`,
+      `Failed to fetch BetterAuth OpenAPI schema; serving Nest-only spec. ${message}`,
       'Bootstrap',
     );
   }
