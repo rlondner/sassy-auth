@@ -6,6 +6,74 @@ import * as Sentry from '@sentry/nextjs'
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
+interface ParsedSessionCookie {
+  value: string
+  httpOnly: boolean
+  secure?: boolean
+  sameSite?: 'lax' | 'strict' | 'none'
+  path?: string
+  domain?: string
+  maxAge?: number
+  expires?: Date
+}
+
+// Parse the first Set-Cookie clause that matches `better-auth.session_token=...`.
+// Node fetch combines multiple Set-Cookie headers with ", " — split on that
+// boundary while NOT splitting on the "," inside an Expires=Wed, 21 Oct ... date.
+function parseSessionCookie(header: string): ParsedSessionCookie | null {
+  // Cookies are separated by ", " followed by a token=value pair.
+  // The regex below splits only when the next segment starts with cookie-name.
+  const cookies = header.split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/)
+  for (const cookie of cookies) {
+    const parts = cookie.split(';').map((p) => p.trim())
+    const [namePair, ...attrs] = parts
+    const eq = namePair.indexOf('=')
+    if (eq < 0) continue
+    const name = namePair.slice(0, eq)
+    if (name !== 'better-auth.session_token') continue
+    const value = namePair.slice(eq + 1)
+
+    const parsed: ParsedSessionCookie = { value, httpOnly: false }
+    for (const attr of attrs) {
+      const [k, v] = attr.split('=', 2)
+      switch (k.toLowerCase()) {
+        case 'httponly':
+          parsed.httpOnly = true
+          break
+        case 'secure':
+          parsed.secure = true
+          break
+        case 'samesite': {
+          const lower = (v ?? '').toLowerCase()
+          if (lower === 'lax' || lower === 'strict' || lower === 'none') {
+            parsed.sameSite = lower
+          }
+          break
+        }
+        case 'path':
+          if (v) parsed.path = v
+          break
+        case 'domain':
+          if (v) parsed.domain = v
+          break
+        case 'max-age': {
+          const n = Number(v)
+          if (Number.isFinite(n)) parsed.maxAge = n
+          break
+        }
+        case 'expires':
+          if (v) {
+            const d = new Date(v)
+            if (!Number.isNaN(d.getTime())) parsed.expires = d
+          }
+          break
+      }
+    }
+    return parsed
+  }
+  return null
+}
+
 export async function signIn(formData: FormData): Promise<{ error?: string }> {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
@@ -36,17 +104,23 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
     return { error: 'invalidCredentials' }
   }
 
-  // Forward session cookie from auth server to the browser
+  // Forward session cookie from auth server to the browser, preserving
+  // the upstream Set-Cookie attributes (Max-Age, Expires, Path, Domain,
+  // SameSite, HttpOnly, Secure). Hand-parse rather than regex-extract so
+  // the lifetime upstream issued is honored on the client.
   const cookieStore = await cookies()
   const setCookieHeader = res.headers.get('set-cookie')
   if (setCookieHeader) {
-    const tokenMatch = setCookieHeader.match(/better-auth\.session_token=([^;]+)/)
-    if (tokenMatch) {
-      cookieStore.set('better-auth.session_token', tokenMatch[1], {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
+    const parsed = parseSessionCookie(setCookieHeader)
+    if (parsed) {
+      cookieStore.set('better-auth.session_token', parsed.value, {
+        httpOnly: parsed.httpOnly,
+        secure: parsed.secure ?? process.env.NODE_ENV === 'production',
+        sameSite: parsed.sameSite ?? 'lax',
+        path: parsed.path ?? '/',
+        ...(parsed.maxAge !== undefined && { maxAge: parsed.maxAge }),
+        ...(parsed.expires !== undefined && { expires: parsed.expires }),
+        ...(parsed.domain !== undefined && { domain: parsed.domain }),
       })
     }
   }
