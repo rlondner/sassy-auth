@@ -5,3 +5,11 @@ dist/
 .turbo/
 **/server.pid
 **/server-stopped
+
+.mcp.json
+designs/apps-mgmt/apps-mgmt-create-app.zip
+designs/apps-mgmt/apps-mgmt-edit-app.zip
+designs/apps-mgmt/apps-mgmt-list-view-metrics.zip
+designs/apps-mgmt/apps-mgmt-list-view.zip
+designs/apps-mgmt/apps-mgmt-preview_en.zip
+designs/apps-mgmt/apps-mgmt-preview_fr.zip

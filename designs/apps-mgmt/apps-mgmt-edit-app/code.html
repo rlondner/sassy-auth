@@ -1,0 +1,387 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>SassyAuth - Edit App</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#dae2fd",
+                    "outline-variant": "#c7c4d8",
+                    "secondary-fixed": "#dae2fd",
+                    "primary": "#3525cd",
+                    "surface-container-low": "#eff4ff",
+                    "on-tertiary-container": "#d9d8ff",
+                    "surface": "#f8f9ff",
+                    "primary-fixed": "#e2dfff",
+                    "on-surface-variant": "#464555",
+                    "tertiary-container": "#4b4dd8",
+                    "on-error": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "surface-container-high": "#dce9ff",
+                    "surface-container-highest": "#d3e4fe",
+                    "outline": "#777587",
+                    "on-secondary-fixed": "#131b2e",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed-variant": "#2f2ebe",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "background": "#f8f9ff",
+                    "surface-variant": "#d3e4fe",
+                    "on-error-container": "#93000a",
+                    "on-secondary-container": "#5c647a",
+                    "inverse-primary": "#c3c0ff",
+                    "secondary-fixed-dim": "#bec6e0",
+                    "inverse-surface": "#213145",
+                    "primary-container": "#4f46e5",
+                    "on-tertiary-fixed": "#07006c",
+                    "error": "#ba1a1a",
+                    "surface-bright": "#f8f9ff",
+                    "on-background": "#0b1c30",
+                    "on-surface": "#0b1c30",
+                    "tertiary-fixed-dim": "#c0c1ff",
+                    "secondary": "#565e74",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "tertiary": "#3130c0",
+                    "surface-tint": "#4d44e3",
+                    "on-secondary-fixed-variant": "#3f465c",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-primary-fixed": "#0f0069",
+                    "on-tertiary": "#ffffff",
+                    "surface-dim": "#cbdbf5",
+                    "on-primary-container": "#dad7ff",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container": "#e5eeff",
+                    "tertiary-fixed": "#e1e0ff",
+                    "on-primary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "pane-master": "380px",
+                    "pane-detail": "auto",
+                    "stack-lg": "32px",
+                    "pane-nav": "260px",
+                    "gutter": "1px",
+                    "stack-sm": "8px",
+                    "container-padding": "24px",
+                    "stack-md": "16px"
+            },
+            "fontFamily": {
+                    "body-sm": [
+                            "Manrope"
+                    ],
+                    "headline-sm": [
+                            "Manrope"
+                    ],
+                    "headline-lg": [
+                            "Manrope"
+                    ],
+                    "label-md": [
+                            "Manrope"
+                    ],
+                    "body-lg": [
+                            "Manrope"
+                    ],
+                    "label-sm": [
+                            "Manrope"
+                    ],
+                    "body-md": [
+                            "Manrope"
+                    ],
+                    "headline-md": [
+                            "Manrope"
+                    ]
+            },
+            "fontSize": {
+                    "body-sm": [
+                            "13px",
+                            {
+                                    "lineHeight": "18px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-sm": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-lg": [
+                            "30px",
+                            {
+                                    "lineHeight": "36px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-md": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-sm": [
+                            "11px",
+                            {
+                                    "lineHeight": "14px",
+                                    "letterSpacing": "0.03em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #f8f9ff;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Hide scrollbars for clean pane look */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d3e4fe;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background overflow-hidden flex flex-col antialiased" style="width: 1600px; height: 1280px;">
+<!-- TopNavBar -->
+<nav class="sticky top-0 right-0 w-full z-40 bg-surface text-primary border-b border-outline-variant flex justify-between items-center h-16 px-container-padding flex-shrink-0">
+<div class="flex items-center gap-4">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">SassyAuth</span>
+</div>
+<div class="flex-1 max-w-md mx-8 hidden md:block">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="w-full bg-surface-container-highest border border-outline-variant rounded-full py-1.5 pl-9 pr-4 font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Search..." type="text">
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative group mr-4 cursor-pointer">
+<div class="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm">language</span>
+<span class="font-label-md text-label-md">EN</span>
+<span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary-container opacity-80 transition-all duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary-container opacity-80 transition-all duration-200">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-md text-label-md font-bold cursor-pointer hover:opacity-80 transition-opacity">
+                A
+            </div>
+<button class="ml-2 px-4 py-1.5 bg-surface-container-high border border-outline-variant rounded font-label-md text-label-md text-on-surface hover:bg-surface-container-highest transition-colors hidden sm:block">Export</button>
+<button class="ml-2 px-4 py-1.5 bg-primary text-on-primary rounded font-label-md text-label-md hover:bg-primary-container transition-colors hidden sm:block">Create New</button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="w-pane-nav bg-inverse-surface text-primary-fixed flex flex-col h-full py-stack-lg border-r border-outline-variant flex-shrink-0">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-surface-bright">SassyAuth</h1>
+<p class="font-label-sm text-label-sm text-primary-fixed-dim mt-1 uppercase tracking-wider opacity-80">Admin Console</p>
+</div>
+<nav class="flex-1 overflow-y-auto space-y-1">
+<a class="text-primary-fixed-dim border-l-2 border-primary-fixed bg-white/5 font-bold px-6 py-3 flex items-center gap-3 scale-[0.99] transition-transform duration-100" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">apps</span>
+<span class="font-label-md text-label-md">Apps</span>
+</a>
+<a class="text-on-secondary-fixed-variant px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors" href="#">
+<span class="material-symbols-outlined">corporate_fare</span>
+<span class="font-label-md text-label-md">Organizations</span>
+</a>
+<a class="text-on-secondary-fixed-variant px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md text-label-md">Users</span>
+</a>
+<a class="text-on-secondary-fixed-variant px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="font-label-md text-label-md">Permissions</span>
+</a>
+<a class="text-on-secondary-fixed-variant px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-label-md">Audit Logs</span>
+</a>
+</nav>
+</aside>
+<!-- Master Pane -->
+<div class="w-pane-master bg-surface-container-low border-r border-outline-variant flex flex-col h-full flex-shrink-0">
+<div class="p-4 border-b border-outline-variant bg-surface-container-lowest">
+<div class="flex justify-between items-center mb-4">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Applications</h2>
+<span class="px-2 py-1 bg-surface-container-high text-on-surface-variant rounded font-label-sm text-label-sm">4 Total</span>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="w-full bg-surface border border-outline-variant rounded py-1.5 pl-9 pr-3 font-body-sm text-body-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Filter apps..." type="text">
+</div>
+</div>
+<div class="flex-1 overflow-y-auto">
+<div class="border-b border-outline-variant bg-surface-container-highest/50 relative cursor-pointer">
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-primary"></div>
+<div class="p-4 pl-5">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-md text-label-md text-on-surface font-bold">AuthCore API</span>
+<span class="px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded font-label-sm text-label-sm">Active</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">api.sassyauth.internal</p>
+</div>
+</div>
+<div class="border-b border-outline-variant hover:bg-surface-container-highest/30 cursor-pointer transition-colors">
+<div class="p-4 pl-5">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-md text-label-md text-on-surface">Client Portal</span>
+<span class="px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded font-label-sm text-label-sm">Active</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">portal.acmecorp.com</p>
+</div>
+</div>
+<div class="border-b border-outline-variant hover:bg-surface-container-highest/30 cursor-pointer transition-colors">
+<div class="p-4 pl-5">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-md text-label-md text-on-surface">Billing Sync Service</span>
+<span class="px-1.5 py-0.5 bg-error-container text-on-error-container rounded font-label-sm text-label-sm">Paused</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">billing-worker-01</p>
+</div>
+</div>
+<div class="border-b border-outline-variant hover:bg-surface-container-highest/30 cursor-pointer transition-colors">
+<div class="p-4 pl-5">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-md text-label-md text-on-surface">Analytics Dashboard</span>
+<span class="px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded font-label-sm text-label-sm">Active</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">data.sassyauth.internal</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Detail Pane (Form) -->
+<main class="flex-1 bg-surface-container-lowest flex flex-col h-full overflow-hidden relative">
+<header class="p-6 border-b border-outline-variant flex justify-between items-end flex-shrink-0 bg-surface-container-lowest">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Apps</span>
+<span class="material-symbols-outlined text-xs text-outline">chevron_right</span>
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider">Edit App</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface">AuthCore API</h2>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 border border-outline-variant text-on-surface font-label-md text-label-md rounded hover:bg-surface-container-low transition-colors">Cancel</button>
+<button class="px-4 py-2 bg-primary text-on-primary font-label-md text-label-md rounded hover:bg-primary-container transition-colors shadow-sm">Save Changes</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-6 lg:p-8">
+<div class="max-w-3xl mx-auto space-y-8">
+<!-- Basic Info Section -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden">
+<div class="px-6 py-4 border-b border-outline-variant bg-surface-container-low flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">info</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">General Information</h3>
+</div>
+<div class="p-6 space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-1.5">
+<label class="block font-label-md text-label-md text-on-surface">App Name</label>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-2 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm" type="text" value="AuthCore API">
+</div>
+<div class="space-y-1.5">
+<label class="block font-label-md text-label-md text-on-surface">App URL</label>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded px-3 py-2 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm" type="text" value="https://api.sassyauth.internal">
+</div>
+</div>
+</div>
+</section>
+<!-- Identifiers Section (Read Only) -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden">
+<div class="px-6 py-4 border-b border-outline-variant bg-surface-container-low flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">fingerprint</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">System Identifiers</h3>
+</div>
+<div class="p-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-1.5 relative">
+<label class="block font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
+                                        Public ID
+                                        <span class="material-symbols-outlined text-[14px]" title="Read-only system generated ID">lock</span>
+</label>
+<div class="flex">
+<input class="w-full bg-surface-container border border-outline-variant rounded-l px-3 py-2 font-body-sm text-body-sm text-on-surface-variant font-mono cursor-not-allowed" disabled="" readonly="" type="text" value="pub_8f72c3b1a9e4">
+<button class="px-3 border border-l-0 border-outline-variant rounded-r bg-surface hover:bg-surface-container-high transition-colors text-on-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</div>
+<div class="space-y-1.5 relative">
+<label class="block font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
+                                        Internal ID
+                                        <span class="material-symbols-outlined text-[14px]" title="Read-only system generated ID">lock</span>
+</label>
+<div class="flex">
+<input class="w-full bg-surface-container border border-outline-variant rounded-l px-3 py-2 font-body-sm text-body-sm text-on-surface-variant font-mono cursor-not-allowed" disabled="" readonly="" type="text" value="int_authcore_prd_001">
+<button class="px-3 border border-l-0 border-outline-variant rounded-r bg-surface hover:bg-surface-container-high transition-colors text-on-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+
+
+</body></html>
