@@ -47,6 +47,22 @@ export class InvitationsService {
     const baUserId = inv.user.betterAuthUser.id;
 
     await prisma.$transaction(async (tx) => {
+      // Atomically claim the invitation: only updates rows where
+      // usedAt IS NULL and the token has not expired. count === 1 means
+      // we won the race; count === 0 means another concurrent acceptance
+      // claimed it first.
+      const claimed = await tx.saInvitation.updateMany({
+        where: {
+          id: inv.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+      if (claimed.count !== 1) {
+        throw new BadRequestException('Invitation already used or expired');
+      }
+
       await tx.account.create({
         data: {
           id: crypto.randomUUID(),
@@ -67,11 +83,6 @@ export class InvitationsService {
       await tx.user.update({
         where: { id: baUserId },
         data: { emailVerified: true, updatedAt: now },
-      });
-
-      await tx.saInvitation.update({
-        where: { id: inv.id },
-        data: { usedAt: now },
       });
     });
 

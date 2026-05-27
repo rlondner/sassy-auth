@@ -5,7 +5,7 @@ import { LoggerService } from '../common/logger/logger.service';
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
-    saInvitation: { findUnique: jest.fn(), update: jest.fn() },
+    saInvitation: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     saUser: { update: jest.fn() },
     user: { update: jest.fn() },
     account: { create: jest.fn() },
@@ -15,7 +15,7 @@ jest.mock('@sassy-auth/db', () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
-  saInvitation: { findUnique: jest.Mock; update: jest.Mock };
+  saInvitation: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
   saUser: { update: jest.Mock };
   user: { update: jest.Mock };
   account: { create: jest.Mock };
@@ -77,15 +77,26 @@ describe('InvitationsService', () => {
   });
 
   describe('acceptInvitation', () => {
-    it('creates Account, activates SaUser, marks invitation used', async () => {
+    it('creates Account, activates SaUser, claims the invitation atomically', async () => {
       mockPrisma.saInvitation.findUnique.mockResolvedValue(validInvitation);
+      mockPrisma.saInvitation.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.account.create.mockResolvedValue(undefined);
       mockPrisma.saUser.update.mockResolvedValue(undefined);
       mockPrisma.user.update.mockResolvedValue(undefined);
-      mockPrisma.saInvitation.update.mockResolvedValue(undefined);
 
       await expect(service.acceptInvitation('abc123', 'NewP@ss1')).resolves.toBeUndefined();
 
+      // updateMany is the conditional claim: must filter on usedAt:null
+      // and an `expiresAt > now` guard, both crucial for race safety.
+      expect(mockPrisma.saInvitation.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: validInvitation.id,
+            usedAt: null,
+          }),
+          data: expect.objectContaining({ usedAt: expect.any(Date) }),
+        }),
+      );
       expect(mockPrisma.account.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ providerId: 'credential', userId: 'ba-jane' }),
@@ -94,9 +105,15 @@ describe('InvitationsService', () => {
       expect(mockPrisma.saUser.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'active' } }),
       );
-      expect(mockPrisma.saInvitation.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ usedAt: expect.any(Date) }) }),
-      );
+    });
+
+    it('throws BadRequestException when the atomic claim finds zero rows (lost race)', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(validInvitation);
+      mockPrisma.saInvitation.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.acceptInvitation('abc123', 'NewP@ss1')).rejects.toBeInstanceOf(BadRequestException);
+      // account.create must NOT have been called when the claim failed
+      expect(mockPrisma.account.create).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException for expired token', async () => {
