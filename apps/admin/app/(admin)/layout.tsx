@@ -29,7 +29,8 @@ export default async function AdminLayout({
 
   if (!session?.user) notFound()
 
-  Sentry.setUser({ email: session.user.email })
+  // Identify by opaque id only — never propagate plaintext email to Sentry.
+  Sentry.setUser({ id: session.user.id })
   Sentry.setTag('locale', currentLocale)
 
   const user = {

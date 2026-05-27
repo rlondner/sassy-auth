@@ -175,7 +175,6 @@ export class UsersService {
       context: 'UsersService',
       userId: saUser.publicId,
       orgId: dto.orgId,
-      email: dto.email,
     });
     return {
       user: formatUser(saUser),
