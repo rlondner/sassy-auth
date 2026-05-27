@@ -10,10 +10,15 @@ declare global {
   }
 }
 
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
+
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    const requestId = (req.headers['x-request-id'] as string) ?? uuidv4();
+    const inbound = req.headers['x-request-id'];
+    const candidate = typeof inbound === 'string' ? inbound : undefined;
+    const requestId =
+      candidate && REQUEST_ID_PATTERN.test(candidate) ? candidate : uuidv4();
     req.requestId = requestId;
     res.setHeader('X-Request-Id', requestId);
     next();
