@@ -1,5 +1,10 @@
 import * as crypto from 'crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { checkPermission } from '../common/permissions/check-permission';
@@ -132,43 +137,57 @@ export class UsersService {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const { saUser, invitation } = await prisma.$transaction(async (tx) => {
-      await tx.user.create({
-        data: {
-          id: baUserId,
-          name: `${dto.firstName} ${dto.lastName}`,
-          email: dto.email,
-          emailVerified: false,
-          createdAt: now,
-          updatedAt: now,
-        },
-      });
+    let saUser: Awaited<ReturnType<typeof prisma.saUser.create>>;
+    let invitation: Awaited<ReturnType<typeof prisma.saInvitation.create>>;
+    try {
+      ({ saUser, invitation } = await prisma.$transaction(async (tx) => {
+        await tx.user.create({
+          data: {
+            id: baUserId,
+            name: `${dto.firstName} ${dto.lastName}`,
+            email: dto.email,
+            emailVerified: false,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
 
-      const createdSaUser = await tx.saUser.create({
-        data: {
-          publicId: baUserId.slice(0, 12),
-          betterAuthUserId: baUserId,
-          orgId: org.id,
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          phoneNumber: dto.phoneNumber ?? null,
-          username: dto.username ?? null,
-          status: 'pending',
-        },
-        include: USER_INCLUDE,
-      });
+        const createdSaUser = await tx.saUser.create({
+          data: {
+            publicId: baUserId.slice(0, 12),
+            betterAuthUserId: baUserId,
+            orgId: org.id,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            phoneNumber: dto.phoneNumber ?? null,
+            username: dto.username ?? null,
+            status: 'pending',
+          },
+          include: USER_INCLUDE,
+        });
 
-      const createdInvitation = await tx.saInvitation.create({
-        data: {
-          publicId: baUserId.slice(12, 24),
-          token,
-          userId: createdSaUser.id,
-          expiresAt,
-        },
-      });
+        const createdInvitation = await tx.saInvitation.create({
+          data: {
+            publicId: baUserId.slice(12, 24),
+            token,
+            userId: createdSaUser.id,
+            expiresAt,
+          },
+        });
 
-      return { saUser: createdSaUser, invitation: createdInvitation };
-    });
+        return { saUser: createdSaUser, invitation: createdInvitation };
+      }));
+    } catch (e: unknown) {
+      if (
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        (e as { code?: string }).code === 'P2002'
+      ) {
+        throw new ConflictException('A user with that email or username already exists.');
+      }
+      throw e;
+    }
 
     const baseUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
     this.logger.getWinstonLogger().info('User created', {
