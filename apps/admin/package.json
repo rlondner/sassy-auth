@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@sassy-auth/ui": "workspace:*",
+    "@sentry/nextjs": "^10.54.0",
     "next": "^15.0.0",
     "next-intl": "^3.26.0",
     "react": "^18.3.0",
@@ -31,12 +32,16 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "jsdom",
-    "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"],
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.ts"
+    ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts"
     },
-    "transformIgnorePatterns": ["node_modules/(?!(@sassy-auth)/)"],
+    "transformIgnorePatterns": [
+      "node_modules/(?!(@sassy-auth)/)"
+    ],
     "globals": {
       "ts-jest": {
         "tsconfig": {
