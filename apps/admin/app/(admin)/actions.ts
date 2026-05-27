@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import * as Sentry from '@sentry/nextjs'
 
 export async function setLocaleAction(locale: string, pathname: string) {
   const cookieStore = await cookies()
@@ -10,6 +11,12 @@ export async function setLocaleAction(locale: string, pathname: string) {
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
   })
+  Sentry.addBreadcrumb({
+    category: 'ui',
+    message: `Locale switched to ${locale}`,
+    level: 'info',
+  })
+  Sentry.setTag('locale', locale)
   redirect(pathname)
 }
 
@@ -21,5 +28,10 @@ export async function signOutAction() {
     headers: { Cookie: cookieStore.toString() },
   })
   cookieStore.delete('better-auth.session_token')
+  Sentry.addBreadcrumb({
+    category: 'auth',
+    message: 'Admin signed out',
+    level: 'info',
+  })
   redirect('/login')
 }

@@ -1,5 +1,6 @@
 import { headers, cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
+import * as Sentry from '@sentry/nextjs'
 import { AdminShell } from '@/components/admin-shell'
 import { getAvailableLocales, getLocale } from '@/lib/locale'
 
@@ -27,6 +28,9 @@ export default async function AdminLayout({
   const availableLocales = getAvailableLocales()
 
   if (!session?.user) notFound()
+
+  Sentry.setUser({ email: session.user.email })
+  Sentry.setTag('locale', currentLocale)
 
   const user = {
     firstName: session.user.name?.split(' ')[0] ?? '',

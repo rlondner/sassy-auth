@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import * as Sentry from '@sentry/nextjs'
 import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, InvitationInfo } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
@@ -30,16 +31,21 @@ export async function getUser(id: string): Promise<User> {
 
 export async function createUser(payload: CreateUserPayload): Promise<CreateUserResponse> {
   const res = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(payload) })
-  return res.json()
+  const result: CreateUserResponse = await res.json()
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User created: ${result.user.email}`, level: 'info' })
+  return result
 }
 
 export async function updateUser(id: string, patch: Partial<User>): Promise<User> {
   const res = await apiFetch(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
-  return res.json()
+  const result: User = await res.json()
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User updated: ${id}`, level: 'info' })
+  return result
 }
 
 export async function deleteUser(id: string): Promise<void> {
   await apiFetch(`/api/users/${id}`, { method: 'DELETE' })
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User deleted: ${id}`, level: 'info' })
 }
 
 export async function getOrgs(): Promise<Org[]> {
@@ -65,15 +71,19 @@ export async function getEffectivePermissions(userId: string): Promise<Permissio
 
 export async function assignRole(userId: string, roleId: string): Promise<void> {
   await apiFetch(`/api/users/${userId}/roles`, { method: 'POST', body: JSON.stringify({ roleId }) })
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Role ${roleId} assigned to user ${userId}`, level: 'info' })
 }
 
 export async function removeRole(userId: string, roleId: string): Promise<void> {
   await apiFetch(`/api/users/${userId}/roles/${roleId}`, { method: 'DELETE' })
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Role ${roleId} removed from user ${userId}`, level: 'info' })
 }
 
 export async function resendInvitation(userId: string): Promise<{ inviteUrl: string }> {
   const res = await apiFetch(`/api/users/${userId}/resend-invitation`, { method: 'POST' })
-  return res.json()
+  const result = await res.json()
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Invitation resent for user ${userId}`, level: 'info' })
+  return result
 }
 
 // Public endpoints — no session cookie needed

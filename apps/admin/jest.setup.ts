@@ -38,3 +38,11 @@ beforeEach(() => {
   jest.setMock('fs', fsMock)
   jest.setMock('next/headers', nextHeadersMock)
 })
+
+jest.mock('@sentry/nextjs', () => ({
+  addBreadcrumb: jest.fn(),
+  setUser: jest.fn(),
+  setTag: jest.fn(),
+  captureException: jest.fn(),
+  withScope: jest.fn((cb: any) => cb({ setExtra: jest.fn(), setTag: jest.fn() })),
+}))
