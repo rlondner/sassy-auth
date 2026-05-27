@@ -4,7 +4,7 @@ import { BetterAuthGuard } from '../auth/better-auth.guard';
 import { RolesService } from './roles.service';
 
 @UseGuards(BetterAuthGuard)
-@Controller('api/roles')
+@Controller('roles')
 export class RolesController {
   constructor(private readonly roles: RolesService) {}
 

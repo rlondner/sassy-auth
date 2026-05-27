@@ -13,7 +13,7 @@ function callerBaId(req: Request): string {
 }
 
 @UseGuards(BetterAuthGuard)
-@Controller('api/users')
+@Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 

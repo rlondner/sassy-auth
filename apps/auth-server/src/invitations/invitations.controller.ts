@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { InvitationsService } from './invitations.service';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 
-@Controller('api/invitations')
+@Controller('invitations')
 export class InvitationsController {
   constructor(private readonly service: InvitationsService) {}
 
