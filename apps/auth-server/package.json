@@ -59,7 +59,8 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^better-auth/node$": "<rootDir>/__mocks__/better-auth-node.ts"
+      "^better-auth/node$": "<rootDir>/__mocks__/better-auth-node.ts",
+      "^uuid$": "<rootDir>/__mocks__/uuid.ts"
     },
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
