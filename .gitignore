@@ -6,6 +6,7 @@ dist/
 **/server.pid
 **/server-stopped
 
+logs/
 .mcp.json
 designs/apps-mgmt/apps-mgmt-create-app.zip
 designs/apps-mgmt/apps-mgmt-edit-app.zip
