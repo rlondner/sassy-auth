@@ -37,6 +37,47 @@ const PLATFORM_ADMINS: ReadonlyArray<{
 
 const SUPER_ADMIN_ROLE_NAME = 'Platform Super Admin';
 
+async function ensurePlatformSuperAdminRole(platformAppId: number) {
+  let role = await prisma.saRole.findFirst({
+    where: { name: SUPER_ADMIN_ROLE_NAME, appId: platformAppId },
+  });
+
+  if (!role) {
+    role = await prisma.$transaction(async (tx) => {
+      const created = await tx.saRole.create({
+        data: {
+          publicId: 'placeholder',
+          name: SUPER_ADMIN_ROLE_NAME,
+          appId: platformAppId,
+        },
+      });
+      const publicId = sqids.encode([created.id]);
+      return tx.saRole.update({
+        where: { id: created.id },
+        data: { publicId },
+      });
+    });
+    console.log(`Created role: ${SUPER_ADMIN_ROLE_NAME} (publicId=${role.publicId})`);
+  } else {
+    console.log(`Role already exists: ${SUPER_ADMIN_ROLE_NAME} (publicId=${role.publicId})`);
+  }
+
+  const platformPerms = await prisma.saPermission.findMany({
+    where: { appId: platformAppId, name: { startsWith: 'platform.' } },
+  });
+
+  for (const perm of platformPerms) {
+    await prisma.saRolePermission.upsert({
+      where: { roleId_permissionId: { roleId: role.id, permissionId: perm.id } },
+      create: { roleId: role.id, permissionId: perm.id },
+      update: {},
+    });
+  }
+  console.log(`Role ${SUPER_ADMIN_ROLE_NAME} wired to ${platformPerms.length} platform.* permission(s)`);
+
+  return role;
+}
+
 async function main() {
   console.log('Seeding platform data...');
 
