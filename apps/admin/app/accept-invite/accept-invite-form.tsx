@@ -24,7 +24,16 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (password !== confirm) { setError('Passwords do not match.'); return }
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
+    if (password.length < 12) {
+      setError('Password must be at least 12 characters.')
+      return
+    }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(password)) {
+      setError(
+        'Password must contain an uppercase letter, a lowercase letter, and a digit.',
+      )
+      return
+    }
     setError(null)
     setSubmitting(true)
     try {
@@ -59,7 +68,7 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          minLength={8}
+          minLength={12}
           className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         />
       </div>

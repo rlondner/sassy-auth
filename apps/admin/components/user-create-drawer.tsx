@@ -55,7 +55,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
     const selectedOrg = orgs.find((o) => o.id === form.orgId)
     if (!selectedOrg) return
     getRoles(selectedOrg.appId).then(setRoles)
-  }, [form.orgId])
+  }, [form.orgId, orgs])
 
   function set(field: keyof FormState) {
     return (value: string) => setForm((f) => ({ ...f, [field]: value }))

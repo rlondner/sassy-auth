@@ -32,4 +32,39 @@ describe('RequestIdMiddleware', () => {
     expect(mockRes.setHeader).toHaveBeenCalledWith('X-Request-Id', 'existing-id-123');
     expect(next).toHaveBeenCalled();
   });
+
+  it('rejects an inbound X-Request-Id containing control characters', () => {
+    mockReq.headers = { 'x-request-id': 'evil\nlog forge\t' };
+
+    middleware.use(mockReq as Request, mockRes as Response, next);
+
+    expect(mockReq['requestId']).not.toBe('evil\nlog forge\t');
+    expect(mockReq['requestId']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('rejects an inbound X-Request-Id longer than 128 chars', () => {
+    mockReq.headers = { 'x-request-id': 'a'.repeat(129) };
+
+    middleware.use(mockReq as Request, mockRes as Response, next);
+
+    expect(mockReq['requestId']).not.toBe('a'.repeat(129));
+    expect((mockReq['requestId'] as string).length).toBeLessThanOrEqual(128);
+  });
+
+  it('rejects an inbound X-Request-Id with disallowed characters', () => {
+    mockReq.headers = { 'x-request-id': 'has spaces and !@#' };
+
+    middleware.use(mockReq as Request, mockRes as Response, next);
+
+    expect(mockReq['requestId']).not.toBe('has spaces and !@#');
+    expect(mockReq['requestId']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('accepts a sane request id (UUID-like)', () => {
+    mockReq.headers = { 'x-request-id': '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed' };
+
+    middleware.use(mockReq as Request, mockRes as Response, next);
+
+    expect(mockReq['requestId']).toBe('1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed');
+  });
 });
