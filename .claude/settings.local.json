@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
+  },
   "permissions": {
     "allow": [
       "Bash(bash:*)",
@@ -16,10 +19,24 @@
       "Bash(node /tmp/test_sqid_actual.js)",
       "Bash(pnpm build:*)",
       "Bash(npx tsc:*)",
-      "Bash(pnpm --filter @sassy-auth/db build)"
+      "Bash(pnpm --filter @sassy-auth/db build)",
+      "Bash(gh auth *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(gh pr create --base master --head fix/bug-0014-user-create-drawer-deps --title 'fix\\(bug-0014\\): add orgs to UserCreateDrawer effect deps' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0009-request-id-sanitization --title 'fix\\(bug-0009\\): sanitize inbound X-Request-Id' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0007-password-policy --title 'fix\\(bug-0007\\): tighten password policy to 12 chars + character classes' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0011-create-user-conflict --title 'fix\\(bug-0011\\): map Prisma P2002 to 409 Conflict on createUser' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0012-assign-role-idempotent --title 'fix\\(bug-0012\\): make assignRole idempotent on P2002' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0004-pii-logs-sentry --title 'fix\\(bug-0004\\): strip plaintext email from logs and Sentry' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0006-invitation-race --title 'fix\\(bug-0006\\): claim invitation atomically inside the transaction' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0005-publicid-sqids --title 'fix\\(bug-0005\\): restore Sqid scheme for SaUser/SaInvitation publicId' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0013-login-cookie-attrs --title 'fix\\(bug-0013\\): preserve upstream Set-Cookie attributes on admin login' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0002-scrub-token-logs --title 'fix\\(bug-0002\\): scrub bearer tokens and sensitive query keys from logs' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0003-admin-middleware-validate --title 'fix\\(bug-0003\\): validate admin session against auth-server in middleware' --body ' *)",
+      "Bash(gh pr create --base master --head fix/bug-0001-rbac-org-isolation --title 'fix\\(bug-0001\\): org-scope RBAC across all UsersService methods' --body ' *)",
+      "Bash(gh pr *)",
+      "Bash(python -c \"import json,sys; rows=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(f\\\\\"#{r['number']:>2} {r['headRefName']:<45} -> {r['baseRefName']:<7} {r['title']}\\\\\" for r in rows\\)\\)\")"
     ]
-  },
-  "env": {
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
   }
 }
