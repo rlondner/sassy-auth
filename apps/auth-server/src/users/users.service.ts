@@ -46,9 +46,24 @@ export class UsersService {
     callerBaId: string,
     filters: { orgPublicId?: string; appPublicId?: string },
   ) {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
+    // If a specific org is requested, scope the auth check to that org.
+    // If no org is requested, only `platform.users.manage` can list
+    // cross-tenant — pass an explicit `targetOrgId: -1` sentinel so the
+    // helper rejects holders of `org.users.manage`.
+    let targetOrgId: number | undefined;
+    if (filters.orgPublicId) {
+      const org = await prisma.saOrg.findUnique({ where: { publicId: filters.orgPublicId } });
+      if (!org) throw new NotFoundException('Org not found');
+      targetOrgId = org.id;
+    } else {
+      // Force cross-tenant case to require platform.users.manage
+      targetOrgId = -1;
+    }
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId },
+    );
 
     const where: Record<string, unknown> = {};
     if (filters.orgPublicId) where['org'] = { publicId: filters.orgPublicId };
@@ -58,23 +73,20 @@ export class UsersService {
   }
 
   async getUser(callerBaId: string, publicId: string) {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
-
     const user = await prisma.saUser.findUnique({
       where: { publicId },
       include: USER_INCLUDE,
     });
     if (!user) throw new NotFoundException();
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: (user as unknown as { orgId: number }).orgId },
+    );
     return formatUser(user);
   }
 
   async getUserRoles(callerBaId: string, publicId: string) {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
-
     const user = await prisma.saUser.findUnique({
       where: { publicId },
       include: {
@@ -86,6 +98,11 @@ export class UsersService {
       },
     });
     if (!user) throw new NotFoundException();
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
 
     return user.roles.map((ur) => ({
       id: ur.role.publicId,
@@ -100,10 +117,6 @@ export class UsersService {
   }
 
   async getEffectivePermissions(callerBaId: string, publicId: string) {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
-
     const user = await prisma.saUser.findUnique({
       where: { publicId },
       include: {
@@ -112,6 +125,11 @@ export class UsersService {
       },
     });
     if (!user) throw new NotFoundException();
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
 
     const names = new Set<string>();
     user.roles.forEach((ur) => ur.role.permissions.forEach((rp) => names.add(rp.permission.name)));
@@ -120,12 +138,14 @@ export class UsersService {
     return { userId: publicId, permissions: Array.from(names).sort() };
   }
   async createUser(callerBaId: string, dto: CreateUserDto) {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
-
     const org = await prisma.saOrg.findUnique({ where: { publicId: dto.orgId } });
     if (!org) throw new NotFoundException('Org not found');
+
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: org.id },
+    );
 
     const baUserId = crypto.randomUUID();
     const now = new Date();
@@ -183,12 +203,13 @@ export class UsersService {
     };
   }
   async updateUser(callerBaId: string, publicId: string, dto: UpdateUserDto) {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
-
     const existing = await prisma.saUser.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: existing.orgId },
+    );
 
     const updated = await prisma.saUser.update({
       where: { publicId },
@@ -211,10 +232,13 @@ export class UsersService {
   }
 
   async deleteUser(callerBaId: string, publicId: string): Promise<void> {
-    await checkPermission(callerBaId, 'platform.users.manage');
-
     const existing = await prisma.saUser.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
+    // delete is a destructive action — keep the strictest gate
+    // (platform-wide only) but pass the targetOrgId for audit symmetry.
+    await checkPermission(callerBaId, ['platform.users.manage'], {
+      targetOrgId: existing.orgId,
+    });
 
     await prisma.saUser.delete({ where: { publicId } });
     this.logger.getWinstonLogger().info('User deleted', {
@@ -223,12 +247,13 @@ export class UsersService {
     });
   }
   async assignRole(callerBaId: string, userPublicId: string, dto: AssignRoleDto): Promise<void> {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
-
     const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
     if (!user) throw new NotFoundException('User not found');
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
 
     const role = await prisma.saRole.findUnique({ where: { publicId: dto.roleId } });
     if (!role) throw new NotFoundException('Role not found');
@@ -242,12 +267,13 @@ export class UsersService {
   }
 
   async removeRole(callerBaId: string, userPublicId: string, rolePublicId: string): Promise<void> {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
-
     const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
     if (!user) throw new NotFoundException('User not found');
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
 
     const role = await prisma.saRole.findUnique({ where: { publicId: rolePublicId } });
     if (!role) throw new NotFoundException('Role not found');
@@ -260,12 +286,13 @@ export class UsersService {
     });
   }
   async resendInvitation(callerBaId: string, userPublicId: string) {
-    await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
-      await checkPermission(callerBaId, 'org.users.manage');
-    });
-
     const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
     if (!user) throw new NotFoundException('User not found');
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
     if (user.status !== 'pending') throw new BadRequestException('User is not pending — invitation cannot be resent');
 
     // Expire all existing unused tokens for this user
