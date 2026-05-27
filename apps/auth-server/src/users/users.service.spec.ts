@@ -190,6 +190,16 @@ describe('UsersService', () => {
       mockPrisma.saOrg.findUnique.mockResolvedValue(null);
       await expect(service.createUser('ba-caller', dto)).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('throws ConflictException when Prisma reports a unique-violation (P2002)', async () => {
+      const { ConflictException } = await import('@nestjs/common');
+      mockPrisma.$transaction.mockImplementationOnce(() => {
+        const err = new Error('Unique constraint failed');
+        (err as Error & { code?: string }).code = 'P2002';
+        return Promise.reject(err);
+      });
+      await expect(service.createUser('ba-caller', dto)).rejects.toBeInstanceOf(ConflictException);
+    });
   });
 
   describe('updateUser', () => {
