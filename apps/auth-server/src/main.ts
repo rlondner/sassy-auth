@@ -36,7 +36,11 @@ async function bootstrap() {
     .setTitle('Sassy Auth API')
     .setDescription('Multi-tenant auth and user management')
     .setVersion(pkg.version)
-    .addCookieAuth(BETTER_AUTH_SESSION_COOKIE, { type: 'apiKey', in: 'cookie' })
+    .addCookieAuth(
+      BETTER_AUTH_SESSION_COOKIE,
+      { type: 'apiKey', in: 'cookie' },
+      BETTER_AUTH_SESSION_COOKIE,
+    )
     .build();
 
   const nestDoc = SwaggerModule.createDocument(app, swaggerConfig);
