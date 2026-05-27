@@ -17,7 +17,7 @@
 | Logging library | Winston | Feature-rich, widely used, JSON-native output |
 | Error tracking | Sentry | Best JS/Node/React SDKs, generous free tier, OTel built-in |
 | OTel strategy | Via Sentry SDK | Sentry Node SDK auto-instruments via OTel — no separate collector needed |
-| Log transport | stdout only | PaaS (Fly/Railway/Render) collects stdout natively |
+| Log transport | stdout (prod), stdout + files (dev) | PaaS collects stdout natively; local files enable offline review |
 | Frontend observability | Errors + breadcrumbs | No performance monitoring — just error capture and admin action breadcrumbs |
 
 ## Architecture Overview
@@ -83,10 +83,24 @@
 }
 ```
 
-**Development** (pretty-print):
+**Development** (pretty-print to console + file):
 ```
 [12:00:00] INFO [TokenService] JWT issued | traceId=abc123 requestId=req-uuid-456
 ```
+
+### Development File Transports
+
+In development (`NODE_ENV !== 'production'`), Winston additionally writes logs to local files for offline review and search:
+
+- `logs/combined.log` — All log entries (JSON format, same schema as production)
+- `logs/error.log` — Error-level entries only (JSON format)
+
+The `logs/` directory is `.gitignore`d. Files are rotated or truncated on app restart to avoid unbounded growth. Console pretty-print output remains active alongside file transports.
+
+Sentry traces in dev are also written to local files when `SENTRY_DSN` is not set:
+- `logs/traces.log` — OTel span data exported via a file exporter, one JSON object per span
+
+This allows developers to inspect full request traces without needing a Sentry account during local development.
 
 ### Log Levels
 
@@ -282,6 +296,10 @@ src/
       sentry-exception.filter.ts        # Replaces http-exception.filter.ts
     middleware/
       request-id.middleware.ts           # X-Request-Id generation
+logs/                                    # Dev only, .gitignore'd
+  combined.log                           # All log entries (JSON)
+  error.log                              # Error-level only (JSON)
+  traces.log                             # OTel spans (JSON, when no SENTRY_DSN)
 ```
 
 ### admin
