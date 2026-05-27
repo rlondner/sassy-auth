@@ -88,6 +88,7 @@ describe('UsersService', () => {
     });
 
     it('passes orgId filter to prisma when provided', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 1, publicId: 'org1' });
       mockPrisma.saUser.findMany.mockResolvedValue([]);
       await service.listUsers('ba-caller', { orgPublicId: 'org1' });
       expect(mockPrisma.saUser.findMany).toHaveBeenCalledWith(
