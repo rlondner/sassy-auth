@@ -233,7 +233,21 @@ export class UsersService {
     const role = await prisma.saRole.findUnique({ where: { publicId: dto.roleId } });
     if (!role) throw new NotFoundException('Role not found');
 
-    await prisma.saUserRole.create({ data: { userId: user.id, roleId: role.id } });
+    try {
+      await prisma.saUserRole.create({ data: { userId: user.id, roleId: role.id } });
+    } catch (e: unknown) {
+      // P2002 = unique-constraint violation: the role is already assigned.
+      // Role assignment is idempotent — swallow and treat as success.
+      if (
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        (e as { code?: string }).code === 'P2002'
+      ) {
+        return;
+      }
+      throw e;
+    }
     this.logger.getWinstonLogger().info('Role assigned to user', {
       context: 'UsersService',
       userId: userPublicId,

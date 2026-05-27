@@ -244,6 +244,17 @@ describe('UsersService', () => {
       mockPrisma.saRole.findUnique.mockResolvedValue(null);
       await expect(service.assignRole('ba-caller', 'usr1', { roleId: 'bad' })).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('is idempotent when the role is already assigned (Prisma P2002)', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1' });
+      mockPrisma.saUserRole.create.mockImplementationOnce(() => {
+        const err = new Error('Unique constraint failed');
+        (err as Error & { code?: string }).code = 'P2002';
+        return Promise.reject(err);
+      });
+      await expect(service.assignRole('ba-caller', 'usr1', { roleId: 'role1' })).resolves.toBeUndefined();
+    });
   });
 
   describe('removeRole', () => {
