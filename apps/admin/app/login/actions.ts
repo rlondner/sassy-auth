@@ -51,7 +51,8 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
     }
   }
 
-  Sentry.setUser({ email })
+  // Do not pass plaintext email to Sentry; the admin layout will identify
+  // the user by id after the next page render reads the session.
   Sentry.addBreadcrumb({
     category: 'auth',
     message: 'Admin login successful',
