@@ -6,6 +6,7 @@ import {
 import { prisma } from '@sassy-auth/db';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
+import { LoggerService } from '../common/logger/logger.service';
 
 const INVITATION_INCLUDE = {
   user: {
@@ -15,6 +16,8 @@ const INVITATION_INCLUDE = {
 
 @Injectable()
 export class InvitationsService {
+  constructor(private readonly logger: LoggerService) {}
+
   async validateToken(token: string) {
     const inv = await prisma.saInvitation.findUnique({
       where: { token },
@@ -70,6 +73,11 @@ export class InvitationsService {
         where: { id: inv.id },
         data: { usedAt: now },
       });
+    });
+
+    this.logger.getWinstonLogger().info('Invitation accepted', {
+      context: 'InvitationsService',
+      userId: inv.user.publicId ?? String(inv.user.id),
     });
   }
 }

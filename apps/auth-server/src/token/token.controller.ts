@@ -11,6 +11,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { compare } from 'bcryptjs';
 import { Request } from 'express';
 import { prisma } from '@sassy-auth/db';
@@ -22,6 +23,7 @@ import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
+import { LoggerService } from '../common/logger/logger.service';
 
 @Controller('token')
 export class TokenController {
@@ -29,6 +31,7 @@ export class TokenController {
     private readonly tokenService: TokenService,
     private readonly oauthService: OauthService,
     private readonly sqidService: SqidService,
+    private readonly logger: LoggerService,
   ) {}
 
   /** GET /api/token/jwks */
@@ -88,6 +91,14 @@ export class TokenController {
     url.searchParams.set('code', code);
     if (state) url.searchParams.set('state', state);
 
+    this.logger.getWinstonLogger().info('OAuth authorization code issued', {
+      context: 'TokenController',
+      appId: clientId,
+      userId: saUser.publicId,
+    });
+    Sentry.setTag('authFlow', 'oauth');
+    Sentry.setTag('appId', clientId);
+
     return { url: url.toString(), statusCode: 302 };
   }
 
@@ -116,6 +127,12 @@ export class TokenController {
       userPublicId: saUser.publicId,
       orgPublicId: saUser.org.publicId,
       appPublicId,
+    });
+
+    this.logger.getWinstonLogger().info('OAuth code exchanged, JWT issued', {
+      context: 'TokenController',
+      appId: appPublicId,
+      userId: userPublicId,
     });
 
     return { access_token: token, token_type: 'Bearer', expires_in: 3600 };
@@ -160,7 +177,14 @@ export class TokenController {
         where: { betterAuthUser: { email: dto.identifier } },
         include: { org: true, betterAuthUser: true },
       }) as SaUserWithOrg | null;
-      if (!found) throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
+      if (!found) {
+        this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
+          context: 'TokenController',
+          identifierType: detectIdentifierType(dto.identifier),
+          appId: dto.appId,
+        });
+        throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
+      }
       betterAuthEmail = dto.identifier;
       saUser = found;
     } else if (identifierType === 'username') {
@@ -168,7 +192,14 @@ export class TokenController {
         where: { username: dto.identifier },
         include: { org: true, betterAuthUser: true },
       }) as SaUserWithOrg | null;
-      if (!found) throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
+      if (!found) {
+        this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
+          context: 'TokenController',
+          identifierType: detectIdentifierType(dto.identifier),
+          appId: dto.appId,
+        });
+        throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
+      }
       betterAuthEmail = found.betterAuthUser.email;
       saUser = found;
     } else {
@@ -177,7 +208,14 @@ export class TokenController {
         where: { phoneNumber: dto.identifier },
         include: { org: true, betterAuthUser: true },
       }) as SaUserWithOrg | null;
-      if (!found) throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
+      if (!found) {
+        this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
+          context: 'TokenController',
+          identifierType: detectIdentifierType(dto.identifier),
+          appId: dto.appId,
+        });
+        throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
+      }
       betterAuthEmail = found.betterAuthUser.email;
       saUser = found;
     }
@@ -195,10 +233,20 @@ export class TokenController {
       },
     });
     if (!account?.password) {
+      this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
+        context: 'TokenController',
+        identifierType: detectIdentifierType(dto.identifier),
+        appId: dto.appId,
+      });
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
     }
     const valid = await compare(dto.password, account.password);
     if (!valid) {
+      this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
+        context: 'TokenController',
+        identifierType: detectIdentifierType(dto.identifier),
+        appId: dto.appId,
+      });
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
     }
 
@@ -209,6 +257,16 @@ export class TokenController {
       orgPublicId: saUser.org.publicId,
       appPublicId: app.publicId,
     });
+
+    this.logger.getWinstonLogger().info('Direct login successful, JWT issued', {
+      context: 'TokenController',
+      identifierType: detectIdentifierType(dto.identifier),
+      appId: dto.appId,
+      userId: saUser.publicId,
+    });
+    Sentry.setUser({ id: saUser.publicId });
+    Sentry.setTag('authFlow', 'direct');
+    Sentry.setTag('appId', dto.appId);
 
     return { access_token: token, token_type: 'Bearer', expires_in: 3600 };
   }

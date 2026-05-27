@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { SqidService } from '../common/sqid/sqid.service';
+import { LoggerService } from '../common/logger/logger.service';
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -65,7 +66,11 @@ describe('UsersService', () => {
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
-      providers: [UsersService, SqidService],
+      providers: [
+        UsersService,
+        SqidService,
+        { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+      ],
     }).compile();
     service = module.get(UsersService);
     jest.clearAllMocks();

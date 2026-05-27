@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { InvitationsService } from './invitations.service';
+import { LoggerService } from '../common/logger/logger.service';
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -44,7 +45,10 @@ describe('InvitationsService', () => {
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
-      providers: [InvitationsService],
+      providers: [
+        InvitationsService,
+        { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+      ],
     }).compile();
     service = module.get(InvitationsService);
     jest.clearAllMocks();

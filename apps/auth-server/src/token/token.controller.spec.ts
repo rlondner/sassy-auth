@@ -3,7 +3,16 @@ import { TokenController } from './token.controller';
 import { TokenService } from './token.service';
 import { OauthService } from './oauth.service';
 import { SqidService } from '../common/sqid/sqid.service';
+import { LoggerService } from '../common/logger/logger.service';
 import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+
+jest.mock('@sentry/nestjs', () => ({
+  setTag: jest.fn(),
+  setUser: jest.fn(),
+  captureException: jest.fn(),
+  withScope: jest.fn((cb) => cb({ setExtra: jest.fn(), setTag: jest.fn() })),
+  lastEventId: jest.fn(),
+}));
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -56,6 +65,7 @@ describe('TokenController', () => {
         { provide: TokenService, useValue: mockTokenService },
         { provide: OauthService, useValue: mockOauthService },
         { provide: SqidService, useValue: mockSqidService },
+        { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
       ],
     }).compile();
     controller = module.get(TokenController);

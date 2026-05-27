@@ -6,6 +6,7 @@ import { checkPermission } from '../common/permissions/check-permission';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { LoggerService } from '../common/logger/logger.service';
 
 const USER_INCLUDE = {
   betterAuthUser: { select: { email: true } },
@@ -36,7 +37,10 @@ function formatUser(u: {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly sqids: SqidService) {}
+  constructor(
+    private readonly sqids: SqidService,
+    private readonly logger: LoggerService,
+  ) {}
 
   async listUsers(
     callerBaId: string,
@@ -167,6 +171,12 @@ export class UsersService {
     });
 
     const baseUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    this.logger.getWinstonLogger().info('User created', {
+      context: 'UsersService',
+      userId: saUser.publicId,
+      orgId: dto.orgId,
+      email: dto.email,
+    });
     return {
       user: formatUser(saUser),
       inviteUrl: `${baseUrl}/accept-invite?token=${invitation.token}`,
@@ -191,6 +201,12 @@ export class UsersService {
       },
       include: USER_INCLUDE,
     });
+    const changedFields = Object.keys(dto).filter((k) => dto[k as keyof typeof dto] !== undefined);
+    this.logger.getWinstonLogger().info('User updated', {
+      context: 'UsersService',
+      userId: publicId,
+      changedFields,
+    });
     return formatUser(updated);
   }
 
@@ -201,6 +217,10 @@ export class UsersService {
     if (!existing) throw new NotFoundException();
 
     await prisma.saUser.delete({ where: { publicId } });
+    this.logger.getWinstonLogger().info('User deleted', {
+      context: 'UsersService',
+      userId: publicId,
+    });
   }
   async assignRole(callerBaId: string, userPublicId: string, dto: AssignRoleDto): Promise<void> {
     await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
@@ -214,6 +234,11 @@ export class UsersService {
     if (!role) throw new NotFoundException('Role not found');
 
     await prisma.saUserRole.create({ data: { userId: user.id, roleId: role.id } });
+    this.logger.getWinstonLogger().info('Role assigned to user', {
+      context: 'UsersService',
+      userId: userPublicId,
+      roleId: dto.roleId,
+    });
   }
 
   async removeRole(callerBaId: string, userPublicId: string, rolePublicId: string): Promise<void> {
@@ -228,6 +253,11 @@ export class UsersService {
     if (!role) throw new NotFoundException('Role not found');
 
     await prisma.saUserRole.delete({ where: { userId_roleId: { userId: user.id, roleId: role.id } } });
+    this.logger.getWinstonLogger().info('Role removed from user', {
+      context: 'UsersService',
+      userId: userPublicId,
+      roleId: rolePublicId,
+    });
   }
   async resendInvitation(callerBaId: string, userPublicId: string) {
     await checkPermission(callerBaId, 'platform.users.manage').catch(async () => {
@@ -250,6 +280,11 @@ export class UsersService {
 
     const invitation = await prisma.saInvitation.create({
       data: { publicId, token, userId: user.id, expiresAt },
+    });
+
+    this.logger.getWinstonLogger().info('Invitation resent', {
+      context: 'UsersService',
+      userId: userPublicId,
     });
 
     const baseUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
