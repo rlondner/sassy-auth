@@ -299,4 +299,16 @@ describe('UsersService', () => {
       await expect(service.resendInvitation('ba-caller', 'usr1')).rejects.toBeInstanceOf(BadRequestException);
     });
   });
+
+  describe('deleteUser self-delete guard', () => {
+    it('throws ForbiddenException when caller targets their own SaUser', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue({
+        publicId: 'me-public',
+        orgId: 1,
+        betterAuthUserId: 'ba-caller',
+      });
+      await expect(service.deleteUser('ba-caller', 'me-public')).rejects.toThrow(/own account/);
+      expect(mockPrisma.saUser.delete).not.toHaveBeenCalled();
+    });
+  });
 });
