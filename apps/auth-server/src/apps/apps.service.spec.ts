@@ -125,6 +125,11 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.delete).not.toHaveBeenCalled();
   });
 
+  it('deleteApp throws NotFoundException when missing', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(null);
+    await expect(service.deleteApp('ba-caller', 'nope')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('deleteApp throws ConflictException on P2003 (dependent FK)', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     mockPrisma.saApp.delete.mockRejectedValue({ code: 'P2003' });
