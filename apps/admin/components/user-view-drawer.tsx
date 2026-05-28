@@ -4,9 +4,10 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import {
   Sheet, SheetContent, SheetHeader, SheetBody, SheetClose, SheetTitle,
-  Button, UserAvatar, StatusChip, Badge,
+  Button, UserAvatar, StatusChip, Badge, ConfirmDialog,
 } from '@sassy-auth/ui'
 import { getUserRoles, getEffectivePermissions, updateUser } from '@/lib/api'
+import { deleteUserAction } from '@/app/(admin)/users/actions'
 import type { User, Role, Permission } from '@/lib/types'
 
 const MAX_PERMISSIONS_SHOWN = 5
@@ -26,6 +27,8 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
   const [saving, setSaving] = React.useState(false)
   const [showAllPerms, setShowAllPerms] = React.useState(false)
   const [editValues, setEditValues] = React.useState({ firstName: '', lastName: '', phoneNumber: '', username: '' })
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
+  const [deleteError, setDeleteError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (!open || !user) return
@@ -76,6 +79,14 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
               </>
             ) : (
               <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-[var(--destructive)] text-[var(--destructive)]"
+                  onClick={() => { setDeleteError(null); setDeleteOpen(true) }}
+                >
+                  {t('users.actions.delete')}
+                </Button>
                 <Button variant="outline" size="sm">{t('users.drawer.resetPassword')}</Button>
                 <Button size="sm" onClick={() => setEditing(true)}>{t('users.drawer.edit')}</Button>
               </>
@@ -176,6 +187,25 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
           </div>
         </SheetBody>
       </SheetContent>
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t('users.confirmDelete.title')}
+        description={t('users.confirmDelete.body', { name: `${user.firstName} ${user.lastName}` })}
+        confirmLabel={t('users.confirmDelete.button')}
+        cancelLabel={t('users.drawer.cancel')}
+        variant="destructive"
+        onConfirm={async () => {
+          const result = await deleteUserAction(user.id)
+          if ('errorKey' in result) {
+            const msg = t(result.errorKey)
+            setDeleteError(msg)
+            throw new Error(msg)
+          }
+          onOpenChange(false)
+        }}
+        error={deleteError ?? undefined}
+      />
     </Sheet>
   )
 }
