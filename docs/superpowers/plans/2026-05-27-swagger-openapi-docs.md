@@ -6,7 +6,7 @@
 
 **Architecture:** Enable the `@nestjs/swagger` CLI plugin to infer schemas from existing `class-validator` DTOs (zero per-field annotation). At bootstrap, build the Nest OpenAPI doc, invoke BetterAuth's `open-api` plugin to retrieve its OpenAPI document in-process, then merge both into one document served at `/api/docs`. Same-origin cookie reuse means signing in via the BetterAuth endpoints in Swagger UI sets the session cookie used by subsequent Try-it-out calls.
 
-**Tech Stack:** NestJS 10 (Express adapter), `@nestjs/swagger` ^7.4 + CLI plugin, `better-auth/plugins/open-api`, Jest + ts-jest, pnpm workspaces.
+**Tech Stack:** NestJS 10 (Express adapter), `@nestjs/swagger` ^7.4 + CLI plugin, `better-auth/plugins` (open-api plugin), Jest + ts-jest, pnpm workspaces.
 
 **Reference spec:** `docs/superpowers/specs/2026-05-27-swagger-openapi-docs-design.md`
 
@@ -116,10 +116,10 @@ git commit -m "feat(auth-server): add @nestjs/swagger + enable CLI plugin"
 
 - [ ] **Step 1: Import the plugin**
 
-Open `apps/auth-server/src/auth/auth.config.ts`. Add this import after the existing `import { emailOTP } from 'better-auth/plugins';` line:
+Open `apps/auth-server/src/auth/auth.config.ts`. The existing `magicLink` and `emailOTP` already come from `'better-auth/plugins'`; add `openAPI` to that same import list (better-auth's package exports do not expose `'better-auth/plugins/open-api'` as a public subpath in v1.6 — the symbol lives on the `'better-auth/plugins'` barrel):
 
 ```ts
-import { openAPI } from 'better-auth/plugins/open-api';
+import { magicLink, emailOTP, openAPI } from 'better-auth/plugins';
 ```
 
 - [ ] **Step 2: Add `openAPI` to the plugins array**

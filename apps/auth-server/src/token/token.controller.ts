@@ -11,6 +11,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import * as Sentry from '@sentry/nestjs';
 import { compare } from 'bcryptjs';
 import { Request } from 'express';
@@ -25,6 +26,7 @@ import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
 import { LoggerService } from '../common/logger/logger.service';
 
+@ApiTags('Token')
 @Controller('token')
 export class TokenController {
   constructor(
