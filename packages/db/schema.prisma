@@ -71,7 +71,7 @@ enum UserStatus {
 model SaApp {
   id          Int            @id @default(autoincrement())
   publicId    String         @unique
-  name        String
+  name        String         @unique
   url         String
   isPlatform  Boolean        @default(false)
   orgs        SaOrg[]
