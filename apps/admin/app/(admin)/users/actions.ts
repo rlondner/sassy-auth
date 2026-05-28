@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createUser, assignRole } from '@/lib/api'
+import { createUser, assignRole, deleteUser } from '@/lib/api'
 import type { CreateUserPayload } from '@/lib/types'
 
 interface CreateUserInput extends CreateUserPayload {
@@ -21,5 +21,22 @@ export async function createUserAction(
     const message = err instanceof Error ? err.message : 'Unknown error'
     if (message.includes('409') || message.includes('already')) return { error: 'A user with this email already exists.' }
     return { error: message }
+  }
+}
+
+export async function deleteUserAction(
+  userId: string,
+): Promise<{ ok: true } | { errorKey: string }> {
+  try {
+    await deleteUser(userId)
+    revalidatePath('/users')
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : ''
+    if (message.includes('403') && message.toLowerCase().includes('own')) {
+      return { errorKey: 'users.confirmDelete.selfDeleteError' }
+    }
+    if (message.includes('403')) return { errorKey: 'users.errors.forbidden' }
+    return { errorKey: 'users.errors.generic' }
   }
 }
