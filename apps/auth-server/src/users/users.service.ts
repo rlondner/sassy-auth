@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -252,6 +253,9 @@ export class UsersService {
   async deleteUser(callerBaId: string, publicId: string): Promise<void> {
     const existing = await prisma.saUser.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
+    if (existing.betterAuthUserId === callerBaId) {
+      throw new ForbiddenException('You cannot delete your own account');
+    }
     // delete is a destructive action — keep the strictest gate
     // (platform-wide only) but pass the targetOrgId for audit symmetry.
     await checkPermission(callerBaId, ['platform.users.manage'], {

@@ -19,3 +19,4 @@ export {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from './components/dropdown-menu'
 export { FormField } from './components/form-field'
+export { ConfirmDialog, type ConfirmDialogProps } from './components/confirm-dialog'
