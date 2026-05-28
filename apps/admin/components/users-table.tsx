@@ -4,12 +4,13 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import {
-  Button, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  Button, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, StatusChip, UserAvatar,
 } from '@sassy-auth/ui'
 import type { User, Org } from '@/lib/types'
 import { UserViewDrawer } from './user-view-drawer'
 import { UserCreateDrawer } from './user-create-drawer'
+import { deleteUserAction } from '@/app/(admin)/users/actions'
 
 interface UsersTableProps {
   users: User[]
@@ -22,6 +23,8 @@ export function UsersTable({ users, orgs }: UsersTableProps) {
   const [selectedUser, setSelectedUser] = React.useState<User | null>(null)
   const [viewOpen, setViewOpen] = React.useState(false)
   const [createOpen, setCreateOpen] = React.useState(false)
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
+  const [deleteError, setDeleteError] = React.useState<string | null>(null)
 
   const orgMap = React.useMemo(
     () => Object.fromEntries(orgs.map((o) => [o.id, o])),
@@ -98,7 +101,12 @@ export function UsersTable({ users, orgs }: UsersTableProps) {
               ) : u.status === 'inactive' ? (
                 <DropdownMenuItem>{t('users.actions.activate')}</DropdownMenuItem>
               ) : null}
-              <DropdownMenuItem className="text-[var(--destructive)]">{t('users.actions.delete')}</DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-[var(--destructive)]"
+                onClick={(e) => { e.stopPropagation(); setSelectedUser(u); setDeleteError(null); setDeleteOpen(true) }}
+              >
+                {t('users.actions.delete')}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )
@@ -156,6 +164,26 @@ export function UsersTable({ users, orgs }: UsersTableProps) {
         open={createOpen}
         onOpenChange={setCreateOpen}
       />
+      {selectedUser && (
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          title={t('users.confirmDelete.title')}
+          description={t('users.confirmDelete.body', { name: `${selectedUser.firstName} ${selectedUser.lastName}` })}
+          confirmLabel={t('users.confirmDelete.button')}
+          cancelLabel={t('users.drawer.cancel')}
+          variant="destructive"
+          onConfirm={async () => {
+            const result = await deleteUserAction(selectedUser.id)
+            if ('errorKey' in result) {
+              const msg = t(result.errorKey)
+              setDeleteError(msg)
+              throw new Error(msg) // keep dialog open via ConfirmDialog's error path
+            }
+          }}
+          error={deleteError ?? undefined}
+        />
+      )}
     </>
   )
 }
