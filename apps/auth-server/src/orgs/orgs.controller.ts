@@ -1,8 +1,12 @@
 import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { BetterAuthGuard } from '../auth/better-auth.guard';
+import { BETTER_AUTH_SESSION_COOKIE } from '../common/constants';
 import { OrgsService } from './orgs.service';
 
+@ApiTags('Orgs')
+@ApiCookieAuth(BETTER_AUTH_SESSION_COOKIE)
 @UseGuards(BetterAuthGuard)
 @Controller('orgs')
 export class OrgsController {

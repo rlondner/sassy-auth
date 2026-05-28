@@ -1,7 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { magicLink } from 'better-auth/plugins';
-import { emailOTP } from 'better-auth/plugins';
+import { magicLink, emailOTP, openAPI } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,5 +50,6 @@ export const auth: any = betterAuth({
         console.log(`[email-otp] ${email} → ${otp}`);
       },
     }),
+    openAPI({ disableDefaultReference: true }),
   ],
 });
