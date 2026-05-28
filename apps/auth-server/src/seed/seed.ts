@@ -1,5 +1,7 @@
+import 'dotenv/config';
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
+import { auth } from '../auth/auth.config';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -14,6 +16,126 @@ const PLATFORM_PERMISSIONS = [
   'org.users.manage',
   'org.permissions.manage',
 ] as const;
+
+const ADMIN_PASSWORD = 'Pass@word1234';
+
+type AdminGrant =
+  | { kind: 'direct'; permission: string }
+  | { kind: 'role'; role: string };
+
+const PLATFORM_ADMINS: ReadonlyArray<{
+  email: string;
+  firstName: string;
+  lastName: string;
+  grant: AdminGrant;
+}> = [
+  { email: 'u@sa.io', firstName: 'Users', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.users.manage' } },
+  { email: 'o@sa.io', firstName: 'Orgs',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.orgs.manage' } },
+  { email: 'a@sa.io', firstName: 'Apps',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.apps.manage' } },
+  { email: 'p@sa.io', firstName: 'Perms', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.permissions.manage' } },
+  { email: 's@sa.io', firstName: 'Super', lastName: 'Admin', grant: { kind: 'role',   role: 'Platform Super Admin' } },
+];
+
+const SUPER_ADMIN_ROLE_NAME = 'Platform Super Admin';
+
+async function ensurePlatformSuperAdminRole(platformAppId: number) {
+  let role = await prisma.saRole.findFirst({
+    where: { name: SUPER_ADMIN_ROLE_NAME, appId: platformAppId },
+  });
+
+  if (!role) {
+    role = await prisma.$transaction(async (tx) => {
+      const created = await tx.saRole.create({
+        data: {
+          publicId: 'placeholder',
+          name: SUPER_ADMIN_ROLE_NAME,
+          appId: platformAppId,
+        },
+      });
+      const publicId = sqids.encode([created.id]);
+      return tx.saRole.update({
+        where: { id: created.id },
+        data: { publicId },
+      });
+    });
+    console.log(`Created role: ${SUPER_ADMIN_ROLE_NAME} (publicId=${role.publicId})`);
+  } else {
+    console.log(`Role already exists: ${SUPER_ADMIN_ROLE_NAME} (publicId=${role.publicId})`);
+  }
+
+  const platformPerms = await prisma.saPermission.findMany({
+    where: { appId: platformAppId, name: { startsWith: 'platform.' } },
+  });
+
+  for (const perm of platformPerms) {
+    await prisma.saRolePermission.upsert({
+      where: { roleId_permissionId: { roleId: role.id, permissionId: perm.id } },
+      create: { roleId: role.id, permissionId: perm.id },
+      update: {},
+    });
+  }
+  console.log(`Role ${SUPER_ADMIN_ROLE_NAME} wired to ${platformPerms.length} platform.* permission(s)`);
+
+  return role;
+}
+
+async function seedPlatformAdmin(
+  admin: (typeof PLATFORM_ADMINS)[number],
+  platformOrgId: number,
+  superAdminRoleId: number,
+) {
+  const existing = await prisma.user.findUnique({ where: { email: admin.email } });
+  if (existing) {
+    console.log(`Admin already exists: ${admin.email}`);
+    return;
+  }
+
+  const result = await auth.api.signUpEmail({
+    body: {
+      email: admin.email,
+      password: ADMIN_PASSWORD,
+      name: `${admin.firstName} ${admin.lastName}`,
+    },
+  });
+  const baUserId: string = result.user.id;
+
+  await prisma.user.update({
+    where: { id: baUserId },
+    data: { emailVerified: true },
+  });
+
+  const saUser = await prisma.$transaction(async (tx) => {
+    const created = await tx.saUser.create({
+      data: {
+        publicId: 'placeholder',
+        betterAuthUserId: baUserId,
+        orgId: platformOrgId,
+        firstName: admin.firstName,
+        lastName: admin.lastName,
+        status: 'active',
+      },
+    });
+    const publicId = sqids.encode([created.id]);
+    return tx.saUser.update({
+      where: { id: created.id },
+      data: { publicId },
+    });
+  });
+
+  if (admin.grant.kind === 'direct') {
+    const perm = await prisma.saPermission.findUnique({ where: { name: admin.grant.permission } });
+    if (!perm) throw new Error(`Permission not found: ${admin.grant.permission}`);
+    await prisma.saUserPermission.create({
+      data: { userId: saUser.id, permissionId: perm.id },
+    });
+    console.log(`Created admin ${admin.email} with direct permission ${admin.grant.permission}`);
+  } else {
+    await prisma.saUserRole.create({
+      data: { userId: saUser.id, roleId: superAdminRoleId },
+    });
+    console.log(`Created admin ${admin.email} with role ${admin.grant.role}`);
+  }
+}
 
 async function main() {
   console.log('Seeding platform data...');
@@ -79,6 +201,14 @@ async function main() {
       });
       console.log(`Created permission: ${name}`);
     }
+  }
+
+  // 4. Platform Super Admin role
+  const superAdminRole = await ensurePlatformSuperAdminRole(platformApp.id);
+
+  // 5. Platform admin users
+  for (const admin of PLATFORM_ADMINS) {
+    await seedPlatformAdmin(admin, platformOrg.id, superAdminRole.id);
   }
 
   console.log('Seed complete.');
