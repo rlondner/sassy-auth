@@ -49,3 +49,33 @@ export interface InvitationInfo {
   email: string
   expired: boolean
 }
+
+export interface App {
+  publicId: string;
+  name: string;
+  url: string;
+  isPlatform: boolean;
+}
+
+export interface CreateAppPayload {
+  name: string;
+  url: string;
+}
+
+export interface UpdateAppPayload {
+  name?: string;
+  url?: string;
+}
+
+export interface ListAppsParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+}
+
+export interface ListAppsResponse {
+  items: App[];
+  total: number;
+  page: number;
+  pageSize: number;
+}

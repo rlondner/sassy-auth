@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, InvitationInfo } from './types'
+import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, InvitationInfo, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -100,4 +100,39 @@ export async function acceptInvitation(token: string, password: string): Promise
     body: JSON.stringify({ password }),
   })
   if (!res.ok) throw new Error(`API error ${res.status}: accept invitation`)
+}
+
+export async function getApps(params: ListAppsParams = {}): Promise<ListAppsResponse> {
+  const sp = new URLSearchParams();
+  if (params.page !== undefined) sp.set('page', String(params.page));
+  if (params.pageSize !== undefined) sp.set('pageSize', String(params.pageSize));
+  if (params.q) sp.set('q', params.q);
+  const qs = sp.toString();
+  const res = await apiFetch(`/api/apps${qs ? `?${qs}` : ''}`);
+  return res.json();
+}
+
+export async function createApp(payload: CreateAppPayload): Promise<App> {
+  const res = await apiFetch('/api/apps', { method: 'POST', body: JSON.stringify(payload) });
+  const app: App = await res.json();
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `App created: ${app.publicId}`, level: 'info' });
+  return app;
+}
+
+export async function updateApp(publicId: string, patch: UpdateAppPayload): Promise<App> {
+  const res = await apiFetch(`/api/apps/${publicId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  const app: App = await res.json();
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `App updated: ${publicId}`, level: 'info' });
+  return app;
+}
+
+export async function deleteApp(publicId: string): Promise<void> {
+  await apiFetch(`/api/apps/${publicId}`, { method: 'DELETE' });
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `App deleted: ${publicId}`, level: 'info' });
+}
+
+export async function getMyPermissions(): Promise<string[]> {
+  const res = await apiFetch('/api/me/permissions');
+  const body: { permissions: string[] } = await res.json();
+  return body.permissions;
 }
