@@ -1,4 +1,3 @@
-// apps/auth-server/src/apps/dto/list-apps-query.dto.ts
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
