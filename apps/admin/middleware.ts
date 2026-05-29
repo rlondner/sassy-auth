@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { AUTH_SERVER_URL } from '@/lib/config'
 
 const PUBLIC_PATHS = ['/login', '/accept-invite']
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
 async function validateSession(request: NextRequest): Promise<boolean> {
   // Forward the inbound cookie header to the auth server so BetterAuth
@@ -11,7 +11,7 @@ async function validateSession(request: NextRequest): Promise<boolean> {
   if (!cookieHeader.includes('better-auth.session_token=')) return false
 
   try {
-    const res = await fetch(`${AUTH_SERVER}/api/auth/get-session`, {
+    const res = await fetch(`${AUTH_SERVER_URL}/api/auth/get-session`, {
       headers: { Cookie: cookieHeader },
       // Edge runtime — must not cache or be revalidated.
       cache: 'no-store',

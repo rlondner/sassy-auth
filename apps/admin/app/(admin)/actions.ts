@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
+import { AUTH_SERVER_URL } from '@/lib/config'
 
 export async function setLocaleAction(locale: string, pathname: string) {
   const cookieStore = await cookies()
@@ -22,10 +23,9 @@ export async function setLocaleAction(locale: string, pathname: string) {
 }
 
 export async function signOutAction() {
-  const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
   const cookieStore = await cookies()
   const origin = await getForwardedOrigin()
-  await fetch(`${AUTH_SERVER}/api/auth/sign-out`, {
+  await fetch(`${AUTH_SERVER_URL}/api/auth/sign-out`, {
     method: 'POST',
     headers: {
       Cookie: cookieStore.toString(),

@@ -4,8 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
-
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+import { AUTH_SERVER_URL } from '@/lib/config'
 
 interface ParsedSessionCookie {
   value: string
@@ -92,7 +91,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
 
   let res: Response
   try {
-    res = await fetch(`${AUTH_SERVER}/api/auth/sign-in/email`, {
+    res = await fetch(`${AUTH_SERVER_URL}/api/auth/sign-in/email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
