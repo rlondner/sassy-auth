@@ -1,7 +1,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse } from './types'
+import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -49,9 +49,34 @@ export async function deleteUser(id: string): Promise<void> {
   Sentry.addBreadcrumb({ category: 'admin.action', message: `User deleted: ${id}`, level: 'info' })
 }
 
-export async function getOrgs(): Promise<Org[]> {
-  const res = await apiFetch('/api/orgs')
-  return res.json()
+export async function getOrgs(params: ListOrgsParams = {}): Promise<ListOrgsResponse> {
+  const sp = new URLSearchParams();
+  if (params.page !== undefined) sp.set('page', String(params.page));
+  if (params.pageSize !== undefined) sp.set('pageSize', String(params.pageSize));
+  if (params.q) sp.set('q', params.q);
+  if (params.appId) sp.set('appId', params.appId);
+  const qs = sp.toString();
+  const res = await apiFetch(`/api/orgs${qs ? `?${qs}` : ''}`);
+  return res.json();
+}
+
+export async function createOrg(payload: CreateOrgPayload): Promise<OrgRow> {
+  const res = await apiFetch('/api/orgs', { method: 'POST', body: JSON.stringify(payload) });
+  const org: OrgRow = await res.json();
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Org created: ${org.publicId}`, level: 'info' });
+  return org;
+}
+
+export async function updateOrg(publicId: string, patch: UpdateOrgPayload): Promise<OrgRow> {
+  const res = await apiFetch(`/api/orgs/${publicId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  const org: OrgRow = await res.json();
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Org updated: ${publicId}`, level: 'info' });
+  return org;
+}
+
+export async function deleteOrg(publicId: string): Promise<void> {
+  await apiFetch(`/api/orgs/${publicId}`, { method: 'DELETE' });
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Org deleted: ${publicId}`, level: 'info' });
 }
 
 export async function getRoles(appId?: string): Promise<Role[]> {
