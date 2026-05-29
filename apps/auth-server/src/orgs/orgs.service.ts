@@ -117,4 +117,20 @@ export class OrgsService {
       throw e;
     }
   }
+
+  async deleteOrg(callerBaId: string, publicId: string): Promise<void> {
+    await checkPermission(callerBaId, 'platform.orgs.manage');
+    const existing = await prisma.saOrg.findUnique({ where: { publicId } });
+    if (!existing) throw new NotFoundException();
+    if (existing.isPlatform) throw new ForbiddenException('Platform org cannot be modified');
+    try {
+      await prisma.saOrg.delete({ where: { publicId } });
+      this.logger.getWinstonLogger().info('Org deleted', { context: 'OrgsService', orgId: publicId });
+    } catch (e: unknown) {
+      if (isPrismaCode(e, 'P2003')) {
+        throw new ConflictException('Org has dependent users');
+      }
+      throw e;
+    }
+  }
 }

@@ -230,4 +230,36 @@ describe('OrgsService', () => {
       await expect(service.getOrg('ba-caller', 'nope')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('deleteOrg', () => {
+    const existing = { id: 10, publicId: 'sq_10', name: 'Acme', isPlatform: false, appId: 1 };
+    const platformExisting = { id: 20, publicId: 'sq_20', name: 'Platform', isPlatform: true, appId: 2 };
+
+    it('rejects platform orgs with ForbiddenException', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(platformExisting);
+      await expect(service.deleteOrg('ba-caller', 'sq_20'))
+        .rejects.toBeInstanceOf(ForbiddenException);
+      expect(mockPrisma.saOrg.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when missing', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(null);
+      await expect(service.deleteOrg('ba-caller', 'nope'))
+        .rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws ConflictException on P2003 (dependent users)', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(existing);
+      mockPrisma.saOrg.delete.mockRejectedValue({ code: 'P2003' });
+      await expect(service.deleteOrg('ba-caller', 'sq_10'))
+        .rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('succeeds for ordinary orgs', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(existing);
+      mockPrisma.saOrg.delete.mockResolvedValue(existing);
+      await service.deleteOrg('ba-caller', 'sq_10');
+      expect(mockPrisma.saOrg.delete).toHaveBeenCalledWith({ where: { publicId: 'sq_10' } });
+    });
+  });
 });
