@@ -4,7 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] — 2026-05-27
+## [Unreleased] — 2026-05-29
+
+Major e2e testing infrastructure day: the `admin-e2e` Playwright suite shipped end-to-end with CI, alongside auth fixes for Origin header forwarding and cookie attribute preservation. Design work started on the Orgs admin UI.
+
+### Added
+
+#### Admin E2E Test Suite (`apps/admin-e2e`)
+- **New workspace package** `@sassy-auth/admin-e2e` bootstrapped with Playwright, chromium-only. (`eb44710`)
+- **Login spec** verifying `s@sa.io` signs in and redirects to `/users`, with error-text-on-failure racing for clear diagnostics. (`0aef125`, `97226dc`)
+- **`LoginPage` Page Object Model** with scoped submit button locator. (`1bceaf2`, `df72ad4`)
+- **Auto-applied diagnostics fixture** attaching console logs, page errors, network failures, page HTML snapshot, and visible text on test failure. (`a138529`, `fad2862`)
+- **i18n helper** reading admin `messages/en.json` for assertion text. (`5cf4891`, `3e3222b`)
+- **Auth-state setup project** + `chromium-authed` project for future logged-in specs. (`f5456d8`, `c0f8548`)
+- **Playwright config** with conditional `webServer` (CI spins up both servers; local assumes they are running). (`8ce75cd`, `08e7838`)
+- **`data-testid="login-error"`** hook on admin login page for e2e selector stability. (`b2c6ab8`)
+
+#### CI / DevOps
+- **GitHub Actions e2e workflow** (`.github/workflows/e2e.yml`) with Postgres 16 service container, Prisma migration, RSA keypair generation, seed data, Playwright browser install, and artifact uploads for report/traces. (`06c9907`, `8f80906`)
+- **Turbo `test:e2e` task** in `turbo.json` with passthrough env vars and no caching. (`3fd73ef`)
+
+#### Documentation
+- **Orgs admin UI design spec** mirroring the apps page. (`41be341`)
+- **Admin E2E README** (`apps/admin-e2e/README.md`). (`c16079b`)
+- **Playwright E2E design spec and implementation plan**. (`f717666`, `e45ba10`, `09840fc`)
+- **BEGINNER_README.md** for junior developer onboarding. (`2f2760d`)
+- **2026-05-28 code review** report. (`3caec0d`)
+
+### Fixed
+
+- **Origin header forwarding** — new `getForwardedOrigin()` helper (`apps/admin/lib/auth-origin.ts`) extracts the browser's Origin/Referer and forwards it on server-to-server BetterAuth calls. Fixes 403 errors from Undici's default `Sec-Fetch-Mode: cors` tripping BetterAuth's CSRF middleware. (`62e69b4`)
+- **Trusted origins config** — `auth.config.ts` now reads `TRUSTED_ORIGINS` env var (comma-separated), defaulting to `http://localhost:3001`. (`644bc6d`)
+- **Sign-out redirect** — `signOutAction()` now redirects to `/` instead of `/login`, letting the middleware handle the redirect chain. (`e17ec2e`)
+- **Login soft failure** — `signIn()` catches transport-level errors (auth-server unreachable) and returns `serverUnavailable` error key instead of crashing. (`2fa5010`)
+- **Cookie attribute preservation** — full `parseSessionCookie()` replaces the old regex-extract, preserving `Max-Age`, `Expires`, `Domain`, `Path`, `SameSite`, `HttpOnly`, and `Secure` from upstream `Set-Cookie`. Resolves bug-0013 from 05-27 review. (`2fa5010`)
+- **Password verification** — direct-login flow now uses `better-auth/crypto` instead of raw bcrypt. (`f4bd89e`)
+- **CI workflow** — test-results upload now gates on `steps.run-e2e.outcome == 'failure'`. (`8f80906`)
+- **tsconfig noEmit** — `admin-e2e/tsconfig.json` uses `noEmit: true` to suppress stray `.js` emit. (`59a5de3`)
+
+### Changed
+
+- **`.gitignore`** — added `**/*.tsbuildinfo` glob; removed previously committed `apps/admin/tsconfig.tsbuildinfo`. (`ccce6d5`)
+- **Root page redirect** — `apps/admin/app/page.tsx` now redirects authenticated users to `/users`. (`92c1638`)
+- **Next.js dev indicators** repositioned via `next.config.ts`. (`5bda178`)
+- **User drawer** — various fixes to drawer behavior, data fetching, and view-drawer test coverage. (`1b00820`)
+- **Auth-server e2e tests** — extended to cover seeded super-admin flows. (`0ab856d`)
+- **`api-public.ts`** — added unauthenticated fetch helper for public auth endpoints. (`b5c07d0`)
+
+---
+
+## [2026-05-28] — 2026-05-27
 
 Heavy feature day across the monorepo (63 commits, all on `master`, local only — 12+ commits ahead of `origin/master` at time of writing). Three concurrent threads: full users/invitations/roles/orgs API surface on `auth-server`, the new `admin` Next.js console, and production-grade observability on both apps.
 

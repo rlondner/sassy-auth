@@ -200,6 +200,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `RSA_PUBLIC_KEY`      | Base64-encoded SPKI PEM public key (served via JWKS endpoint)  |
 | `BETTER_AUTH_SECRET`  | Random string, 32+ characters                                  |
 | `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`      |
+| `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
 
 ### Admin console
 
@@ -487,11 +488,28 @@ Unit test files live alongside source files as `*.spec.ts` / `*.test.tsx` and ru
 
 ### E2E tests
 
+**Auth-server E2E (Jest + Supertest):**
+
 ```bash
 pnpm --filter @sassy-auth/auth-server test:e2e
 ```
 
-E2E tests are in `apps/auth-server/test/` and use the Jest config at `test/jest-e2e.json`. They require a running database.
+Tests are in `apps/auth-server/test/` using the Jest config at `test/jest-e2e.json`. They require a running database.
+
+**Admin E2E (Playwright):**
+
+```bash
+# Requires both servers running (pnpm dev in another terminal)
+pnpm --filter @sassy-auth/admin-e2e test:e2e
+
+# Headed mode (see the browser)
+pnpm --filter @sassy-auth/admin-e2e test:e2e:headed
+
+# Interactive UI mode
+pnpm --filter @sassy-auth/admin-e2e test:e2e:ui
+```
+
+Tests are in `apps/admin-e2e/tests/`. In CI, the Playwright config automatically starts both servers. Locally, start `pnpm dev` first. See `apps/admin-e2e/README.md` for details.
 
 ---
 
@@ -511,8 +529,8 @@ The `client_secret` field is accepted in `POST /api/token/oauth/token` but not c
 **RBAC not org-scoped.**
 `checkPermission` only verifies that the caller holds the named permission — it does not constrain by `orgId`. A user with `org.users.manage` in org A can currently act on users in org B. Tracked as **bug-0001**.
 
-**No CI.**
-No GitHub Actions workflow yet — typecheck/test/lint must be run locally.
+**CI — E2E only, no typecheck/lint.**
+A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. Typecheck and lint are not yet wired into CI.
 
 **Admin / orgs / apps / roles CRUD UI.**
 Only users management is implemented in the admin console. Orgs / apps / roles / permissions CRUD is planned for a later sub-project.
