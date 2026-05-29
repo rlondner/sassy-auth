@@ -46,7 +46,10 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
               </>
             )}
             <SheetClose asChild>
-              <button className="ml-2 flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
+              <button
+                className="ml-2 flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]"
+                aria-label={t('common.close')}
+              >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </SheetClose>
@@ -59,6 +62,7 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             onCopy={() => copy(app.url, 'url')}
             copied={copied === 'url'}
             copyLabel={t('apps.actions.copy')}
+            copiedLabel={t('apps.actions.copied')}
           />
           <DetailRow
             label={t('apps.fields.publicId')}
@@ -67,6 +71,7 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             onCopy={() => copy(app.publicId, 'sqid')}
             copied={copied === 'sqid'}
             copyLabel={t('apps.actions.copy')}
+            copiedLabel={t('apps.actions.copied')}
           />
         </SheetBody>
       </SheetContent>
@@ -75,14 +80,19 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
 }
 
 function DetailRow({
-  label, value, onCopy, copied, mono, copyLabel,
-}: { label: string; value: string; onCopy: () => void; copied: boolean; mono?: boolean; copyLabel: string }) {
+  label, value, onCopy, copied, mono, copyLabel, copiedLabel,
+}: { label: string; value: string; onCopy: () => void; copied: boolean; mono?: boolean; copyLabel: string; copiedLabel: string }) {
   return (
     <div>
       <p className="text-label-sm font-bold uppercase tracking-wider text-[var(--muted-foreground)]">{label}</p>
       <div className="mt-1 flex items-center justify-between rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2">
         <code className={mono ? 'font-mono text-body-sm' : 'text-body-sm'}>{value}</code>
-        <button type="button" aria-label={copyLabel} onClick={onCopy} className="text-[var(--muted-foreground)] hover:text-[var(--primary)]">
+        <button
+          type="button"
+          aria-label={copied ? copiedLabel : copyLabel}
+          onClick={onCopy}
+          className="text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+        >
           <span className="material-symbols-outlined text-[16px]">{copied ? 'check' : 'content_copy'}</span>
         </button>
       </div>

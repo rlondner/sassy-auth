@@ -1,4 +1,9 @@
 {
+  "common": {
+    "close": "Close",
+    "moreActions": "More actions",
+    "switchLanguage": "Switch language"
+  },
   "nav": {
     "apps": "Apps",
     "orgs": "Orgs",

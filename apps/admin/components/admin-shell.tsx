@@ -91,7 +91,12 @@ export async function AdminShell({ children, currentPath, user, currentLocale, a
               <p className="truncate text-label-sm text-[var(--sidebar-fg)]/60">{user.email}</p>
             </div>
             <form action={signOutAction}>
-              <button type="submit" className="text-[var(--sidebar-fg)]/60 hover:text-[var(--sidebar-fg)]" title={t('nav.signOut')}>
+              <button
+                type="submit"
+                className="text-[var(--sidebar-fg)]/60 hover:text-[var(--sidebar-fg)]"
+                title={t('nav.signOut')}
+                aria-label={t('nav.signOut')}
+              >
                 <span className="material-symbols-outlined text-[20px]">logout</span>
               </button>
             </form>

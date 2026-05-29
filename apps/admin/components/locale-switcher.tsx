@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@sassy-auth/ui'
@@ -13,6 +14,7 @@ interface LocaleSwitcherProps {
 }
 
 export function LocaleSwitcher({ currentLocale, availableLocales }: LocaleSwitcherProps) {
+  const t = useTranslations()
   const [isPending, startTransition] = useTransition()
   const pathname = usePathname()
 
@@ -28,6 +30,7 @@ export function LocaleSwitcher({ currentLocale, availableLocales }: LocaleSwitch
         <button
           className="flex items-center gap-1 rounded px-2 py-1 text-[var(--sidebar-fg)] hover:bg-white/10 disabled:opacity-50"
           disabled={isPending}
+          aria-label={t('common.switchLanguage')}
         >
           <span className="material-symbols-outlined text-[18px]">language</span>
           <span className="text-label-sm font-bold tracking-wider">{currentLocale.toUpperCase()}</span>

@@ -97,7 +97,10 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
               </>
             )}
             <SheetClose asChild>
-              <button className="ml-2 flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
+              <button
+                className="ml-2 flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]"
+                aria-label={t('common.close')}
+              >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </SheetClose>

@@ -77,7 +77,7 @@ export function AppsTable({ initial }: Props) {
             <code className="rounded bg-[var(--muted)] px-1.5 py-0.5 font-mono text-label-md">{a.publicId}</code>
             <button
               type="button"
-              aria-label={t('apps.actions.copy')}
+              aria-label={copied ? t('apps.actions.copied') : t('apps.actions.copy')}
               onClick={(e) => {
                 e.stopPropagation()
                 copyToClipboard(a.publicId, () => {
@@ -101,7 +101,7 @@ export function AppsTable({ initial }: Props) {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
+            <button aria-label={t('common.moreActions')} className="flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
                 <span className="material-symbols-outlined text-[20px] text-[var(--muted-foreground)]">more_vert</span>
               </button>
             </DropdownMenuTrigger>

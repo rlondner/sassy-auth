@@ -1,4 +1,9 @@
 {
+  "common": {
+    "close": "Fermer",
+    "moreActions": "Plus d’actions",
+    "switchLanguage": "Changer de langue"
+  },
   "nav": {
     "apps": "Applications",
     "orgs": "Organisations",

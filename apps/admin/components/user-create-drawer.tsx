@@ -111,7 +111,10 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
             <SheetDescription>{t('users.drawer.createSubtitle')}</SheetDescription>
           </div>
           <SheetClose asChild>
-            <button className="flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
+            <button
+              className="flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]"
+              aria-label={t('common.close')}
+            >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
           </SheetClose>
