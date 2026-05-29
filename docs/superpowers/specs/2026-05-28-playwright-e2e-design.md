@@ -73,7 +73,6 @@ apps/admin-e2e/
 │  app/login/page.tsx          form with name=email, name=password     │
 │  app/login/actions.ts        Server Action → POST /api/auth/sign-in  │
 │  middleware.ts               redirects unauth → /login               │
-│  app/page.tsx                redirect('/users') (added in prior turn)│
 └──────────────────────────────────────────────────────────────────────┘
                        │ fetch with cookies forwarded
                        ▼
@@ -131,11 +130,13 @@ Role-based (`getByLabel`, `getByRole`) for every interactive element. The label 
   - `chromium-authed` — `Desktop Chrome` device + `storageState: '.auth/super-admin.json'`; `dependencies: ['setup']`; `testMatch: /authed\/.*\.spec\.ts/`
 - `webServer`:
   - When `CI_TESTS === 'true'`: array of two entries.
-    - auth-server: `command: 'pnpm --filter @sassy-auth/auth-server dev'`, `url: '${AUTH_SERVER_URL}/api/token/jwks'`, `reuseExistingServer: false`, `timeout: 120_000`, `stdout: 'pipe'`, `stderr: 'pipe'`.
+    - auth-server: `command: 'pnpm --filter @sassy-auth/auth-server dev'`, `url: \`${AUTH_SERVER_URL}/api/token/jwks\`` (backtick template literal in the implementation), `reuseExistingServer: false`, `timeout: 120_000`, `stdout: 'pipe'`, `stderr: 'pipe'`.
     - admin: `command: 'pnpm --filter @sassy-auth/admin dev'`, `url: ADMIN_URL`, `reuseExistingServer: false`, `timeout: 120_000`, `stdout: 'pipe'`, `stderr: 'pipe'`.
   - Otherwise: `undefined`.
 
 Workers fixed to 1 in CI on purpose: BetterAuth session writes and a single shared Postgres mean parallel workers racing on `s@sa.io` login could trigger session collisions. Lift after the suite stabilizes.
+
+The `chromium-authed` project ships with zero matching specs in this PR (the `tests/authed/` folder is empty). Playwright treats this as a zero-test project and skips it silently — no "no tests found" failure, because that error fires only when a CLI filter resolves to zero tests across the whole run.
 
 ### 4.2 `lib/i18n.ts`
 
