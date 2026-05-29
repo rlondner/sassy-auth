@@ -4,10 +4,21 @@ import { magicLink, emailOTP, openAPI } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
+// Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
+// browser-originated, which trips BetterAuth's formCsrfMiddleware and then
+// requires a trusted Origin. Comma-separated list in TRUSTED_ORIGINS; defaults
+// to the admin app's dev URL so local + e2e work out of the box.
+const TRUSTED_ORIGINS = process.env.TRUSTED_ORIGINS
+  ?.split(',')
+  .map((s) => s.trim())
+  .filter(Boolean) ?? ['http://localhost:3001'];
+
 export const auth: any = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
+  trustedOrigins: TRUSTED_ORIGINS,
   emailAndPassword: {
     enabled: true,
   },
