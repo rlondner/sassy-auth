@@ -58,6 +58,11 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
 
+      - name: Build workspace packages
+        run: |
+          pnpm --filter @sassy-auth/types build
+          pnpm --filter @sassy-auth/db build
+
       - name: Apply migrations
         run: pnpm --filter @sassy-auth/db exec prisma migrate deploy --schema=schema.prisma
 
