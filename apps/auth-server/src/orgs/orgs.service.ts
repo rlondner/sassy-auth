@@ -70,4 +70,29 @@ export class OrgsService {
     if (!org) throw new NotFoundException();
     return formatOrg(org);
   }
+
+  async createOrg(callerBaId: string, dto: CreateOrgDto) {
+    await checkPermission(callerBaId, 'platform.orgs.manage');
+    const app = await prisma.saApp.findUnique({ where: { publicId: dto.appId } });
+    if (!app) throw new NotFoundException('App not found');
+    if (app.isPlatform) throw new ForbiddenException('Cannot create orgs under a platform app');
+    try {
+      type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+      const created = await prisma.$transaction(async (tx: Tx) => {
+        const draft = await tx.saOrg.create({
+          data: { publicId: 'placeholder', name: dto.name, appId: app.id, isPlatform: false },
+        });
+        return tx.saOrg.update({
+          where: { id: draft.id },
+          data: { publicId: this.sqids.encode(draft.id) },
+          include: ORG_INCLUDE,
+        });
+      });
+      this.logger.getWinstonLogger().info('Org created', { context: 'OrgsService', orgId: created.publicId });
+      return formatOrg(created);
+    } catch (e: unknown) {
+      if (isPrismaCode(e, 'P2002')) throw new ConflictException('Org with this name already exists in this app');
+      throw e;
+    }
+  }
 }

@@ -115,6 +115,55 @@ describe('OrgsService', () => {
     });
   });
 
+  describe('createOrg', () => {
+    const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', isPlatform: false };
+    const platformAppRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', isPlatform: true };
+    const createdRow = { ...orgRow, name: 'Acme', appId: 1 };
+
+    it('generates publicId via two-step transaction and returns formatted org', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+      mockPrisma.saOrg.create.mockResolvedValue({ ...createdRow, publicId: 'placeholder' });
+      mockPrisma.saOrg.update.mockResolvedValue(createdRow);
+
+      const result = await service.createOrg('ba-caller', { name: 'Acme', appId: 'sq_1' });
+
+      expect(mockPrisma.saOrg.create).toHaveBeenCalledWith({
+        data: { publicId: 'placeholder', name: 'Acme', appId: 1, isPlatform: false },
+      });
+      expect(mockPrisma.saOrg.update).toHaveBeenCalledWith({
+        where: { id: 10 }, data: { publicId: 'sq_10' },
+        include: { app: { select: { publicId: true, name: true } }, _count: { select: { users: true } } },
+      });
+      expect(result).toEqual({
+        publicId: 'sq_10', name: 'Acme', isPlatform: false, userCount: 3,
+        app: { publicId: 'sq_1', name: 'Customer Portal' },
+      });
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.orgs.manage');
+    });
+
+    it('throws NotFoundException when appId sqid does not exist', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+      await expect(service.createOrg('ba-caller', { name: 'Acme', appId: 'nope' }))
+        .rejects.toBeInstanceOf(NotFoundException);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when parent app is isPlatform', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(platformAppRow);
+      await expect(service.createOrg('ba-caller', { name: 'X', appId: 'sq_2' }))
+        .rejects.toBeInstanceOf(ForbiddenException);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException on P2002 (duplicate name in app)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.$transaction.mockRejectedValue({ code: 'P2002' });
+      await expect(service.createOrg('ba-caller', { name: 'Acme', appId: 'sq_1' }))
+        .rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
   describe('getOrg', () => {
     it('returns formatted org when found', async () => {
       mockPrisma.saOrg.findUnique.mockResolvedValue(orgRow);
