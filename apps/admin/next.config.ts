@@ -6,6 +6,9 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@sassy-auth/ui'],
+  devIndicators: {
+    position: "bottom-right", // top-right, bottom-right, top-left, bottom-left
+  },
 }
 
 export default withSentryConfig(withNextIntl(nextConfig), {
