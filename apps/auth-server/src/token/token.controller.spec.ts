@@ -26,7 +26,7 @@ jest.mock('../auth/auth.config', () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
-jest.mock('bcryptjs', () => ({ compare: jest.fn().mockResolvedValue(true) }));
+jest.mock('better-auth/crypto', () => ({ verifyPassword: jest.fn().mockResolvedValue(true) }));
 
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';

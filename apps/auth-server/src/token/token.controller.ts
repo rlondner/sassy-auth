@@ -13,12 +13,15 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import * as Sentry from '@sentry/nestjs';
-import { compare } from 'bcryptjs';
 import { Request } from 'express';
 import { prisma } from '@sassy-auth/db';
 import { detectIdentifierType, TokenErrorCode } from '@sassy-auth/types';
 import { auth } from '../auth/auth.config';
 import { fromNodeHeaders } from 'better-auth/node';
+// BetterAuth hashes passwords with scrypt by default (format `<saltHex>:<hashHex>`),
+// not bcrypt — use its own verifier so direct-login stays compatible with any
+// account created via BetterAuth (sign-up, seed, admin invite, etc.).
+import { verifyPassword } from 'better-auth/crypto';
 import { SqidService } from '../common/sqid/sqid.service';
 import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
@@ -242,7 +245,7 @@ export class TokenController {
       });
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
     }
-    const valid = await compare(dto.password, account.password);
+    const valid = await verifyPassword({ hash: account.password, password: dto.password });
     if (!valid) {
       this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
         context: 'TokenController',
