@@ -25,8 +25,25 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'setup',
+      testDir: '.',
+      testMatch: /auth-state\.setup\.ts/,
+    },
+    {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // No dependencies — login.spec.ts must exercise the real /login flow,
+      // not start from a pre-set session.
+      testIgnore: /authed\/.*\.spec\.ts/,
+    },
+    {
+      name: 'chromium-authed',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: '.auth/super-admin.json',
+      },
+      dependencies: ['setup'],
+      testMatch: /authed\/.*\.spec\.ts/,
     },
   ],
   webServer: CI_TESTS
