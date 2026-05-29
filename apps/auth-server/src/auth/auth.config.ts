@@ -9,10 +9,18 @@ import { prisma } from '@sassy-auth/db';
 // browser-originated, which trips BetterAuth's formCsrfMiddleware and then
 // requires a trusted Origin. Comma-separated list in TRUSTED_ORIGINS; defaults
 // to the admin app's dev URL so local + e2e work out of the box.
-const TRUSTED_ORIGINS = process.env.TRUSTED_ORIGINS
+const TRUSTED_ORIGINS = (process.env.TRUSTED_ORIGINS
   ?.split(',')
   .map((s) => s.trim())
-  .filter(Boolean) ?? ['http://localhost:3001'];
+  .filter(Boolean) ?? ['http://localhost:3001'])
+  .map((origin) => {
+    try {
+      new URL(origin)
+      return origin
+    } catch {
+      throw new Error(`Invalid origin in TRUSTED_ORIGINS: "${origin}"`)
+    }
+  });
 
 export const auth: any = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
