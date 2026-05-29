@@ -87,11 +87,20 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
     return { error: 'Email and password are required.' }
   }
 
-  const res = await fetch(`${AUTH_SERVER}/api/auth/sign-in/email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
+  let res: Response
+  try {
+    res = await fetch(`${AUTH_SERVER}/api/auth/sign-in/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+  } catch (err) {
+    // Transport-level failure (auth server down, DNS, TLS). Surface a
+    // dedicated error so the form can prompt the operator to retry
+    // instead of crashing the action with a 500.
+    Sentry.captureException(err, { tags: { area: 'auth', action: 'admin-login' } })
+    return { error: 'serverUnavailable' }
+  }
 
   if (!res.ok) {
     Sentry.addBreadcrumb({

@@ -47,7 +47,9 @@ export default function LoginPage() {
 
           {state?.error && (
             <p className="text-label-md text-[var(--destructive)]">
-              {state.error === 'invalidCredentials' || state.error === 'inactive'
+              {state.error === 'invalidCredentials' ||
+              state.error === 'inactive' ||
+              state.error === 'serverUnavailable'
                 ? t(`error.${state.error}`)
                 : state.error}
             </p>

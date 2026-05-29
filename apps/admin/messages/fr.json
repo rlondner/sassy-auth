@@ -153,7 +153,8 @@
     "submit": "Se connecter",
     "error": {
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
-      "inactive": "Ce compte a été désactivé."
+      "inactive": "Ce compte a été désactivé.",
+      "serverUnavailable": "Le service de connexion est indisponible. Veuillez réessayer dans un instant."
     }
   },
   "acceptInvite": {
