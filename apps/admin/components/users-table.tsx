@@ -15,10 +15,12 @@ import { deleteUserAction } from '@/app/(admin)/users/actions'
 interface UsersTableProps {
   users: User[]
   orgs: Org[]
+  initialOrgId?: string
 }
 
-export function UsersTable({ users, orgs }: UsersTableProps) {
+export function UsersTable({ users, orgs, initialOrgId }: UsersTableProps) {
   const t = useTranslations()
+  void initialOrgId
   const [globalFilter, setGlobalFilter] = React.useState('')
   const [selectedUser, setSelectedUser] = React.useState<User | null>(null)
   const [viewOpen, setViewOpen] = React.useState(false)
