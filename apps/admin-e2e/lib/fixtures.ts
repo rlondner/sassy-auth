@@ -39,31 +39,26 @@ export const test = base.extend<{ diagnostics: DiagnosticBuckets }>({
 
       // After test runs, attach diagnostics on failure only.
       if (testInfo.status !== testInfo.expectedStatus) {
+        async function safeAttach(name: string, body: string, contentType: string) {
+          try {
+            await testInfo.attach(name, { body, contentType })
+          } catch {
+            // best-effort: don't let one attach failure mask the others
+          }
+        }
+
         const html = await page.content().catch(() => '<could not capture page HTML>')
         const visibleText = await page.locator('body').innerText().catch(() => null)
 
-        await testInfo.attach('console.log', {
-          body: buckets.consoleMessages.join('\n') || '(none)',
-          contentType: 'text/plain',
-        })
-        await testInfo.attach('page-errors.log', {
-          body: buckets.pageErrors.join('\n\n') || '(none)',
-          contentType: 'text/plain',
-        })
-        await testInfo.attach('network.log', {
-          body: buckets.networkFailures.join('\n') || '(none)',
-          contentType: 'text/plain',
-        })
-        await testInfo.attach('page-snapshot.html', {
-          body: html,
-          contentType: 'text/html',
-        })
-        if (visibleText) {
-          await testInfo.attach('visible-page-text.txt', {
-            body: visibleText,
-            contentType: 'text/plain',
-          })
-        }
+        await safeAttach('console.log', buckets.consoleMessages.join('\n') || '(none)', 'text/plain')
+        await safeAttach('page-errors.log', buckets.pageErrors.join('\n\n') || '(none)', 'text/plain')
+        await safeAttach('network.log', buckets.networkFailures.join('\n') || '(none)', 'text/plain')
+        await safeAttach('page-snapshot.html', html, 'text/html')
+        await safeAttach(
+          'visible-page-text.txt',
+          visibleText ?? '<could not capture visible text>',
+          'text/plain',
+        )
       }
     },
     { auto: true },
