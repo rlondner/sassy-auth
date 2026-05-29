@@ -1,8 +1,9 @@
 import enMessages from '../../admin/messages/en.json'
 
-// Walk a dot-path: 'login.email' → enMessages.login.email.
-// Throws on missing key — a dropped i18n entry should surface as a
-// loud test error, not a silent selector miss.
+/**
+ * Look up a dot-path key in the admin en.json, e.g. t('login.email').
+ * Unlike next-intl's useTranslations, the full namespace is part of the key.
+ */
 export function t(key: string): string {
   const value = key.split('.').reduce<unknown>((acc, k) => {
     if (acc && typeof acc === 'object' && k in (acc as Record<string, unknown>)) {
@@ -11,7 +12,7 @@ export function t(key: string): string {
     return undefined
   }, enMessages)
   if (typeof value !== 'string') {
-    throw new Error(`i18n key missing or not a string: ${key}`)
+    throw new Error(`i18n key '${key}' missing or not a string (got: ${JSON.stringify(value)})`)
   }
   return value
 }
