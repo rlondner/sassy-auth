@@ -1,6 +1,7 @@
+import 'server-only'
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, InvitationInfo, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse } from './types'
+import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -101,6 +102,7 @@ export async function acceptInvitation(token: string, password: string): Promise
   })
   if (!res.ok) throw new Error(`API error ${res.status}: accept invitation`)
 }
+
 
 export async function getApps(params: ListAppsParams = {}): Promise<ListAppsResponse> {
   const sp = new URLSearchParams();

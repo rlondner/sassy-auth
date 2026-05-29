@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { Button } from '@sassy-auth/ui'
-import { acceptInvitation } from '@/lib/api'
+import { acceptInvitation } from '@/lib/api-public'
 
 interface AcceptInviteFormProps {
   token: string

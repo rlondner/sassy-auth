@@ -6,8 +6,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetBody, SheetFooter, SheetClose, SheetTitle, SheetDescription,
   Button, FormField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sassy-auth/ui'
-import { getRoles } from '@/lib/api'
-import { createUserAction } from '@/app/(admin)/users/actions'
+import { createUserAction, getRolesAction } from '@/app/(admin)/users/actions'
 import type { Org, Role } from '@/lib/types'
 
 interface UserCreateDrawerProps {
@@ -54,7 +53,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
     if (!form.orgId) { setRoles([]); return }
     const selectedOrg = orgs.find((o) => o.id === form.orgId)
     if (!selectedOrg) return
-    getRoles(selectedOrg.appId).then(setRoles)
+    getRolesAction(selectedOrg.appId).then(setRoles)
   }, [form.orgId, orgs])
 
   function set(field: keyof FormState) {

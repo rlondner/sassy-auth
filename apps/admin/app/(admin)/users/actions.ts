@@ -1,8 +1,16 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createUser, assignRole, deleteUser } from '@/lib/api'
-import type { CreateUserPayload } from '@/lib/types'
+import {
+  createUser,
+  assignRole,
+  getUserRoles,
+  getEffectivePermissions,
+  getRoles,
+  updateUser,
+  deleteUser,
+} from '@/lib/api'
+import type { CreateUserPayload, Permission, Role, User } from '@/lib/types'
 
 interface CreateUserInput extends CreateUserPayload {
   roleId?: string
@@ -22,6 +30,24 @@ export async function createUserAction(
     if (message.includes('409') || message.includes('already')) return { error: 'A user with this email already exists.' }
     return { error: message }
   }
+}
+
+export async function getUserRolesAction(userId: string): Promise<Role[]> {
+  return getUserRoles(userId)
+}
+
+export async function getEffectivePermissionsAction(userId: string): Promise<Permission[]> {
+  return getEffectivePermissions(userId)
+}
+
+export async function getRolesAction(appId?: string): Promise<Role[]> {
+  return getRoles(appId)
+}
+
+export async function updateUserAction(id: string, patch: Partial<User>): Promise<User> {
+  const result = await updateUser(id, patch)
+  revalidatePath('/users')
+  return result
 }
 
 export async function deleteUserAction(

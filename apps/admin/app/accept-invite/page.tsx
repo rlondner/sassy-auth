@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server'
-import { validateInvitation } from '@/lib/api'
+import { validateInvitation } from '@/lib/api-public'
 import { AcceptInviteForm } from './accept-invite-form'
 
 interface Props {

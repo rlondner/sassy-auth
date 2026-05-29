@@ -5,10 +5,18 @@ import en from '@/messages/en.json'
 import { UserViewDrawer } from '../user-view-drawer'
 import type { User } from '@/lib/types'
 
-jest.mock('@/lib/api', () => ({
-  getUserRoles: jest.fn().mockResolvedValue([{ id: 'r1', name: 'admin', appId: 'app1' }]),
-  getEffectivePermissions: jest.fn().mockResolvedValue([{ id: 'p1', name: 'users.read', appId: 'app1' }]),
-  updateUser: jest.fn().mockResolvedValue({}),
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string, params?: Record<string, unknown>) => {
+    if (params) return `${key}(${JSON.stringify(params)})`
+    return key
+  },
+}))
+
+
+jest.mock('@/app/(admin)/users/actions', () => ({
+  getUserRolesAction: jest.fn().mockResolvedValue([{ id: 'r1', name: 'admin', appId: 'app1' }]),
+  getEffectivePermissionsAction: jest.fn().mockResolvedValue([{ id: 'p1', name: 'users.read', appId: 'app1' }]),
+  updateUserAction: jest.fn().mockResolvedValue({}),
 }))
 
 jest.mock('@/app/(admin)/users/actions', () => ({

@@ -6,8 +6,13 @@ import {
   Sheet, SheetContent, SheetHeader, SheetBody, SheetClose, SheetTitle,
   Button, UserAvatar, StatusChip, Badge, ConfirmDialog,
 } from '@sassy-auth/ui'
-import { getUserRoles, getEffectivePermissions, updateUser } from '@/lib/api'
-import { deleteUserAction } from '@/app/(admin)/users/actions'
+import {
+  getUserRolesAction,
+  getEffectivePermissionsAction,
+  updateUserAction,
+  deleteUserAction,
+} from '@/app/(admin)/users/actions'
+
 import type { User, Role, Permission } from '@/lib/types'
 
 const MAX_PERMISSIONS_SHOWN = 5
@@ -36,7 +41,7 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
     setEditing(false)
     setShowAllPerms(false)
     setEditValues({ firstName: user.firstName, lastName: user.lastName, phoneNumber: user.phoneNumber ?? '', username: user.username ?? '' })
-    Promise.all([getUserRoles(user.id), getEffectivePermissions(user.id)])
+    Promise.all([getUserRolesAction(user.id), getEffectivePermissionsAction(user.id)])
       .then(([r, p]) => { setRoles(r); setPermissions(p) })
       .finally(() => setLoading(false))
   }, [open, user?.id])
@@ -45,7 +50,7 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
     if (!user) return
     setSaving(true)
     try {
-      await updateUser(user.id, {
+      await updateUserAction(user.id, {
         firstName: editValues.firstName,
         lastName: editValues.lastName,
         phoneNumber: editValues.phoneNumber || null,

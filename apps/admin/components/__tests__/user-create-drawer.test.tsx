@@ -8,10 +8,7 @@ jest.mock('next-intl', () => ({
 
 jest.mock('@/app/(admin)/users/actions', () => ({
   createUserAction: jest.fn().mockResolvedValue({ inviteUrl: 'http://localhost:3001/accept-invite?token=abc123' }),
-}))
-
-jest.mock('@/lib/api', () => ({
-  getRoles: jest.fn().mockResolvedValue([{ id: 'r1', name: 'admin', appId: 'app1' }]),
+  getRolesAction: jest.fn().mockResolvedValue([{ id: 'r1', name: 'admin', appId: 'app1' }]),
 }))
 
 const mockOrgs: Org[] = [{ id: 'org1', name: 'Acme Corp', appId: 'app1', isPlatform: true }]

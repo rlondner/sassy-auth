@@ -12,7 +12,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }))
 
-jest.mock('@/lib/api', () => ({
+jest.mock('@/lib/api-public', () => ({
   acceptInvitation: jest.fn().mockResolvedValue(undefined),
 }))
 
@@ -32,7 +32,7 @@ describe('AcceptInviteForm', () => {
   })
 
   it('calls acceptInvitation on valid submit', async () => {
-    const { acceptInvitation } = require('@/lib/api')
+    const { acceptInvitation } = require('@/lib/api-public')
     render(<AcceptInviteForm token="test-token" firstName="Alice" email="alice@example.com" />)
     fireEvent.change(screen.getByLabelText('acceptInvite.password'), { target: { value: 'SecurePass1!' } })
     fireEvent.change(screen.getByLabelText('acceptInvite.confirmPassword'), { target: { value: 'SecurePass1!' } })
