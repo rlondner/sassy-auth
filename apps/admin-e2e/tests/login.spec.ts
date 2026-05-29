@@ -30,7 +30,7 @@ test.describe('Login', () => {
         (await login.anyErrorMessage.textContent())?.trim() ?? '<unknown>'
       throw new Error(
         `Login flow rendered an error to the user instead of redirecting: "${renderedErrorText}". ` +
-          `See attached console.log, network.log, and page-snapshot.html for full context.`,
+          `See attached console.log, page-errors.log, network.log, page-snapshot.html, and visible-page-text.txt for full context.`,
       )
     }
 
