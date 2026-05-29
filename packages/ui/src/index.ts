@@ -10,6 +10,7 @@ export { StatusChip } from './components/status-chip'
 export { UserAvatar } from './components/user-avatar'
 export { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/table'
 export { DataTable } from './components/data-table'
+export type { ColumnDef } from '@tanstack/react-table'
 export {
   Sheet, SheetBody, SheetClose, SheetContent, SheetDescription,
   SheetFooter, SheetHeader, SheetOverlay, SheetPortal, SheetTitle, SheetTrigger,

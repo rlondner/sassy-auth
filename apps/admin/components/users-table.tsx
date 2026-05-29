@@ -2,10 +2,9 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
-import { ColumnDef } from '@tanstack/react-table'
 import {
   Button, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger, StatusChip, UserAvatar,
+  DropdownMenuSeparator, DropdownMenuTrigger, StatusChip, UserAvatar, type ColumnDef,
 } from '@sassy-auth/ui'
 import type { User, Org } from '@/lib/types'
 import { UserViewDrawer } from './user-view-drawer'

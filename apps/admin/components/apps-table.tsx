@@ -2,10 +2,9 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
-import { ColumnDef } from '@tanstack/react-table'
 import {
   Button, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger, Badge,
+  DropdownMenuSeparator, DropdownMenuTrigger, Badge, type ColumnDef,
 } from '@sassy-auth/ui'
 import { copyToClipboard } from '@/lib/clipboard'
 import { deleteAppAction, listAppsAction } from '@/app/(admin)/apps/actions'
