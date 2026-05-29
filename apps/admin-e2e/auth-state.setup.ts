@@ -2,8 +2,8 @@ import { test as setup, expect } from '@playwright/test'
 import { LoginPage } from './pages/login.page'
 import path from 'path'
 
-const SUPER_ADMIN_EMAIL = 's@sa.io'
-const SUPER_ADMIN_PASSWORD = 'Pass@word1234'
+const SUPER_ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 's@sa.io'
+const SUPER_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 const AUTH_FILE = path.join(__dirname, '.auth/super-admin.json')
 
 setup('authenticate as super admin', async ({ page }) => {

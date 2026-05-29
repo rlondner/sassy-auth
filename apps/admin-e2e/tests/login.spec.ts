@@ -1,8 +1,8 @@
 import { test, expect } from '../lib/fixtures'
 import { LoginPage } from '../pages/login.page'
 
-const SUPER_ADMIN_EMAIL = 's@sa.io'
-const SUPER_ADMIN_PASSWORD = 'Pass@word1234'
+const SUPER_ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 's@sa.io'
+const SUPER_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 const RACE_TIMEOUT_MS = 10_000
 
 test.describe('Login', () => {
