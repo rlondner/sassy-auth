@@ -38,5 +38,7 @@ export async function signOutAction() {
     message: 'Admin signed out',
     level: 'info',
   })
-  redirect('/login')
+  // Redirect to the app root; the middleware will bounce the now-unauthenticated
+  // request to /login, so the user lands there without us hardcoding that route here.
+  redirect('/')
 }
