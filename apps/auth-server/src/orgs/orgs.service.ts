@@ -95,4 +95,26 @@ export class OrgsService {
       throw e;
     }
   }
+
+  async updateOrg(callerBaId: string, publicId: string, dto: UpdateOrgDto) {
+    if (dto.name === undefined) {
+      throw new BadRequestException('At least one of name must be provided');
+    }
+    await checkPermission(callerBaId, 'platform.orgs.manage');
+    const existing = await prisma.saOrg.findUnique({ where: { publicId } });
+    if (!existing) throw new NotFoundException();
+    if (existing.isPlatform) throw new ForbiddenException('Platform org cannot be modified');
+    try {
+      const updated = await prisma.saOrg.update({
+        where: { publicId },
+        data: { name: dto.name },
+        include: ORG_INCLUDE,
+      });
+      this.logger.getWinstonLogger().info('Org updated', { context: 'OrgsService', orgId: publicId });
+      return formatOrg(updated);
+    } catch (e: unknown) {
+      if (isPrismaCode(e, 'P2002')) throw new ConflictException('Org with this name already exists in this app');
+      throw e;
+    }
+  }
 }

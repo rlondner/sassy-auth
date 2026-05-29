@@ -19,6 +19,11 @@ jest.mock('../common/permissions/check-permission', () => ({
   checkPermission: jest.fn().mockResolvedValue(undefined),
 }));
 
+const ORG_INCLUDE_FOR_TEST = {
+  app: { select: { publicId: true, name: true } },
+  _count: { select: { users: true } },
+} as const;
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saOrg: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
@@ -160,6 +165,47 @@ describe('OrgsService', () => {
       mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
       mockPrisma.$transaction.mockRejectedValue({ code: 'P2002' });
       await expect(service.createOrg('ba-caller', { name: 'Acme', appId: 'sq_1' }))
+        .rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('updateOrg', () => {
+    const existing = { id: 10, publicId: 'sq_10', name: 'Acme', isPlatform: false, appId: 1 };
+    const platformExisting = { id: 20, publicId: 'sq_20', name: 'Platform', isPlatform: true, appId: 2 };
+
+    it('throws BadRequestException when no fields provided', async () => {
+      await expect(service.updateOrg('ba-caller', 'sq_10', {}))
+        .rejects.toBeInstanceOf(BadRequestException);
+      expect(mockPrisma.saOrg.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when org missing', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(null);
+      await expect(service.updateOrg('ba-caller', 'nope', { name: 'X' }))
+        .rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects platform orgs with ForbiddenException', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(platformExisting);
+      await expect(service.updateOrg('ba-caller', 'sq_20', { name: 'X' }))
+        .rejects.toBeInstanceOf(ForbiddenException);
+      expect(mockPrisma.saOrg.update).not.toHaveBeenCalled();
+    });
+
+    it('succeeds with partial name patch', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(existing);
+      mockPrisma.saOrg.update.mockResolvedValue({ ...orgRow, name: 'Renamed' });
+      const result = await service.updateOrg('ba-caller', 'sq_10', { name: 'Renamed' });
+      expect(mockPrisma.saOrg.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_10' }, data: { name: 'Renamed' }, include: ORG_INCLUDE_FOR_TEST,
+      });
+      expect(result.name).toBe('Renamed');
+    });
+
+    it('throws ConflictException on P2002', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(existing);
+      mockPrisma.saOrg.update.mockRejectedValue({ code: 'P2002' });
+      await expect(service.updateOrg('ba-caller', 'sq_10', { name: 'dup' }))
         .rejects.toBeInstanceOf(ConflictException);
     });
   });
