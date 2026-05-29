@@ -1,0 +1,98 @@
+name: e2e
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admin-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sassy
+          POSTGRES_PASSWORD: sassy
+          POSTGRES_DB: sassy_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sassy -d sassy_e2e"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      # All values below are non-sensitive test-only — the Postgres DB is
+      # ephemeral and torn down after every run.
+      CI_TESTS: 'true'
+      DATABASE_URL: postgresql://sassy:sassy@localhost:5432/sassy_e2e
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: test-secret-at-least-32-chars-long!!
+      AUTH_SERVER_URL: http://localhost:3000
+      ADMIN_URL: http://localhost:3001
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
+
+      - name: Apply migrations
+        run: pnpm --filter @sassy-auth/db exec prisma migrate deploy --schema=schema.prisma
+
+      - name: Generate RSA keypair for auth-server
+        run: |
+          mkdir -p ./keys
+          openssl genpkey -algorithm RSA -out ./keys/private.pem -pkeyopt rsa_keygen_bits:2048
+          openssl rsa -in ./keys/private.pem -pubout -out ./keys/public.pem
+          echo "RSA_PRIVATE_KEY=$(base64 -w0 ./keys/private.pem)" >> $GITHUB_ENV
+          echo "RSA_PUBLIC_KEY=$(base64 -w0 ./keys/public.pem)" >> $GITHUB_ENV
+
+      - name: Seed platform data
+        run: pnpm --filter @sassy-auth/auth-server seed
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @sassy-auth/admin-e2e exec playwright install --with-deps chromium
+
+      - name: Run e2e
+        id: run-e2e
+        run: pnpm --filter @sassy-auth/admin-e2e test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/admin-e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload test results (traces, videos, attachments)
+        if: ${{ failure() && steps.run-e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: apps/admin-e2e/test-results/
+          retention-days: 14

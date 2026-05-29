@@ -8,6 +8,11 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "env": ["CI_TESTS", "ADMIN_URL", "AUTH_SERVER_URL", "DATABASE_URL", "BETTER_AUTH_URL", "BETTER_AUTH_SECRET", "RSA_PRIVATE_KEY", "RSA_PUBLIC_KEY"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
