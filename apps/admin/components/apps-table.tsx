@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import {
-  Button, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  Button, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -13,6 +13,7 @@ import type { App, ListAppsResponse } from '@/lib/types'
 import { AppViewDrawer } from './app-view-drawer'
 import { AppCreateDrawer } from './app-create-drawer'
 import { AppEditDrawer } from './app-edit-drawer'
+import { DeleteAlertDialog } from './delete-alert-dialog'
 
 interface Props { initial: ListAppsResponse }
 
@@ -134,13 +135,11 @@ export function AppsTable({ initial }: Props) {
     if (!selected) return
     const result = await deleteAppAction(selected.publicId)
     if (result && 'errorKey' in result) {
-      const msg = t(result.errorKey)
-      setDeleteError(msg)
-      throw new Error(msg) // keeps ConfirmDialog open via its error path
+      setDeleteError(t(result.errorKey))
+      return
     }
     setDeleteOpen(false)
     setViewOpen(false)
-    // Refresh data
     const refreshed = await listAppsAction({ q: query || undefined, page, pageSize })
     if (refreshed && 'items' in refreshed) setData(refreshed)
   }
@@ -205,16 +204,15 @@ export function AppsTable({ initial }: Props) {
       )}
       <AppCreateDrawer open={createOpen} onOpenChange={setCreateOpen} />
       {selected && (
-        <ConfirmDialog
+        <DeleteAlertDialog
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
           title={t('apps.confirmDelete.title')}
           description={t('apps.confirmDelete.body', { name: selected.name })}
           confirmLabel={t('apps.confirmDelete.button')}
           cancelLabel={t('apps.drawer.cancel')}
-          variant="destructive"
+          error={deleteError}
           onConfirm={handleDelete}
-          error={deleteError ?? undefined}
         />
       )}
     </>

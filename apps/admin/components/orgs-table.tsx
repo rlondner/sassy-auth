@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import {
-  Button, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  Button, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -13,6 +13,7 @@ import type { App, OrgRow, ListOrgsResponse } from '@/lib/types'
 import { OrgViewDrawer } from './org-view-drawer'
 import { OrgCreateDrawer } from './org-create-drawer'
 import { OrgEditDrawer } from './org-edit-drawer'
+import { DeleteAlertDialog } from './delete-alert-dialog'
 
 interface Props { initial: ListOrgsResponse; apps: App[] }
 
@@ -152,9 +153,8 @@ export function OrgsTable({ initial, apps }: Props) {
     if (!selected) return
     const result = await deleteOrgAction(selected.publicId)
     if (result && 'errorKey' in result) {
-      const msg = t(result.errorKey)
-      setDeleteError(msg)
-      throw new Error(msg)
+      setDeleteError(t(result.errorKey))
+      return
     }
     setDeleteOpen(false)
     setViewOpen(false)
@@ -238,16 +238,15 @@ export function OrgsTable({ initial, apps }: Props) {
       )}
       <OrgCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} />
       {selected && (
-        <ConfirmDialog
+        <DeleteAlertDialog
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
           title={t('orgs.confirmDelete.title')}
           description={t('orgs.confirmDelete.body', { name: selected.name })}
           confirmLabel={t('orgs.confirmDelete.button')}
           cancelLabel={t('orgs.drawer.cancel')}
-          variant="destructive"
+          error={deleteError}
           onConfirm={handleDelete}
-          error={deleteError ?? undefined}
         />
       )}
     </>

@@ -4,8 +4,9 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import {
   Sheet, SheetContent, SheetHeader, SheetBody, SheetClose, SheetTitle,
-  Button, UserAvatar, StatusChip, Badge, ConfirmDialog,
+  Button, UserAvatar, StatusChip, Badge,
 } from '@sassy-auth/ui'
+import { DeleteAlertDialog } from './delete-alert-dialog'
 import {
   getUserRolesAction,
   getEffectivePermissionsAction,
@@ -192,24 +193,22 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
           </div>
         </SheetBody>
       </SheetContent>
-      <ConfirmDialog
+      <DeleteAlertDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={t('users.confirmDelete.title')}
         description={t('users.confirmDelete.body', { name: `${user.firstName} ${user.lastName}` })}
         confirmLabel={t('users.confirmDelete.button')}
         cancelLabel={t('users.drawer.cancel')}
-        variant="destructive"
+        error={deleteError}
         onConfirm={async () => {
           const result = await deleteUserAction(user.id)
           if ('errorKey' in result) {
-            const msg = t(result.errorKey)
-            setDeleteError(msg)
-            throw new Error(msg)
+            setDeleteError(t(result.errorKey))
+            return
           }
           onOpenChange(false)
         }}
-        error={deleteError ?? undefined}
       />
     </Sheet>
   )
