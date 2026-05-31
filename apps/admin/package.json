@@ -22,6 +22,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/react": "^16.0.0",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
@@ -41,7 +42,8 @@
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
-      "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts"
+      "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts",
+      "^server-only$": "<rootDir>/__mocks__/server-only.ts"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(@sassy-auth)/)"

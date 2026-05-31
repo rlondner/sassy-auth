@@ -1,7 +1,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse } from './types'
+import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
