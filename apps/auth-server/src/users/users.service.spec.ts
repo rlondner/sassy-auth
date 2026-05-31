@@ -120,7 +120,7 @@ describe('UsersService', () => {
       });
       const result = await service.getUserRoles('ba-caller', 'usr1');
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('role1');
+      expect(result[0].publicId).toBe('role1');
       expect(result[0].name).toBe('Platform Admin');
     });
 
