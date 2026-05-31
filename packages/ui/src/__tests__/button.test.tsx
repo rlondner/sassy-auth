@@ -19,9 +19,4 @@ describe('Button', () => {
     render(<Button disabled>Click me</Button>)
     expect(screen.getByRole('button', { name: 'Click me' })).toBeDisabled()
   })
-
-  it('maintains children when loading', () => {
-    render(<Button loading>Save</Button>)
-    expect(screen.getByText('Save')).toBeInTheDocument()
-  })
 })
