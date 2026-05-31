@@ -1,7 +1,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo } from './types'
+import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -167,4 +167,34 @@ export async function getMyPermissions(): Promise<string[]> {
   const res = await apiFetch('/api/me/permissions');
   const body: { permissions: string[] } = await res.json();
   return body.permissions;
+}
+
+export async function getPermissions(params: ListPermissionsParams = {}): Promise<ListPermissionsResponse> {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.appId) qs.set('appId', params.appId)
+  if (params.page) qs.set('page', String(params.page))
+  if (params.pageSize) qs.set('pageSize', String(params.pageSize))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const res = await apiFetch(`/api/permissions${suffix}`)
+  return res.json()
+}
+
+export async function getPermission(publicId: string): Promise<PermissionDetail> {
+  const res = await apiFetch(`/api/permissions/${publicId}`)
+  return res.json()
+}
+
+export async function createPermission(payload: CreatePermissionPayload): Promise<PermissionRow> {
+  const res = await apiFetch('/api/permissions', { method: 'POST', body: JSON.stringify(payload) })
+  return res.json()
+}
+
+export async function updatePermission(publicId: string, patch: UpdatePermissionPayload): Promise<PermissionRow> {
+  const res = await apiFetch(`/api/permissions/${publicId}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  return res.json()
+}
+
+export async function deletePermission(publicId: string): Promise<void> {
+  await apiFetch(`/api/permissions/${publicId}`, { method: 'DELETE' })
 }
