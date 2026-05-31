@@ -32,7 +32,14 @@ function parseSessionCookie(header: string): ParsedSessionCookie | null {
     if (eq < 0) continue
     const name = namePair.slice(0, eq)
     if (name !== 'better-auth.session_token') continue
-    const value = namePair.slice(eq + 1)
+    // The upstream Set-Cookie carries the value in its on-the-wire form
+    // (e.g. base64 `=` arrives as `%3D`). Next.js's cookieStore.set runs
+    // the value through cookie.serialize, which encodeURIComponent's it
+    // again — yielding `%253D` on the wire. better-auth's parser decodes
+    // exactly once, so the signature ends up as `…%3D` (length 48 ≠ 44),
+    // session lookup returns null, and every refresh bounces to /login.
+    // Single-decode here so the round-trip is identity.
+    const value = decodeURIComponent(namePair.slice(eq + 1))
 
     const parsed: ParsedSessionCookie = { value, httpOnly: false }
     for (const attr of attrs) {
