@@ -19,7 +19,7 @@ export interface Org {
 }
 
 export interface Role {
-  id: string
+  publicId: string
   name: string
   appId: string
 }
@@ -142,6 +142,48 @@ export interface ListPermissionsParams {
 
 export interface ListPermissionsResponse {
   items: PermissionRow[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface RoleRow {
+  publicId: string
+  name: string
+  app: { publicId: string; name: string }
+  permissionCount: number
+  userCount: number
+}
+
+export interface RolePermissionRef {
+  publicId: string
+  name: string
+}
+
+export interface RoleDetail extends RoleRow {
+  permissions: RolePermissionRef[]
+}
+
+export interface CreateRolePayload {
+  name: string
+  appId: string
+  permissionIds?: string[]
+}
+
+export interface UpdateRolePayload {
+  name?: string
+  permissionIds?: string[]
+}
+
+export interface ListRolesParams {
+  q?: string
+  appId?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface ListRolesResponse {
+  items: RoleRow[]
   total: number
   page: number
   pageSize: number

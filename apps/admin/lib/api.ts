@@ -1,7 +1,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse } from './types'
+import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -79,10 +79,34 @@ export async function deleteOrg(publicId: string): Promise<void> {
   Sentry.addBreadcrumb({ category: 'admin.action', message: `Org deleted: ${publicId}`, level: 'info' });
 }
 
-export async function getRoles(appId?: string): Promise<Role[]> {
-  const params = appId ? `?appId=${appId}` : ''
-  const res = await apiFetch(`/api/roles${params}`)
+export async function getRoles(params: ListRolesParams = {}): Promise<ListRolesResponse> {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.appId) qs.set('appId', params.appId)
+  if (params.page) qs.set('page', String(params.page))
+  if (params.pageSize) qs.set('pageSize', String(params.pageSize))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const res = await apiFetch(`/api/roles${suffix}`)
   return res.json()
+}
+
+export async function getRole(publicId: string): Promise<RoleDetail> {
+  const res = await apiFetch(`/api/roles/${publicId}`)
+  return res.json()
+}
+
+export async function createRole(payload: CreateRolePayload): Promise<RoleDetail> {
+  const res = await apiFetch('/api/roles', { method: 'POST', body: JSON.stringify(payload) })
+  return res.json()
+}
+
+export async function updateRole(publicId: string, patch: UpdateRolePayload): Promise<RoleDetail> {
+  const res = await apiFetch(`/api/roles/${publicId}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  return res.json()
+}
+
+export async function deleteRole(publicId: string): Promise<void> {
+  await apiFetch(`/api/roles/${publicId}`, { method: 'DELETE' })
 }
 
 export async function getUserRoles(userId: string): Promise<Role[]> {

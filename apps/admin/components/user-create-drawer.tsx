@@ -214,7 +214,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
                         <SelectValue placeholder={form.orgId ? 'Select role' : 'Select org first'} />
                       </SelectTrigger>
                       <SelectContent>
-                        {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                        {roles.map((r) => <SelectItem key={r.publicId} value={r.publicId}>{r.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

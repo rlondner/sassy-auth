@@ -41,7 +41,12 @@ export async function getEffectivePermissionsAction(userId: string): Promise<Per
 }
 
 export async function getRolesAction(appId?: string): Promise<Role[]> {
-  return getRoles(appId)
+  const result = await getRoles({ appId, pageSize: 200 })
+  return result.items.map((r) => ({
+    publicId: r.publicId,
+    name: r.name,
+    appId: r.app.publicId,
+  }))
 }
 
 export async function updateUserAction(id: string, patch: Partial<User>): Promise<User> {
