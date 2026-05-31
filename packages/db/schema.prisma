@@ -87,6 +87,8 @@ model SaOrg {
   app        SaApp    @relation(fields: [appId], references: [id])
   isPlatform Boolean  @default(false)
   users      SaUser[]
+
+  @@unique([appId, name])
 }
 
 model SaUser {

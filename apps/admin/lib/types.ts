@@ -79,3 +79,34 @@ export interface ListAppsResponse {
   page: number;
   pageSize: number;
 }
+
+export interface OrgRow {
+  publicId: string;
+  name: string;
+  isPlatform: boolean;
+  userCount: number;
+  app: { publicId: string; name: string };
+}
+
+export interface CreateOrgPayload {
+  name: string;
+  appId: string;
+}
+
+export interface UpdateOrgPayload {
+  name?: string;
+}
+
+export interface ListOrgsParams {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  appId?: string;
+}
+
+export interface ListOrgsResponse {
+  items: OrgRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
