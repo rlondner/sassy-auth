@@ -534,3 +534,6 @@ A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright test
 
 **Admin / orgs / apps / roles CRUD UI.**
 Only users management is implemented in the admin console. Orgs / apps / roles / permissions CRUD is planned for a later sub-project.
+
+**shadcn reskin planned.**
+The current `@sassy-auth/ui` primitives (Radix + Tailwind) are being replaced with shadcn/ui. Design spec and implementation plan are in `docs/superpowers/`. See `CHANGELOG.md` for status.

@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-05-31
+
+Light day — one critical cookie-encoding bugfix, the orgs-admin-ui feature branch merge, and design documentation for the upcoming shadcn reskin.
+
+### Fixed
+
+- **Session cookie double-encoding** — `parseSessionCookie()` now `decodeURIComponent`'s the cookie value before passing it to `cookieStore.set()`. Previously, base64 `=` padding arrived as `%3D` from upstream; Next.js's `cookie.serialize` re-encoded it to `%253D`, producing a 48-char signature instead of 44. BetterAuth's session lookup returned null, bouncing every page refresh back to `/login`. (`30de696`)
+
+### Added
+
+- **Admin nav E2E regression test** — `apps/admin-e2e/tests/authed/admin-nav.spec.ts` verifies a pre-authenticated session survives navigation to `/users`, hard refresh, `/apps`, and `/orgs`. Guards against the double-encoding regression and any future cookie-handling regressions. (`30de696`)
+- **Shadcn reskin design spec** — `docs/superpowers/specs/2026-05-31-shadcn-reskin-design.md`: token system (slate/blue-600 palette), sidebar-first layout, component migration inventory (Button, Input, Select, Table, Sheet → shadcn equivalents), dark mode via `next-themes`. (`bbb2b5f`)
+- **Shadcn reskin implementation plan** — `docs/superpowers/plans/2026-05-31-shadcn-reskin.md`: 30+ tasks covering shadcn CLI setup, package rewire, component-by-component migration, `AdminShell` sidebar rebuild, dark mode toggle, and QA. (`db5c613`, `a3e8e2a`)
+- **Orgs admin UI branch merged** — `feat/orgs-admin-ui` and `orgs-admin-ui` branches merged to master, bringing in the daily code review report (`CR_2026-05-29.md`) and agent worktree references. (`2b8e3aa`, `51074b0`)
+
+### Risky patterns / missing tests
+
+See [TODO_2026-05-31.md](./todo/TODO_2026-05-31.md) and [BUGS_2026-05-31.md](./bugs/BUGS_2026-05-31.md).
+
+- **bug-0022** — `decodeURIComponent` in `parseSessionCookie` can throw `URIError` on malformed percent-encoded values (no try-catch).
+- **bug-0023** — `.claude/worktrees/agent-*` submodule references committed to git history via merge commit.
+
+---
+
 ## [Unreleased] — 2026-05-29
 
 Major e2e testing infrastructure day: the `admin-e2e` Playwright suite shipped end-to-end with CI, alongside auth fixes for Origin header forwarding and cookie attribute preservation. Design work started on the Orgs admin UI.
