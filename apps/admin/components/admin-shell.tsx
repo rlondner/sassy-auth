@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server'
-import { SidebarShell, NavIcons } from './sidebar-shell'
+import { SidebarShell, type NavIconName } from './sidebar-shell'
 
 interface AdminShellProps {
   children: React.ReactNode
@@ -14,20 +14,24 @@ export async function AdminShell({
 }: AdminShellProps) {
   const t = await getTranslations()
 
-  const groups = [
+  // Icon NAMES (strings) — not component references. A 'use client' module's
+  // non-component exports become opaque client references on the server side,
+  // so e.g. `NavIcons.Boxes` would evaluate to `undefined` here and crash with
+  // "Element type is invalid ... got: undefined" during SSR.
+  const groups: { label: string; items: { href: string; label: string; icon: NavIconName }[] }[] = [
     {
       label: t('nav.directory'),
       items: [
-        { href: '/apps', label: t('nav.apps'), icon: NavIcons.Boxes },
-        { href: '/orgs', label: t('nav.orgs'), icon: NavIcons.Building2 },
-        { href: '/users', label: t('nav.users'), icon: NavIcons.Users },
+        { href: '/apps', label: t('nav.apps'), icon: 'Boxes' },
+        { href: '/orgs', label: t('nav.orgs'), icon: 'Building2' },
+        { href: '/users', label: t('nav.users'), icon: 'Users' },
       ],
     },
     {
       label: t('nav.accessControl'),
       items: [
-        { href: '/roles', label: t('nav.roles'), icon: NavIcons.ShieldEllipsis },
-        { href: '/permissions', label: t('nav.permissions'), icon: NavIcons.KeyRound },
+        { href: '/roles', label: t('nav.roles'), icon: 'ShieldEllipsis' },
+        { href: '/permissions', label: t('nav.permissions'), icon: 'KeyRound' },
       ],
     },
   ]

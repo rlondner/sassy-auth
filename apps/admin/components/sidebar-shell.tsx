@@ -10,10 +10,14 @@ import {
 } from '@sassy-auth/ui'
 import { UserFooter } from './user-footer'
 
+// Map icon names (sent from server) to actual lucide components (client-only).
+const NAV_ICONS = { Boxes, Building2, Users, ShieldEllipsis, KeyRound } as const
+export type NavIconName = keyof typeof NAV_ICONS
+
 interface NavItem {
   href: string
   label: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: NavIconName
 }
 
 interface NavGroup {
@@ -59,7 +63,7 @@ export function SidebarShell({
               <SidebarMenu>
                 {g.items.map((item) => {
                   const isActive = currentPath.startsWith(item.href)
-                  const Icon = item.icon
+                  const Icon = NAV_ICONS[item.icon]
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
@@ -101,4 +105,3 @@ export function SidebarShell({
   )
 }
 
-export const NavIcons = { Boxes, Building2, Users, ShieldEllipsis, KeyRound }
