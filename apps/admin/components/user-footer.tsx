@@ -19,24 +19,32 @@ export function UserFooter({
   user, currentLocale, availableLocales, signOutLabel, lightModeLabel, darkModeLabel,
 }: UserFooterProps) {
   return (
-    <div className="flex items-center gap-2 border-t border-sidebar-border bg-[hsl(220_47%_3%)] p-4">
-      <UserAvatar firstName={user.firstName} lastName={user.lastName} size="sm" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
-        <p className="truncate text-xs text-sidebar-foreground">{user.email}</p>
+    <>
+      {/* Expanded mode */}
+      <div className="flex items-center gap-2 border-t border-sidebar-border bg-[hsl(220_47%_3%)] p-4 group-data-[collapsible=icon]:hidden">
+        <UserAvatar firstName={user.firstName} lastName={user.lastName} size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
+          <p className="truncate text-xs text-sidebar-foreground">{user.email}</p>
+        </div>
+        <ThemeToggle lightLabel={lightModeLabel} darkLabel={darkModeLabel} />
+        <LocaleSwitcher currentLocale={currentLocale} availableLocales={availableLocales} />
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            className="text-sidebar-foreground hover:text-white"
+            title={signOutLabel}
+            aria-label={signOutLabel}
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </form>
       </div>
-      <ThemeToggle lightLabel={lightModeLabel} darkLabel={darkModeLabel} />
-      <LocaleSwitcher currentLocale={currentLocale} availableLocales={availableLocales} />
-      <form action={signOutAction}>
-        <button
-          type="submit"
-          className="text-sidebar-foreground hover:text-white"
-          title={signOutLabel}
-          aria-label={signOutLabel}
-        >
-          <LogOut className="h-4 w-4" />
-        </button>
-      </form>
-    </div>
+
+      {/* Collapsed mode (icon-rail) */}
+      <div className="hidden flex-col items-center gap-2 border-t border-sidebar-border bg-[hsl(220_47%_3%)] p-2 group-data-[collapsible=icon]:flex">
+        <UserAvatar firstName={user.firstName} lastName={user.lastName} size="sm" />
+      </div>
+    </>
   )
 }
