@@ -222,6 +222,82 @@
       "generic": "Une erreur est survenue. Veuillez réessayer."
     }
   },
+  "roles": {
+    "title": "Rôles",
+    "subtitle": "Gérez les rôles et les permissions qu'ils accordent.",
+    "totalCount": "{count} au total",
+    "search": "Rechercher par nom de rôle…",
+    "create": "Ajouter un rôle",
+    "accessDenied": {
+      "title": "Accès refusé",
+      "body": "Vous n'avez pas accès aux données de cette page."
+    },
+    "columns": {
+      "nameAndApp": "Rôle et application",
+      "sqid": "ID public (Sqid)",
+      "usage": "Utilisation",
+      "actions": "Actions"
+    },
+    "fields": {
+      "name": "Nom",
+      "nameHint": "Un libellé court pour le rôle, par ex. Éditeur ou Admin Org.",
+      "app": "Application",
+      "appImmutable": "L'application ne peut pas être modifiée après création.",
+      "publicId": "ID public",
+      "permissions": "Permissions",
+      "permissionsShort": "permissions",
+      "usersShort": "utilisateurs",
+      "permissionRow": "Permission",
+      "addPermission": "Ajouter une permission",
+      "removePermission": "Retirer la permission",
+      "selectPermission": "Sélectionnez une permission",
+      "noPermissionsForApp": "Aucune permission n'existe encore pour cette application.",
+      "selectAppFirst": "Sélectionnez d'abord une application."
+    },
+    "actions": {
+      "view": "Voir",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "copy": "Copier",
+      "copied": "Copié !"
+    },
+    "drawer": {
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "createTitle": "Ajouter un rôle",
+      "createSubtitle": "Définir un nouveau rôle et les permissions qu'il accorde.",
+      "editTitle": "Modifier le rôle",
+      "viewTitle": "Détails du rôle",
+      "permissionsSection": "Permissions assignées",
+      "noPermissions": "Ce rôle n'accorde encore aucune permission.",
+      "showingTop50": "Affichage des 50 premières sur {total}",
+      "inUseTooltip": "Assigné à {userCount} utilisateurs — retirez d'abord les assignations"
+    },
+    "filter": { "appLabel": "Filtrer par application", "allApps": "Toutes les applications" },
+    "pagination": {
+      "showing": "Affichage de {from}–{to} sur {total}",
+      "pageSize": "{count} par page",
+      "previous": "Précédent",
+      "next": "Suivant"
+    },
+    "confirmDelete": {
+      "title": "Supprimer le rôle",
+      "body": "Supprimer « {name} » ? Cette action est irréversible.",
+      "button": "Supprimer"
+    },
+    "errors": {
+      "nameRequired": "Le nom est obligatoire.",
+      "nameExists": "Un rôle avec ce nom existe déjà dans cette application.",
+      "appRequired": "L'application est obligatoire.",
+      "appNotFound": "L'application sélectionnée est introuvable.",
+      "invalidInput": "Un ou plusieurs champs sont invalides.",
+      "inUse": "Le rôle est assigné à des utilisateurs. Retirez d'abord les assignations.",
+      "forbidden": "Vous n'avez pas la permission d'effectuer cette action.",
+      "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "permissionsMustMatchApp": "Les permissions doivent appartenir à la même application que le rôle."
+    }
+  },
   "users": {
     "title": "Utilisateurs",
     "search": "Rechercher des utilisateurs…",
