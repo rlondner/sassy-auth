@@ -1,7 +1,4 @@
-import * as React from 'react'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { NextIntlClientProvider } from 'next-intl'
-import en from '@/messages/en.json'
 import { UserViewDrawer } from '../user-view-drawer'
 import type { User } from '@/lib/types'
 
@@ -17,9 +14,6 @@ jest.mock('@/app/(admin)/users/actions', () => ({
   getUserRolesAction: jest.fn().mockResolvedValue([{ id: 'r1', name: 'admin', appId: 'app1' }]),
   getEffectivePermissionsAction: jest.fn().mockResolvedValue([{ id: 'p1', name: 'users.read', appId: 'app1' }]),
   updateUserAction: jest.fn().mockResolvedValue({}),
-}))
-
-jest.mock('@/app/(admin)/users/actions', () => ({
   deleteUserAction: jest.fn().mockResolvedValue({ ok: true }),
 }))
 
@@ -28,29 +22,25 @@ const mockUser: User = {
   status: 'active', orgId: 'org1', phoneNumber: null, username: null,
 }
 
-function withIntl(node: React.ReactNode) {
-  return <NextIntlClientProvider locale="en" messages={en}>{node}</NextIntlClientProvider>
-}
-
 describe('UserViewDrawer', () => {
   it('renders nothing when closed', () => {
-    render(withIntl(<UserViewDrawer user={mockUser} open={false} onOpenChange={() => {}} />))
+    render(<UserViewDrawer user={mockUser} open={false} onOpenChange={() => {}} />)
     expect(screen.queryByText('Alice Smith')).not.toBeInTheDocument()
   })
 
   it('renders user name when open', async () => {
-    render(withIntl(<UserViewDrawer user={mockUser} open={true} onOpenChange={() => {}} />))
+    render(<UserViewDrawer user={mockUser} open={true} onOpenChange={() => {}} />)
     await waitFor(() => expect(screen.getByText('Alice Smith')).toBeInTheDocument())
   })
 
   it('shows roles after loading', async () => {
-    render(withIntl(<UserViewDrawer user={mockUser} open={true} onOpenChange={() => {}} />))
+    render(<UserViewDrawer user={mockUser} open={true} onOpenChange={() => {}} />)
     await waitFor(() => expect(screen.getByText('admin')).toBeInTheDocument())
   })
 
-  it('renders Delete button and opens ConfirmDialog', async () => {
-    render(withIntl(<UserViewDrawer user={mockUser} open={true} onOpenChange={() => {}} />))
-    fireEvent.click(screen.getByRole('button', { name: en.users.actions.delete }))
+  it('renders Delete button and opens AlertDialog', async () => {
+    render(<UserViewDrawer user={mockUser} open={true} onOpenChange={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'users.actions.delete' }))
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toBeInTheDocument()
     expect(dialog).toHaveTextContent(/Alice Smith/)

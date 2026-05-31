@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
-import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, Button, Badge } from '@sassy-auth/ui'
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, Button, ButtonGroup, Badge } from '@sassy-auth/ui'
 import { copyToClipboard } from '@/lib/clipboard'
 import type { App } from '@/lib/types'
 
@@ -30,7 +30,7 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
       <SheetContent>
         <SheetHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded border border-[var(--border)] bg-[var(--muted)] text-[var(--primary)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded border border-border bg-muted text-primary">
               <span className="material-symbols-outlined text-[20px]">apps</span>
             </div>
             <SheetTitle>{app.name}</SheetTitle>
@@ -38,15 +38,15 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
           </div>
           <div className="flex items-center gap-2">
             {!app.isPlatform && (
-              <>
+              <ButtonGroup>
                 <Button size="sm" variant="outline" onClick={onEdit}>{t('apps.actions.edit')}</Button>
-                <Button size="sm" variant="outline" className="border-[var(--destructive)] text-[var(--destructive)]" onClick={onDelete}>
+                <Button size="sm" variant="outline" className="border-destructive text-destructive" onClick={onDelete}>
                   {t('apps.actions.delete')}
                 </Button>
-              </>
+              </ButtonGroup>
             )}
             <SheetClose asChild>
-              <button className="ml-2 flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
+              <button className="ml-2 flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </SheetClose>
@@ -79,10 +79,10 @@ function DetailRow({
 }: { label: string; value: string; onCopy: () => void; copied: boolean; mono?: boolean; copyLabel: string }) {
   return (
     <div>
-      <p className="text-label-sm font-bold uppercase tracking-wider text-[var(--muted-foreground)]">{label}</p>
-      <div className="mt-1 flex items-center justify-between rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+      <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <div className="mt-1 flex items-center justify-between rounded border border-border bg-card px-3 py-2">
         <code className={mono ? 'font-mono text-body-sm' : 'text-body-sm'}>{value}</code>
-        <button type="button" aria-label={copyLabel} onClick={onCopy} className="text-[var(--muted-foreground)] hover:text-[var(--primary)]">
+        <button type="button" aria-label={copyLabel} onClick={onCopy} className="text-muted-foreground hover:text-primary">
           <span className="material-symbols-outlined text-[16px]">{copied ? 'check' : 'content_copy'}</span>
         </button>
       </div>

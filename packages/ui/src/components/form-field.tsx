@@ -1,9 +1,9 @@
 import * as React from 'react'
 import { cn } from '../lib/utils'
-import { Label } from './label'
-import { Input, type InputProps } from './input'
+import { Label } from './ui/label'
+import { Input } from './ui/input'
 
-interface FormFieldProps extends InputProps {
+interface FormFieldProps extends React.ComponentProps<typeof Input> {
   label: string
   error?: string
   hint?: string
@@ -16,12 +16,12 @@ export function FormField({ label, error, hint, required, className, id, ...prop
     <div className={cn('flex flex-col gap-1.5', className)}>
       <Label htmlFor={fieldId}>
         {label}
-        {required && <span className="ml-0.5 text-[var(--destructive)]">*</span>}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       <Input id={fieldId} aria-invalid={!!error} aria-describedby={error ? `${fieldId}-error` : undefined} {...props} />
-      {hint && !error && <p className="text-label-md text-[var(--muted-foreground)]">{hint}</p>}
+      {hint && !error && <p className="text-label-md text-muted-foreground">{hint}</p>}
       {error && (
-        <p id={`${fieldId}-error`} className="text-label-md text-[var(--destructive)]">
+        <p id={`${fieldId}-error`} className="text-label-md text-destructive">
           {error}
         </p>
       )}

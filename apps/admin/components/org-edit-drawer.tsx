@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import {
   Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle,
-  Button, Input, Label,
+  Button, ButtonGroup, Input, Label,
 } from '@sassy-auth/ui'
 import { updateOrgAction } from '@/app/(admin)/orgs/actions'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -59,11 +59,11 @@ export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
             </div>
             <div>
               <Label>{t('orgs.fields.app')}</Label>
-              <div className="mt-1 flex items-center justify-between rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+              <div className="mt-1 flex items-center justify-between rounded border border-border bg-card px-3 py-2">
                 <span className="text-body-sm">{org.app.name}</span>
-                <code className="font-mono text-label-md text-[var(--muted-foreground)]">{org.app.publicId}</code>
+                <code className="font-mono text-label-md text-muted-foreground">{org.app.publicId}</code>
               </div>
-              <p className="mt-1 text-label-sm text-[var(--muted-foreground)]">{t('orgs.fields.appReadOnlyHint')}</p>
+              <p className="mt-1 text-label-sm text-muted-foreground">{t('orgs.fields.appReadOnlyHint')}</p>
             </div>
             <div>
               <Label htmlFor="orgPublicId">{t('orgs.fields.publicId')}</Label>
@@ -91,28 +91,30 @@ export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
                 </Button>
               </div>
               {copied && (
-                <p className="mt-1 text-label-sm text-[var(--primary)]">
+                <p className="mt-1 text-label-sm text-primary">
                   {t('orgs.actions.copied')}
                 </p>
               )}
             </div>
             {errorKey && (
-              <p role="alert" className="text-body-sm text-[var(--destructive)]">
+              <p role="alert" className="text-body-sm text-destructive">
                 {t(errorKey)}
               </p>
             )}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={pending}
-              >
-                {t('orgs.drawer.cancel')}
-              </Button>
-              <Button type="submit" disabled={!dirty || pending}>
-                {pending ? t('orgs.drawer.saving') : t('orgs.drawer.save')}
-              </Button>
+            <div className="flex justify-end pt-4">
+              <ButtonGroup>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={pending}
+                >
+                  {t('orgs.drawer.cancel')}
+                </Button>
+                <Button type="submit" disabled={!dirty || pending}>
+                  {pending ? t('orgs.drawer.saving') : t('orgs.drawer.save')}
+                </Button>
+              </ButtonGroup>
             </div>
           </form>
         </SheetBody>

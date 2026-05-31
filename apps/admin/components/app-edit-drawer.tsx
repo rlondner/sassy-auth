@@ -9,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
   Button,
+  ButtonGroup,
   Input,
   Label,
 } from '@sassy-auth/ui'
@@ -104,28 +105,30 @@ export function AppEditDrawer({ app, open, onOpenChange }: Props) {
                 </Button>
               </div>
               {copied && (
-                <p className="mt-1 text-label-sm text-[var(--primary)]">
+                <p className="mt-1 text-label-sm text-primary">
                   {t('apps.actions.copied')}
                 </p>
               )}
             </div>
             {errorKey && (
-              <p role="alert" className="text-body-sm text-[var(--destructive)]">
+              <p role="alert" className="text-body-sm text-destructive">
                 {t(errorKey)}
               </p>
             )}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={pending}
-              >
-                {t('apps.drawer.cancel')}
-              </Button>
-              <Button type="submit" disabled={!dirty || pending}>
-                {pending ? t('apps.drawer.saving') : t('apps.drawer.save')}
-              </Button>
+            <div className="flex justify-end pt-4">
+              <ButtonGroup>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={pending}
+                >
+                  {t('apps.drawer.cancel')}
+                </Button>
+                <Button type="submit" disabled={!dirty || pending}>
+                  {pending ? t('apps.drawer.saving') : t('apps.drawer.save')}
+                </Button>
+              </ButtonGroup>
             </div>
           </form>
         </SheetBody>

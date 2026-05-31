@@ -8,7 +8,9 @@
     "support": "Assistance",
     "signOut": "Déconnexion",
     "directory": "Annuaire",
-    "accessControl": "Contrôle d’accès"
+    "accessControl": "Contrôle d’accès",
+    "switchToLight": "Passer en mode clair",
+    "switchToDark": "Passer en mode sombre"
   },
   "apps": {
     "title": "Applications",
