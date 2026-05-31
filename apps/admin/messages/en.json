@@ -150,6 +150,78 @@
       "showing": "Showing {from} to {to} of {total} orgs"
     }
   },
+  "permissions": {
+    "title": "Permissions",
+    "subtitle": "Manage the permissions that roles and users can be assigned.",
+    "totalCount": "{count} Total",
+    "search": "Search by permission name…",
+    "create": "Add Permission",
+    "accessDenied": {
+      "title": "Access denied",
+      "body": "You do not have access to data on this page."
+    },
+    "columns": {
+      "nameAndApp": "Permission & App",
+      "sqid": "Public ID (Sqid)",
+      "usage": "Usage",
+      "actions": "Actions"
+    },
+    "fields": {
+      "name": "Name",
+      "nameHint": "Lowercase dotted notation, e.g. apps.read or org.users.manage.",
+      "app": "App",
+      "appImmutable": "App cannot be changed after creation.",
+      "publicId": "Public ID",
+      "rolesShort": "roles",
+      "usersShort": "users"
+    },
+    "badges": { "platform": "Platform" },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "delete": "Delete",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "drawer": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "createTitle": "Add Permission",
+      "createSubtitle": "Define a new permission scoped to one app.",
+      "editTitle": "Edit Permission",
+      "viewTitle": "Permission Details",
+      "rolesSection": "Assigned to roles",
+      "usersSection": "Granted directly to users",
+      "noRoles": "No roles hold this permission.",
+      "noUsers": "No users hold this permission directly.",
+      "showingTop50": "Showing top 50 of {total}",
+      "inUseTooltip": "In use by {roleCount} roles, {userCount} users — remove assignments first"
+    },
+    "filter": { "appLabel": "Filter by app", "allApps": "All apps" },
+    "pagination": {
+      "showing": "Showing {from}–{to} of {total}",
+      "pageSize": "{count} per page",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "confirmDelete": {
+      "title": "Delete permission",
+      "body": "Delete \"{name}\"? This cannot be undone.",
+      "button": "Delete"
+    },
+    "errors": {
+      "nameRequired": "Name is required.",
+      "nameInvalid": "Name must be lowercase, dotted (e.g. apps.read).",
+      "nameExists": "A permission with that name already exists.",
+      "appRequired": "App is required.",
+      "appNotFound": "Selected app could not be found.",
+      "inUse": "Permission is in use by roles or users. Remove assignments first.",
+      "platformProtected": "Platform-system permissions cannot be modified.",
+      "forbidden": "You do not have permission to perform this action.",
+      "generic": "Something went wrong. Please try again."
+    }
+  },
   "users": {
     "title": "Users",
     "search": "Search users…",
