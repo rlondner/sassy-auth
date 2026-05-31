@@ -3,14 +3,16 @@
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
+import { Plus, Search } from 'lucide-react'
 import {
-  Button, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, StatusChip, UserAvatar,
 } from '@sassy-auth/ui'
 import type { User, Org } from '@/lib/types'
 import { UserViewDrawer } from './user-view-drawer'
 import { UserCreateDrawer } from './user-create-drawer'
 import { DeleteAlertDialog } from './delete-alert-dialog'
+import { PageHeader } from './page-header'
 import { deleteUserAction } from '@/app/(admin)/users/actions'
 
 interface UsersTableProps {
@@ -45,8 +47,8 @@ export function UsersTable({ users, orgs, initialOrgId }: UsersTableProps) {
           <div className="flex items-center gap-3">
             <UserAvatar firstName={u.firstName} lastName={u.lastName} />
             <div>
-              <p className="text-body-sm font-semibold text-[var(--foreground)]">{u.firstName} {u.lastName}</p>
-              <p className="text-label-md text-[var(--muted-foreground)]">{u.email}</p>
+              <p className="text-body-sm font-semibold text-foreground">{u.firstName} {u.lastName}</p>
+              <p className="text-label-md text-muted-foreground">{u.email}</p>
             </div>
           </div>
         )
@@ -72,7 +74,7 @@ export function UsersTable({ users, orgs, initialOrgId }: UsersTableProps) {
       header: t('users.columns.lastLogin'),
       cell: ({ row }) => {
         const ts = row.original.lastLoginAt
-        if (!ts) return <span className="text-[var(--muted-foreground)]">{t('users.fields.never')}</span>
+        if (!ts) return <span className="text-muted-foreground">{t('users.fields.never')}</span>
         return new Date(ts).toLocaleDateString()
       },
     },
@@ -84,8 +86,8 @@ export function UsersTable({ users, orgs, initialOrgId }: UsersTableProps) {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button className="flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
-                <span className="material-symbols-outlined text-[20px] text-[var(--muted-foreground)]">more_vert</span>
+              <button className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -100,12 +102,12 @@ export function UsersTable({ users, orgs, initialOrgId }: UsersTableProps) {
               )}
               <DropdownMenuSeparator />
               {u.status === 'active' ? (
-                <DropdownMenuItem className="text-[var(--destructive)]">{t('users.actions.deactivate')}</DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive">{t('users.actions.deactivate')}</DropdownMenuItem>
               ) : u.status === 'inactive' ? (
                 <DropdownMenuItem>{t('users.actions.activate')}</DropdownMenuItem>
               ) : null}
               <DropdownMenuItem
-                className="text-[var(--destructive)]"
+                className="text-destructive"
                 onClick={(e) => { e.stopPropagation(); setSelectedUser(u); setDeleteError(null); setDeleteOpen(true) }}
               >
                 {t('users.actions.delete')}
@@ -119,35 +121,35 @@ export function UsersTable({ users, orgs, initialOrgId }: UsersTableProps) {
 
   return (
     <>
-      {/* Page header */}
-      <div className="border-b border-[var(--border)] bg-[var(--card)] px-container-padding py-5">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-headline-md">{t('users.title')}</h1>
-          <div className="flex items-center gap-3">
+      <PageHeader
+        crumbs={[
+          { href: '/users', label: t('nav.directory') },
+          { label: t('users.title') },
+        ]}
+        actions={
+          <>
             <div className="relative">
-              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted-foreground)]">search</span>
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="search"
                 placeholder={t('users.search')}
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="h-9 w-64 rounded border border-[var(--border)] bg-[var(--card)] pl-8 pr-3 text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <button className="flex h-9 items-center gap-1.5 rounded border border-[var(--border)] px-3 text-body-sm hover:bg-[var(--muted)]">
-              <span className="material-symbols-outlined text-[18px]">filter_list</span>
-              Filter
-            </button>
-            <Button onClick={() => setCreateOpen(true)}>
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              {t('users.addUser')}
-            </Button>
-          </div>
-        </div>
-      </div>
+            <ButtonGroup>
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                {t('users.addUser')}
+              </Button>
+            </ButtonGroup>
+          </>
+        }
+      />
 
       {/* Table */}
-      <div className="px-container-padding py-4">
+      <div className="px-8 py-4">
         <DataTable
           columns={columns}
           data={users}

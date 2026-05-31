@@ -3,8 +3,9 @@
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
+import { Plus, Search } from 'lucide-react'
 import {
-  Button, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -14,6 +15,7 @@ import { OrgViewDrawer } from './org-view-drawer'
 import { OrgCreateDrawer } from './org-create-drawer'
 import { OrgEditDrawer } from './org-edit-drawer'
 import { DeleteAlertDialog } from './delete-alert-dialog'
+import { PageHeader } from './page-header'
 
 interface Props { initial: ListOrgsResponse; apps: App[] }
 
@@ -59,7 +61,7 @@ export function OrgsTable({ initial, apps }: Props) {
         const o = row.original
         return (
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded border border-[var(--border)] bg-[var(--muted)] text-[var(--primary)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded border border-border bg-muted text-primary">
               <span className="material-symbols-outlined text-[20px]">corporate_fare</span>
             </div>
             <div>
@@ -67,7 +69,7 @@ export function OrgsTable({ initial, apps }: Props) {
                 <p className="text-body-sm font-semibold">{o.name}</p>
                 {o.isPlatform && <Badge variant="secondary">{t('orgs.badges.platform')}</Badge>}
               </div>
-              <p className="text-label-md text-[var(--muted-foreground)]">{o.app.name}</p>
+              <p className="text-label-md text-muted-foreground">{o.app.name}</p>
             </div>
           </div>
         )
@@ -86,7 +88,7 @@ export function OrgsTable({ initial, apps }: Props) {
         const copied = copiedSqid === o.publicId
         return (
           <div className="flex items-center gap-2">
-            <code className="rounded bg-[var(--muted)] px-1.5 py-0.5 font-mono text-label-md">{o.publicId}</code>
+            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-label-md">{o.publicId}</code>
             <button
               type="button"
               aria-label={t('orgs.actions.copy')}
@@ -97,7 +99,7 @@ export function OrgsTable({ initial, apps }: Props) {
                   setTimeout(() => setCopiedSqid(null), 2000)
                 })
               }}
-              className="text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+              className="text-muted-foreground hover:text-primary"
             >
               <span className="material-symbols-outlined text-[14px]">{copied ? 'check' : 'content_copy'}</span>
             </button>
@@ -120,8 +122,8 @@ export function OrgsTable({ initial, apps }: Props) {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
-                <span className="material-symbols-outlined text-[20px] text-[var(--muted-foreground)]">more_vert</span>
+              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -136,7 +138,7 @@ export function OrgsTable({ initial, apps }: Props) {
               {!o.isPlatform && <DropdownMenuSeparator />}
               {!o.isPlatform && (
                 <DropdownMenuItem
-                  className="text-[var(--destructive)]"
+                  className="text-destructive"
                   onClick={(e) => { e.stopPropagation(); setSelected(o); setDeleteError(null); setDeleteOpen(true) }}
                 >
                   {t('orgs.actions.delete')}
@@ -166,22 +168,20 @@ export function OrgsTable({ initial, apps }: Props) {
 
   return (
     <>
-      <div className="border-b border-[var(--border)] bg-[var(--card)] px-container-padding py-5">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-headline-md">
-            {t('orgs.title')}{' '}
-            <span className="ml-2 rounded-full bg-[var(--primary)]/10 px-2 py-0.5 text-label-sm text-[var(--primary)]">
-              {t('orgs.totalCount', { count: data.total })}
-            </span>
-          </h1>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-body-sm text-[var(--muted-foreground)]">
+      <PageHeader
+        crumbs={[
+          { href: '/orgs', label: t('nav.directory') },
+          { label: t('orgs.title') },
+        ]}
+        actions={
+          <>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="sr-only">{t('orgs.filter.appLabel')}</span>
               <select
                 aria-label={t('orgs.filter.appLabel')}
                 value={appFilter}
                 onChange={(e) => { setAppFilter(e.target.value); setPage(1) }}
-                className="h-9 rounded border border-[var(--border)] bg-[var(--card)] px-2 text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="h-9 rounded-md border border-input bg-card px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">{t('orgs.filter.allApps')}</option>
                 {apps.map((a) => (
@@ -190,24 +190,26 @@ export function OrgsTable({ initial, apps }: Props) {
               </select>
             </label>
             <div className="relative">
-              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted-foreground)]">search</span>
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="search"
                 placeholder={t('orgs.search')}
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setPage(1) }}
-                className="h-9 w-72 rounded border border-[var(--border)] bg-[var(--card)] pl-8 pr-3 text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <Button onClick={() => setCreateOpen(true)}>
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              {t('orgs.create')}
-            </Button>
-          </div>
-        </div>
-      </div>
+            <ButtonGroup>
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                {t('orgs.create')}
+              </Button>
+            </ButtonGroup>
+          </>
+        }
+      />
 
-      <div className="px-container-padding py-4">
+      <div className="px-8 py-4">
         <DataTable
           columns={columns}
           data={data.items}
@@ -261,13 +263,13 @@ function Pagination({
   const to = Math.min(total, page * pageSize)
 
   return (
-    <div className="mt-4 flex items-center justify-between text-body-sm text-[var(--muted-foreground)]">
+    <div className="mt-4 flex items-center justify-between text-body-sm text-muted-foreground">
       <div className="flex items-center gap-3">
         <span>{t('orgs.pagination.showing', { from, to, total })}</span>
         <select
           value={pageSize}
           onChange={(e) => onPageSize(Number(e.target.value))}
-          className="rounded border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-body-sm"
+          className="rounded border border-border bg-card px-2 py-1 text-body-sm"
         >
           {[5, 10, 25, 50].map((n) => (
             <option key={n} value={n}>{t('orgs.pagination.pageSize', { count: n })}</option>
@@ -275,11 +277,11 @@ function Pagination({
         </select>
       </div>
       <div className="flex items-center gap-2">
-        <button disabled={page <= 1} onClick={() => onPage(page - 1)} className="rounded border border-[var(--border)] px-2 py-1 disabled:opacity-30">
+        <button disabled={page <= 1} onClick={() => onPage(page - 1)} className="rounded border border-border px-2 py-1 disabled:opacity-30">
           {t('orgs.pagination.previous')}
         </button>
         <span>{page} / {totalPages}</span>
-        <button disabled={page >= totalPages} onClick={() => onPage(page + 1)} className="rounded border border-[var(--border)] px-2 py-1 disabled:opacity-30">
+        <button disabled={page >= totalPages} onClick={() => onPage(page + 1)} className="rounded border border-border px-2 py-1 disabled:opacity-30">
           {t('orgs.pagination.next')}
         </button>
       </div>

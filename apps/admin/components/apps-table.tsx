@@ -3,8 +3,9 @@
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
+import { Plus, Search } from 'lucide-react'
 import {
-  Button, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -14,6 +15,7 @@ import { AppViewDrawer } from './app-view-drawer'
 import { AppCreateDrawer } from './app-create-drawer'
 import { AppEditDrawer } from './app-edit-drawer'
 import { DeleteAlertDialog } from './delete-alert-dialog'
+import { PageHeader } from './page-header'
 
 interface Props { initial: ListAppsResponse }
 
@@ -53,7 +55,7 @@ export function AppsTable({ initial }: Props) {
         const a = row.original
         return (
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded border border-[var(--border)] bg-[var(--muted)] text-[var(--primary)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded border border-border bg-muted text-primary">
               <span className="material-symbols-outlined text-[20px]">apps</span>
             </div>
             <div>
@@ -61,7 +63,7 @@ export function AppsTable({ initial }: Props) {
                 <p className="text-body-sm font-semibold">{a.name}</p>
                 {a.isPlatform && <Badge variant="secondary">{t('apps.badges.platform')}</Badge>}
               </div>
-              <p className="text-label-md text-[var(--muted-foreground)]">{a.url}</p>
+              <p className="text-label-md text-muted-foreground">{a.url}</p>
             </div>
           </div>
         )
@@ -75,7 +77,7 @@ export function AppsTable({ initial }: Props) {
         const copied = copiedSqid === a.publicId
         return (
           <div className="flex items-center gap-2">
-            <code className="rounded bg-[var(--muted)] px-1.5 py-0.5 font-mono text-label-md">{a.publicId}</code>
+            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-label-md">{a.publicId}</code>
             <button
               type="button"
               aria-label={t('apps.actions.copy')}
@@ -86,7 +88,7 @@ export function AppsTable({ initial }: Props) {
                   setTimeout(() => setCopiedSqid(null), 2000)
                 })
               }}
-              className="text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+              className="text-muted-foreground hover:text-primary"
             >
               <span className="material-symbols-outlined text-[14px]">{copied ? 'check' : 'content_copy'}</span>
             </button>
@@ -102,8 +104,8 @@ export function AppsTable({ initial }: Props) {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
-                <span className="material-symbols-outlined text-[20px] text-[var(--muted-foreground)]">more_vert</span>
+              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -118,7 +120,7 @@ export function AppsTable({ initial }: Props) {
               {!a.isPlatform && <DropdownMenuSeparator />}
               {!a.isPlatform && (
                 <DropdownMenuItem
-                  className="text-[var(--destructive)]"
+                  className="text-destructive"
                   onClick={(e) => { e.stopPropagation(); setSelected(a); setDeleteError(null); setDeleteOpen(true) }}
                 >
                   {t('apps.actions.delete')}
@@ -146,34 +148,34 @@ export function AppsTable({ initial }: Props) {
 
   return (
     <>
-      <div className="border-b border-[var(--border)] bg-[var(--card)] px-container-padding py-5">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-headline-md">
-            {t('apps.title')}{' '}
-            <span className="ml-2 rounded-full bg-[var(--primary)]/10 px-2 py-0.5 text-label-sm text-[var(--primary)]">
-              {t('apps.totalCount', { count: data.total })}
-            </span>
-          </h1>
-          <div className="flex items-center gap-3">
+      <PageHeader
+        crumbs={[
+          { href: '/apps', label: t('nav.directory') },
+          { label: t('apps.title') },
+        ]}
+        actions={
+          <>
             <div className="relative">
-              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted-foreground)]">search</span>
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="search"
                 placeholder={t('apps.search')}
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setPage(1) }}
-                className="h-9 w-72 rounded border border-[var(--border)] bg-[var(--card)] pl-8 pr-3 text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <Button onClick={() => setCreateOpen(true)}>
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              {t('apps.create')}
-            </Button>
-          </div>
-        </div>
-      </div>
+            <ButtonGroup>
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                {t('apps.create')}
+              </Button>
+            </ButtonGroup>
+          </>
+        }
+      />
 
-      <div className="px-container-padding py-4">
+      <div className="px-8 py-4">
         <DataTable
           columns={columns}
           data={data.items}
@@ -227,13 +229,13 @@ function Pagination({
   const to = Math.min(total, page * pageSize)
 
   return (
-    <div className="mt-4 flex items-center justify-between text-body-sm text-[var(--muted-foreground)]">
+    <div className="mt-4 flex items-center justify-between text-body-sm text-muted-foreground">
       <div className="flex items-center gap-3">
         <span>{t('apps.pagination.showing', { from, to, total })}</span>
         <select
           value={pageSize}
           onChange={(e) => onPageSize(Number(e.target.value))}
-          className="rounded border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-body-sm"
+          className="rounded border border-border bg-card px-2 py-1 text-body-sm"
         >
           {[5, 10, 25, 50].map((n) => (
             <option key={n} value={n}>{t('apps.pagination.pageSize', { count: n })}</option>
@@ -241,11 +243,11 @@ function Pagination({
         </select>
       </div>
       <div className="flex items-center gap-2">
-        <button disabled={page <= 1} onClick={() => onPage(page - 1)} className="rounded border border-[var(--border)] px-2 py-1 disabled:opacity-30">
+        <button disabled={page <= 1} onClick={() => onPage(page - 1)} className="rounded border border-border px-2 py-1 disabled:opacity-30">
           {t('apps.pagination.previous')}
         </button>
         <span>{page} / {totalPages}</span>
-        <button disabled={page >= totalPages} onClick={() => onPage(page + 1)} className="rounded border border-[var(--border)] px-2 py-1 disabled:opacity-30">
+        <button disabled={page >= totalPages} onClick={() => onPage(page + 1)} className="rounded border border-border px-2 py-1 disabled:opacity-30">
           {t('apps.pagination.next')}
         </button>
       </div>
