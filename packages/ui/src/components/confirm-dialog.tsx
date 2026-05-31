@@ -77,6 +77,7 @@ export function ConfirmDialog({
           <div className="mt-6 flex justify-end gap-2">
             <AlertDialog.Cancel asChild>
               <Button
+                type="button"
                 variant="outline"
                 disabled={pending}
               >
@@ -84,6 +85,7 @@ export function ConfirmDialog({
               </Button>
             </AlertDialog.Cancel>
             <Button
+              type="button"
               variant={variant === 'destructive' ? 'destructive' : 'default'}
               onClick={handleConfirm}
               loading={pending}
