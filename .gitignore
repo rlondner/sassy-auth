@@ -42,3 +42,4 @@ designs/apps-mgmt/apps-mgmt-preview_fr.zip
 apps/auth-server/.env
 .worktrees/
 
+.gstack/

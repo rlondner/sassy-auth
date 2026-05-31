@@ -92,7 +92,12 @@ export async function getUserRoles(userId: string): Promise<Role[]> {
 
 export async function getEffectivePermissions(userId: string): Promise<Permission[]> {
   const res = await apiFetch(`/api/users/${userId}/effective-permissions`)
-  return res.json()
+  // Server returns { userId, permissions: string[] } (permission names only).
+  // The drawer expects Permission[] with id/name/appId, so synthesize id from
+  // the name (permission names are unique) and leave appId empty since the
+  // server doesn't surface it on this endpoint.
+  const body = (await res.json()) as { userId: string; permissions: string[] }
+  return body.permissions.map((name) => ({ id: name, name, appId: '' }))
 }
 
 export async function assignRole(userId: string, roleId: string): Promise<void> {
