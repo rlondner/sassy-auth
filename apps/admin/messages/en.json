@@ -8,7 +8,9 @@
     "support": "Support",
     "signOut": "Sign Out",
     "directory": "Directory",
-    "accessControl": "Access Control"
+    "accessControl": "Access Control",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode"
   },
   "apps": {
     "title": "Applications",

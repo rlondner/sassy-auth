@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react'
 import { usePathname } from 'next/navigation'
+import { Globe, Check, ChevronDown } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@sassy-auth/ui'
@@ -26,25 +27,21 @@ export function LocaleSwitcher({ currentLocale, availableLocales }: LocaleSwitch
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="flex items-center gap-1 rounded px-2 py-1 text-[var(--sidebar-fg)] hover:bg-white/10 disabled:opacity-50"
+          type="button"
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-sidebar-foreground hover:bg-sidebar-accent hover:text-white disabled:opacity-50"
           disabled={isPending}
+          aria-label="Change language"
         >
-          <span className="material-symbols-outlined text-[18px]">language</span>
-          <span className="text-label-sm font-bold tracking-wider">{currentLocale.toUpperCase()}</span>
-          <span className="material-symbols-outlined text-[14px]">expand_more</span>
+          <Globe className="h-4 w-4" />
+          <span className="tracking-wider">{currentLocale.toUpperCase()}</span>
+          <ChevronDown className="h-3 w-3" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="bg-[#2d4157] border-white/10">
+      <DropdownMenuContent align="start" side="top">
         {availableLocales.map((locale) => (
-          <DropdownMenuItem
-            key={locale}
-            onClick={() => handleLocaleChange(locale)}
-            className="text-[var(--primary-fixed)] focus:bg-white/10 focus:text-white"
-          >
+          <DropdownMenuItem key={locale} onClick={() => handleLocaleChange(locale)}>
             {locale.toUpperCase()}
-            {locale === currentLocale && (
-              <span className="material-symbols-outlined ml-auto text-[16px]">check</span>
-            )}
+            {locale === currentLocale && <Check className="ml-auto h-4 w-4" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

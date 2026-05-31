@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Manrope } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 const manrope = Manrope({
@@ -28,9 +29,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className={`${manrope.variable} font-sans antialiased`}>
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
-        </NextIntlClientProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <NextIntlClientProvider locale={locale} messages={messages}>
+            {children}
+          </NextIntlClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
