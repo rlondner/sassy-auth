@@ -8,9 +8,10 @@ import { InvitationsModule } from './invitations/invitations.module';
 import { OrgsModule } from './orgs/orgs.module';
 import { RolesModule } from './roles/roles.module';
 import { AppsModule } from './apps/apps.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import { MeModule } from './me/me.module';
 
 @Module({
-  imports: [SentryModule.forRoot(), CommonModule, AuthModule, TokenModule, UsersModule, InvitationsModule, OrgsModule, RolesModule, AppsModule, MeModule],
+  imports: [SentryModule.forRoot(), CommonModule, AuthModule, TokenModule, UsersModule, InvitationsModule, OrgsModule, RolesModule, AppsModule, PermissionsModule, MeModule],
 })
 export class AppModule {}

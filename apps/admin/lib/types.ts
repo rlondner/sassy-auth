@@ -110,3 +110,39 @@ export interface ListOrgsResponse {
   page: number;
   pageSize: number;
 }
+
+export interface PermissionRow {
+  publicId: string
+  name: string
+  app: { publicId: string; name: string }
+  roleCount: number
+  userCount: number
+}
+
+export interface PermissionDetail extends PermissionRow {
+  roles: Array<{ publicId: string; name: string; appName: string }>
+  users: Array<{ publicId: string; email: string; firstName: string; lastName: string }>
+}
+
+export interface CreatePermissionPayload {
+  name: string
+  appId: string
+}
+
+export interface UpdatePermissionPayload {
+  name?: string
+}
+
+export interface ListPermissionsParams {
+  q?: string
+  appId?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface ListPermissionsResponse {
+  items: PermissionRow[]
+  total: number
+  page: number
+  pageSize: number
+}

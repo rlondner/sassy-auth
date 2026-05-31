@@ -150,6 +150,78 @@
       "showing": "{from} à {to} sur {total} organisations"
     }
   },
+  "permissions": {
+    "title": "Permissions",
+    "subtitle": "Gérez les permissions assignables aux rôles et utilisateurs.",
+    "totalCount": "{count} au total",
+    "search": "Rechercher par nom de permission…",
+    "create": "Ajouter une permission",
+    "accessDenied": {
+      "title": "Accès refusé",
+      "body": "Vous n'avez pas accès aux données de cette page."
+    },
+    "columns": {
+      "nameAndApp": "Permission et application",
+      "sqid": "ID public (Sqid)",
+      "usage": "Utilisation",
+      "actions": "Actions"
+    },
+    "fields": {
+      "name": "Nom",
+      "nameHint": "Notation pointée en minuscules, par ex. apps.read ou org.users.manage.",
+      "app": "Application",
+      "appImmutable": "L'application ne peut pas être modifiée après création.",
+      "publicId": "ID public",
+      "rolesShort": "rôles",
+      "usersShort": "utilisateurs"
+    },
+    "badges": { "platform": "Plateforme" },
+    "actions": {
+      "view": "Voir",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "copy": "Copier",
+      "copied": "Copié !"
+    },
+    "drawer": {
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "createTitle": "Ajouter une permission",
+      "createSubtitle": "Définir une nouvelle permission liée à une application.",
+      "editTitle": "Modifier la permission",
+      "viewTitle": "Détails de la permission",
+      "rolesSection": "Assignée aux rôles",
+      "usersSection": "Attribuée directement aux utilisateurs",
+      "noRoles": "Aucun rôle ne détient cette permission.",
+      "noUsers": "Aucun utilisateur ne détient directement cette permission.",
+      "showingTop50": "Affichage des 50 premiers sur {total}",
+      "inUseTooltip": "Utilisée par {roleCount} rôles, {userCount} utilisateurs — retirez les assignations d'abord"
+    },
+    "filter": { "appLabel": "Filtrer par application", "allApps": "Toutes les applications" },
+    "pagination": {
+      "showing": "Affichage de {from}–{to} sur {total}",
+      "pageSize": "{count} par page",
+      "previous": "Précédent",
+      "next": "Suivant"
+    },
+    "confirmDelete": {
+      "title": "Supprimer la permission",
+      "body": "Supprimer « {name} » ? Cette action est irréversible.",
+      "button": "Supprimer"
+    },
+    "errors": {
+      "nameRequired": "Le nom est obligatoire.",
+      "nameInvalid": "Le nom doit être en minuscules et pointé (par ex. apps.read).",
+      "nameExists": "Une permission avec ce nom existe déjà.",
+      "appRequired": "L'application est obligatoire.",
+      "appNotFound": "L'application sélectionnée est introuvable.",
+      "inUse": "Permission utilisée par des rôles ou utilisateurs. Retirez d'abord les assignations.",
+      "platformProtected": "Les permissions système de la plateforme ne peuvent pas être modifiées.",
+      "forbidden": "Vous n'avez pas la permission d'effectuer cette action.",
+      "generic": "Une erreur est survenue. Veuillez réessayer."
+    }
+  },
   "users": {
     "title": "Utilisateurs",
     "search": "Rechercher des utilisateurs…",
