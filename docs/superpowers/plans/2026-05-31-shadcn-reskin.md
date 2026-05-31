@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace `@sassy-auth/ui` primitives with shadcn/ui (generated via the shadcn CLI into `packages/ui`), then restyle `apps/admin` end-to-end to match `designs/main-design/variant.html`. Headline change: a real `Sidebar` driving `admin-shell.tsx`.
+**Goal:** Replace `@sassy-auth/ui` primitives with shadcn/ui (generated via the shadcn CLI into `packages/ui`), then restyle `apps/admin` end-to-end to match `designs/main-design/variant.html` (light) and `designs/main-design/variant-dark.html` (dark). Headline changes: a real `Sidebar` driving `admin-shell.tsx`, plus a light/dark theme toggle in the sidebar footer powered by `next-themes`.
 
-**Architecture:** shadcn CLI installs into `packages/ui` (single source of truth across the monorepo). The package re-exports new primitives through `src/index.ts`; `apps/admin` keeps importing from `@sassy-auth/ui`. Theme tokens flip from indigo to blue-600 in HSL form so the design's `bg-brand-*` and `bg-[hsl(var(--sidebar))]` classnames work verbatim. `ConfirmDialog` stays as a back-compat wrapper around `AlertDialog`.
+**Architecture:** shadcn CLI installs into `packages/ui` (single source of truth across the monorepo). The package re-exports new primitives through `src/index.ts`; `apps/admin` keeps importing from `@sassy-auth/ui`. Theme tokens flip from indigo to blue-600 in HSL form so the design's `bg-brand-*` and `bg-[hsl(var(--sidebar))]` classnames work verbatim. `globals.css` defines both `:root` (light) and `.dark` (dark) blocks; Tailwind `darkMode: 'class'` lets `dark:` variants respond to the class. `next-themes` toggles the `.dark` class on `<html>` and a sun/moon `ThemeToggle` in the sidebar footer drives it. `ConfirmDialog` stays as a back-compat wrapper around `AlertDialog`.
 
-**Tech Stack:** Next.js 15 (App Router) · Tailwind v3.4 · Radix primitives · shadcn/ui CLI · class-variance-authority · lucide-react · pnpm workspaces · Jest + Testing Library.
+**Tech Stack:** Next.js 15 (App Router) · Tailwind v3.4 · Radix primitives · shadcn/ui CLI · class-variance-authority · lucide-react · next-themes · pnpm workspaces · Jest + Testing Library.
 
 **Spec:** [`docs/superpowers/specs/2026-05-31-shadcn-reskin-design.md`](../specs/2026-05-31-shadcn-reskin-design.md)
 
@@ -22,7 +22,10 @@
 **New (in `apps/admin`):**
 - `components/page-header.tsx` — reusable top bar (breadcrumb + actions + search slot)
 - `components/sidebar-shell.tsx` — client portion of admin-shell that holds `SidebarProvider`
-- `components/user-footer.tsx` — sidebar footer (avatar + name + locale switcher + sign out)
+- `components/user-footer.tsx` — sidebar footer (avatar + name + locale switcher + theme toggle + sign out)
+- `components/theme-provider.tsx` — thin client wrapper around `next-themes`'s `ThemeProvider`
+- `components/theme-toggle.tsx` — sun/moon icon button that cycles theme via `useTheme()`
+- `components/delete-alert-dialog.tsx` — shared AlertDialog helper for the 3 delete flows
 
 **Modified:**
 - `packages/ui/package.json` (deps: tailwindcss-animate, lucide-react, @radix-ui/react-avatar, @radix-ui/react-separator, @radix-ui/react-tooltip, @radix-ui/react-scroll-area)
@@ -32,7 +35,8 @@
 - `packages/ui/src/components/confirm-dialog.tsx` (becomes wrapper)
 - `packages/ui/src/components/user-avatar.tsx` (pastel palette per design)
 - `packages/ui/src/components/status-chip.tsx` (use design palette)
-- `apps/admin/package.json` (add lucide-react)
+- `apps/admin/package.json` (add `lucide-react`, `next-themes`)
+- `apps/admin/app/layout.tsx` (add `suppressHydrationWarning`, wrap children in `<ThemeProvider>`)
 - `apps/admin/components/admin-shell.tsx` (rewrite — server wrapper)
 - `apps/admin/components/locale-switcher.tsx` (restyle for new sidebar footer)
 - `apps/admin/components/access-denied-panel.tsx` (use lucide icon, design palette)
@@ -72,14 +76,14 @@ pnpm --filter @sassy-auth/ui add tailwindcss-animate lucide-react @radix-ui/reac
 
 Expected: `packages/ui/package.json` updated; pnpm-lock updated. No errors.
 
-- [ ] **Step 3: Add `lucide-react` to `apps/admin`**
+- [ ] **Step 3: Add `lucide-react` and `next-themes` to `apps/admin`**
 
 Run:
 ```bash
-pnpm --filter @sassy-auth/admin add lucide-react
+pnpm --filter @sassy-auth/admin add lucide-react next-themes
 ```
 
-- [ ] **Step 4: Rewrite `packages/ui/globals.css` with HSL tokens**
+- [ ] **Step 4: Rewrite `packages/ui/globals.css` with HSL tokens (light + dark)**
 
 Replace the file's contents with:
 
@@ -121,6 +125,37 @@ Replace the file's contents with:
     --sidebar-ring: 221 83% 53%;
   }
 
+  .dark {
+    --background: 225 50% 8%;          /* #0a0f1e (night-base) */
+    --foreground: 213 27% 84%;         /* slate-300 */
+    --card: 220 39% 11%;               /* #111827 (night-card) */
+    --card-foreground: 213 27% 84%;
+    --popover: 220 39% 11%;
+    --popover-foreground: 213 27% 84%;
+    --primary: 217 91% 60%;            /* brand-500 = #60a5fa */
+    --primary-foreground: 225 50% 8%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 213 27% 84%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 213 27% 84%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 213 27% 84%;
+    --border: 217 33% 17%;             /* #1f2937 (night-border) */
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
+
+    --sidebar: 220 47% 5%;             /* #070b14 (night-sidebar) */
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 225 50% 8%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 213 27% 84%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 217 91% 60%;
+  }
+
   * {
     @apply border-border;
   }
@@ -140,6 +175,7 @@ import type { Config } from 'tailwindcss'
 import tailwindcssAnimate from 'tailwindcss-animate'
 
 const config: Config = {
+  darkMode: 'class',
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
@@ -285,13 +321,15 @@ Expected: Build will likely fail because legacy `--sidebar-bg` references in old
 ```bash
 git add packages/ui/components.json packages/ui/tailwind.config.ts packages/ui/globals.css packages/ui/package.json packages/ui/tsconfig.json apps/admin/package.json pnpm-lock.yaml
 git commit -m "$(cat <<'EOF'
-chore(ui): set up shadcn foundation
+chore(ui): set up shadcn foundation with light + dark tokens
 
-Switch theme tokens to shadcn-style HSL CSS variables. Add brand blue
-palette per designs/main-design/variant.html. Install tailwindcss-animate
-+ lucide-react + Radix avatar/separator/tooltip/scroll-area. Add
-components.json so the shadcn CLI can generate primitives into
-packages/ui.
+Switch theme tokens to shadcn-style HSL CSS variables under :root and
+.dark blocks (variant.html + variant-dark.html). darkMode: 'class' on
+Tailwind so dark: variants follow next-themes. Add brand blue palette.
+Install tailwindcss-animate + lucide-react + Radix avatar/separator/
+tooltip/scroll-area in @sassy-auth/ui, and next-themes + lucide-react
+in @sassy-auth/admin. Add components.json so the shadcn CLI can generate
+primitives into packages/ui.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -552,9 +590,9 @@ import { cn } from '../lib/utils'
 type StatusVariant = 'active' | 'pending' | 'inactive'
 
 const styles: Record<StatusVariant, { wrap: string; dot: string }> = {
-  active:   { wrap: 'bg-green-100 text-green-800 border border-green-200', dot: 'bg-green-500' },
-  pending:  { wrap: 'bg-amber-100 text-amber-800 border border-amber-200', dot: 'bg-amber-500' },
-  inactive: { wrap: 'bg-slate-100 text-slate-600 border border-slate-200', dot: 'bg-slate-400' },
+  active:   { wrap: 'bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800', dot: 'bg-green-500' },
+  pending:  { wrap: 'bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800', dot: 'bg-amber-500' },
+  inactive: { wrap: 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',     dot: 'bg-slate-400' },
 }
 
 interface StatusChipProps {
@@ -604,28 +642,96 @@ EOF
 
 ---
 
-## Task 4: Rewrite admin-shell with shadcn Sidebar
+## Task 4: Rewrite admin-shell with shadcn Sidebar (with theme toggle)
 
 **Files:**
 - Create: `apps/admin/components/sidebar-shell.tsx`
 - Create: `apps/admin/components/user-footer.tsx`
+- Create: `apps/admin/components/theme-provider.tsx`
+- Create: `apps/admin/components/theme-toggle.tsx`
 - Modify: `apps/admin/components/admin-shell.tsx`
 - Modify: `apps/admin/components/locale-switcher.tsx`
-- Modify: `apps/admin/app/layout.tsx` (Inter font)
+- Modify: `apps/admin/app/layout.tsx` (Inter font + ThemeProvider + suppressHydrationWarning)
 
-- [ ] **Step 1: Ensure Inter font in `apps/admin/app/layout.tsx`**
+- [ ] **Step 1: Update `apps/admin/app/layout.tsx` for Inter + ThemeProvider**
 
-Read the file. If Inter is already loaded via `next/font/google`, skip. Otherwise add:
+Read the file. Add `suppressHydrationWarning` to `<html>`, ensure Inter is loaded via `next/font/google`, and wrap children in `<ThemeProvider>`:
 
 ```tsx
 import { Inter } from 'next/font/google'
+import { ThemeProvider } from '@/components/theme-provider'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
-// in the <html> tag's className: append `${inter.variable} font-sans`
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} font-sans`}>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
+  )
+}
 ```
 
-If the file already loads Inter via a `<link>` tag, leave it.
+(Preserve any existing imports — Sentry, providers, etc. The ThemeProvider should be the outermost client wrapper inside `<body>`.)
+
+- [ ] **Step 1b: Create `apps/admin/components/theme-provider.tsx`**
+
+```tsx
+'use client'
+
+import * as React from 'react'
+import { ThemeProvider as NextThemesProvider } from 'next-themes'
+import type { ThemeProviderProps } from 'next-themes'
+
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+}
+```
+
+- [ ] **Step 1c: Create `apps/admin/components/theme-toggle.tsx`**
+
+```tsx
+'use client'
+
+import * as React from 'react'
+import { Moon, Sun } from 'lucide-react'
+import { useTheme } from 'next-themes'
+
+export function ThemeToggle({ lightLabel, darkLabel }: { lightLabel: string; darkLabel: string }) {
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => { setMounted(true) }, [])
+
+  const isDark = mounted && resolvedTheme === 'dark'
+  const next = isDark ? 'light' : 'dark'
+  const label = isDark ? lightLabel : darkLabel
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(next)}
+      className="text-sidebar-foreground hover:text-white"
+      aria-label={label}
+      title={label}
+    >
+      {mounted ? (
+        isDark
+          ? <Sun className="h-4 w-4" />
+          : <Moon className="h-4 w-4" />
+      ) : (
+        <Moon className="h-4 w-4 opacity-0" />
+      )}
+    </button>
+  )
+}
+```
+
+(The `mounted` gate prevents SSR/CSR mismatch: until React hydrates we render a transparent icon of the right size.)
 
 - [ ] **Step 2: Restyle `locale-switcher.tsx` for the new dark sidebar footer**
 
@@ -691,6 +797,7 @@ export function LocaleSwitcher({ currentLocale, availableLocales }: LocaleSwitch
 import { LogOut } from 'lucide-react'
 import { UserAvatar } from '@sassy-auth/ui'
 import { LocaleSwitcher } from './locale-switcher'
+import { ThemeToggle } from './theme-toggle'
 import { signOutAction } from '@/app/(admin)/actions'
 
 interface UserFooterProps {
@@ -698,16 +805,21 @@ interface UserFooterProps {
   currentLocale: string
   availableLocales: string[]
   signOutLabel: string
+  lightModeLabel: string
+  darkModeLabel: string
 }
 
-export function UserFooter({ user, currentLocale, availableLocales, signOutLabel }: UserFooterProps) {
+export function UserFooter({
+  user, currentLocale, availableLocales, signOutLabel, lightModeLabel, darkModeLabel,
+}: UserFooterProps) {
   return (
-    <div className="flex items-center gap-3 border-t border-sidebar-border bg-[hsl(217_33%_8%)] p-4">
+    <div className="flex items-center gap-2 border-t border-sidebar-border bg-[hsl(220_47%_3%)] p-4">
       <UserAvatar firstName={user.firstName} lastName={user.lastName} size="sm" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
         <p className="truncate text-xs text-sidebar-foreground">{user.email}</p>
       </div>
+      <ThemeToggle lightLabel={lightModeLabel} darkLabel={darkModeLabel} />
       <LocaleSwitcher currentLocale={currentLocale} availableLocales={availableLocales} />
       <form action={signOutAction}>
         <button
@@ -757,11 +869,14 @@ interface SidebarShellProps {
   currentLocale: string
   availableLocales: string[]
   signOutLabel: string
+  lightModeLabel: string
+  darkModeLabel: string
   children: React.ReactNode
 }
 
 export function SidebarShell({
-  groups, currentPath, user, currentLocale, availableLocales, signOutLabel, children,
+  groups, currentPath, user, currentLocale, availableLocales,
+  signOutLabel, lightModeLabel, darkModeLabel, children,
 }: SidebarShellProps) {
   return (
     <SidebarProvider>
@@ -816,11 +931,13 @@ export function SidebarShell({
             currentLocale={currentLocale}
             availableLocales={availableLocales}
             signOutLabel={signOutLabel}
+            lightModeLabel={lightModeLabel}
+            darkModeLabel={darkModeLabel}
           />
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="bg-slate-50/50">{children}</SidebarInset>
+      <SidebarInset className="bg-background">{children}</SidebarInset>
     </SidebarProvider>
   )
 }
@@ -874,6 +991,8 @@ export async function AdminShell({
       currentLocale={currentLocale}
       availableLocales={availableLocales}
       signOutLabel={t('nav.signOut')}
+      lightModeLabel={t('nav.switchToLight')}
+      darkModeLabel={t('nav.switchToDark')}
     >
       {children}
     </SidebarShell>
@@ -881,29 +1000,55 @@ export async function AdminShell({
 }
 ```
 
+- [ ] **Step 5b: Add `nav.switchToLight` and `nav.switchToDark` to every i18n catalog**
+
+For each file under `apps/admin/messages/*.json` (likely `en.json`, plus any other locales), add two entries under the existing `nav` object:
+
+```json
+{
+  "nav": {
+    "...": "existing keys...",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode"
+  }
+}
+```
+
+Translate per locale (e.g., French: "Passer en mode clair" / "Passer en mode sombre"). If only `en.json` exists, this is a single edit. Verify the build doesn't surface missing-key errors after.
+
 - [ ] **Step 6: Type-check + admin tests**
 
 Run: `pnpm --filter @sassy-auth/admin build` (catches TS errors fast)
 Then: `pnpm --filter @sassy-auth/admin test`
 Expected: both pass. If a test snapshots HTML structure of the sidebar, update it.
 
-- [ ] **Step 7: Boot dev server and screenshot**
+- [ ] **Step 7: Boot dev server and screenshot (light + dark)**
 
 Run (in background): `pnpm --filter @sassy-auth/admin dev`
-Wait for "Ready", then use the `browse` skill (or open http://localhost:3001/apps in a browser) to confirm: dark sidebar visible, Users link active when on /users, sign-out icon at bottom, locale switcher beside it. Don't proceed if the sidebar isn't rendering — diagnose first.
+Wait for "Ready", then use the `browse` skill (or open http://localhost:3001/apps in a browser) to confirm:
+1. Dark sidebar visible, Users link active when on /users, sign-out icon at bottom, locale switcher and theme toggle beside it.
+2. Click the theme toggle — the page flips to dark mode: content area becomes `#0a0f1e`, cards become `#111827`, sidebar becomes even darker `#070b14`. Refresh — theme persists (next-themes uses localStorage).
+3. Hard-reload — no flash of unstyled / wrong-theme content (FOUC). If there is a flash, double-check `suppressHydrationWarning` + `disableTransitionOnChange` are both set.
+Don't proceed if any of those fail — diagnose first.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add apps/admin/components/admin-shell.tsx apps/admin/components/sidebar-shell.tsx apps/admin/components/user-footer.tsx apps/admin/components/locale-switcher.tsx apps/admin/app/layout.tsx
+git add apps/admin/components/admin-shell.tsx apps/admin/components/sidebar-shell.tsx apps/admin/components/user-footer.tsx apps/admin/components/theme-provider.tsx apps/admin/components/theme-toggle.tsx apps/admin/components/locale-switcher.tsx apps/admin/app/layout.tsx apps/admin/messages
 git commit -m "$(cat <<'EOF'
-feat(admin): rewrite admin-shell with shadcn Sidebar
+feat(admin): Sidebar + light/dark theme toggle
 
 Sidebar primitive drives the dark left navigation per
 designs/main-design/variant.html. SidebarProvider lives in a client
 component (SidebarShell) wrapped by the original server AdminShell so
-translations and session data still come from the server. Locale
-switcher moves into the sidebar footer next to the user avatar.
+translations and session data still come from the server.
+
+ThemeProvider (next-themes, class strategy) wraps the app in
+layout.tsx. ThemeToggle sits in the sidebar footer next to the locale
+switcher and sign-out icon — sun in light mode, moon in dark, mounted
+guard against SSR/CSR mismatch. Switching theme flips :root vs .dark
+CSS variables (added in the previous foundation commit), so every
+shadcn primitive responds automatically.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1104,7 +1249,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ crumbs, actions }: PageHeaderProps) {
   return (
-    <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8">
+    <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-border bg-card px-8">
       <div className="flex items-center gap-3">
         <SidebarTrigger className="-ml-2" />
         <Breadcrumb>
@@ -1135,9 +1280,9 @@ export function PageHeader({ crumbs, actions }: PageHeaderProps) {
 
 Replace the rendered `<TableRow>` / `<TableHead>` / `<TableCell>` classNames to add hover bg, padding, and font sizes per design. Edit the file's render code:
 
-Find the existing `<TableRow ...>` body row and add `className={cn('border-b border-slate-200 hover:bg-slate-50/50', onRowClick && 'cursor-pointer')}`. Make sure to add `import { cn } from '../lib/utils'`.
+Find the existing `<TableRow ...>` body row and add `className={cn('border-b border-border hover:bg-muted/50', onRowClick && 'cursor-pointer')}`. Make sure to add `import { cn } from '../lib/utils'`.
 
-Find the existing `<TableHead ...>` element and ensure it carries `className="bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500"`. The shadcn `Table` defaults to neutral text; explicit overrides keep the design.
+Find the existing `<TableHead ...>` element and ensure it carries `className="bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground"`. The shadcn `Table` defaults to neutral text; explicit overrides keep the design. These tokens shift correctly between light and dark modes.
 
 - [ ] **Step 3: Update `apps/admin/components/users-table.tsx` to use PageHeader**
 
@@ -1157,13 +1302,13 @@ import { Plus, Search, SlidersHorizontal } from 'lucide-react'
   actions={
     <>
       <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
           placeholder={t('users.search')}
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
-          className="h-9 w-64 rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
       <ButtonGroup>
@@ -1232,14 +1377,14 @@ import * as React from 'react'
 import { cn } from '../lib/utils'
 
 const AVATAR_COLORS = [
-  'bg-orange-100 text-orange-700 ring-1 ring-orange-200',
-  'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
-  'bg-purple-100 text-purple-700 ring-1 ring-purple-200',
-  'bg-pink-100 text-pink-700 ring-1 ring-pink-200',
-  'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200',
-  'bg-teal-100 text-teal-700 ring-1 ring-teal-200',
-  'bg-rose-100 text-rose-700 ring-1 ring-rose-200',
-  'bg-blue-100 text-blue-700 ring-1 ring-blue-200',
+  'bg-orange-100  text-orange-700  ring-1 ring-orange-200  dark:bg-orange-900/40  dark:text-orange-300  dark:ring-orange-800',
+  'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:ring-emerald-800',
+  'bg-purple-100  text-purple-700  ring-1 ring-purple-200  dark:bg-purple-900/40  dark:text-purple-300  dark:ring-purple-800',
+  'bg-pink-100    text-pink-700    ring-1 ring-pink-200    dark:bg-pink-900/40    dark:text-pink-300    dark:ring-pink-800',
+  'bg-indigo-100  text-indigo-700  ring-1 ring-indigo-200  dark:bg-indigo-900/40  dark:text-indigo-300  dark:ring-indigo-800',
+  'bg-teal-100    text-teal-700    ring-1 ring-teal-200    dark:bg-teal-900/40    dark:text-teal-300    dark:ring-teal-800',
+  'bg-rose-100    text-rose-700    ring-1 ring-rose-200    dark:bg-rose-900/40    dark:text-rose-300    dark:ring-rose-800',
+  'bg-blue-100    text-blue-700    ring-1 ring-blue-200    dark:bg-blue-900/40    dark:text-blue-300    dark:ring-blue-800',
 ]
 
 function colorForName(name: string): string {
@@ -1294,7 +1439,7 @@ Find the header `<div className="flex items-center gap-2">` actions block and wr
 
 Change the banner div from `bg-gradient-to-r from-[#3525cd] to-[#6750a4]` to `bg-gradient-to-r from-brand-600 to-indigo-800`.
 
-Change the access section's `rounded-lg border border-[var(--border)]` outer card to `rounded-xl border border-slate-200 bg-white shadow-sm`.
+Change the access section's `rounded-lg border border-[var(--border)]` outer card to `rounded-xl border border-border bg-card shadow-sm`.
 
 - [ ] **Step 4: Reskin the create/edit drawers for users/orgs/apps**
 
@@ -1362,10 +1507,10 @@ export function AccessDeniedPanel() {
   const t = useTranslations()
   return (
     <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <Lock className="mx-auto h-10 w-10 text-slate-400" />
-        <h2 className="mt-4 text-lg font-semibold text-slate-900">{t('apps.accessDenied.title')}</h2>
-        <p className="mt-2 text-sm text-slate-500">{t('apps.accessDenied.body')}</p>
+      <div className="max-w-md rounded-xl border border-border bg-card p-8 text-center shadow-sm">
+        <Lock className="mx-auto h-10 w-10 text-muted-foreground" />
+        <h2 className="mt-4 text-lg font-semibold text-foreground">{t('apps.accessDenied.title')}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{t('apps.accessDenied.body')}</p>
       </div>
     </div>
   )
@@ -1389,9 +1534,9 @@ Expected: all green across `@sassy-auth/ui` and `@sassy-auth/admin`.
 Run: `pnpm --filter @sassy-auth/admin build`
 Expected: build succeeds, zero TypeScript errors.
 
-- [ ] **Step 5: Visual smoke test (manual)**
+- [ ] **Step 5: Visual smoke test (manual) — both themes**
 
-If not already running: `pnpm --filter @sassy-auth/admin dev`. Navigate to each of:
+If not already running: `pnpm --filter @sassy-auth/admin dev`. For BOTH light and dark modes (use the sidebar footer theme toggle to flip), navigate to each of:
 - `/apps` — Apps table renders, sidebar Apps item active.
 - `/orgs` — same, Orgs active.
 - `/users` — same, Users active.
@@ -1400,7 +1545,7 @@ If not already running: `pnpm --filter @sassy-auth/admin dev`. Navigate to each 
 - Click the sidebar trigger in the page header — sidebar collapses to icons.
 - Switch locale via the footer dropdown — page re-renders in the chosen language.
 
-Take a screenshot of each (Users page especially) and compare visually against `designs/main-design/variant.html`. Note any visual drift in a follow-up comment on the PR.
+Take a screenshot of each in both themes (Users page especially) and compare visually against `designs/main-design/variant.html` (light) and `variant-dark.html` (dark). Watch for any element that doesn't switch — usually a hardcoded `bg-white` or `text-slate-900` that should be `bg-card` / `text-foreground`. Note any visual drift in a follow-up comment on the PR.
 
 - [ ] **Step 6: Commit final polish**
 
@@ -1426,14 +1571,16 @@ gh pr create --title "shadcn reskin of admin console" --body "$(cat <<'EOF'
 ## Summary
 - Replaces hand-authored UI primitives in @sassy-auth/ui with shadcn/ui (generated via shadcn CLI into packages/ui)
 - Rewrites admin-shell.tsx using shadcn Sidebar (collapsible-to-icon, dark navy bg, ButtonGroup'd page-header actions)
+- Adds light/dark theme toggle in sidebar footer powered by next-themes; full dark palette per variant-dark.html
 - Migrates delete confirmations to shadcn AlertDialog
 - Reskins page headers, tables, drawers, avatars, and access-denied panel against designs/main-design/variant.html
-- Theme tokens flip from indigo to blue-600 (HSL CSS variables)
+- Theme tokens flip from indigo to blue-600 (HSL CSS variables, :root + .dark blocks)
 
 ## Test plan
 - [x] pnpm test -r — all green
 - [x] pnpm --filter @sassy-auth/admin build — clean
-- [ ] Visual smoke: /apps, /orgs, /users, all drawers, delete dialog, sidebar collapse, locale switcher
+- [ ] Visual smoke (light): /apps, /orgs, /users, all drawers, delete dialog, sidebar collapse, locale switcher
+- [ ] Visual smoke (dark): same surfaces; verify no FOUC on hard reload
 
 Spec: docs/superpowers/specs/2026-05-31-shadcn-reskin-design.md
 Plan: docs/superpowers/plans/2026-05-31-shadcn-reskin.md
@@ -1445,7 +1592,8 @@ EOF
 
 ## Self-review notes
 
-- **Spec coverage:** Every section in `2026-05-31-shadcn-reskin-design.md` maps to one or more tasks. Theme tokens → Task 1. Shadcn install + primitive replacement → Tasks 1-3. Sidebar rewrite → Task 4. AlertDialog migration → Task 5. PageHeader + tables → Task 6. Drawers + UserAvatar palette → Task 7. Access-denied + verification → Task 8.
-- **Out-of-scope from spec:** The user-detail "banner + per-org cards" page is explicitly not built (matches spec). No new server actions, no i18n changes.
-- **Type consistency:** `SidebarShell` in Task 4 takes `groups: NavGroup[]` and is consumed by `AdminShell` in the same task — names align. `DeleteAlertDialog` in Task 5 is the single new component; later tasks don't reference a renamed version.
-- **Risk:** Step 6/7 of Task 7 (the `[var(--…)]` → Tailwind-class sweep) is the largest single change. If a grep miss leaves a bare `[var(--primary)]` in the code, the affected element renders with no color (because the var is now an HSL triple, not a CSS color). Verification is the dev-server visual check — broken elements will jump out.
+- **Spec coverage:** Every section in `2026-05-31-shadcn-reskin-design.md` maps to one or more tasks. Theme tokens (light + dark) → Task 1. Shadcn install + primitive replacement → Tasks 1-3. Sidebar rewrite + theme toggle + ThemeProvider → Task 4. AlertDialog migration → Task 5. PageHeader + tables → Task 6. Drawers + UserAvatar palette → Task 7. Access-denied + verification (both themes) → Task 8.
+- **Out-of-scope from spec:** The user-detail "banner + per-org cards" page is explicitly not built (matches spec). No new server actions. Two new i18n keys (`nav.switchToLight`, `nav.switchToDark`) are added; this is a minimal, theme-toggle-only addition explicitly called out in Task 4 Step 5b.
+- **Type consistency:** `SidebarShell` in Task 4 takes `groups: NavGroup[]` and is consumed by `AdminShell` in the same task — names align. `lightModeLabel` / `darkModeLabel` props flow consistently `AdminShell` → `SidebarShell` → `UserFooter` → `ThemeToggle`. `DeleteAlertDialog` in Task 5 is the single new component; later tasks don't reference a renamed version.
+- **Risk 1:** Step 6/7 of Task 7 (the `[var(--…)]` → Tailwind-class sweep) is the largest single change. If a grep miss leaves a bare `[var(--primary)]` in the code, the affected element renders with no color (because the var is now an HSL triple, not a CSS color). Verification is the dev-server visual check — broken elements will jump out.
+- **Risk 2:** Hardcoded light colors (`bg-white`, `text-slate-900`, `from-brand-600 to-indigo-800` banner) won't switch with the theme. The dark-mode visual check in Task 8 Step 5 is the catch — any element that doesn't flip is a missed semantic-token swap. The pastel avatar colors in Task 7 are intentional exceptions (the design uses pastels in both themes via `dark:` variants).
