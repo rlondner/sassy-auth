@@ -142,4 +142,30 @@ describe('AppsService', () => {
     await service.deleteApp('ba-caller', 'sq_1');
     expect(mockPrisma.saApp.delete).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
   });
+
+  describe('createApp re-throw non-P2002 error', () => {
+    it('re-throws unexpected errors from the transaction', async () => {
+      const unexpected = new Error('DB connection lost');
+      mockPrisma.$transaction.mockRejectedValueOnce(unexpected);
+      await expect(service.createApp('ba-caller', { name: 'x', url: 'https://x' })).rejects.toThrow('DB connection lost');
+    });
+  });
+
+  describe('updateApp re-throw non-P2002 error', () => {
+    it('re-throws unexpected errors from prisma.update', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      const unexpected = new Error('DB timeout');
+      mockPrisma.saApp.update.mockRejectedValueOnce(unexpected);
+      await expect(service.updateApp('ba-caller', 'sq_1', { name: 'y' })).rejects.toThrow('DB timeout');
+    });
+  });
+
+  describe('deleteApp re-throw non-P2003 error', () => {
+    it('re-throws unexpected errors from prisma.delete', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      const unexpected = new Error('Network failure');
+      mockPrisma.saApp.delete.mockRejectedValueOnce(unexpected);
+      await expect(service.deleteApp('ba-caller', 'sq_1')).rejects.toThrow('Network failure');
+    });
+  });
 });

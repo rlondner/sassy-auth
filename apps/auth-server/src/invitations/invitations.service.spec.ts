@@ -125,5 +125,26 @@ describe('InvitationsService', () => {
       mockPrisma.saInvitation.findUnique.mockResolvedValue({ ...validInvitation, usedAt: new Date() });
       await expect(service.acceptInvitation('abc123', 'NewP@ss1')).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('throws NotFoundException for unknown token in acceptInvitation', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(null);
+      await expect(service.acceptInvitation('unknown', 'NewP@ss1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('acceptInvitation publicId nullish branch', () => {
+    it('logs with user.id when publicId is null', async () => {
+      const invWithoutPublicId = {
+        ...validInvitation,
+        user: { ...validInvitation.user, publicId: null },
+      };
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(invWithoutPublicId);
+      mockPrisma.saInvitation.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.account.create.mockResolvedValue(undefined);
+      mockPrisma.saUser.update.mockResolvedValue(undefined);
+      mockPrisma.user.update.mockResolvedValue(undefined);
+
+      await expect(service.acceptInvitation('abc123', 'NewP@ss1')).resolves.toBeUndefined();
+    });
   });
 });

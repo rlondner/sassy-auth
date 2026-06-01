@@ -95,6 +95,11 @@ describe('UsersService', () => {
         expect.objectContaining({ where: expect.objectContaining({ org: expect.objectContaining({ publicId: 'org1' }) }) }),
       );
     });
+
+    it('throws NotFoundException when orgPublicId does not match any org', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(null);
+      await expect(service.listUsers('ba-caller', { orgPublicId: 'missing-org' })).rejects.toBeInstanceOf(NotFoundException);
+    });
   });
 
   describe('getUser', () => {
@@ -122,6 +127,28 @@ describe('UsersService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].publicId).toBe('role1');
       expect(result[0].name).toBe('Platform Admin');
+    });
+
+    it('maps permissions within roles (non-empty permissions list)', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue({
+        ...makeSaUser(),
+        roles: [
+          {
+            role: {
+              publicId: 'role1', name: 'Editor', app: { publicId: 'app1' },
+              permissions: [
+                { permission: { publicId: 'sq_p1', name: 'apps.read' } },
+                { permission: { publicId: 'sq_p2', name: 'apps.write' } },
+              ],
+            },
+          },
+        ],
+      });
+      const result = await service.getUserRoles('ba-caller', 'usr1');
+      expect(result[0].permissions).toEqual([
+        { publicId: 'sq_p1', name: 'apps.read', appId: 'app1' },
+        { publicId: 'sq_p2', name: 'apps.write', appId: 'app1' },
+      ]);
     });
 
     it('throws NotFoundException when user not found', async () => {
@@ -214,6 +241,22 @@ describe('UsersService', () => {
       expect(result.status).toBe('inactive');
     });
 
+    it('updates all optional fields (lastName, phoneNumber, username)', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saUser.update.mockResolvedValue(
+        makeSaUser({ lastName: 'Jones', phoneNumber: '+1555000', username: 'alice_j' }),
+      );
+      const result = await service.updateUser('ba-caller', 'usr1', {
+        lastName: 'Jones', phoneNumber: '+1555000', username: 'alice_j',
+      });
+      expect(mockPrisma.saUser.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ lastName: 'Jones', phoneNumber: '+1555000', username: 'alice_j' }),
+        }),
+      );
+      expect(result.lastName).toBe('Jones');
+    });
+
     it('throws NotFoundException when user not found', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(null);
       await expect(service.updateUser('ba-caller', 'usr1', {})).rejects.toBeInstanceOf(NotFoundException);
@@ -298,6 +341,11 @@ describe('UsersService', () => {
       const { BadRequestException } = await import('@nestjs/common');
       await expect(service.resendInvitation('ba-caller', 'usr1')).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('throws NotFoundException when user not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.resendInvitation('ba-caller', 'missing-usr')).rejects.toBeInstanceOf(NotFoundException);
+    });
   });
 
   describe('deleteUser self-delete guard', () => {
@@ -309,6 +357,41 @@ describe('UsersService', () => {
       });
       await expect(service.deleteUser('ba-caller', 'me-public')).rejects.toThrow(/own account/);
       expect(mockPrisma.saUser.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createUser re-throw non-P2002 error', () => {
+    it('re-throws unexpected errors from the transaction', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 2, publicId: 'org1' });
+      mockPrisma.$transaction.mockImplementationOnce(() => {
+        return Promise.reject(new Error('Connection timeout'));
+      });
+      await expect(service.createUser('ba-caller', {
+        firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', orgId: 'org1',
+      })).rejects.toThrow('Connection timeout');
+    });
+  });
+
+  describe('assignRole re-throw non-P2002 error', () => {
+    it('re-throws unexpected errors from prisma.saUserRole.create', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1' });
+      const unexpected = new Error('DB timeout');
+      mockPrisma.saUserRole.create.mockImplementationOnce(() => Promise.reject(unexpected));
+      await expect(service.assignRole('ba-caller', 'usr1', { roleId: 'role1' })).rejects.toThrow('DB timeout');
+    });
+  });
+
+  describe('removeRole NotFoundException for missing role', () => {
+    it('throws NotFoundException when role not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValue(null);
+      await expect(service.removeRole('ba-caller', 'usr1', 'missing-role')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException when user not found', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.removeRole('ba-caller', 'missing-user', 'role1')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

@@ -54,6 +54,23 @@ describe('PermissionsService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('listPermissions', () => {
+    it('uses default empty-object for q when called with no second arg', async () => {
+      mocks.saPermission.findMany.mockResolvedValue([]);
+      mocks.saPermission.count.mockResolvedValue(0);
+      const result = await makeService().listPermissions('ba-caller');
+      expect(result.items).toEqual([]);
+      expect(result.page).toBe(1);
+      expect(result.pageSize).toBe(25);
+    });
+
+    it('returns empty roleGroups/userGroups when there are no permissions', async () => {
+      mocks.saPermission.findMany.mockResolvedValue([]);
+      mocks.saPermission.count.mockResolvedValue(0);
+      const result = await makeService().listPermissions('ba-caller', {});
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
     it('returns rows with roleCount/userCount and respects q + appId filters', async () => {
       mocks.saApp.findUnique.mockResolvedValue({ id: 5, publicId: 'sq_app5' });
       mocks.saPermission.findMany.mockResolvedValue([
@@ -133,6 +150,11 @@ describe('PermissionsService', () => {
   });
 
   describe('updatePermission', () => {
+    it('throws NotFoundException when permission does not exist', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue(null);
+      await expect(makeService().updatePermission('ba-caller', 'missing', { name: 'apps.new' })).rejects.toBeInstanceOf(NotFoundException);
+    });
+
     it('rejects when name starts with platform. (Forbidden)', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'platform.users.manage', appId: 1 });
       await expect(makeService().updatePermission('ba-caller', 'sq_p1', { name: 'platform.users.manage.x' })).rejects.toBeInstanceOf(ForbiddenException);
@@ -156,6 +178,11 @@ describe('PermissionsService', () => {
   });
 
   describe('deletePermission', () => {
+    it('throws NotFoundException when permission does not exist', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue(null);
+      await expect(makeService().deletePermission('ba-caller', 'missing')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
     it('rejects platform.* with Forbidden', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'platform.users.manage' });
       await expect(makeService().deletePermission('ba-caller', 'sq_p1')).rejects.toBeInstanceOf(ForbiddenException);
@@ -175,6 +202,34 @@ describe('PermissionsService', () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'apps.read' });
       mocks.saPermission.delete.mockResolvedValue(undefined);
       await expect(makeService().deletePermission('ba-caller', 'sq_p1')).resolves.toBeUndefined();
+    });
+
+    it('re-throws unexpected errors from prisma.delete', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'apps.read' });
+      mocks.saPermission.delete.mockRejectedValueOnce(new Error('DB timeout'));
+      await expect(makeService().deletePermission('ba-caller', 'sq_p1')).rejects.toThrow('DB timeout');
+    });
+  });
+
+  describe('createPermission re-throw non-P2002 error', () => {
+    it('re-throws unexpected transaction errors', async () => {
+      mocks.saApp.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_app1' });
+      (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error('Network failure'));
+      await expect(makeService().createPermission('ba-caller', { name: 'apps.read', appId: 'sq_app1' })).rejects.toThrow('Network failure');
+    });
+  });
+
+  describe('updatePermission ConflictException P2002', () => {
+    it('translates P2002 to ConflictException', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'apps.read', appId: 1 });
+      mocks.saPermission.update.mockRejectedValueOnce({ code: 'P2002' });
+      await expect(makeService().updatePermission('ba-caller', 'sq_p1', { name: 'apps.list' })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('re-throws unexpected errors from prisma.update', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'apps.read', appId: 1 });
+      mocks.saPermission.update.mockRejectedValueOnce(new Error('DB timeout'));
+      await expect(makeService().updatePermission('ba-caller', 'sq_p1', { name: 'apps.list' })).rejects.toThrow('DB timeout');
     });
   });
 });
