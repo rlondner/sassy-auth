@@ -1,0 +1,8 @@
+=============================== Coverage summary ===============================
+Statements   : 89.86% ( 771/858 )
+Branches     : 73.31% ( 217/296 )
+Functions    : 92.8% ( 116/125 )
+Lines        : 89.86% ( 665/740 )
+File                            | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                        
+All files                       |   89.86 |    73.31 |    92.8 |   89.86 |                                          
+Tests:       162 passed, 162 total
