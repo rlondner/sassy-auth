@@ -84,8 +84,8 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
         />
       </div>
       {error && <p className="text-label-md text-[var(--destructive)]">{error}</p>}
-      <Button type="submit" className="w-full" disabled={submitting}>
-        {submitting ? '…' : t('acceptInvite.submit')}
+      <Button type="submit" className="w-full" loading={submitting}>
+        {t('acceptInvite.submit')}
       </Button>
     </form>
   )
