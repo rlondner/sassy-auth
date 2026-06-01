@@ -12,6 +12,12 @@
     "switchToLight": "Switch to light mode",
     "switchToDark": "Switch to dark mode"
   },
+  "common": {
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm"
+  },
   "apps": {
     "title": "Applications",
     "subtitle": "Manage authentication apps registered with SassyAuth.",
@@ -73,6 +79,11 @@
       "previous": "Previous",
       "next": "Next",
       "showing": "Showing {from} to {to} of {total} apps"
+    },
+    "toast": {
+      "created": "App created",
+      "updated": "App updated",
+      "deleted": "App deleted"
     }
   },
   "orgs": {
@@ -148,6 +159,11 @@
       "previous": "Previous",
       "next": "Next",
       "showing": "Showing {from} to {to} of {total} orgs"
+    },
+    "toast": {
+      "created": "Org created",
+      "updated": "Org updated",
+      "deleted": "Org deleted"
     }
   },
   "permissions": {
@@ -204,6 +220,11 @@
       "pageSize": "{count} per page",
       "previous": "Previous",
       "next": "Next"
+    },
+    "toast": {
+      "created": "Permission created",
+      "updated": "Permission updated",
+      "deleted": "Permission deleted"
     },
     "confirmDelete": {
       "title": "Delete permission",
@@ -281,6 +302,11 @@
       "previous": "Previous",
       "next": "Next"
     },
+    "toast": {
+      "created": "Role created",
+      "updated": "Role updated",
+      "deleted": "Role deleted"
+    },
     "confirmDelete": {
       "title": "Delete role",
       "body": "Delete \"{name}\"? This cannot be undone.",
@@ -302,6 +328,7 @@
     "title": "Users",
     "search": "Search users…",
     "addUser": "Add User",
+    "create": "Add User",
     "columns": {
       "user": "User",
       "status": "Status",
@@ -357,7 +384,14 @@
       "deactivate": "Deactivate",
       "activate": "Activate",
       "delete": "Delete",
-      "resendInvitation": "Resend Invitation"
+      "resendInvitation": "Resend Invitation",
+      "resend": "Resend Invitation"
+    },
+    "toast": {
+      "created": "User created",
+      "updated": "User updated",
+      "deleted": "User deleted",
+      "resent": "Invitation resent"
     },
     "confirmDelete": {
       "title": "Delete user",
