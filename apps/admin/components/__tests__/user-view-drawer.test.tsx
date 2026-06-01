@@ -11,7 +11,7 @@ jest.mock('next-intl', () => ({
 
 
 jest.mock('@/app/(admin)/users/actions', () => ({
-  getUserRolesAction: jest.fn().mockResolvedValue([{ id: 'r1', name: 'admin', appId: 'app1' }]),
+  getUserRolesAction: jest.fn().mockResolvedValue([{ publicId: 'r1', name: 'admin', appId: 'app1' }]),
   getEffectivePermissionsAction: jest.fn().mockResolvedValue([{ id: 'p1', name: 'users.read', appId: 'app1' }]),
   updateUserAction: jest.fn().mockResolvedValue({}),
   deleteUserAction: jest.fn().mockResolvedValue({ ok: true }),

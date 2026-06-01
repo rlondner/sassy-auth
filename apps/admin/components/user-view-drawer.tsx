@@ -171,7 +171,7 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
                     <div className="flex flex-wrap gap-2">
                       {roles.length === 0
                         ? <span className="text-body-sm text-muted-foreground">—</span>
-                        : roles.map((r) => <Badge key={r.id} variant="secondary">{r.name}</Badge>)}
+                        : roles.map((r) => <Badge key={r.publicId} variant="secondary">{r.name}</Badge>)}
                     </div>
                   </div>
                   <div>

@@ -222,6 +222,82 @@
       "generic": "Something went wrong. Please try again."
     }
   },
+  "roles": {
+    "title": "Roles",
+    "subtitle": "Manage roles and the permissions they grant.",
+    "totalCount": "{count} Total",
+    "search": "Search by role name…",
+    "create": "Add Role",
+    "accessDenied": {
+      "title": "Access denied",
+      "body": "You do not have access to data on this page."
+    },
+    "columns": {
+      "nameAndApp": "Role & App",
+      "sqid": "Public ID (Sqid)",
+      "usage": "Usage",
+      "actions": "Actions"
+    },
+    "fields": {
+      "name": "Name",
+      "nameHint": "A short label for the role, e.g. Editor or Org Admin.",
+      "app": "App",
+      "appImmutable": "App cannot be changed after creation.",
+      "publicId": "Public ID",
+      "permissions": "Permissions",
+      "permissionsShort": "permissions",
+      "usersShort": "users",
+      "permissionRow": "Permission",
+      "addPermission": "Add permission",
+      "removePermission": "Remove permission",
+      "selectPermission": "Select a permission",
+      "noPermissionsForApp": "No permissions exist for this app yet.",
+      "selectAppFirst": "Select an app first."
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "delete": "Delete",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "drawer": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "createTitle": "Add Role",
+      "createSubtitle": "Define a new role and the permissions it grants.",
+      "editTitle": "Edit Role",
+      "viewTitle": "Role Details",
+      "permissionsSection": "Assigned permissions",
+      "noPermissions": "This role grants no permissions yet.",
+      "showingTop50": "Showing top 50 of {total}",
+      "inUseTooltip": "Assigned to {userCount} users — remove role assignments first"
+    },
+    "filter": { "appLabel": "Filter by app", "allApps": "All apps" },
+    "pagination": {
+      "showing": "Showing {from}–{to} of {total}",
+      "pageSize": "{count} per page",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "confirmDelete": {
+      "title": "Delete role",
+      "body": "Delete \"{name}\"? This cannot be undone.",
+      "button": "Delete"
+    },
+    "errors": {
+      "nameRequired": "Name is required.",
+      "nameExists": "A role with that name already exists in this app.",
+      "appRequired": "App is required.",
+      "appNotFound": "Selected app could not be found.",
+      "invalidInput": "One or more fields are invalid.",
+      "inUse": "Role is assigned to users. Remove assignments first.",
+      "forbidden": "You do not have permission to perform this action.",
+      "generic": "Something went wrong. Please try again.",
+      "permissionsMustMatchApp": "Permissions must belong to the same app as the role."
+    }
+  },
   "users": {
     "title": "Users",
     "search": "Search users…",

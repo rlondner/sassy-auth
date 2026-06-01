@@ -111,11 +111,11 @@ export class UsersService {
     );
 
     return user.roles.map((ur) => ({
-      id: ur.role.publicId,
+      publicId: ur.role.publicId,
       name: ur.role.name,
       appId: ur.role.app.publicId,
       permissions: ur.role.permissions.map((rp) => ({
-        id: rp.permission.publicId,
+        publicId: rp.permission.publicId,
         name: rp.permission.name,
         appId: ur.role.app.publicId,
       })),
