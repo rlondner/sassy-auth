@@ -1,0 +1,8 @@
+import { bootApp, closeApp } from './harness';
+
+describe('orgs matrix (placeholder)', () => {
+  beforeAll(async () => { await bootApp(); });
+  afterAll(async () => { await closeApp(); });
+
+  it.skip('matrix populated in PR 3', () => {});
+});
