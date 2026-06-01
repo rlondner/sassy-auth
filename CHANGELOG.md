@@ -4,6 +4,74 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-01
+
+Massive day — 47 commits across three workstreams: (1) full permissions and roles CRUD on both auth-server and admin UI, (2) shadcn reskin of the admin console (sidebar, drawers, dark mode, AlertDialog), and (3) a test coverage campaign adding controller specs, service branch coverage, and the matrix E2E test infrastructure.
+
+### Added
+
+#### auth-server — Permissions CRUD
+- **`PermissionsService`** with TDD spec — full CRUD (list with pagination/search/app-filter, get with role/user detail, create, update, delete) and `isPlatform()` guard preventing mutation of `platform.*` permissions. (`7f966df`, `34a5e34`)
+- **`PermissionsController`** mounted at `/api/permissions` — 5 endpoints (GET list, GET :id, POST, PATCH :id, DELETE :id). (`34a5e34`)
+- **Permissions DTOs** — `CreatePermissionDto`, `UpdatePermissionDto`, `ListPermissionsQueryDto` with `@Matches(NAME_REGEX)` validation for dotted lowercase names. (`16d113a`)
+
+#### auth-server — Roles CRUD expansion
+- **Role CRUD with permission management** — `RolesService` expanded from read-only to full CRUD: create role with permission IDs, update name/description/permissions atomically in a transaction, delete with user-assignment guard. (`379a1db`)
+- **Roles DTOs** — `CreateRoleDto`, `UpdateRoleDto`, `ListRolesQueryDto`. (`379a1db`)
+
+#### auth-server — Test coverage campaign
+- **Controller specs** for all 6 modules: apps (4 endpoints), orgs (5), roles (5), permissions (5), users (10), me (2), invitations (2). (`4480256`, `b072cc5`, `ccac0ae`, `611c1c5`, `c9b955c`, `6d4c1c9`)
+- **Service spec branch coverage gaps filled** — apps, invitations, orgs, permissions, roles, users service specs expanded with edge cases (P2002/P2003 handling, NotFoundException, ForbiddenException for platform resources). (`7cb727b`)
+- **Coverage baseline captured** — 228 tests, 93.33% statement coverage. (`b6fa656`)
+- **Matrix E2E test infrastructure** — Nest bootstrap + per-admin session helper (`harness.ts`), per-test data factories with LIFO cleanup queue (`factories.ts`), permissions-matrix single source of truth (`permissions-matrix.ts`). Spec files for all 5 resources created (placeholder `it.skip`). (`990e6cb`, `622a4ad`, `712dd4a`)
+- **API & E2E test coverage campaign design spec and implementation plan**. (`61cbe30`, `e58efa7`)
+
+#### admin — Permissions UI
+- **`/permissions` route + server actions** — list, get, create, update, delete with error mapping and `revalidatePath`. (`fdfcfc1`, `c3ae5b9`)
+- **PermissionsTable** — TanStack Table with search, app filter, pagination, row actions (view/edit/copy name/delete). (`fc3808c`)
+- **PermissionCreateDrawer, PermissionEditDrawer, PermissionViewDrawer** — full drawer set with form validation, `NAME_REGEX` enforcement, role/user detail in view drawer. (`61559f2`, `5e8ca5a`, `83d5547`)
+- **Permissions i18n** — `permissions.*` block in en.json and fr.json. (`35d7862`)
+- **Permissions types + API client helpers**. (`997ef54`)
+- **Permissions UI test suites** — 4 test files covering create, edit, view drawers and table. (`116081d`)
+
+#### admin — Roles UI
+- **`/roles` route + server actions** — list, get, create, update, delete, listAppPermissions. (`fb48d9c`)
+- **RolesTable** — TanStack Table with search, app filter, pagination, row actions. (`52dd681`)
+- **RoleCreateDrawer, RoleEditDrawer, RoleViewDrawer** — full drawer set. RoleCreateDrawer includes `PermissionRowsEditor` for inline permission management. (`255c386`, `e23b633`, `1541fa0`)
+- **Roles i18n** — `roles.*` block in en.json and fr.json. (`6d81389`)
+- **Role types + API helpers + user drawer migration** to shared types. (`177d757`)
+- **Roles UI test suites** — 4 test files. (`529e8ff`)
+
+#### admin — Shadcn reskin
+- **Sidebar + light/dark theme toggle** — `SidebarShell`, `ThemeProvider`, `ThemeToggle`, `UserFooter` with icon-collapse mode. (`07fd7f4`, `c032520`)
+- **Unified `PageHeader`** across Apps/Orgs/Users. (`c7e9d6b`)
+- **`DeleteAlertDialog`** — shadcn AlertDialog for all delete confirmations, replacing inline confirms. (`7b3c477`)
+- **Drawer + avatar reskin** — all 9 drawers (apps, orgs, users × create/edit/view) reskinned per slate/indigo palette. (`adff67d`)
+- **Access-denied panel polish**. (`7726ba2`)
+- **Design from variant.com** imported. (`3173bab`)
+
+### Fixed
+
+- **Effective-permissions API response shape** — admin `lib/api.ts` now unwraps the correct response envelope. (`63aa0ee`)
+- **Pre-existing build + test breakage** — `server-only` mock, view-drawer test fix, Next.js config, package deps. (`db93252`)
+- **Authenticated routes broken** — bumped `lucide-react`, pass icon names as strings across server/client boundary. (`df86a1e`)
+
+### Risky patterns / missing tests
+
+See [TODO_2026-06-01.md](./todo/TODO_2026-06-01.md) and [BUGS_2026-06-01.md](./bugs/BUGS_2026-06-01.md).
+
+- **bug-0024** — Missing org/tenant isolation in `PermissionsService` — all operations check `platform.permissions.manage` but never pass `targetOrgId`.
+- **bug-0025** — Missing org/tenant isolation in `RolesService` — same issue.
+- **bug-0026** — Permission `name` unique constraint is global, not per-app (should be `@@unique([appId, name])`).
+- **bug-0027** — Role `name` has no unique constraint at all (missing `@@unique([appId, name])`).
+- **bug-0028** — Admin UI type narrowing uses weak `'publicId' in res` check instead of `'errorKey' in res` (3 instances).
+- **bug-0029** — Role names have no input validation in admin UI (permissions require `NAME_REGEX`).
+- **bug-0030** — Delete buttons in permissions/roles tables use `data-disabled` instead of HTML `disabled`, breaking keyboard navigation.
+- **bug-0031** — Matrix test cleanup queue is module-scoped and never reset between test files, risking cross-spec pollution.
+- **bug-0032** — Error mapping in admin server actions relies on brittle string matching against error messages.
+
+---
+
 ## [Unreleased] — 2026-05-31
 
 Light day — one critical cookie-encoding bugfix, the orgs-admin-ui feature branch merge, and design documentation for the upcoming shadcn reskin.

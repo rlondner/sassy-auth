@@ -419,8 +419,26 @@ Cache the JWKS document locally and refresh it only when you encounter a key ID 
 | POST   | `/api/users/:id/resend-invitation`            | Re-issue invitation for a pending user           |
 | GET    | `/api/invitations/:token`                     | Validate an invitation (returns user info + `expired`) |
 | POST   | `/api/invitations/:token`                     | Accept invitation (sets password, creates Account, activates user) |
-| GET    | `/api/orgs`                                   | List orgs (read-only)                            |
-| GET    | `/api/roles`                                  | List roles (read-only)                           |
+| GET    | `/api/orgs`                                   | List orgs (filter by `appId`)                    |
+| GET    | `/api/orgs/:id`                               | Get org                                          |
+| POST   | `/api/orgs`                                   | Create org                                       |
+| PATCH  | `/api/orgs/:id`                               | Update org                                       |
+| DELETE | `/api/orgs/:id`                               | Delete org                                       |
+| GET    | `/api/apps`                                   | List apps (filter by `orgId`)                    |
+| GET    | `/api/apps/:id`                               | Get app                                          |
+| POST   | `/api/apps`                                   | Create app                                       |
+| PATCH  | `/api/apps/:id`                               | Update app                                       |
+| DELETE | `/api/apps/:id`                               | Delete app                                       |
+| GET    | `/api/roles`                                  | List roles (filter by `appId`)                   |
+| GET    | `/api/roles/:id`                              | Get role (includes permissions, user count)       |
+| POST   | `/api/roles`                                  | Create role with permission IDs                  |
+| PATCH  | `/api/roles/:id`                              | Update role name/description/permissions         |
+| DELETE | `/api/roles/:id`                              | Delete role (blocked if users assigned)          |
+| GET    | `/api/permissions`                            | List permissions (filter by `appId`, search `q`) |
+| GET    | `/api/permissions/:id`                        | Get permission (includes role/user detail)       |
+| POST   | `/api/permissions`                            | Create permission                                |
+| PATCH  | `/api/permissions/:id`                        | Update permission name/description               |
+| DELETE | `/api/permissions/:id`                        | Delete permission (blocked if roles/users assigned) |
 
 BetterAuth mounts on Express before NestJS and intercepts all `/api/auth/*` routes directly. NestJS handles all other routes.
 
@@ -439,7 +457,11 @@ pnpm --filter @sassy-auth/admin dev
 Routes:
 - `/login` — credential login (proxies BetterAuth via Server Action)
 - `/accept-invite?token=...` — invitation landing
-- `/users` — users management (TanStack Table, view/edit drawer, create drawer)
+- `/users` — users management (TanStack Table, view/edit/create drawers)
+- `/orgs` — org management
+- `/apps` — app management
+- `/roles` — role management with inline permission assignment
+- `/permissions` — permission management with role/user detail view
 
 i18n is wired with `next-intl` (locales: `en`, `fr`). Strings live in `apps/admin/messages/`. The active locale is detected from the `Accept-Language` header and can be overridden via the `LocaleSwitcher` in the shell.
 
@@ -532,8 +554,8 @@ The `client_secret` field is accepted in `POST /api/token/oauth/token` but not c
 **CI — E2E only, no typecheck/lint.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. Typecheck and lint are not yet wired into CI.
 
-**Admin / orgs / apps / roles CRUD UI.**
-Only users management is implemented in the admin console. Orgs / apps / roles / permissions CRUD is planned for a later sub-project.
+**Permissions and roles not org-scoped in CRUD endpoints.**
+The new `/api/permissions` and `/api/roles` CRUD endpoints check `platform.permissions.manage` but do not pass `targetOrgId` to `checkPermission`. An org-admin could manage resources across orgs. Tracked as **bug-0024** and **bug-0025**.
 
-**shadcn reskin planned.**
-The current `@sassy-auth/ui` primitives (Radix + Tailwind) are being replaced with shadcn/ui. Design spec and implementation plan are in `docs/superpowers/`. See `CHANGELOG.md` for status.
+**Permission name uniqueness is global, not per-app.**
+The `SaPermission.name` constraint is `@unique` globally instead of `@@unique([appId, name])`. Two apps cannot share a permission name like `users.read`. Tracked as **bug-0026**.
