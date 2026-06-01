@@ -96,7 +96,8 @@ export async function createTempRole(): Promise<{ publicId: string; name: string
 export async function createTempPermission(): Promise<{ publicId: string; name: string; appPublicId: string }> {
   const app = await createTempApp();
   const s = as(superAdmin());
-  const permName = `e2e.${uniqueName('perm').replace(/-/g, '.')}`;
+  const uid = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+  const permName = `e2e.perm.p${uid}`;
   const res = await s.post('/api/permissions', { name: permName, appId: app.publicId });
   if (res.status !== 201) throw new Error(`createTempPermission failed (${res.status}): ${JSON.stringify(res.body)}`);
   const created = res.body as { publicId: string; name: string };
