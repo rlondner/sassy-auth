@@ -1,6 +1,5 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../../lib/fixtures'
-import { t } from '../../lib/i18n'
 
 const NAV_KEYS = ['apps', 'orgs', 'users', 'roles', 'permissions'] as const
 type NavKey = (typeof NAV_KEYS)[number]
@@ -25,7 +24,7 @@ async function expectActiveNav(page: Page, active: NavKey): Promise<void> {
 // failure modes against a pre-authenticated storageState session. It also
 // asserts that the sidebar highlights the nav item for the current route.
 test.describe('Admin nav (authed)', () => {
-  test('s@sa.io stays signed in across /users, refresh, /apps, /orgs', async ({ page }) => {
+  test('s@sa.io stays signed in and sidebar highlights the active route across all admin pages', async ({ page }) => {
     // /users — initial nav from cold storageState
     await page.goto('/users')
     await expect(page).toHaveURL(/\/users$/)
