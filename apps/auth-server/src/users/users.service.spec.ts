@@ -485,4 +485,87 @@ describe('UsersService', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
+
+  describe('getUserDirectPermissions', () => {
+    const callerBaId = 'ba-caller';
+    const userPublicId = 'usrPub';
+
+    it('returns the direct-permission rows mapped to Permission shape', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce({
+        id: 1, publicId: userPublicId, betterAuthUserId: 'ba-target', orgId: 9,
+        directPermissions: [
+          { permission: { publicId: 'pA', name: 'apps.read', appId: 4 } },
+          { permission: { publicId: 'pB', name: 'apps.write', appId: 4 } },
+        ],
+      });
+
+      const result = await service.getUserDirectPermissions(callerBaId, userPublicId);
+      expect(result).toEqual([
+        { id: 'pA', name: 'apps.read', appId: '' },
+        { id: 'pB', name: 'apps.write', appId: '' },
+      ]);
+    });
+
+    it('throws NotFoundException for unknown user publicId', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(null);
+      await expect(
+        service.getUserDirectPermissions(callerBaId, 'nope'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('setUserDirectPermissions', () => {
+    const callerBaId = 'ba-caller';
+    const userPublicId = 'usrPub';
+    const orgWithApp = { id: 9, appId: 4 };
+
+    function primeFindUnique() {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce({
+        id: 1, publicId: userPublicId, betterAuthUserId: 'ba-target', orgId: orgWithApp.id,
+      });
+      mockPrisma.saOrg.findUnique.mockResolvedValueOnce({ id: orgWithApp.id, appId: orgWithApp.appId });
+    }
+
+    it('deletes existing direct-permission rows and inserts the new set inside a transaction', async () => {
+      primeFindUnique();
+      mockPrisma.saPermission.findMany.mockResolvedValue([
+        { id: 30, publicId: 'pA', appId: orgWithApp.appId },
+      ]);
+
+      await service.setUserDirectPermissions(callerBaId, userPublicId, ['pA']);
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.saUserPermission.deleteMany).toHaveBeenCalledWith({ where: { userId: 1 } });
+      expect(mockPrisma.saUserPermission.createMany).toHaveBeenCalledWith({
+        data: [{ userId: 1, permissionId: 30 }],
+      });
+    });
+
+    it('clears all direct permissions when given an empty list', async () => {
+      primeFindUnique();
+      await service.setUserDirectPermissions(callerBaId, userPublicId, []);
+      expect(mockPrisma.saUserPermission.deleteMany).toHaveBeenCalledWith({ where: { userId: 1 } });
+      expect(mockPrisma.saUserPermission.createMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects permission publicIds from a different app with BadRequestException', async () => {
+      primeFindUnique();
+      mockPrisma.saPermission.findMany.mockResolvedValue([
+        { id: 30, publicId: 'pA', appId: orgWithApp.appId },
+        { id: 99, publicId: 'pWrong', appId: 7 },
+      ]);
+      await expect(
+        service.setUserDirectPermissions(callerBaId, userPublicId, ['pA', 'pWrong']),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('refuses self-edit with ForbiddenException', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce({
+        id: 1, publicId: userPublicId, betterAuthUserId: callerBaId, orgId: 9,
+      });
+      await expect(
+        service.setUserDirectPermissions(callerBaId, userPublicId, []),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
 });
