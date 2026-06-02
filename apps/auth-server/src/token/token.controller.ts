@@ -77,7 +77,16 @@ export class TokenController {
       throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
     }
 
-    assertRedirectUriMatchesApp(redirectUri, app.url);
+    try {
+      assertRedirectUriMatchesApp(redirectUri, app.url);
+    } catch (err) {
+      this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
+        context: 'TokenController',
+        appId: clientId,
+        attemptedOrigin: (() => { try { return new URL(redirectUri).origin; } catch { return '<unparseable>'; } })(),
+      });
+      throw err;
+    }
 
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
@@ -138,13 +147,35 @@ export class TokenController {
       throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
     }
 
-    assertRedirectUriMatchesApp(dto.redirect_uri, app.url);
+    try {
+      assertRedirectUriMatchesApp(dto.redirect_uri, app.url);
+    } catch (err) {
+      this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
+        context: 'TokenController',
+        appId: dto.client_id,
+        attemptedOrigin: (() => { try { return new URL(dto.redirect_uri).origin; } catch { return '<unparseable>'; } })(),
+      });
+      throw err;
+    }
 
-    const { userId: userPublicId, appPublicId } = this.oauthService.exchangeCode(
-      dto.code,
-      dto.client_id,
-      dto.code_verifier,
-    );
+    let userPublicId: string;
+    let appPublicId: string;
+    try {
+      const exchanged = this.oauthService.exchangeCode(
+        dto.code,
+        dto.client_id,
+        dto.code_verifier,
+      );
+      userPublicId = exchanged.userId;
+      appPublicId = exchanged.appPublicId;
+    } catch (err) {
+      this.logger.getWinstonLogger().warn('oauth.pkce.verify_failed', {
+        context: 'TokenController',
+        appId: dto.client_id,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
 
     const saUser = await prisma.saUser.findFirst({
       where: { publicId: userPublicId },
