@@ -141,6 +141,27 @@ export async function resendInvitation(userId: string): Promise<{ inviteUrl: str
   return result
 }
 
+export async function setUserRoles(userId: string, roleIds: string[]): Promise<void> {
+  await apiFetch(`/api/users/${userId}/roles`, {
+    method: 'PUT',
+    body: JSON.stringify({ roleIds }),
+  })
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User roles set: ${userId}`, level: 'info' })
+}
+
+export async function getUserDirectPermissions(userId: string): Promise<Permission[]> {
+  const res = await apiFetch(`/api/users/${userId}/direct-permissions`)
+  return res.json()
+}
+
+export async function setUserDirectPermissions(userId: string, permissionIds: string[]): Promise<void> {
+  await apiFetch(`/api/users/${userId}/direct-permissions`, {
+    method: 'PUT',
+    body: JSON.stringify({ permissionIds }),
+  })
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User direct permissions set: ${userId}`, level: 'info' })
+}
+
 // Public endpoints — no session cookie needed
 export async function validateInvitation(token: string): Promise<InvitationInfo> {
   const res = await fetch(`${BASE}/api/invitations/${token}`)
