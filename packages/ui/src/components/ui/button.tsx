@@ -51,12 +51,18 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading}
         {...props}
       >
-        {loading && (
-          <span className="material-symbols-outlined animate-spin" style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-            progress_activity
-          </span>
+        {asChild ? (
+          children
+        ) : (
+          <>
+            {loading && (
+              <span className="material-symbols-outlined animate-spin" style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                progress_activity
+              </span>
+            )}
+            {children}
+          </>
         )}
-        {children}
       </Comp>
     )
   }
