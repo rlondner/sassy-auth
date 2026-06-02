@@ -1,4 +1,4 @@
-import { headers, cookies } from 'next/headers'
+import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { AdminShell } from '@/components/admin-shell'
@@ -21,9 +21,6 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const headersList = await headers()
-  const pathname = headersList.get('x-pathname') ?? '/users'
-
   const [session, currentLocale] = await Promise.all([getSession(), getLocale()])
   const availableLocales = getAvailableLocales()
 
@@ -41,7 +38,6 @@ export default async function AdminLayout({
 
   return (
     <AdminShell
-      currentPath={pathname}
       user={user}
       currentLocale={currentLocale}
       availableLocales={availableLocales}
