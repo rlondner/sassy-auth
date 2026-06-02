@@ -153,10 +153,11 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange }: UserViewDrawe
           username: editProfile.username || null,
         })
           .then(() => ({ axis: 'profile' as const, ok: true }))
-          .catch((e: unknown) => ({
-            axis: 'profile' as const, ok: false,
-            error: e instanceof Error ? e.message : 'users.errors.generic',
-          })),
+          .catch((e: unknown): { axis: 'profile'; ok: false; errorKey?: string; error?: string } =>
+            e instanceof Error
+              ? { axis: 'profile', ok: false, error: e.message }
+              : { axis: 'profile', ok: false, errorKey: 'users.errors.generic' },
+          ),
       )
     }
     if (rolesDirty) {
