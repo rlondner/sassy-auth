@@ -184,14 +184,9 @@ describe('SassyAuth E2E', () => {
     });
 
     it('POST /api/token/oauth/token returns 401 for invalid code', async () => {
-      // The token-exchange DTO uses @IsUrl() which (with default options) rejects
-      // hosts without a TLD like `localhost`, so promote the seeded platform app
-      // to a TLD-bearing URL for the redirect_uri origin check before exchanging.
-      const seeded = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
-      const platformApp = await prisma.saApp.update({
-        where: { id: seeded.id },
-        data: { url: 'http://app.example.com' },
-      });
+      // The DTO uses @IsUrl({ require_tld: false }) so localhost URLs work in
+      // dev/test without any test-side URL mutation.
+      const platformApp = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
       const res = await request(httpServer)
         .post('/api/token/oauth/token')
         .send({
@@ -228,14 +223,10 @@ describe('SassyAuth E2E', () => {
         expect(sessionCookie).toBeTruthy();
 
         // 2. Look up the platform app's publicId from the seed.
-        // OauthTokenExchangeDto enforces @IsUrl() (default) which rejects
-        // hosts without a TLD, so make sure the platform app URL has one
-        // for the redirect_uri origin match.
-        const seeded = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
-        const app = await prisma.saApp.update({
-          where: { id: seeded.id },
-          data: { url: 'http://app.example.com' },
-        });
+        // OauthTokenExchangeDto now uses @IsUrl({ require_tld: false }) so the
+        // seeded http://localhost:3000 URL is accepted as-is for the redirect_uri
+        // origin match — no test-side mutation needed.
+        const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
 
         // 3. Build PKCE pair and call /api/token/oauth/authorize.
         const verifier = 'a'.repeat(64);

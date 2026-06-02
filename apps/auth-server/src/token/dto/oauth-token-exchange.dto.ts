@@ -16,6 +16,6 @@ export class OauthTokenExchangeDto {
   @IsNotEmpty()
   code_verifier!: string;
 
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   redirect_uri!: string;
 }
