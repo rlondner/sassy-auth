@@ -124,13 +124,7 @@ test.describe('Lifecycle (authed) — provision + accept invite + sign-in', () =
       // "Select a role" empty-state option appears once it's ready).
       await dialog.getByRole('button', { name: t('users.fields.addRole') }).click()
       await dialog.getByLabel(t('users.fields.roleRow')).first().selectOption({ label: ROLE_NAME })
-      // The user-create drawer grew taller in T12 (Role + DirectPerm editors)
-      // and the SheetContent is non-scrollable, so the SheetFooter Create
-      // button sits below the viewport. Even force-click still trips
-      // Playwright's "outside of viewport" guard, so dispatch the click
-      // synthetically — the React onClick handler runs identically.
-      const createBtn = dialog.getByRole('button', { name: t('users.drawer.create') })
-      await createBtn.dispatchEvent('click')
+      await dialog.getByRole('button', { name: t('users.drawer.create') }).click()
 
       // 6. Capture the invite URL surfaced in the success state ────────
       await expect(dialog.getByText(t('users.drawer.inviteCreated'))).toBeVisible({ timeout: 10_000 })
