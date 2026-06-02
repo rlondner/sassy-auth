@@ -72,7 +72,7 @@ export class TokenService {
       iss: issuer,
       iat: now,
       exp: now + 3600,
-      permissions,
+      scope: permissions.join(' '),
     };
 
     return jwt.sign(payload, this.privateKey, { algorithm: 'RS256' });

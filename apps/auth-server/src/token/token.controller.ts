@@ -27,6 +27,7 @@ import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
+import { assertRedirectUriMatchesApp } from './redirect-uri';
 import { LoggerService } from '../common/logger/logger.service';
 
 @ApiTags('Token')
@@ -56,10 +57,15 @@ export class TokenController {
   async oauthAuthorize(
     @Query('client_id') clientId: string,
     @Query('redirect_uri') redirectUri: string,
+    @Query('code_challenge') codeChallenge: string,
+    @Query('code_challenge_method') codeChallengeMethod: string,
     @Query('state') state: string = '',
     @Req() req: Request,
   ) {
-    // Validate app exists
+    if (!codeChallenge || codeChallengeMethod !== 'S256') {
+      throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
+    }
+
     let numericId: number;
     try {
       numericId = this.sqidService.decode(clientId);
@@ -71,7 +77,8 @@ export class TokenController {
       throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
     }
 
-    // Require active BetterAuth session
+    assertRedirectUriMatchesApp(redirectUri, app.url);
+
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
     });
@@ -79,7 +86,6 @@ export class TokenController {
       throw new UnauthorizedException();
     }
 
-    // Look up sa_user for this BetterAuth user
     const saUser = await prisma.saUser.findFirst({
       where: { betterAuthUserId: session.user.id },
       include: { org: true },
@@ -91,7 +97,12 @@ export class TokenController {
       throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
     }
 
-    const code = this.oauthService.generateCode(saUser.publicId, app.publicId);
+    const code = this.oauthService.generateCode(
+      saUser.publicId,
+      app.publicId,
+      codeChallenge,
+      'S256',
+    );
     const url = new URL(redirectUri);
     url.searchParams.set('code', code);
     if (state) url.searchParams.set('state', state);
@@ -100,6 +111,8 @@ export class TokenController {
       context: 'TokenController',
       appId: clientId,
       userId: saUser.publicId,
+      pkceMethod: 'S256',
+      redirectUriOrigin: new URL(redirectUri).origin,
     });
     Sentry.setTag('authFlow', 'oauth');
     Sentry.setTag('appId', clientId);
@@ -114,9 +127,23 @@ export class TokenController {
    */
   @Post('oauth/token')
   async oauthToken(@Body() dto: OauthTokenExchangeDto) {
+    let numericId: number;
+    try {
+      numericId = this.sqidService.decode(dto.client_id);
+    } catch {
+      throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
+    }
+    const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+    if (!app) {
+      throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+    }
+
+    assertRedirectUriMatchesApp(dto.redirect_uri, app.url);
+
     const { userId: userPublicId, appPublicId } = this.oauthService.exchangeCode(
       dto.code,
       dto.client_id,
+      dto.code_verifier,
     );
 
     const saUser = await prisma.saUser.findFirst({
@@ -138,6 +165,7 @@ export class TokenController {
       context: 'TokenController',
       appId: appPublicId,
       userId: userPublicId,
+      pkceMethod: 'S256',
     });
 
     return { access_token: token, token_type: 'Bearer', expires_in: 3600 };

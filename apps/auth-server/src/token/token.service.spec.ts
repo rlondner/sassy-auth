@@ -111,7 +111,8 @@ describe('TokenService', () => {
       expect(decoded.aud).toBe('app-1');
       expect(decoded.org).toBe('org-1');
       expect(decoded.iss).toBe('https://auth.example.com');
-      expect(Array.isArray(decoded.permissions)).toBe(true);
+      expect(typeof decoded.scope).toBe('string');
+      expect(decoded.scope).toBe('invoices.create reports.read sales.manage');
       expect(decoded.exp! - decoded.iat!).toBe(3600);
     });
   });

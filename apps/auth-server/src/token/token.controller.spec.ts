@@ -122,7 +122,7 @@ describe('TokenController', () => {
   // ── GET /api/token/oauth/authorize ───────────────────────────────────────
 
   describe('oauthAuthorize', () => {
-    const app = { id: 10, publicId: 'sqid-10', isPlatform: false };
+    const app = { id: 10, publicId: 'sqid-10', isPlatform: false, url: 'https://app.example.com' };
     const fakeSession = { user: { id: 'ba-user-1', email: 'user@example.com' } };
     const saUser = {
       id: 1,
@@ -142,6 +142,8 @@ describe('TokenController', () => {
       const result = await controller.oauthAuthorize(
         'sqid-10',
         'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
         'csrf-state',
         fakeReq,
       );
@@ -157,7 +159,7 @@ describe('TokenController', () => {
 
       const fakeReq = { headers: {} } as unknown as import('express').Request;
       await expect(
-        controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', '', fakeReq),
+        controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -171,7 +173,7 @@ describe('TokenController', () => {
 
       const fakeReq = { headers: {} } as unknown as import('express').Request;
       await expect(
-        controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', '', fakeReq),
+        controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
       ).rejects.toThrow(ForbiddenException);
     });
   });
@@ -191,13 +193,13 @@ describe('TokenController', () => {
         org: { publicId: 'sqid-5', appId: 10 },
       };
       mockPrisma.saUser.findFirst.mockResolvedValue(saUser);
-      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
       mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
 
       const result = await controller.oauthToken({
         code: 'valid-code',
         client_id: 'sqid-10',
-        client_secret: 'secret',
+        code_verifier: 'a'.repeat(64),
         redirect_uri: 'https://app.example.com/callback',
       });
 
