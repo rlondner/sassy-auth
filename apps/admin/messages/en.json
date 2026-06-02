@@ -360,7 +360,10 @@
       "nMorePermissions": "+ {count} more",
       "inviteCreated": "User created — share this invitation link:",
       "copyLink": "Copy Link",
-      "copied": "Copied!"
+      "copied": "Copied!",
+      "assignedDirectPermissions": "Direct Permissions",
+      "noRoles": "No roles assigned.",
+      "noDirectPermissions": "No direct permissions."
     },
     "fields": {
       "firstName": "First Name",
@@ -376,7 +379,18 @@
       "created": "Created",
       "never": "Never",
       "today": "Today at {time}",
-      "primary": "Primary"
+      "primary": "Primary",
+      "roleRow": "Role",
+      "directPermissionRow": "Direct permission",
+      "addRole": "Add role",
+      "removeRole": "Remove role",
+      "selectRole": "Select a role",
+      "selectOrgFirst": "Select an organization first",
+      "noRolesForApp": "No roles defined for this app.",
+      "addDirectPermission": "Add direct permission",
+      "removeDirectPermission": "Remove direct permission",
+      "selectDirectPermission": "Select a permission",
+      "noDirectPermissionsForApp": "No permissions defined for this app."
     },
     "actions": {
       "edit": "Edit",
@@ -401,7 +415,9 @@
     },
     "errors": {
       "forbidden": "You do not have permission to perform this action.",
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "rolesSetFailed": "Failed to update roles.",
+      "directPermissionsSetFailed": "Failed to update direct permissions."
     }
   },
   "login": {
