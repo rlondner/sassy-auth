@@ -161,6 +161,7 @@ export function UsersTable({ users, orgs, initialOrgId }: UsersTableProps) {
       {/* Drawers */}
       <UserViewDrawer
         user={selectedUser}
+        orgs={orgs}
         open={viewOpen}
         onOpenChange={setViewOpen}
       />
