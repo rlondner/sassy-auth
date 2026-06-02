@@ -4,11 +4,10 @@ import 'reflect-metadata';
 import express from 'express';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import { ValidationPipe } from '@nestjs/common';
 import { toNodeHandler } from 'better-auth/node';
 import { AppModule } from './app.module';
 import { auth } from './auth/auth.config';
-import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
+import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { mergeOpenApiDocs } from './docs/openapi';
@@ -28,9 +27,7 @@ async function bootstrap() {
     logger: loggerService,
   });
 
-  app.setGlobalPrefix('api');
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.useGlobalFilters(new SentryExceptionFilter(loggerService));
+  configureNestApp(app, loggerService);
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Sassy Auth API')

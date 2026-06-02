@@ -70,6 +70,20 @@ describe('InvitationsService', () => {
       expect(result.expired).toBe(true);
     });
 
+    // Regression: a used-but-not-yet-expired invitation must report
+    // expired:true so the accept-invite page renders the "expired or invalid"
+    // ErrorState instead of the password form. Pre-fix, validateToken only
+    // checked expiresAt and revisiting a consumed link still showed the form.
+    it('returns expired:true for an already-used token whose expiresAt is still in the future', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue({
+        ...validInvitation,
+        usedAt: new Date(),
+        expiresAt: futureDate,
+      });
+      const result = await service.validateToken('abc123');
+      expect(result.expired).toBe(true);
+    });
+
     it('throws NotFoundException for unknown token', async () => {
       mockPrisma.saInvitation.findUnique.mockResolvedValue(null);
       await expect(service.validateToken('unknown')).rejects.toBeInstanceOf(NotFoundException);

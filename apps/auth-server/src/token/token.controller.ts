@@ -147,8 +147,8 @@ export class TokenController {
    * POST /api/token/direct/login
    *
    * Accepts an identifier (email | username | phone) + password + appId.
-   * Validates credentials directly against the bcrypt hash in the account
-   * table (no BetterAuth session created). Returns a signed RS256 JWT.
+   * Validates credentials directly against BetterAuth's scrypt hash in the
+   * account table (no BetterAuth session created). Returns a signed RS256 JWT.
    */
   @Post('direct/login')
   async directLogin(@Body() dto: DirectLoginDto) {
