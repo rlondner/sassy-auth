@@ -10,6 +10,7 @@ import { DeleteAlertDialog } from './delete-alert-dialog'
 import {
   getUserRolesAction,
   getEffectivePermissionsAction,
+  getUserDirectPermissionsAction,
   updateUserAction,
   deleteUserAction,
 } from '@/app/(admin)/users/actions'
@@ -28,6 +29,7 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
   const t = useTranslations()
   const [roles, setRoles] = React.useState<Role[]>([])
   const [permissions, setPermissions] = React.useState<Permission[]>([])
+  const [directPermissions, setDirectPermissions] = React.useState<Permission[]>([])
   const [loading, setLoading] = React.useState(false)
   const [editing, setEditing] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
@@ -42,8 +44,12 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
     setEditing(false)
     setShowAllPerms(false)
     setEditValues({ firstName: user.firstName, lastName: user.lastName, phoneNumber: user.phoneNumber ?? '', username: user.username ?? '' })
-    Promise.all([getUserRolesAction(user.id), getEffectivePermissionsAction(user.id)])
-      .then(([r, p]) => { setRoles(r); setPermissions(p) })
+    Promise.all([
+      getUserRolesAction(user.id),
+      getEffectivePermissionsAction(user.id),
+      getUserDirectPermissionsAction(user.id),
+    ])
+      .then(([r, p, d]) => { setRoles(r); setPermissions(p); setDirectPermissions(d) })
       .finally(() => setLoading(false))
   }, [open, user?.id])
 
@@ -165,13 +171,23 @@ export function UserViewDrawer({ user, open, onOpenChange }: UserViewDrawerProps
               <p className="text-body-sm text-muted-foreground">Loading…</p>
             ) : (
               <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-3 gap-6">
                   <div>
                     <p className="mb-2 text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('users.drawer.assignedRoles')}</p>
                     <div className="flex flex-wrap gap-2">
                       {roles.length === 0
                         ? <span className="text-body-sm text-muted-foreground">—</span>
                         : roles.map((r) => <Badge key={r.publicId} variant="secondary">{r.name}</Badge>)}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('users.drawer.assignedDirectPermissions')}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {directPermissions.length === 0
+                        ? <span className="text-body-sm text-muted-foreground">—</span>
+                        : directPermissions.map((p) => (
+                            <span key={p.id} className="rounded border border-border px-2 py-0.5 text-label-md">{p.name}</span>
+                          ))}
                     </div>
                   </div>
                   <div>
