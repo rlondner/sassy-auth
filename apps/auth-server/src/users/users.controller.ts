@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete, Param, Body, Query, HttpCode, UseGuards, Req,
+  Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, HttpCode, UseGuards, Req,
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -9,6 +9,8 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { SetUserRolesDto } from './dto/set-user-roles.dto';
+import { SetUserDirectPermissionsDto } from './dto/set-user-direct-permissions.dto';
 
 function callerBaId(req: Request): string {
   return (req as unknown as Record<string, { id: string }>)['betterAuthUser'].id;
@@ -72,5 +74,30 @@ export class UsersController {
   @Post(':id/resend-invitation')
   resendInvitation(@Req() req: Request, @Param('id') id: string) {
     return this.users.resendInvitation(callerBaId(req), id);
+  }
+
+  @Put(':id/roles')
+  @HttpCode(204)
+  setRoles(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: SetUserRolesDto,
+  ) {
+    return this.users.setUserRoles(callerBaId(req), id, dto.roleIds);
+  }
+
+  @Get(':id/direct-permissions')
+  getDirectPermissions(@Req() req: Request, @Param('id') id: string) {
+    return this.users.getUserDirectPermissions(callerBaId(req), id);
+  }
+
+  @Put(':id/direct-permissions')
+  @HttpCode(204)
+  setDirectPermissions(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: SetUserDirectPermissionsDto,
+  ) {
+    return this.users.setUserDirectPermissions(callerBaId(req), id, dto.permissionIds);
   }
 }

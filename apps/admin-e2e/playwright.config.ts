@@ -1,7 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// Use CI_TESTS rather than CI so we don't inadvertently flip other
-// tooling that reads process.env.CI (e.g. pnpm, Next.js telemetry).
 const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
@@ -12,9 +10,6 @@ export default defineConfig({
   forbidOnly: CI_TESTS,
   retries: CI_TESTS ? 2 : 0,
   workers: CI_TESTS ? 1 : undefined,
-  // Per-test cap. Spec-level race timeouts (e.g. waitFor(10s)) must stay
-  // strictly below this so they produce informative race errors instead
-  // of a generic "Test timeout exceeded" message.
   timeout: 30_000,
   reporter: CI_TESTS ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
@@ -30,20 +25,42 @@ export default defineConfig({
       testMatch: /auth-state\.setup\.ts/,
     },
     {
+      // Unauthed flow tests (e.g. login.spec.ts).
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      // No dependencies — login.spec.ts must exercise the real /login flow,
-      // not start from a pre-set session.
-      testIgnore: /authed\/.*\.spec\.ts/,
+      testIgnore: /(authed|matrix)\/.*\.spec\.ts/,
     },
     {
-      name: 'chromium-authed',
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: '.auth/super-admin.json',
-      },
+      // Super admin only — existing authed/ flow plus matrix participation.
+      name: 'chromium-super',
+      use: { ...devices['Desktop Chrome'], storageState: '.auth/super-admin.json' },
       dependencies: ['setup'],
-      testMatch: /authed\/.*\.spec\.ts/,
+      testMatch: /(authed|matrix)\/.*\.spec\.ts/,
+    },
+    // The four resource-specific admins participate only in the matrix.
+    {
+      name: 'chromium-apps',
+      use: { ...devices['Desktop Chrome'], storageState: '.auth/apps-admin.json' },
+      dependencies: ['setup'],
+      testMatch: /matrix\/.*\.spec\.ts/,
+    },
+    {
+      name: 'chromium-orgs',
+      use: { ...devices['Desktop Chrome'], storageState: '.auth/orgs-admin.json' },
+      dependencies: ['setup'],
+      testMatch: /matrix\/.*\.spec\.ts/,
+    },
+    {
+      name: 'chromium-perms',
+      use: { ...devices['Desktop Chrome'], storageState: '.auth/perms-admin.json' },
+      dependencies: ['setup'],
+      testMatch: /matrix\/.*\.spec\.ts/,
+    },
+    {
+      name: 'chromium-users',
+      use: { ...devices['Desktop Chrome'], storageState: '.auth/users-admin.json' },
+      dependencies: ['setup'],
+      testMatch: /matrix\/.*\.spec\.ts/,
     },
   ],
   webServer: CI_TESTS

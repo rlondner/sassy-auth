@@ -12,6 +12,7 @@ import { checkPermission } from '../common/permissions/check-permission';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { resolveRoleIdsForApp, resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
 import { LoggerService } from '../common/logger/logger.service';
 
 const USER_INCLUDE = {
@@ -153,6 +154,12 @@ export class UsersService {
       { targetOrgId: org.id },
     );
 
+    // Resolve + app-scope-validate role/permission ids BEFORE entering the
+    // create transaction so a bad publicId throws cleanly without leaving
+    // an orphan user behind.
+    const numericRoleIds = await resolveRoleIdsForApp(org.appId, dto.roleIds ?? []);
+    const numericPermIds = await resolvePermissionIdsForApp(org.appId, dto.directPermissionIds ?? []);
+
     const baUserId = crypto.randomUUID();
     const now = new Date();
     const token = crypto.randomBytes(32).toString('hex');
@@ -187,6 +194,17 @@ export class UsersService {
           include: USER_INCLUDE,
         });
 
+        if (numericRoleIds.length > 0) {
+          await tx.saUserRole.createMany({
+            data: numericRoleIds.map((roleId) => ({ userId: createdSaUser.id, roleId })),
+          });
+        }
+        if (numericPermIds.length > 0) {
+          await tx.saUserPermission.createMany({
+            data: numericPermIds.map((permissionId) => ({ userId: createdSaUser.id, permissionId })),
+          });
+        }
+
         const createdInvitation = await tx.saInvitation.create({
           data: {
             publicId: baUserId.slice(12, 24),
@@ -215,6 +233,8 @@ export class UsersService {
       context: 'UsersService',
       userId: saUser.publicId,
       orgId: dto.orgId,
+      roleCount: numericRoleIds.length,
+      directPermissionCount: numericPermIds.length,
     });
     return {
       user: formatUser(saUser),
@@ -321,6 +341,111 @@ export class UsersService {
       roleId: rolePublicId,
     });
   }
+
+  async setUserRoles(
+    callerBaId: string,
+    userPublicId: string,
+    roleIds: string[],
+  ): Promise<void> {
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.betterAuthUserId === callerBaId) {
+      throw new ForbiddenException('You cannot edit your own access');
+    }
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    const org = await prisma.saOrg.findUnique({ where: { id: user.orgId } });
+    if (!org) throw new NotFoundException('User org not found');
+
+    const numericIds = await resolveRoleIdsForApp(org.appId, roleIds);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.saUserRole.deleteMany({ where: { userId: user.id } });
+      if (numericIds.length > 0) {
+        await tx.saUserRole.createMany({
+          data: numericIds.map((roleId) => ({ userId: user.id, roleId })),
+        });
+      }
+    });
+
+    this.logger.getWinstonLogger().info('User roles set', {
+      context: 'UsersService',
+      userId: userPublicId,
+      roleCount: numericIds.length,
+    });
+  }
+
+  async getUserDirectPermissions(
+    callerBaId: string,
+    userPublicId: string,
+  ): Promise<Array<{ id: string; name: string; appId: string }>> {
+    const user = await prisma.saUser.findUnique({
+      where: { publicId: userPublicId },
+      include: {
+        directPermissions: { include: { permission: { select: { publicId: true, name: true, appId: true } } } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    // The admin Permission shape uses appId as a publicId string; the
+    // /api/users/:id/effective-permissions endpoint already publishes
+    // appId: '' for the same reason — direct-permission rows don't carry
+    // the app publicId via this query path. Match that convention.
+    return (user as unknown as {
+      directPermissions: Array<{ permission: { publicId: string; name: string; appId: number } }>;
+    }).directPermissions.map((up) => ({
+      id: up.permission.publicId,
+      name: up.permission.name,
+      appId: '',
+    }));
+  }
+
+  async setUserDirectPermissions(
+    callerBaId: string,
+    userPublicId: string,
+    permissionIds: string[],
+  ): Promise<void> {
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.betterAuthUserId === callerBaId) {
+      throw new ForbiddenException('You cannot edit your own access');
+    }
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    const org = await prisma.saOrg.findUnique({ where: { id: user.orgId } });
+    if (!org) throw new NotFoundException('User org not found');
+
+    const numericIds = await resolvePermissionIdsForApp(org.appId, permissionIds);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.saUserPermission.deleteMany({ where: { userId: user.id } });
+      if (numericIds.length > 0) {
+        await tx.saUserPermission.createMany({
+          data: numericIds.map((permissionId) => ({ userId: user.id, permissionId })),
+        });
+      }
+    });
+
+    this.logger.getWinstonLogger().info('User direct permissions set', {
+      context: 'UsersService',
+      userId: userPublicId,
+      permissionCount: numericIds.length,
+    });
+  }
+
   async resendInvitation(callerBaId: string, userPublicId: string) {
     const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
     if (!user) throw new NotFoundException('User not found');

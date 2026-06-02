@@ -167,6 +167,12 @@ describe('OrgsService', () => {
       await expect(service.createOrg('ba-caller', { name: 'Acme', appId: 'sq_1' }))
         .rejects.toBeInstanceOf(ConflictException);
     });
+
+    it('re-throws unexpected errors from the transaction', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.$transaction.mockRejectedValueOnce(new Error('DB timeout'));
+      await expect(service.createOrg('ba-caller', { name: 'Acme', appId: 'sq_1' })).rejects.toThrow('DB timeout');
+    });
   });
 
   describe('updateOrg', () => {
@@ -207,6 +213,12 @@ describe('OrgsService', () => {
       mockPrisma.saOrg.update.mockRejectedValue({ code: 'P2002' });
       await expect(service.updateOrg('ba-caller', 'sq_10', { name: 'dup' }))
         .rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('re-throws unexpected errors from prisma.update', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(existing);
+      mockPrisma.saOrg.update.mockRejectedValueOnce(new Error('Network failure'));
+      await expect(service.updateOrg('ba-caller', 'sq_10', { name: 'X' })).rejects.toThrow('Network failure');
     });
   });
 
@@ -260,6 +272,12 @@ describe('OrgsService', () => {
       mockPrisma.saOrg.delete.mockResolvedValue(existing);
       await service.deleteOrg('ba-caller', 'sq_10');
       expect(mockPrisma.saOrg.delete).toHaveBeenCalledWith({ where: { publicId: 'sq_10' } });
+    });
+
+    it('re-throws unexpected errors from prisma.delete', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue(existing);
+      mockPrisma.saOrg.delete.mockRejectedValueOnce(new Error('Unexpected DB error'));
+      await expect(service.deleteOrg('ba-caller', 'sq_10')).rejects.toThrow('Unexpected DB error');
     });
   });
 });

@@ -37,6 +37,8 @@ export interface CreateUserPayload {
   orgId: string
   username?: string
   phoneNumber?: string
+  roleIds?: string[]
+  directPermissionIds?: string[]
 }
 
 export interface CreateUserResponse {

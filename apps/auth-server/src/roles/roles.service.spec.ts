@@ -67,6 +67,23 @@ describe('RolesService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('listRoles', () => {
+    it('uses default empty-object for q when called with no second arg', async () => {
+      mocks.saRole.findMany.mockResolvedValue([]);
+      mocks.saRole.count.mockResolvedValue(0);
+      const result = await makeService().listRoles('ba-caller');
+      expect(result.items).toEqual([]);
+      expect(result.page).toBe(1);
+      expect(result.pageSize).toBe(25);
+    });
+
+    it('returns empty permGroups/userGroups when there are no roles', async () => {
+      mocks.saRole.findMany.mockResolvedValue([]);
+      mocks.saRole.count.mockResolvedValue(0);
+      const result = await makeService().listRoles('ba-caller', {});
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
     it('returns rows with permissionCount/userCount and respects q + appId filters', async () => {
       mocks.saApp.findUnique.mockResolvedValue({ id: 5, publicId: 'sq_app5' });
       mocks.saRole.findMany.mockResolvedValue([
@@ -181,12 +198,78 @@ describe('RolesService', () => {
         .rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it('throws NotFoundException when role does not exist', async () => {
+      mocks.saRole.findUnique.mockResolvedValue(null);
+      await expect(makeService().updateRole('ba-caller', 'sq_r1', { name: 'Renamed' })).rejects.toBeInstanceOf(NotFoundException);
+    });
+
     it('happy path updates name + replaces permissions', async () => {
       mocks.saRole.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_r1', name: 'Editor', appId: 1 });
       mocks.saPermission.findMany.mockResolvedValue([{ id: 10, publicId: 'sq_p1', appId: 1 }]);
       mocks.saUserRole.count.mockResolvedValue(0);
       const result = await makeService().updateRole('ba-caller', 'sq_r1', { name: 'Editor v2', permissionIds: ['sq_p1'] });
       expect(result.publicId).toBe('sq_r1');
+      // The default txStub.saRole.findUnique returns one permission, ensuring map callback is exercised
+      expect(result.permissions).toEqual([{ publicId: 'sq_p1', name: 'apps.read' }]);
+    });
+
+    it('updates permissionIds only (no name) — skips tx.saRole.update', async () => {
+      mocks.saRole.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_r1', name: 'Editor', appId: 1 });
+      mocks.saPermission.findMany.mockResolvedValue([{ id: 10, publicId: 'sq_p1', appId: 1 }]);
+      mocks.saUserRole.count.mockResolvedValue(2);
+      const result = await makeService().updateRole('ba-caller', 'sq_r1', { permissionIds: ['sq_p1'] });
+      expect(result.publicId).toBe('sq_r1');
+    });
+
+    it('translates P2002 to ConflictException in updateRole', async () => {
+      mocks.saRole.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_r1', name: 'Editor', appId: 1 });
+      mocks.saPermission.findMany.mockResolvedValue([]);
+      (prisma.$transaction as jest.Mock).mockRejectedValueOnce({ code: 'P2002' });
+      await expect(makeService().updateRole('ba-caller', 'sq_r1', { name: 'Duplicate' })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('re-throws unexpected errors from the transaction', async () => {
+      mocks.saRole.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_r1', name: 'Editor', appId: 1 });
+      mocks.saPermission.findMany.mockResolvedValue([]);
+      (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error('DB timeout'));
+      await expect(makeService().updateRole('ba-caller', 'sq_r1', { name: 'new' })).rejects.toThrow('DB timeout');
+    });
+  });
+
+  describe('createRole with non-empty permissionIds', () => {
+    it('creates role and links permissions when permissionIds is provided (returns permissions in response)', async () => {
+      mocks.saApp.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_app1' });
+      mocks.saPermission.findMany.mockResolvedValue([{ id: 10, publicId: 'sq_p1', appId: 1 }]);
+      // Override $transaction to return a role WITH permissions so line 152 (map callback) is exercised
+      (prisma.$transaction as jest.Mock).mockImplementationOnce(async (cb: (tx: unknown) => unknown) => {
+        const txStub = {
+          saRole: {
+            create: jest.fn().mockResolvedValue({ id: 42, name: 'Editor', appId: 1, publicId: 'placeholder' }),
+            update: jest.fn().mockResolvedValue({
+              id: 42, publicId: 'sq_42', name: 'Editor', appId: 1,
+              app: { publicId: 'sq_app1', name: 'Customer Portal' },
+              permissions: [{ permission: { publicId: 'sq_p1', name: 'apps.read' } }],
+            }),
+          },
+          saRolePermission: {
+            createMany: jest.fn().mockResolvedValue({ count: 1 }),
+            deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
+        };
+        return cb(txStub);
+      });
+      const result = await makeService().createRole('ba-caller', {
+        name: 'Editor', appId: 'sq_app1', permissionIds: ['sq_p1'],
+      });
+      expect(result.publicId).toBe('sq_42');
+      expect(result.permissions).toEqual([{ publicId: 'sq_p1', name: 'apps.read' }]);
+    });
+
+    it('re-throws unexpected transaction errors', async () => {
+      mocks.saApp.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_app1' });
+      mocks.saPermission.findMany.mockResolvedValue([]);
+      (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error('Network failure'));
+      await expect(makeService().createRole('ba-caller', { name: 'Admin', appId: 'sq_app1' })).rejects.toThrow('Network failure');
     });
   });
 
@@ -208,6 +291,12 @@ describe('RolesService', () => {
     it('throws NotFound when the role does not exist', async () => {
       mocks.saRole.findUnique.mockResolvedValue(null);
       await expect(makeService().deleteRole('ba-caller', 'missing')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('re-throws unexpected errors from the transaction', async () => {
+      mocks.saRole.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_r1', name: 'Editor' });
+      (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error('Unexpected DB error'));
+      await expect(makeService().deleteRole('ba-caller', 'sq_r1')).rejects.toThrow('Unexpected DB error');
     });
   });
 });

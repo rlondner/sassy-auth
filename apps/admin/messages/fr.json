@@ -12,6 +12,12 @@
     "switchToLight": "Passer en mode clair",
     "switchToDark": "Passer en mode sombre"
   },
+  "common": {
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm"
+  },
   "apps": {
     "title": "Applications",
     "subtitle": "Gérez les applications d’authentification enregistrées dans SassyAuth.",
@@ -73,6 +79,11 @@
       "previous": "Précédent",
       "next": "Suivant",
       "showing": "{from} à {to} sur {total} applications"
+    },
+    "toast": {
+      "created": "App created",
+      "updated": "App updated",
+      "deleted": "App deleted"
     }
   },
   "orgs": {
@@ -148,6 +159,11 @@
       "previous": "Précédent",
       "next": "Suivant",
       "showing": "{from} à {to} sur {total} organisations"
+    },
+    "toast": {
+      "created": "Org created",
+      "updated": "Org updated",
+      "deleted": "Org deleted"
     }
   },
   "permissions": {
@@ -204,6 +220,11 @@
       "pageSize": "{count} par page",
       "previous": "Précédent",
       "next": "Suivant"
+    },
+    "toast": {
+      "created": "Permission created",
+      "updated": "Permission updated",
+      "deleted": "Permission deleted"
     },
     "confirmDelete": {
       "title": "Supprimer la permission",
@@ -281,6 +302,11 @@
       "previous": "Précédent",
       "next": "Suivant"
     },
+    "toast": {
+      "created": "Role created",
+      "updated": "Role updated",
+      "deleted": "Role deleted"
+    },
     "confirmDelete": {
       "title": "Supprimer le rôle",
       "body": "Supprimer « {name} » ? Cette action est irréversible.",
@@ -302,6 +328,7 @@
     "title": "Utilisateurs",
     "search": "Rechercher des utilisateurs…",
     "addUser": "Ajouter un utilisateur",
+    "create": "Add User",
     "columns": {
       "user": "Utilisateur",
       "status": "Statut",
@@ -333,7 +360,10 @@
       "nMorePermissions": "+ {count} de plus",
       "inviteCreated": "Utilisateur créé — partagez ce lien d’invitation :",
       "copyLink": "Copier le lien",
-      "copied": "Copié !"
+      "copied": "Copié !",
+      "assignedDirectPermissions": "Permissions directes",
+      "noRoles": "Aucun rôle attribué.",
+      "noDirectPermissions": "Aucune permission directe."
     },
     "fields": {
       "firstName": "Prénom",
@@ -349,7 +379,18 @@
       "created": "Créé le",
       "never": "Jamais",
       "today": "Aujourd’hui à {time}",
-      "primary": "Principal"
+      "primary": "Principal",
+      "roleRow": "Rôle",
+      "directPermissionRow": "Permission directe",
+      "addRole": "Ajouter un rôle",
+      "removeRole": "Supprimer le rôle",
+      "selectRole": "Sélectionner un rôle",
+      "selectOrgFirst": "Sélectionnez d'abord une organisation",
+      "noRolesForApp": "Aucun rôle défini pour cette application.",
+      "addDirectPermission": "Ajouter une permission directe",
+      "removeDirectPermission": "Supprimer la permission directe",
+      "selectDirectPermission": "Sélectionner une permission",
+      "noDirectPermissionsForApp": "Aucune permission définie pour cette application."
     },
     "actions": {
       "edit": "Modifier",
@@ -357,7 +398,14 @@
       "deactivate": "Désactiver",
       "activate": "Activer",
       "delete": "Supprimer",
-      "resendInvitation": "Renvoyer l’invitation"
+      "resendInvitation": "Renvoyer l’invitation",
+      "resend": "Resend Invitation"
+    },
+    "toast": {
+      "created": "User created",
+      "updated": "User updated",
+      "deleted": "User deleted",
+      "resent": "Invitation resent"
     },
     "confirmDelete": {
       "title": "Supprimer l’utilisateur",
@@ -367,7 +415,9 @@
     },
     "errors": {
       "forbidden": "Vous n’avez pas la permission d’effectuer cette action.",
-      "generic": "Une erreur est survenue. Veuillez réessayer."
+      "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "rolesSetFailed": "Échec de la mise à jour des rôles.",
+      "directPermissionsSetFailed": "Échec de la mise à jour des permissions directes."
     }
   },
   "login": {
