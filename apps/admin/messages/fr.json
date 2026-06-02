@@ -362,8 +362,7 @@
       "copyLink": "Copier le lien",
       "copied": "Copié !",
       "assignedDirectPermissions": "Permissions directes",
-      "noRoles": "Aucun rôle attribué.",
-      "noDirectPermissions": "Aucune permission directe."
+      "noRoles": "Aucun rôle attribué."
     },
     "fields": {
       "firstName": "Prénom",
@@ -381,16 +380,11 @@
       "today": "Aujourd’hui à {time}",
       "primary": "Principal",
       "roleRow": "Rôle",
-      "directPermissionRow": "Permission directe",
       "addRole": "Ajouter un rôle",
       "removeRole": "Supprimer le rôle",
       "selectRole": "Sélectionner un rôle",
       "selectOrgFirst": "Sélectionnez d'abord une organisation",
-      "noRolesForApp": "Aucun rôle défini pour cette application.",
-      "addDirectPermission": "Ajouter une permission directe",
-      "removeDirectPermission": "Supprimer la permission directe",
-      "selectDirectPermission": "Sélectionner une permission",
-      "noDirectPermissionsForApp": "Aucune permission définie pour cette application."
+      "noRolesForApp": "Aucun rôle défini pour cette application."
     },
     "actions": {
       "edit": "Modifier",
