@@ -112,19 +112,25 @@ test.describe('Lifecycle (authed) — provision + accept invite + sign-in', () =
       await dialog.getByLabel(t('users.fields.firstName')).fill(USER_FIRST)
       await dialog.getByLabel(t('users.fields.lastName')).fill(USER_LAST)
       await dialog.getByLabel(t('users.fields.email')).fill(USER_EMAIL)
-      // Org + Role are Radix <Select>s whose <label> is NOT bound via
-      // htmlFor / aria-labelledby, so getByLabel can't reach the combobox.
-      // Disambiguate by anchored placeholder text — note "Select org" is a
-      // substring of the role trigger's "Select org first" disabled state,
-      // so we anchor both with /^…$/.
+      // Org is still a Radix <Select> whose <label> is NOT bound via
+      // htmlFor / aria-labelledby, so getByLabel can't reach the combobox —
+      // disambiguate by anchored placeholder text.
       const orgTrigger = dialog.locator('button[role="combobox"]', { hasText: /^Select org$/ })
       await orgTrigger.click()
       await page.getByRole('option', { name: ORG_NAME }).click()
-      const roleTrigger = dialog.locator('button[role="combobox"]', { hasText: /^Select role$/ })
-      await expect(roleTrigger).toBeEnabled({ timeout: 10_000 })
-      await roleTrigger.click()
-      await page.getByRole('option', { name: ROLE_NAME }).click()
-      await dialog.getByRole('button', { name: t('users.drawer.create') }).click()
+      // Roles are now driven by RoleRowsEditor — a list of native <select>
+      // rows scoped to the org's app, spawned by an "Add role" button. Wait
+      // for the editor to finish loading roles for this app (the disabled
+      // "Select a role" empty-state option appears once it's ready).
+      await dialog.getByRole('button', { name: t('users.fields.addRole') }).click()
+      await dialog.getByLabel(t('users.fields.roleRow')).first().selectOption({ label: ROLE_NAME })
+      // The user-create drawer grew taller in T12 (Role + DirectPerm editors)
+      // and the SheetContent is non-scrollable, so the SheetFooter Create
+      // button sits below the viewport. Even force-click still trips
+      // Playwright's "outside of viewport" guard, so dispatch the click
+      // synthetically — the React onClick handler runs identically.
+      const createBtn = dialog.getByRole('button', { name: t('users.drawer.create') })
+      await createBtn.dispatchEvent('click')
 
       // 6. Capture the invite URL surfaced in the success state ────────
       await expect(dialog.getByText(t('users.drawer.inviteCreated'))).toBeVisible({ timeout: 10_000 })
@@ -175,6 +181,56 @@ test.describe('Lifecycle (authed) — provision + accept invite + sign-in', () =
     const cookies = await page.context().cookies()
     const sessionCookie = cookies.find((c) => c.name === 'better-auth.session_token')
     expect(sessionCookie?.value).toBeTruthy()
+
+    // 9. Open a fresh super-admin context to drive the edit drawer ─────
+    //    The current context now holds the new user's session; we need
+    //    super-admin cookies again to edit the user.
+    const superCtx = await page.context().browser()!.newContext({
+      storageState: '.auth/super-admin.json',
+    })
+    const superPage = await superCtx.newPage()
+    try {
+      await superPage.goto('/users')
+
+      // Open the lifecycle user's view drawer by clicking their row.
+      const userRow = superPage.getByRole('row', { name: new RegExp(USER_EMAIL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })
+      await expect(userRow).toBeVisible({ timeout: 10_000 })
+      await userRow.click()
+
+      const dialog = superPage.getByRole('dialog')
+      await expect(dialog).toBeVisible()
+
+      // Click Edit (header button)
+      await dialog.getByRole('button', { name: t('users.drawer.edit') }).click()
+
+      // Add a direct-permission row. PermissionRowsEditor is reused from the
+      // role-create drawer, so its controls are labeled with the roles.fields.*
+      // keys (NOT users.fields.*). The user had no direct permissions before,
+      // so the first new row's dropdown can pick PERM_NAME (the only perm in
+      // this app) without hitting the duplicate-row guard.
+      const addPerm = dialog.getByRole('button', { name: t('roles.fields.addPermission') })
+      await addPerm.click()
+      // PermissionRowsEditor renders BOTH <select aria-label="Permission">
+      // and <button aria-label="Remove permission"> per row, and getByLabel
+      // is substring-matched, so it would also match the remove button.
+      // Scope to actual <select> elements to disambiguate.
+      const permSelects = dialog.locator('select[aria-label="' + t('roles.fields.permissionRow') + '"]')
+      const permCount = await permSelects.count()
+      const newPermSelect = permSelects.nth(permCount - 1)
+      await newPermSelect.selectOption({ label: PERM_NAME })
+
+      // Save
+      await dialog.getByRole('button', { name: t('users.drawer.save') }).click()
+
+      // After successful Save the drawer exits edit mode; the direct-perm
+      // chip should now appear in view mode.
+      await expect(
+        dialog.getByText(t('users.drawer.assignedDirectPermissions')),
+      ).toBeVisible()
+      await expect(dialog.locator('text=' + PERM_NAME).first()).toBeVisible()
+    } finally {
+      await superCtx.close()
+    }
   })
 })
 
