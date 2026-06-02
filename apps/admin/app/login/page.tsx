@@ -2,11 +2,13 @@
 
 import { useTranslations } from 'next-intl'
 import { useActionState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@sassy-auth/ui'
 import { signIn } from './actions'
 
 export default function LoginPage() {
   const t = useTranslations('login')
+  const next = useSearchParams().get('next') ?? ''
   const [state, formAction, isPending] = useActionState(
     async (_prev: { error?: string }, formData: FormData) => signIn(formData),
     {},
@@ -21,6 +23,8 @@ export default function LoginPage() {
         </div>
 
         <form action={formAction} className="flex flex-col gap-4">
+          <input type="hidden" name="next" value={next} />
+
           <div className="flex flex-col gap-1.5">
             <label className="text-label-md font-semibold" htmlFor="email">{t('email')}</label>
             <input
