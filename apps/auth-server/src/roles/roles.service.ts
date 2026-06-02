@@ -5,6 +5,7 @@ import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
+import { resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { ListRolesQueryDto } from './dto/list-roles-query.dto';
@@ -23,29 +24,6 @@ const ROLE_DETAIL_INCLUDE = {
 
 function isPrismaCode(e: unknown, code: string): boolean {
   return typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === code;
-}
-
-async function resolvePermissionIds(
-  appId: number,
-  permissionPublicIds: string[],
-): Promise<number[]> {
-  if (permissionPublicIds.length === 0) return [];
-  const perms = (await prisma.saPermission.findMany({
-    where: { publicId: { in: permissionPublicIds } },
-    select: { id: true, publicId: true, appId: true },
-  })) as Array<{ id: number; publicId: string; appId: number }>;
-  if (perms.length !== permissionPublicIds.length) {
-    const found = new Set(perms.map((p) => p.publicId));
-    const missing = permissionPublicIds.filter((id) => !found.has(id));
-    throw new NotFoundException(`Permission(s) not found: ${missing.join(', ')}`);
-  }
-  const wrongApp = perms.filter((p) => p.appId !== appId);
-  if (wrongApp.length > 0) {
-    throw new BadRequestException(
-      `Permission(s) belong to a different app: ${wrongApp.map((p) => p.publicId).join(', ')}`,
-    );
-  }
-  return perms.map((p) => p.id);
 }
 
 @Injectable()
@@ -120,7 +98,7 @@ export class RolesService {
     const app = await prisma.saApp.findUnique({ where: { publicId: dto.appId } });
     if (!app) throw new NotFoundException('App not found');
 
-    const permissionIds = await resolvePermissionIds(app.id, dto.permissionIds ?? []);
+    const permissionIds = await resolvePermissionIdsForApp(app.id, dto.permissionIds ?? []);
 
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -167,7 +145,7 @@ export class RolesService {
 
     const permissionIds = dto.permissionIds === undefined
       ? undefined
-      : await resolvePermissionIds(existing.appId, dto.permissionIds);
+      : await resolvePermissionIdsForApp(existing.appId, dto.permissionIds);
 
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
