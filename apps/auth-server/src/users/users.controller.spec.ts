@@ -14,6 +14,9 @@ const mockUsersService = {
   deleteUser: jest.fn(),
   getUserRoles: jest.fn(),
   getEffectivePermissions: jest.fn(),
+  getUserDirectPermissions: jest.fn(),
+  setUserRoles: jest.fn(),
+  setUserDirectPermissions: jest.fn(),
   assignRole: jest.fn(),
   removeRole: jest.fn(),
   resendInvitation: jest.fn(),
@@ -127,6 +130,30 @@ describe('UsersController', () => {
       mockUsersService.resendInvitation.mockResolvedValue({ inviteUrl: 'x' });
       await controller.resendInvitation(makeReq('ba-9'), 'usr-1');
       expect(mockUsersService.resendInvitation).toHaveBeenCalledWith('ba-9', 'usr-1');
+    });
+  });
+
+  describe('setRoles', () => {
+    it('forwards caller id, user id, and roleIds to UsersService.setUserRoles', async () => {
+      mockUsersService.setUserRoles.mockResolvedValue(undefined);
+      await controller.setRoles(makeReq('ba-7'), 'usr-1', { roleIds: ['rA', 'rB'] });
+      expect(mockUsersService.setUserRoles).toHaveBeenCalledWith('ba-7', 'usr-1', ['rA', 'rB']);
+    });
+  });
+
+  describe('getDirectPermissions', () => {
+    it('forwards caller id and user id to UsersService.getUserDirectPermissions', async () => {
+      mockUsersService.getUserDirectPermissions.mockResolvedValue([{ id: 'pA', name: 'apps.read', appId: '' }]);
+      await controller.getDirectPermissions(makeReq('ba-8'), 'usr-1');
+      expect(mockUsersService.getUserDirectPermissions).toHaveBeenCalledWith('ba-8', 'usr-1');
+    });
+  });
+
+  describe('setDirectPermissions', () => {
+    it('forwards caller id, user id, and permissionIds to UsersService.setUserDirectPermissions', async () => {
+      mockUsersService.setUserDirectPermissions.mockResolvedValue(undefined);
+      await controller.setDirectPermissions(makeReq('ba-9'), 'usr-1', { permissionIds: ['pA'] });
+      expect(mockUsersService.setUserDirectPermissions).toHaveBeenCalledWith('ba-9', 'usr-1', ['pA']);
     });
   });
 });
