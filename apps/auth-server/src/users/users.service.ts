@@ -154,6 +154,12 @@ export class UsersService {
       { targetOrgId: org.id },
     );
 
+    // Resolve + app-scope-validate role/permission ids BEFORE entering the
+    // create transaction so a bad publicId throws cleanly without leaving
+    // an orphan user behind.
+    const numericRoleIds = await resolveRoleIdsForApp(org.appId, dto.roleIds ?? []);
+    const numericPermIds = await resolvePermissionIdsForApp(org.appId, dto.directPermissionIds ?? []);
+
     const baUserId = crypto.randomUUID();
     const now = new Date();
     const token = crypto.randomBytes(32).toString('hex');
@@ -188,6 +194,17 @@ export class UsersService {
           include: USER_INCLUDE,
         });
 
+        if (numericRoleIds.length > 0) {
+          await tx.saUserRole.createMany({
+            data: numericRoleIds.map((roleId) => ({ userId: createdSaUser.id, roleId })),
+          });
+        }
+        if (numericPermIds.length > 0) {
+          await tx.saUserPermission.createMany({
+            data: numericPermIds.map((permissionId) => ({ userId: createdSaUser.id, permissionId })),
+          });
+        }
+
         const createdInvitation = await tx.saInvitation.create({
           data: {
             publicId: baUserId.slice(12, 24),
@@ -216,6 +233,8 @@ export class UsersService {
       context: 'UsersService',
       userId: saUser.publicId,
       orgId: dto.orgId,
+      roleCount: numericRoleIds.length,
+      directPermissionCount: numericPermIds.length,
     });
     return {
       user: formatUser(saUser),

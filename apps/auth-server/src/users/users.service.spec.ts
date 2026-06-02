@@ -250,6 +250,50 @@ describe('UsersService', () => {
       });
       await expect(service.createUser('ba-caller', dto)).rejects.toBeInstanceOf(ConflictException);
     });
+
+    it('atomically wires roleIds and directPermissionIds inside the create transaction', async () => {
+      // Org lookup for app-scope validation
+      mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 9, publicId: 'org1', appId: 4, name: 'Plat', isPlatform: false });
+      // Role + permission resolution
+      mockPrisma.saRole.findMany.mockResolvedValue([
+        { id: 20, publicId: 'rA', appId: 4 },
+      ]);
+      mockPrisma.saPermission.findMany.mockResolvedValue([
+        { id: 30, publicId: 'pA', appId: 4 },
+      ]);
+
+      mockPrisma.user.create.mockResolvedValue(undefined);
+      const created = makeSaUser({ id: 7, publicId: 'newPub' });
+      mockPrisma.saUser.create.mockResolvedValue(created);
+      mockPrisma.saInvitation.create.mockResolvedValue({ token: 'tok-1' });
+
+      await service.createUser('ba-caller', {
+        firstName: 'A', lastName: 'B', email: 'a@b.io', orgId: 'org1',
+        roleIds: ['rA'], directPermissionIds: ['pA'],
+      });
+
+      expect(mockPrisma.saUserRole.createMany).toHaveBeenCalledWith({
+        data: [{ userId: 7, roleId: 20 }],
+      });
+      expect(mockPrisma.saUserPermission.createMany).toHaveBeenCalledWith({
+        data: [{ userId: 7, permissionId: 30 }],
+      });
+    });
+
+    it('treats undefined roleIds / directPermissionIds as no-op (no createMany call)', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 9, publicId: 'org1', appId: 4 });
+      mockPrisma.user.create.mockResolvedValue(undefined);
+      const created = makeSaUser({ id: 7, publicId: 'newPub' });
+      mockPrisma.saUser.create.mockResolvedValue(created);
+      mockPrisma.saInvitation.create.mockResolvedValue({ token: 'tok-1' });
+
+      await service.createUser('ba-caller', {
+        firstName: 'A', lastName: 'B', email: 'a@b.io', orgId: 'org1',
+      });
+
+      expect(mockPrisma.saUserRole.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.saUserPermission.createMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateUser', () => {
