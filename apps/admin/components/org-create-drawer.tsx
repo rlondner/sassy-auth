@@ -119,8 +119,8 @@ export function OrgCreateDrawer({ apps, open, onOpenChange }: Props) {
                 >
                   {t('orgs.drawer.cancel')}
                 </Button>
-                <Button type="submit" disabled={pending || noApps}>
-                  {pending ? t('orgs.drawer.saving') : t('orgs.drawer.createTitle')}
+                <Button type="submit" loading={pending} disabled={noApps}>
+                  {t('orgs.drawer.createTitle')}
                 </Button>
               </ButtonGroup>
             </div>

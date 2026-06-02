@@ -393,7 +393,8 @@
       "activate": "Activate",
       "delete": "Delete",
       "resendInvitation": "Resend Invitation",
-      "resend": "Resend Invitation"
+      "resend": "Resend Invitation",
+      "moreActions": "More actions"
     },
     "toast": {
       "created": "User created",
