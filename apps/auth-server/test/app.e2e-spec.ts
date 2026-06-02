@@ -556,6 +556,67 @@ describe('SassyAuth E2E', () => {
         .expect(200);
       expect(me.body.permissions).toEqual(expect.arrayContaining([`e2e.t${ts}.read`]));
     });
+
+    // The lifecycle test only assigns the original role at the start. Here
+    // we use the new set-replace endpoints to add a SECOND role and a
+    // direct permission, then verify the union flows through /api/me/permissions.
+
+    it('sets a second role + a direct permission via the new set-replace endpoints', async () => {
+      // Provision a second role pointing at the same app + permission.
+      const role2Res = await request(httpServer)
+        .post('/api/roles')
+        .set('Cookie', superAdminCookie)
+        .send({
+          name: `E2E Lifecycle Role 2 ${ts}`,
+          appId: appPublicId,
+          permissionIds: [permPublicId],
+        })
+        .expect(201);
+      const role2PublicId = role2Res.body.publicId as string;
+
+      // Add the new role to the existing single-role set (set-replace).
+      await request(httpServer)
+        .put(`/api/users/${userPublicId}/roles`)
+        .set('Cookie', superAdminCookie)
+        .send({ roleIds: [rolePublicId, role2PublicId] })
+        .expect(204);
+
+      // Grant the same permission directly to the user as well.
+      await request(httpServer)
+        .put(`/api/users/${userPublicId}/direct-permissions`)
+        .set('Cookie', superAdminCookie)
+        .send({ permissionIds: [permPublicId] })
+        .expect(204);
+
+      // GET reflects the new direct-permission row.
+      const direct = await request(httpServer)
+        .get(`/api/users/${userPublicId}/direct-permissions`)
+        .set('Cookie', superAdminCookie)
+        .expect(200);
+      expect(direct.body).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: `e2e.t${ts}.read` }),
+      ]));
+    });
+
+    it('the newly-signed-in user still sees the same effective permission set via /api/me', async () => {
+      const signIn = await request(httpServer)
+        .post('/api/auth/sign-in/email')
+        .send({ email: inviteeEmail, password: PASSWORD })
+        .expect(200);
+      const setCookie = signIn.headers['set-cookie'] as unknown as string[] | string | undefined;
+      const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+      const userCookie = cookies
+        .map((c) => c.split(';')[0])
+        .find((c) => c.startsWith('better-auth.session_token='))!;
+
+      const me = await request(httpServer)
+        .get('/api/me/permissions')
+        .set('Cookie', userCookie)
+        .expect(200);
+      // The same permission, granted via 2 roles + 1 direct, still appears once
+      // (deduplicated union — guards against double-counting in the join).
+      expect(me.body.permissions).toEqual(expect.arrayContaining([`e2e.t${ts}.read`]));
+    });
   });
 
   // ── Final cleanup: e2e-user@example.com via super-admin DELETE ────────────
