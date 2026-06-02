@@ -59,8 +59,8 @@ sassy-auth/
         token/               # JWT issuance: OAuth2 and direct login flows
         users/               # Users CRUD + role assignment
         invitations/         # Invitation issue / validate / accept
-        orgs/                # Org list (read-only)
-        roles/               # Role list (read-only)
+        orgs/                # Org CRUD
+        roles/               # Role CRUD + permission assignment
         common/
           permissions/       # checkPermission helper
           middleware/        # RequestIdMiddleware
@@ -413,8 +413,11 @@ Cache the JWKS document locally and refresh it only when you encounter a key ID 
 | PATCH  | `/api/users/:id`                              | Update user                                      |
 | DELETE | `/api/users/:id`                              | Delete user                                      |
 | GET    | `/api/users/:id/roles`                        | List user's roles                                |
+| PUT    | `/api/users/:id/roles`                        | Set-replace all roles (atomic swap)              |
 | POST   | `/api/users/:id/roles`                        | Assign role                                      |
 | DELETE | `/api/users/:id/roles/:roleId`                | Remove role                                      |
+| GET    | `/api/users/:id/direct-permissions`           | List user's direct permission assignments        |
+| PUT    | `/api/users/:id/direct-permissions`           | Set-replace all direct permissions (atomic swap) |
 | GET    | `/api/users/:id/effective-permissions`        | Computed permissions (roles ∪ direct)            |
 | POST   | `/api/users/:id/resend-invitation`            | Re-issue invitation for a pending user           |
 | GET    | `/api/invitations/:token`                     | Validate an invitation (returns user info + `expired`) |
@@ -554,8 +557,5 @@ The `client_secret` field is accepted in `POST /api/token/oauth/token` but not c
 **CI — E2E only, no typecheck/lint.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. Typecheck and lint are not yet wired into CI.
 
-**Permissions and roles not org-scoped in CRUD endpoints.**
-The new `/api/permissions` and `/api/roles` CRUD endpoints check `platform.permissions.manage` but do not pass `targetOrgId` to `checkPermission`. An org-admin could manage resources across orgs. Tracked as **bug-0024** and **bug-0025**.
-
-**Permission name uniqueness is global, not per-app.**
-The `SaPermission.name` constraint is `@unique` globally instead of `@@unique([appId, name])`. Two apps cannot share a permission name like `users.read`. Tracked as **bug-0026**.
+**Set-replace DTOs lack array size limits.**
+The `PUT /users/:id/roles` and `PUT /users/:id/direct-permissions` endpoints accept arrays of any size (including empty). No `@ArrayMaxSize` is enforced. Tracked as **bug-0034**.

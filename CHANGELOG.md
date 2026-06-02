@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-02
+
+User access management shipped end-to-end — 28 commits across auth-server (role + direct-permission set-replace APIs, atomic createUser), admin UI (3-axis user drawers, RoleRowsEditor), and the sidebar active-route highlight feature branch. All 9 bugs from the 2026-06-01 review (bug-0024 through bug-0032) were merged to master.
+
+### Added
+
+#### auth-server — User role + direct-permission management
+- **`UsersService.setUserRoles()`** — set-replace endpoint that atomically swaps all roles for a user within their org's app scope. Wrapped in `$transaction`. (`06abf2d`)
+- **`UsersService.getUserDirectPermissions()` + `setUserDirectPermissions()`** — read and set-replace direct permission assignments. (`59ea2e2`)
+- **`createUser` expanded** — now accepts `roleIds` and `directPermissionIds` arrays, resolved and assigned atomically inside the creation transaction. (`1a1383e`)
+- **`PUT /users/:id/roles`** — set-replace roles endpoint. (`8077cff`)
+- **`GET /users/:id/direct-permissions`** — read direct permissions. (`8077cff`)
+- **`PUT /users/:id/direct-permissions`** — set-replace direct permissions endpoint. (`8077cff`)
+- **`SetUserRolesDto` + `SetUserDirectPermissionsDto`** — validation DTOs. (`a64a673`)
+- **`resolveAppScopedIds` shared helper** — extracted from repeated app-scoped ID resolution logic into `common/permissions/`. (`360f3b4`)
+- **E2E tests** for `PUT /users/:id/roles` and direct-permissions endpoints. (`aec78a1`)
+
+#### admin — User access editing UI
+- **`RoleRowsEditor`** — multi-row role picker primitive for inline role management in drawers. (`c780734`)
+- **User create drawer** — supports N roles + N direct permissions via new editor components. (`5832b5e`)
+- **User view drawer** — surfaces direct permissions read-only alongside roles and effective permissions. (`fbb0385`)
+- **User edit drawer** — 3-axis editing: profile fields, role assignment, direct permission assignment. (`98abb49`)
+- **API client helpers** — `setUserRoles()`, `getUserDirectPermissions()`, `setUserDirectPermissions()` added to `lib/api.ts`. (`6a28512`)
+- **Server actions** — `setUserRolesAction()`, `setUserDirectPermissionsAction()`, `getUserDirectPermissionsAction()`. (`1b45c19`)
+- **i18n** — role + direct-permission editor strings in en.json/fr.json. (`900e423`)
+- **Unit tests** — create-drawer passes roleIds + directPermissionIds; view-drawer renders + edits direct perms and roles. (`aae7c7e`, `0e74bc3`)
+- **E2E test** — Playwright covers user edit drawer direct-perm flow. (`2e9b851`)
+
+#### Sidebar active-route highlight (in progress — `fix/sidebar-active-highlight`)
+- **Design spec** for sidebar active-route highlight behavior. (`45def99`)
+- **Implementation plan** for sidebar active-route highlight. (`5337b2a`)
+- **E2E test** asserting sidebar highlights the active route across all 5 admin areas. (`18d1802`, `75b2fe7`)
+
+#### Documentation
+- **FastAPI resource server spec** — design spec for a FastAPI resource server with PKCE against SassyAuth. (`44a1fe6`)
+
+### Fixed
+- **accept-invite CORS + scrypt hashing** — fixed CORS for the accept-invite endpoint, switched to scrypt (via `better-auth/crypto`) for password hashing to match BetterAuth's verifier, and dropped the `bcryptjs` dependency. (`af9f4ca`)
+- **SheetContent scroll** — added `flex flex-col` to `SheetContent` so `SheetBody` scrolls correctly when content overflows. (`8ae19b3`)
+- **Profile-save error routing** — non-Error failures in user profile save now route through `t()` for i18n instead of crashing. (`7cbfc5a`)
+- **Unused i18n keys** — dropped unused `users.fields.directPermission*` keys from message bundles. (`ae9772f`)
+- **bug-0024 through bug-0032** — all 9 bugs from the 2026-06-01 review merged to master via `feat/test-coverage-campaign`. See [BUGS_2026-06-01.md](./bugs/BUGS_2026-06-01.md).
+
+### Risky patterns / missing tests
+
+See [TODO_2026-06-02.md](./todo/TODO_2026-06-02.md) and [BUGS_2026-06-02.md](./bugs/BUGS_2026-06-02.md).
+
+- **bug-0033** — Sidebar `startsWith()` matching can false-positive on overlapping route prefixes.
+- **bug-0034** — `SetUserRolesDto` / `SetUserDirectPermissionsDto` have no `@ArrayMaxSize` or empty-array guard.
+- **bug-0035** — New user server actions repeat the brittle string-matching error pattern already fixed in bug-0032.
+- **bug-0036** — `getUserDirectPermissions()` returns `appId: ''`, losing the app context for direct permissions.
+- **bug-0037** — `TRUSTED_ORIGINS` is not validated at startup; malformed values silently break CORS.
+
+---
+
 ## [Unreleased] — 2026-06-01
 
 Massive day — 47 commits across three workstreams: (1) full permissions and roles CRUD on both auth-server and admin UI, (2) shadcn reskin of the admin console (sidebar, drawers, dark mode, AlertDialog), and (3) a test coverage campaign adding controller specs, service branch coverage, and the matrix E2E test infrastructure.
