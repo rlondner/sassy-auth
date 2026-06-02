@@ -12,6 +12,7 @@ import { checkPermission } from '../common/permissions/check-permission';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { resolveRoleIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
 import { LoggerService } from '../common/logger/logger.service';
 
 const USER_INCLUDE = {
@@ -321,6 +322,44 @@ export class UsersService {
       roleId: rolePublicId,
     });
   }
+
+  async setUserRoles(
+    callerBaId: string,
+    userPublicId: string,
+    roleIds: string[],
+  ): Promise<void> {
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.betterAuthUserId === callerBaId) {
+      throw new ForbiddenException('You cannot edit your own access');
+    }
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    const org = await prisma.saOrg.findUnique({ where: { id: user.orgId } });
+    if (!org) throw new NotFoundException('User org not found');
+
+    const numericIds = await resolveRoleIdsForApp(org.appId, roleIds);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.saUserRole.deleteMany({ where: { userId: user.id } });
+      if (numericIds.length > 0) {
+        await tx.saUserRole.createMany({
+          data: numericIds.map((roleId) => ({ userId: user.id, roleId })),
+        });
+      }
+    });
+
+    this.logger.getWinstonLogger().info('User roles set', {
+      context: 'UsersService',
+      userId: userPublicId,
+      roleCount: numericIds.length,
+    });
+  }
+
   async resendInvitation(callerBaId: string, userPublicId: string) {
     const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
     if (!user) throw new NotFoundException('User not found');
