@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-04
+
+Quiet day — no new code commits landed. One docs-only commit (`b1ff9cf`) from the previous daily review. Targeted scan of existing code on `master` surfaced 2 new bugs.
+
+### Bugs found
+
+See [TODO_2026-06-04.md](./todo/TODO_2026-06-04.md) and [BUGS_2026-06-04.md](./bugs/BUGS_2026-06-04.md).
+
+- **bug-0048** — Magic link URLs and OTP codes logged to `console.log` with no production guard; leaks authentication secrets to log aggregators.
+- **bug-0049** — JWT token lifetime hardcoded to 3600 seconds (`token.service.ts:74`); not configurable via environment variable.
+
+### Project health note
+
+29 open PRs, 0 merged. All bug-fix branches (bug-0001 through bug-0047) remain empty — no implementation work has started. 3 critical bugs (RBAC isolation, JWT breaking change, in-memory OAuth codes) block the PKCE feature branch from shipping.
+
+---
+
 ## [Unreleased] — 2026-06-03
 
 OAuth2 PKCE (S256) shipped end-to-end on `docs/pkce-resource-server-design` — 8 implementation commits adding the authorize/token flow to auth-server, a FastAPI resource server reference app, login redirect support (`next=` URL), idempotent demo seed, and structured observability logs. The JWT payload saw a **breaking change**: the `permissions` array was replaced with a space-separated `scope` string to align with OAuth 2.0 conventions.
