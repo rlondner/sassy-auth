@@ -4,6 +4,72 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-03
+
+OAuth2 PKCE (S256) shipped end-to-end on `docs/pkce-resource-server-design` — 8 implementation commits adding the authorize/token flow to auth-server, a FastAPI resource server reference app, login redirect support (`next=` URL), idempotent demo seed, and structured observability logs. The JWT payload saw a **breaking change**: the `permissions` array was replaced with a space-separated `scope` string to align with OAuth 2.0 conventions.
+
+### Added
+
+#### auth-server — OAuth2 PKCE (S256)
+- **`/api/token/oauth/authorize`** now requires `code_challenge` + `code_challenge_method=S256` query params; rejects requests without PKCE. (`144c474`)
+- **`/api/token/oauth/token`** accepts `code_verifier` instead of `client_secret`; verifies S256 challenge using `crypto.timingSafeEqual` for constant-time comparison. (`144c474`)
+- **`OauthService.generateCode()`** stores `codeChallenge` and `codeChallengeMethod` alongside the authorization code (5-minute TTL). (`144c474`)
+- **`OauthService.exchangeCode()`** verifies the verifier against the stored challenge; single-use (code deleted after exchange). (`144c474`)
+- **`assertRedirectUriMatchesApp()`** — new origin-matching validator for `redirect_uri` against the app's registered URL. (`144c474`)
+- **`redirect-uri.spec.ts`** — unit tests for origin matching including localhost, port mismatches, path permutations. (`144c474`)
+- **E2E PKCE round-trip test** — authorize → token exchange → JWT verification with scope claim. (`9ae64e3`)
+- **`IsUrl({ require_tld: false })`** on `OauthTokenExchangeDto.redirect_uri` to allow `localhost` redirect URIs during development. (`27d5ecf`)
+- **JWT `scope` claim** — permissions now serialized as a space-separated string (`scope`) instead of a JSON array (`permissions`). Sorted alphabetically, deduplicated. (`144c474`)
+
+#### auth-server — Observability
+- **Structured logging** added to OAuth authorize, token exchange, PKCE verification failure, redirect URI rejection, and direct login success/failure paths. Uses Winston via `LoggerService`. (`d204515`)
+- **Sentry tags** — `authFlow` and `appId` tags set on both OAuth and direct-login flows. (`d204515`)
+
+#### auth-server — Demo seed
+- **`seedDemoResourceServer()`** — idempotent seed for `resourceserver01` app: 2 roles (Property Managers, Inspectors), 8 `rs.*` permissions, 2 demo users. Gated behind `SEED_DEMO=1`. (`bf7673f`)
+
+#### admin — Login redirect (`next=` URL)
+- **`/login?next=<url>`** — login page accepts a `next` query parameter; after successful authentication, redirects to the validated URL instead of `/users`. (`4da3fa1`)
+- **`validateNextUrl()`** — same-origin path validator with open-redirect mitigations (rejects `//`, `\`, `userinfo@` URLs, validates absolute URLs against an allowlist). (`4da3fa1`)
+- **`safe-next.spec.ts`** — 9 test cases covering null/empty, same-origin paths, protocol-relative, backslash, absolute allowed/disallowed, userinfo, malformed, and env additions. (`4da3fa1`)
+
+#### FastAPI resource server (`apps/resource-server-fastapi/`)
+- **New app** — Python/FastAPI reference implementation showing how a resource server integrates with SassyAuth via PKCE. (`97f0f67`, `1637743`)
+- **PKCE login flow** — `/auth/login` generates verifier/challenge, redirects to SassyAuth `/authorize`; `/auth/callback` exchanges code for JWT via `code_verifier`. (`1637743`)
+- **JWKS token verification** — `PyJWKClient` with 10-minute cache, RS256 algorithm enforcement, audience/issuer validation, required claims check. (`1637743`)
+- **`require_scope()` dependency** — FastAPI dependency that extracts Bearer token, verifies JWT, and checks scope. (`1637743`)
+- **`/api/properties`** — sample protected endpoint requiring `rs.properties.read` scope. (`1637743`)
+- **Test suite** — `test_pkce.py` (verifier/challenge generation), `test_verifier.py` (JWT verification + scope checks), `test_api_properties.py` (endpoint integration). (`1637743`)
+
+#### Documentation
+- **FastAPI resource server design spec.** (`a9eb300`)
+- **FastAPI resource server implementation plan.** (`120a42c`)
+
+### Changed (Breaking)
+- **JWT payload** — `permissions: string[]` → `scope: string` (space-separated). Consumers must parse `decoded.scope.split(' ')` instead of `decoded.permissions`. (`144c474`)
+- **`TokenErrorCode` enum** — `INVALID_CODE` and `CODE_EXPIRED` removed; replaced with standard OAuth error codes: `INVALID_REQUEST`, `INVALID_REDIRECT_URI`, `INVALID_GRANT`, `UNAUTHORIZED_CLIENT`. (`144c474`)
+- **`SassyAuthJwtPayload` type** updated to match. (`144c474`)
+
+### Fixed
+- **localhost redirect URIs** — `IsUrl({ require_tld: false })` allows `http://localhost:8010/auth/callback` in the token exchange DTO. Previously, `@IsUrl()` required a TLD, blocking localhost development. (`27d5ecf`)
+
+### Risky patterns / missing tests
+
+See [TODO_2026-06-03.md](./todo/TODO_2026-06-03.md) and [BUGS_2026-06-03.md](./bugs/BUGS_2026-06-03.md).
+
+- **bug-0038** — JWT `permissions` → `scope` is a breaking change with no migration path or version bump.
+- **bug-0039** — In-memory authorization code storage lost on restart; blocks horizontal scaling.
+- **bug-0040** — No garbage collection for expired codes; memory leak under sustained traffic.
+- **bug-0041** — `code_verifier` and `code_challenge` lack RFC 7636 format validation.
+- **bug-0042** — FastAPI resource server exposes access token to client-side JavaScript via `sessionStorage`.
+- **bug-0043** — FastAPI JWKS verifier catches all exceptions generically; masks distinct failure modes.
+- **bug-0044** — FastAPI scope parsing returns `{"None"}` when scope claim is `null`.
+- **bug-0045** — Demo seed hardcodes ngrok URL and weak password instead of reading from env vars.
+- **bug-0046** — No rate limiting on token exchange or FastAPI OAuth endpoints.
+- **bug-0047** — `redirect_uri` allows all paths under the registered origin; no per-app path allowlist.
+
+---
+
 ## [Unreleased] — 2026-06-02
 
 User access management shipped end-to-end — 28 commits across auth-server (role + direct-permission set-replace APIs, atomic createUser), admin UI (3-axis user drawers, RoleRowsEditor), and the sidebar active-route highlight feature branch. All 9 bugs from the 2026-06-01 review (bug-0024 through bug-0032) were merged to master.
