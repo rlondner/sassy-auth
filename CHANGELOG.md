@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-05
+
+No new code commits. Targeted scan of the admin console client layer and component lifecycle patterns surfaced 4 new bugs (2 warning, 2 minor).
+
+### Bugs found
+
+See [TODO_2026-06-05.md](./todo/TODO_2026-06-05.md) and [BUGS_2026-06-05.md](./bugs/BUGS_2026-06-05.md).
+
+- **bug-0050** — `apiFetch` discards auth-server error response bodies; admin UI shows generic "API error 400" instead of actionable messages like "Email already exists."
+- **bug-0051** — `validateInvitation` includes raw invitation token in Error message strings, leaking to Sentry, error boundaries, and console.
+- **bug-0052** — `getEffectivePermissions` client wrapper synthesizes `Permission` objects with `id: name` (a name string, not a Sqid) and `appId: ''`. Latent until inline actions are added.
+- **bug-0053** — 10 admin components use `setTimeout` in click handlers without cleanup on unmount (9 drawer copy handlers + accept-invite form redirect).
+
+### Project health note
+
+31 open PRs, 0 merged. All bug-fix branches (bug-0001 through bug-0049) remain empty — no implementation work has started. 3 critical bugs (RBAC isolation, JWT breaking change, in-memory OAuth codes) block the PKCE feature branch from shipping. Day 10 with zero fixes merged.
+
+---
+
 ## [Unreleased] — 2026-06-04
 
 Quiet day — no new code commits landed. One docs-only commit (`b1ff9cf`) from the previous daily review. Targeted scan of existing code on `master` surfaced 2 new bugs.
