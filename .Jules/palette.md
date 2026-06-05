@@ -1,0 +1,3 @@
+## 2025-05-15 - Standardizing Loading States in Buttons
+**Learning:** Manual loading state implementations (like swapping text for "..." or "Saving") are inconsistent and lack accessibility features like `aria-busy`. A centralized `loading` prop on the `Button` component ensures a consistent UI with a spinner and proper ARIA attributes.
+**Action:** Always use the `loading` prop on the `Button` component for async operations. When implementing loading indicators in components using Radix UI `Slot` (`asChild`), ensure the indicator is conditionally omitted to avoid rendering multiple children into the `Slot`.
