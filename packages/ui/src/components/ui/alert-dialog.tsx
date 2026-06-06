@@ -102,20 +102,27 @@ AlertDialogDescription.displayName =
 const AlertDialogAction = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Action>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action> & Pick<ButtonProps, "loading">
->(({ className, loading, children, ...props }, ref) => (
-  <AlertDialogPrimitive.Action
-    ref={ref}
-    className={cn(buttonVariants(), className)}
-    disabled={props.disabled || loading}
-    {...props}
-    asChild
-  >
-    <button aria-busy={loading ? "true" : undefined}>
-      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      {children}
-    </button>
-  </AlertDialogPrimitive.Action>
-))
+>(({ className, loading, children, ...props }, ref) => {
+  const isAsChild = props.asChild
+  return (
+    <AlertDialogPrimitive.Action
+      ref={ref}
+      className={cn(buttonVariants(), className)}
+      disabled={props.disabled || loading}
+      aria-busy={loading ? "true" : undefined}
+      {...props}
+    >
+      {isAsChild ? (
+        children
+      ) : (
+        <>
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {children}
+        </>
+      )}
+    </AlertDialogPrimitive.Action>
+  )
+})
 AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName
 
 const AlertDialogCancel = React.forwardRef<
