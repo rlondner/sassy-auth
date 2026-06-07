@@ -641,6 +641,12 @@ The JWT `permissions` claim (string array) was replaced with `scope` (space-sepa
 **RBAC not org-scoped.**
 `checkPermission` only verifies that the caller holds the named permission — it does not constrain by `orgId`. A user with `org.users.manage` in org A can currently act on users in org B. Tracked as **bug-0001**.
 
+**Inactive users can still authenticate.**
+Neither the OAuth authorize flow nor the direct login flow checks `saUser.status` before issuing a JWT. Setting a user to `inactive` via the API has no effect on their ability to log in and receive tokens. Tracked as **bug-0074**.
+
+**No rate limiting on authentication endpoints.**
+The `/api/token/direct/login` and `/api/invitations/:token` endpoints accept unlimited requests. Brute-force password attacks are unthrottled. Tracked as **bug-0080**.
+
 **CI — E2E only, no typecheck/lint.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. Typecheck and lint are not yet wired into CI.
 

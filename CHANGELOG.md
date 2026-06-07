@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-07
+
+No new code commits. Deep scan across auth-server token issuance, role/permission services, user service, admin UI components, Prisma schema constraints, and shared packages surfaced **16 new bugs** (1 critical, 9 warning, 6 minor).
+
+### Bugs found
+
+See [TODO_2026-06-07.md](./todo/TODO_2026-06-07.md) and [BUGS_2026-06-07.md](./bugs/BUGS_2026-06-07.md).
+
+#### Critical
+
+- **bug-0074** — Inactive/pending users can obtain JWTs via both OAuth and direct login. Neither flow checks `saUser.status` before issuing a token; setting a user to `inactive` has no effect on authentication.
+
+#### Warning
+
+- **bug-0075** — `listUsers` accepts `appPublicId` filter parameter but silently ignores it; callers get unfiltered results.
+- **bug-0076** — `listRoles`/`getRole`/`listPermissions`/`getPermission` missing `targetOrgId` in checkPermission; org admins can list all roles/permissions cross-tenant.
+- **bug-0077** — `assignRole`/`removeRole` (POST/DELETE) skip app-scoping validation, unlike the bulk `setUserRoles` (PUT) which validates via `resolveRoleIdsForApp`.
+- **bug-0078** — `SaRole` lacks `@@unique([appId, name])` constraint; duplicate role names per app possible via concurrent requests.
+- **bug-0079** — `SaPermission.name` globally unique instead of per-app `@@unique([appId, name])`; prevents same permission name across different apps.
+- **bug-0080** — No rate limiting on `/api/token/direct/login` or `/api/invitations/:token`; brute-force attacks unthrottled.
+- **bug-0081** — `UpdateUserDto` string fields lack `@MinLength`/`@MaxLength` constraints; empty strings and megabyte payloads accepted.
+- **bug-0082** — `OauthTokenExchangeDto.client_secret` required by validation but never verified by controller; false sense of security.
+- **bug-0083** — PrismaClient singleton has no reconnection strategy; DB connection drop causes sustained outage until process restart.
+
+#### Minor
+
+- **bug-0084** — `apiFetch` sends `Content-Type: application/json` on GET/DELETE with no body.
+- **bug-0085** — User `publicId` generated via UUID truncation (12 chars) instead of Sqid pattern used by all other entities.
+- **bug-0086** — `validateInvitation`/`acceptInvitation` duplicated in `api.ts` and `api-public.ts`; divergence risk.
+- **bug-0087** — DataTable sort direction arrows lack `aria-label`; screen readers announce Unicode literals.
+- **bug-0088** — `BreadcrumbPage` uses `role="link"` on non-interactive current-page element.
+- **bug-0089** — Sidebar toggle shortcut (Ctrl+B) conflicts with browser bold formatting.
+
+### Project health note
+
+82 open PRs, 0 merged. All bug-fix branches (bug-0001 through bug-0073) remain empty — no implementation work has started. 5 critical bugs now: RBAC isolation (bug-0001), JWT breaking change (bug-0038), in-memory OAuth codes (bug-0039), redirect_uri validation bypass (bug-0054), and inactive user auth bypass (bug-0074). Day 12 with zero fixes merged. Total open bugs: 89.
+
+---
+
 ## [Unreleased] — 2026-06-06
 
 No new code commits. Deep scan across auth-server OAuth flow, admin server actions, Prisma schema, shared UI components, and middleware surfaced **20 new bugs** (1 critical, 13 warning, 6 minor).
