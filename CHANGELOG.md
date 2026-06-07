@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-06
+
+No new code commits. Deep scan across auth-server OAuth flow, admin server actions, Prisma schema, shared UI components, and middleware surfaced **20 new bugs** (1 critical, 13 warning, 6 minor).
+
+### Bugs found
+
+See [TODO_2026-06-06.md](./todo/TODO_2026-06-06.md) and [BUGS_2026-06-06.md](./bugs/BUGS_2026-06-06.md).
+
+#### Critical
+
+- **bug-0054** — `oauthAuthorize` does not validate `redirect_uri` against the app's registered URL. An attacker-supplied `redirect_uri` causes the authorization code to be redirected to an external domain (RFC 6749 section 10.6 violation).
+
+#### Warning
+
+- **bug-0055** — `deleteUser` orphans BetterAuth `User`, `Session`, and `Account` rows; email is locked and active sessions survive deletion.
+- **bug-0056** — `setLocaleAction` does not validate the `locale` parameter; arbitrary value written to cookie, path traversal possible via dynamic import.
+- **bug-0057** — `setLocaleAction` open redirect: `pathname` parameter passed directly to `redirect()` without validation.
+- **bug-0058** — Users page has no permission check; any authenticated user can view all users across all orgs.
+- **bug-0059** — `SaUser.username` and `phoneNumber` lack unique constraints; `directLogin` may authenticate as wrong user when usernames collide.
+- **bug-0060** — `detectIdentifierType` phone regex misclassifies numeric usernames as phone numbers, causing silent login failures.
+- **bug-0061** — `updateUserAction` is the only mutation action without error handling; throws unhandled exceptions.
+- **bug-0062** — Seed script uses hardcoded password with no production guard.
+- **bug-0063** — `SentryExceptionFilter` sends unsanitized request URL (including invitation tokens) to Sentry.
+- **bug-0064** — Delete menu items in roles/permissions tables use `data-disabled` instead of Radix `disabled` prop.
+- **bug-0065** — `signIn` action ignores `next` query parameter; always redirects to `/users`.
+- **bug-0066** — DataTable sortable headers not keyboard-accessible (WCAG 2.1 SC 2.1.1 violation).
+- **bug-0067** — Invitation endpoints accept any string as token without format validation.
+
+#### Minor
+
+- **bug-0068** — TOCTOU race in org/app update/delete operations (findUnique then mutate, not atomic).
+- **bug-0069** — Middleware `PUBLIC_PATHS` prefix match allows unintended routes like `/login-anything` to bypass auth.
+- **bug-0070** — Users table action buttons (Deactivate, Activate, Reset Password, Resend Invitation) are clickable no-ops.
+- **bug-0071** — DataTable clickable rows not keyboard-accessible.
+- **bug-0072** — `acceptInvitation` exposes raw API error messages to end users.
+- **bug-0073** — OAuth authorization codes never purged from memory (abandoned flows leak).
+
+### Project health note
+
+46+ open PRs, 0 merged. All bug-fix branches (bug-0001 through bug-0053) remain empty — no implementation work has started. 4 critical bugs now: RBAC isolation (bug-0001), JWT breaking change (bug-0038), in-memory OAuth codes (bug-0039), and redirect_uri validation bypass (bug-0054). Day 11 with zero fixes merged. Total open bugs: 73.
+
+---
+
 ## [Unreleased] — 2026-06-05
 
 No new code commits. Targeted scan of the admin console client layer and component lifecycle patterns surfaced 4 new bugs (2 warning, 2 minor).
