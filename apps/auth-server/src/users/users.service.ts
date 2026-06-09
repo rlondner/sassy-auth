@@ -165,10 +165,10 @@ export class UsersService {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    let saUser: Prisma.SaUserGetPayload<{ include: typeof USER_INCLUDE }>;
+    let saUser: any;
     let invitation: Awaited<ReturnType<typeof prisma.saInvitation.create>>;
     try {
-      ({ saUser, invitation } = await prisma.$transaction(async (tx) => {
+      ({ saUser, invitation } = await prisma.$transaction(async (tx: any) => {
         await tx.user.create({
           data: {
             id: baUserId,
@@ -363,7 +363,7 @@ export class UsersService {
 
     const numericIds = await resolveRoleIdsForApp(org.appId, roleIds);
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.saUserRole.deleteMany({ where: { userId: user.id } });
       if (numericIds.length > 0) {
         await tx.saUserRole.createMany({
@@ -430,7 +430,7 @@ export class UsersService {
 
     const numericIds = await resolvePermissionIdsForApp(org.appId, permissionIds);
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.saUserPermission.deleteMany({ where: { userId: user.id } });
       if (numericIds.length > 0) {
         await tx.saUserPermission.createMany({
