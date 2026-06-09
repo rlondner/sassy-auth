@@ -240,7 +240,7 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange }: UserViewDrawe
             {editing ? (
               <ButtonGroup>
                 <Button variant="secondary" size="sm" onClick={handleCancel} disabled={saving}>{t('users.drawer.cancel')}</Button>
-                <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? '…' : t('users.drawer.save')}</Button>
+                <Button size="sm" onClick={handleSave} loading={saving}>{t('users.drawer.save')}</Button>
               </ButtonGroup>
             ) : (
               <ButtonGroup>

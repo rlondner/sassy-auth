@@ -2,9 +2,10 @@
 
 import * as React from "react"
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
+import { Loader2 } from "lucide-react"
 
 import { cn } from "../../lib/utils"
-import { buttonVariants } from "./button"
+import { buttonVariants, type ButtonProps } from "./button"
 
 const AlertDialog = AlertDialogPrimitive.Root
 
@@ -100,13 +101,24 @@ AlertDialogDescription.displayName =
 
 const AlertDialogAction = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Action>,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action> &
+    Pick<ButtonProps, "variant" | "size" | "loading" | "asChild">
+>(({ className, variant, size, loading, disabled, asChild, children, ...props }, ref) => (
   <AlertDialogPrimitive.Action
     ref={ref}
-    className={cn(buttonVariants(), className)}
+    className={cn(buttonVariants({ variant, size }), className)}
+    disabled={loading || disabled}
+    aria-busy={loading ? true : undefined}
+    asChild={asChild}
     {...props}
-  />
+  >
+    {asChild ? children : (
+      <>
+        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {children}
+      </>
+    )}
+  </AlertDialogPrimitive.Action>
 ))
 AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName
 
