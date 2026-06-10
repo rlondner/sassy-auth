@@ -55,14 +55,14 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build packages
-        run: pnpm build
-
       - name: Generate Prisma client
         run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
 
       - name: Apply migrations
         run: pnpm --filter @sassy-auth/db exec prisma migrate deploy --schema=schema.prisma
+
+      - name: Build packages
+        run: pnpm build
 
       - name: Generate RSA keypair for auth-server
         run: |
