@@ -71,10 +71,10 @@ export function ConfirmDialog({
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={pending}
-            className={cn(buttonVariants({ variant: variant === 'destructive' ? 'destructive' : 'default' }))}
+            loading={pending}
+            variant={variant === 'destructive' ? 'destructive' : 'default'}
           >
-            {pending ? '…' : confirmLabel}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

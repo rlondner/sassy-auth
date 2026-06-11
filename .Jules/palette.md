@@ -1,0 +1,3 @@
+## 2026-06-01 - Standardized Loading States for Confirmation Dialogs
+**Learning:** Manual text-based loading indicators (like "...") are less accessible and visually inconsistent compared to standardized spinner components with `aria-busy`. Additionally, when implementing loading states in components that support `asChild` (Radix UI Slot), the loading indicator must be conditionally omitted to avoid rendering multiple children into the Slot.
+**Action:** Use the `loading` prop on `Button` and `AlertDialogAction` components which automatically handles the spinner, `disabled` state, and `aria-busy` attribute.
