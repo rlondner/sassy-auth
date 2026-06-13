@@ -56,7 +56,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm build
+        run: pnpm build --filter "!@sassy-auth/auth-server"
 
       - name: Generate Prisma client
         run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
