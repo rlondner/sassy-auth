@@ -4,7 +4,6 @@ import * as React from 'react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  buttonVariants, cn,
 } from '@sassy-auth/ui'
 
 interface DeleteAlertDialogProps {
@@ -55,10 +54,10 @@ export function DeleteAlertDialog({
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={pending}
-            className={cn(buttonVariants({ variant: 'destructive' }))}
+            loading={pending}
+            variant="destructive"
           >
-            {pending ? '…' : confirmLabel}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
