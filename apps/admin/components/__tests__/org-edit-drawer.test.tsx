@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import { TooltipProvider } from '@sassy-auth/ui'
 import en from '@/messages/en.json'
 import { OrgEditDrawer } from '../org-edit-drawer'
 import * as actions from '@/app/(admin)/orgs/actions'
@@ -15,7 +16,7 @@ const org: OrgRow = {
 }
 
 function withIntl(node: React.ReactNode) {
-  return <NextIntlClientProvider locale="en" messages={en}>{node}</NextIntlClientProvider>
+  return (<NextIntlClientProvider locale="en" messages={en}><TooltipProvider>{node}</TooltipProvider></NextIntlClientProvider>)
 }
 
 describe('OrgEditDrawer', () => {

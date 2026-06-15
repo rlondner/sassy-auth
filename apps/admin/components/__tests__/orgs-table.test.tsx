@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import { TooltipProvider } from '@sassy-auth/ui'
 import en from '@/messages/en.json'
 import { OrgsTable } from '../orgs-table'
 import * as actions from '@/app/(admin)/orgs/actions'
@@ -46,7 +47,7 @@ const initial = {
 }
 
 function withIntl(node: React.ReactNode) {
-  return <NextIntlClientProvider locale="en" messages={en}>{node}</NextIntlClientProvider>
+  return (<NextIntlClientProvider locale="en" messages={en}><TooltipProvider>{node}</TooltipProvider></NextIntlClientProvider>)
 }
 
 describe('OrgsTable', () => {

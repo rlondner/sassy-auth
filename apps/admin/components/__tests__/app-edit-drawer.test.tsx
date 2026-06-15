@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import { TooltipProvider } from '@sassy-auth/ui'
 import en from '@/messages/en.json'
 import { AppEditDrawer } from '../app-edit-drawer'
 import * as actions from '@/app/(admin)/apps/actions'

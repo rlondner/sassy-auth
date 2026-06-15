@@ -1,0 +1,3 @@
+## 2026-06-15 - Standardizing Row Action Tooltips
+**Learning:** Icon-only buttons for row actions (vertical ellipsis) are common but lack clear affordance and accessibility without localized labels and visual tooltips. Radix-based tooltips require a `TooltipProvider` context, which should be placed at the application root and included in unit test wrappers (e.g., `withIntl`).
+**Action:** Use the `common.moreActions` key for consistency across all tables. Always wrap admin table row action buttons in a `Tooltip` with a localized label. Ensure `TooltipProvider` is present in `RootLayout` and test helpers.

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import { TooltipProvider } from '@sassy-auth/ui'
 import en from '@/messages/en.json'
 import { AccessDeniedPanel } from '../access-denied-panel'
 
