@@ -111,11 +111,11 @@ export class UsersService {
       { targetOrgId: user.orgId },
     );
 
-    return user.roles.map((ur) => ({
+    return user.roles.map((ur: any) => ({
       publicId: ur.role.publicId,
       name: ur.role.name,
       appId: ur.role.app.publicId,
-      permissions: ur.role.permissions.map((rp) => ({
+      permissions: ur.role.permissions.map((rp: any) => ({
         publicId: rp.permission.publicId,
         name: rp.permission.name,
         appId: ur.role.app.publicId,
@@ -139,8 +139,8 @@ export class UsersService {
     );
 
     const names = new Set<string>();
-    user.roles.forEach((ur) => ur.role.permissions.forEach((rp) => names.add(rp.permission.name)));
-    user.directPermissions.forEach((up) => names.add(up.permission.name));
+    user.roles.forEach((ur: any) => ur.role.permissions.forEach((rp: any) => names.add(rp.permission.name)));
+    user.directPermissions.forEach((up: any) => names.add(up.permission.name));
 
     return { userId: publicId, permissions: Array.from(names).sort() };
   }
@@ -165,10 +165,10 @@ export class UsersService {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    let saUser: Prisma.SaUserGetPayload<{ include: typeof USER_INCLUDE }>;
+    let saUser: any;
     let invitation: Awaited<ReturnType<typeof prisma.saInvitation.create>>;
     try {
-      ({ saUser, invitation } = await prisma.$transaction(async (tx) => {
+      ({ saUser, invitation } = await prisma.$transaction(async (tx: any) => {
         await tx.user.create({
           data: {
             id: baUserId,
@@ -363,7 +363,7 @@ export class UsersService {
 
     const numericIds = await resolveRoleIdsForApp(org.appId, roleIds);
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.saUserRole.deleteMany({ where: { userId: user.id } });
       if (numericIds.length > 0) {
         await tx.saUserRole.createMany({
@@ -402,7 +402,7 @@ export class UsersService {
     // the app publicId via this query path. Match that convention.
     return (user as unknown as {
       directPermissions: Array<{ permission: { publicId: string; name: string; appId: number } }>;
-    }).directPermissions.map((up) => ({
+    }).directPermissions.map((up: any) => ({
       id: up.permission.publicId,
       name: up.permission.name,
       appId: '',
@@ -430,7 +430,7 @@ export class UsersService {
 
     const numericIds = await resolvePermissionIdsForApp(org.appId, permissionIds);
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.saUserPermission.deleteMany({ where: { userId: user.id } });
       if (numericIds.length > 0) {
         await tx.saUserPermission.createMany({

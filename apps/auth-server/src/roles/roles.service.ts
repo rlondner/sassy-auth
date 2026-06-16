@@ -54,15 +54,15 @@ export class RolesService {
       prisma.saRole.count({ where }),
     ])) as [Array<{ id: number; publicId: string; name: string; app: { publicId: string; name: string } }>, number];
 
-    const ids = rows.map((r) => r.id);
+    const ids = rows.map((r: any) => r.id);
     const [permGroups, userGroups] = ids.length === 0
       ? [[], []] as [Array<{ roleId: number; _count: { _all: number } }>, Array<{ roleId: number; _count: { _all: number } }>]
       : (await Promise.all([
           prisma.saRolePermission.groupBy({ by: ['roleId'], where: { roleId: { in: ids } }, _count: { _all: true } }),
           prisma.saUserRole.groupBy({ by: ['roleId'], where: { roleId: { in: ids } }, _count: { _all: true } }),
         ])) as [Array<{ roleId: number; _count: { _all: number } }>, Array<{ roleId: number; _count: { _all: number } }>];
-    const permMap = new Map(permGroups.map((g) => [g.roleId, g._count._all]));
-    const userMap = new Map(userGroups.map((g) => [g.roleId, g._count._all]));
+    const permMap = new Map(permGroups.map((g: any) => [g.roleId, g._count._all]));
+    const userMap = new Map(userGroups.map((g: any) => [g.roleId, g._count._all]));
 
     return {
       items: rows.map((row) => ({
@@ -89,7 +89,7 @@ export class RolesService {
       publicId: row.publicId, name: row.name,
       app: { publicId: row.app.publicId, name: row.app.name },
       permissionCount: row.permissions.length, userCount,
-      permissions: row.permissions.map((rp) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
+      permissions: row.permissions.map((rp: any) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
     };
   }
 
@@ -127,7 +127,7 @@ export class RolesService {
         publicId: row.publicId, name: row.name,
         app: { publicId: row.app.publicId, name: row.app.name },
         permissionCount: row.permissions.length, userCount: 0,
-        permissions: row.permissions.map((rp) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
+        permissions: row.permissions.map((rp: any) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
       };
     } catch (e: unknown) {
       if (isPrismaCode(e, 'P2002')) throw new ConflictException('Role with this name already exists in this app');
@@ -174,7 +174,7 @@ export class RolesService {
         publicId: row.publicId, name: row.name,
         app: { publicId: row.app.publicId, name: row.app.name },
         permissionCount: row.permissions.length, userCount,
-        permissions: row.permissions.map((rp) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
+        permissions: row.permissions.map((rp: any) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
       };
     } catch (e: unknown) {
       if (isPrismaCode(e, 'P2002')) throw new ConflictException('Role with this name already exists in this app');
