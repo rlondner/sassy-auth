@@ -45,8 +45,16 @@ const initial = {
   total: 2, page: 1, pageSize: 25,
 }
 
+import { TooltipProvider } from '@sassy-auth/ui'
+
 function withIntl(node: React.ReactNode) {
-  return <NextIntlClientProvider locale="en" messages={en}>{node}</NextIntlClientProvider>
+  return (
+    <NextIntlClientProvider locale="en" messages={en}>
+      <TooltipProvider>
+        {node}
+      </TooltipProvider>
+    </NextIntlClientProvider>
+  )
 }
 
 describe('OrgsTable', () => {

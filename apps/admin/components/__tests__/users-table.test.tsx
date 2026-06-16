@@ -1,3 +1,4 @@
+import { TooltipProvider } from "@sassy-auth/ui"
 import * as React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
@@ -51,7 +52,7 @@ const mockUsers: User[] = [
 const mockOrgs: Org[] = [{ id: 'org1', name: 'Acme Corp', appId: 'app1', isPlatform: true }]
 
 function withIntl(node: React.ReactNode) {
-  return <NextIntlClientProvider locale="en" messages={en}>{node}</NextIntlClientProvider>
+  return (<NextIntlClientProvider locale="en" messages={en}><TooltipProvider>{node}</TooltipProvider></NextIntlClientProvider>)
 }
 
 describe('UsersTable', () => {
