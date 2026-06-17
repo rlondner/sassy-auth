@@ -5,3 +5,7 @@
 ## 2026-05-30 - [pnpm version conflict in GitHub Actions]
 **Learning:** In GitHub Actions workflows, 'pnpm/action-setup@v4' must not specify a 'version' property if the root 'package.json' defines 'packageManager' (e.g. "packageManager": "pnpm@9.0.0"). Doing so causes 'ERR_PNPM_BAD_PM_VERSION' and job failure due to multiple version specifications.
 **Action:** Remove `version` property from `pnpm/action-setup` in workflows when `packageManager` is present in `package.json`.
+
+## 2026-05-30 - [CI Build Dependencies]
+**Learning:** Shared workspace packages (like `@sassy-auth/db`) that compile to a `dist` directory must be explicitly built in CI before running dependent applications. Using `pnpm exec turbo build --filter=!@sassy-auth/auth-server` ensures all dependencies are ready while bypassing packages with known pre-existing errors.
+**Action:** Always ensure a build step for workspace dependencies exists in CI workflows that run application-level tests.
