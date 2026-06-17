@@ -28,6 +28,10 @@ jest.mock('@sassy-auth/ui', () => {
     DropdownMenuItem: Item,
     DropdownMenuSeparator: () => <hr />,
     SidebarTrigger: () => <button type="button" aria-label="Toggle Sidebar" />,
+    Tooltip: Passthrough,
+    TooltipTrigger: Passthrough,
+    TooltipContent: () => null,
+    TooltipProvider: Passthrough,
   }
 })
 

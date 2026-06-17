@@ -39,6 +39,25 @@ beforeEach(() => {
   jest.setMock('next/headers', nextHeadersMock)
 })
 
+/**
+ * Global mock for @sassy-auth/ui.
+ *
+ * NOTE: Some test files (like apps-table.test.tsx) also mock this module.
+ * If you add new components to this list, ensure you also update any
+ * file-level mocks that might override this one.
+ */
+jest.mock('@sassy-auth/ui', () => {
+  const React = require('react')
+  const actual = jest.requireActual('@sassy-auth/ui')
+  return {
+    ...actual,
+    Tooltip: ({ children }: any) => React.createElement(React.Fragment, null, children),
+    TooltipTrigger: ({ children }: any) => React.createElement(React.Fragment, null, children),
+    TooltipContent: () => null,
+    TooltipProvider: ({ children }: any) => React.createElement(React.Fragment, null, children),
+  }
+})
+
 jest.mock('@sentry/nextjs', () => ({
   addBreadcrumb: jest.fn(),
   setUser: jest.fn(),
