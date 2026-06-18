@@ -211,6 +211,11 @@ async function main() {
     await seedPlatformAdmin(admin, platformOrg.id, superAdminRole.id);
   }
 
+  if (process.env.SEED_DEMO === '1') {
+    const { seedDemoResourceServer } = await import('./demo-resource-server');
+    await seedDemoResourceServer();
+  }
+
   console.log('Seed complete.');
 }
 

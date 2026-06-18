@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
+import { validateNextUrl } from '@/lib/safe-next'
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -154,5 +155,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
     message: 'Admin login successful',
     level: 'info',
   })
-  redirect('/users')
+  const nextRaw = formData.get('next')
+  const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
+  redirect(nextSafe ?? '/users')
 }

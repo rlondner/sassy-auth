@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-06-18
+
+### Changed (palette/table-action-tooltips branch — PR #107, not merged)
+
+4 commits by `google-labs-jules[bot]` on 2026-06-17 standardizing table row actions across the admin console:
+
+- **Tooltip wrappers on all table "more actions" buttons** — `apps-table.tsx`, `orgs-table.tsx`, `permissions-table.tsx`, `roles-table.tsx`, `users-table.tsx` now wrap the `DropdownMenuTrigger` in a `<Tooltip>` with localized content via `t('common.moreActions')`.
+- **Localized aria-labels** — hardcoded `aria-label="more actions"` replaced with `t('common.moreActions')` across all five tables. The users-table button previously had no `aria-label` at all.
+- **`TooltipProvider` in root layout** — `apps/admin/app/layout.tsx` now wraps children in `<TooltipProvider>` inside `<NextIntlClientProvider>`.
+- **New i18n keys** — `common.moreActions` added to `en.json` ("More actions") and `fr.json` ("Plus d'actions"). French translations for `common.save`, `common.edit`, `common.delete`, `common.confirm` fixed (were untranslated English).
+- **Test infrastructure** — Global tooltip mocks added to `jest.setup.ts`; per-file mocks updated in all five table test files.
+- **CI: build workspace packages** — `e2e.yml` now runs `pnpm exec turbo build --filter=!@sassy-auth/auth-server` before Prisma generate, ensuring `@sassy-auth/db` dist is available. Auth-server excluded due to pre-existing build errors.
+- **Auth-server seed script** — `--transpile-only` flag added to `ts-node` in the seed script for faster execution (skips type checking).
+- **Jules palette doc** — `.Jules/palette.md` added, documenting the tooltip/aria-label pattern and CI build dependency learning.
+
+### Bugs found
+
+See [TODO_2026-06-18.md](./todo/TODO_2026-06-18.md) and [BUGS_2026-06-18.md](./bugs/BUGS_2026-06-18.md).
+
+#### Warning
+
+- **bug-0090** — Jules bot created 6+ duplicate/overlapping PRs (#100–#109) for the same tooltip/loading-state task; only one should be merged.
+- **bug-0091** — Auth-server `seed` script `--transpile-only` change bundled into a UI tooltip PR (#107); scope creep risks merge conflicts and masks seed type errors.
+- **bug-0092** — CI `e2e.yml` excludes auth-server from `turbo build` due to "known pre-existing errors" — build failures are masked, not fixed.
+
+#### Minor
+
+- **bug-0093** — Global `jest.mock('@sassy-auth/ui')` in `jest.setup.ts` is fragile; file-level mocks in 5 test files completely override it, forcing every new test file to manually duplicate tooltip component mocks.
+
+### Project health note
+
+93 open PRs, 0 merged. All bug-fix branches (bug-0001 through bug-0089) remain empty — no implementation work has started. 5 critical bugs: RBAC isolation (bug-0001), JWT breaking change (bug-0038), in-memory OAuth codes (bug-0039), redirect_uri validation bypass (bug-0054), and inactive user auth bypass (bug-0074). Jules bot contributing duplicate PRs (#100–#109) adds to the backlog without fixing existing issues. Day 22 with zero fixes merged. Total open bugs: 93.
+
+---
+
 ## [Unreleased] — 2026-06-07
 
 No new code commits. Deep scan across auth-server token issuance, role/permission services, user service, admin UI components, Prisma schema constraints, and shared packages surfaced **16 new bugs** (1 critical, 9 warning, 6 minor).

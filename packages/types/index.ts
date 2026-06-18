@@ -13,10 +13,10 @@ export interface SassyAuthJwtPayload {
   /** Tenant: sa_org.publicId (Sqid) */
   org: string;
   /**
-   * Effective permissions — union of direct grants and all role permissions,
-   * deduplicated, sorted alphabetically.
+   * OAuth 2.0 scope claim — space-separated, sorted alphabetically. Union of
+   * direct grants and all role permissions for the user, deduplicated.
    */
-  permissions: string[];
+  scope: string;
 }
 
 /** Machine-readable codes returned as the `error` field in 4xx JWT responses. */
@@ -25,8 +25,10 @@ export enum TokenErrorCode {
   APP_NOT_FOUND = 'APP_NOT_FOUND',
   USER_NOT_FOUND = 'USER_NOT_FOUND',
   INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
-  INVALID_CODE = 'INVALID_CODE',
-  CODE_EXPIRED = 'CODE_EXPIRED',
+  INVALID_REQUEST = 'invalid_request',
+  INVALID_REDIRECT_URI = 'invalid_redirect_uri',
+  INVALID_GRANT = 'invalid_grant',
+  UNAUTHORIZED_CLIENT = 'unauthorized_client',
 }
 
 /** Identifier type detected from the login identifier string. */

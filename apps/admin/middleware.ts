@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const PUBLIC_PATHS = ['/login', '/accept-invite']
+const PUBLIC_PATHS = ['/login', '/accept-invite', '/oauth-error']
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
 async function validateSession(request: NextRequest): Promise<boolean> {
