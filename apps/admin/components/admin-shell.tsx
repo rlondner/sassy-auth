@@ -3,14 +3,13 @@ import { SidebarShell, type NavIconName } from './sidebar-shell'
 
 interface AdminShellProps {
   children: React.ReactNode
-  currentPath: string
   user: { firstName: string; lastName: string; email: string }
   currentLocale: string
   availableLocales: string[]
 }
 
 export async function AdminShell({
-  children, currentPath, user, currentLocale, availableLocales,
+  children, user, currentLocale, availableLocales,
 }: AdminShellProps) {
   const t = await getTranslations()
 
@@ -39,7 +38,6 @@ export async function AdminShell({
   return (
     <SidebarShell
       groups={groups}
-      currentPath={currentPath}
       user={user}
       currentLocale={currentLocale}
       availableLocales={availableLocales}

@@ -171,9 +171,7 @@ The seed also creates 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `
 
 **Optional — demo resource server data.** Set `SEED_DEMO=1` to additionally create a sample app (`resourceserver01`), an org (`Citadel`), 8 `rs.*` permissions, 2 roles, and 2 demo users (`m@cpm.io`, `i@cpm.io`) used by the [FastAPI sample resource server](apps/resource-server-fastapi/README.md):
 
-```bash
-SEED_DEMO=1 pnpm --filter @sassy-auth/db db:seed
-```
+
 
 ### 6. Start the development servers
 
@@ -266,7 +264,7 @@ Omit the client ID and secret for any provider you do not want to enable.
 
 ### Flow A: OAuth2 Authorization Code with PKCE (S256)
 
-Use this flow for third-party or external resource servers that redirect users to SassyAuth for login. PKCE is **required** — only the `S256` method is accepted.
+Use this flow for third-party or external resource servers that redirect users to SassyAuth for login. PKCE is **required** — only the `S256` method is accepted and the server rejects authorize requests without a code chal
 
 **Step 0 — Generate a PKCE pair (client-side)**
 
@@ -279,7 +277,17 @@ const code_challenge = crypto
 // Keep `code_verifier` server-side. Send `code_challenge` on the authorize call.
 ```
 
-**Step 1 — Redirect the user to the authorization endpoint**
+**Step 1 — Generate PKCE verifier and challenge**
+
+```javascript
+const verifier = crypto.randomBytes(64).toString('base64url'); // 43-128 chars
+const challenge = crypto
+  .createHash('sha256')
+  .update(verifier)
+  .digest('base64url');
+```
+
+**Step 2 — Redirect the user to the authorization endpoint**
 
 ```
 GET /api/token/oauth/authorize
@@ -292,17 +300,18 @@ GET /api/token/oauth/authorize
 
 The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple, GitHub).
 
-The `redirect_uri` must share an origin (scheme + host + port) with the `url` registered on the `sa_app` row. If it doesn't, the authorize call returns `400 invalid_redirect_uri`. `localhost` URIs are allowed for development.
+**Step 3 — Receive the authorization code**
 
-**Step 2 — Receive the authorization code**
-
-After successful authentication, SassyAuth validates that the user's org belongs to the requested app, then redirects to:
+After successful authentication, SassyAuth validates that the user's org is associated with the requested app, that the `redirect_uri` origin matches the app's registered URL, then redirects to:
 
 ```
 <redirect_uri>?code=<code>&state=<state>
 ```
 
-**Step 3 — Exchange the code + verifier for a JWT**
+The `redirect_uri` must share an origin (scheme + host + port) with the `url` registered on the `sa_app` row. If it doesn't, the authorize call returns `400 invalid_redirect_uri`. `localhost` URIs are allowed for development.
+
+
+**Step 4 — Exchange the code + verifier for a JWT**
 
 ```bash
 curl -X POST http://localhost:3000/api/token/oauth/token \
@@ -310,8 +319,8 @@ curl -X POST http://localhost:3000/api/token/oauth/token \
   -d '{
     "code": "<authorization-code>",
     "client_id": "<appPublicId>",
-    "code_verifier": "<the verifier from Step 0>",
-    "redirect_uri": "<same redirect_uri used in Step 1>"
+    "code_verifier": "<verifier>",
+    "redirect_uri": "<redirect_uri>"
   }'
 ```
 
@@ -325,6 +334,7 @@ Response:
 }
 ```
 
+> **Note:** The `redirect_uri` must use the same origin (scheme + host + port) as the app's registered URL. `localhost` URIs are allowed for development.
 Authorization codes are single-use and stored in-process (see [Known Limitations](#known-limitations)). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
 
 ### Flow B: Direct Login
@@ -545,6 +555,53 @@ The login page supports a `next=<url>` query parameter for post-login redirect (
 
 ---
 
+## Resource Server (FastAPI)
+
+A reference resource server is at `apps/resource-server-fastapi/`. It demonstrates how a third-party application integrates with SassyAuth using OAuth2 PKCE.
+
+**Prerequisites:** Python 3.11+, pip or uv.
+
+```bash
+cd apps/resource-server-fastapi
+python -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+pip install -e ".[dev]"
+```
+
+**Configure:**
+
+```bash
+cp .env.example .env
+# Edit .env — set SASSY_CLIENT_ID to the app's publicId from the seed
+```
+
+| Variable              | Description                                                   |
+|-----------------------|---------------------------------------------------------------|
+| `AUTH_SERVER_URL`     | SassyAuth base URL (default `http://localhost:3000`)          |
+| `ADMIN_URL`           | Admin console URL for login redirect (default `http://localhost:3001`) |
+| `SASSY_CLIENT_ID`    | `sa_app.publicId` for this resource server (from seed output) |
+| `RS_BASE_URL`        | Public URL of this server (e.g. `http://localhost:8010`)      |
+| `REDIRECT_URI`       | OAuth callback URL (e.g. `http://localhost:8010/auth/callback`) |
+
+**Run:**
+
+```bash
+uvicorn app.main:app --port 8010 --reload
+```
+
+**Test:**
+
+```bash
+pytest
+```
+
+Routes:
+- `/` — landing page with login button
+- `/auth/login` — initiates PKCE flow → redirects to SassyAuth
+- `/auth/callback` — receives authorization code, exchanges for JWT
+- `/api/properties` — protected endpoint; requires Bearer token with `rs.properties.read` scope
+
+---
+
 ## Observability
 
 Both apps integrate **Winston** (structured logging) and **Sentry** (error tracking).
@@ -641,6 +698,3 @@ A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright test
 
 **Set-replace DTOs lack array size limits.**
 The `PUT /users/:id/roles` and `PUT /users/:id/direct-permissions` endpoints accept arrays of any size (including empty). No `@ArrayMaxSize` is enforced. Tracked as **bug-0034**.
-
-**Auth-server build errors.**
-The auth-server has unresolved TypeScript build errors that prevent `nest build` from succeeding. CI works around this by excluding the auth-server from `turbo build` and using `ts-node --transpile-only` for seeding. The errors should be investigated and fixed. Tracked as **bug-0092**.
