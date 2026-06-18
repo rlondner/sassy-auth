@@ -15,6 +15,7 @@ interface IssueJwtParams {
 export class TokenService {
   private readonly privateKey: string;
   private readonly publicKey: string;
+  private readonly kid: string;
 
   constructor() {
     if (!process.env.RSA_PRIVATE_KEY || !process.env.RSA_PUBLIC_KEY) {
@@ -22,6 +23,7 @@ export class TokenService {
     }
     this.privateKey = Buffer.from(process.env.RSA_PRIVATE_KEY, 'base64').toString('utf-8');
     this.publicKey = Buffer.from(process.env.RSA_PUBLIC_KEY, 'base64').toString('utf-8');
+    this.kid = process.env.JWT_KEY_ID ?? 'sassy-auth-1';
   }
 
   async resolvePermissions(saUserId: number): Promise<string[]> {
@@ -75,7 +77,7 @@ export class TokenService {
       scope: permissions.join(' '),
     };
 
-    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256' });
+    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
   }
 
   getJwks(): { keys: Record<string, unknown>[] } {
@@ -87,7 +89,7 @@ export class TokenService {
           ...jwk,
           alg: 'RS256',
           use: 'sig',
-          kid: 'sassy-auth-1',
+          kid: this.kid,
         },
       ],
     };

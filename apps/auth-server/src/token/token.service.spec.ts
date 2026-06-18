@@ -30,6 +30,9 @@ const publicPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
 process.env.RSA_PRIVATE_KEY = Buffer.from(privatePem).toString('base64');
 process.env.RSA_PUBLIC_KEY = Buffer.from(publicPem).toString('base64');
 process.env.BETTER_AUTH_URL = 'https://auth.example.com';
+// Non-default value so the assertions prove the env var drives both the JWT
+// header and the JWKS (and they stay in sync).
+process.env.JWT_KEY_ID = 'test-kid-1';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -114,6 +117,13 @@ describe('TokenService', () => {
       expect(typeof decoded.scope).toBe('string');
       expect(decoded.scope).toBe('invoices.create reports.read sales.manage');
       expect(decoded.exp! - decoded.iat!).toBe(3600);
+
+      // The JWT header must carry the env-configured `kid` so JWKS-based
+      // verifiers (e.g. the FastAPI resource server) can pick the right key.
+      const completed = jwt.decode(token, { complete: true }) as {
+        header: { alg: string; kid?: string };
+      };
+      expect(completed.header.kid).toBe('test-kid-1');
     });
   });
 
@@ -126,6 +136,7 @@ describe('TokenService', () => {
       expect(jwks.keys[0].kty).toBe('RSA');
       expect(jwks.keys[0].alg).toBe('RS256');
       expect(jwks.keys[0].use).toBe('sig');
+      expect(jwks.keys[0].kid).toBe('test-kid-1');
     });
   });
 });

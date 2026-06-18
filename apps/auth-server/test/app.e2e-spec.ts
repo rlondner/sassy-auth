@@ -265,6 +265,19 @@ describe('SassyAuth E2E', () => {
         }) as Record<string, unknown>;
         expect(typeof decoded.scope).toBe('string');
         expect('permissions' in decoded).toBe(false);
+
+        // 6. The JWT header `kid` must match the JWKS key — JWKS-based
+        // verifiers (e.g. FastAPI's PyJWKClient) look up the signing key by
+        // this id. If the signer ever drops it or drifts from the JWKS,
+        // every RS call would 401.
+        const completed = jwt.decode(tokenRes.body.access_token, {
+          complete: true,
+        }) as { header: { kid?: string } };
+        const jwksRes = await request(httpServer).get('/api/token/jwks').expect(200);
+        const jwksKid = jwksRes.body.keys[0]?.kid;
+        expect(completed.header.kid).toBeTruthy();
+        expect(jwksKid).toBeTruthy();
+        expect(completed.header.kid).toBe(jwksKid);
       });
     });
   });
