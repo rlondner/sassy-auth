@@ -122,4 +122,13 @@ describe('OauthErrorPage', () => {
     expect(decodeURIComponent(href)).toContain('invalid_redirect_uri')
     expect(decodeURIComponent(href)).toContain('84LRe')
   })
+
+  it('preserves the raw code in the mailto even when code is not in the known set', async () => {
+    process.env.NEXT_PUBLIC_ADMIN_CONTACT_EMAIL = 'admin@example.com'
+    await renderPage({ code: 'something_unrecognised', app: 'AAA1' })
+    const link = screen.getByRole('link', { name: en.oauthError.actions.contactAdministrator })
+    const href = link.getAttribute('href') ?? ''
+    expect(decodeURIComponent(href)).toContain('something_unrecognised')
+    expect(decodeURIComponent(href)).toContain('AAA1')
+  })
 })

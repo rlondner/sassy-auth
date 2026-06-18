@@ -48,7 +48,7 @@ export default async function OauthErrorPage({
           </p>
         ) : null}
 
-        <OauthErrorActions code={isKnown ? code : 'unknown'} app={app} />
+        <OauthErrorActions code={code ?? 'unknown'} app={app} />
       </div>
     </div>
   )

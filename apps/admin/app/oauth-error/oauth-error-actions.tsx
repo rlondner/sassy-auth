@@ -34,9 +34,9 @@ export function OauthErrorActions({ code, app }: Props) {
 
   return (
     <div className="mt-6 flex flex-col gap-2">
-      <Link href="/login" className="w-full">
-        <Button className="w-full">{t('returnToSignIn')}</Button>
-      </Link>
+      <Button asChild className="w-full">
+        <Link href="/login">{t('returnToSignIn')}</Link>
+      </Button>
       {mailtoHref ? (
         <a href={mailtoHref} className="text-center text-label-md text-[var(--primary)] underline-offset-4 hover:underline">
           {t('contactAdministrator')}
