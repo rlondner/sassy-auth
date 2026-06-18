@@ -1,4 +1,3 @@
-import { TooltipProvider } from "@sassy-auth/ui"
 import * as React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
@@ -49,7 +48,7 @@ const initial = {
 }
 
 function withIntl(node: React.ReactNode) {
-  return <NextIntlClientProvider locale="en" messages={en}><TooltipProvider>{node}</TooltipProvider></NextIntlClientProvider>
+  return <NextIntlClientProvider locale="en" messages={en}>{node}</NextIntlClientProvider>
 }
 
 describe('RolesTable', () => {
