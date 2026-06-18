@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpException,
   NotFoundException,
   Post,
   Query,
@@ -28,6 +29,7 @@ import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
 import { assertRedirectUriMatchesApp } from './redirect-uri';
+import { buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { LoggerService } from '../common/logger/logger.service';
 
 @ApiTags('Token')
@@ -62,71 +64,90 @@ export class TokenController {
     @Query('state') state: string = '',
     @Req() req: Request,
   ) {
-    if (!codeChallenge || codeChallengeMethod !== 'S256') {
-      throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
-    }
-
-    let numericId: number;
     try {
-      numericId = this.sqidService.decode(clientId);
-    } catch {
-      throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
-    }
-    const app = await prisma.saApp.findUnique({ where: { id: numericId } });
-    if (!app) {
-      throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
-    }
+      if (!codeChallenge || codeChallengeMethod !== 'S256') {
+        throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
+      }
 
-    try {
-      assertRedirectUriMatchesApp(redirectUri, app.url);
-    } catch (err) {
-      this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
+      let numericId: number;
+      try {
+        numericId = this.sqidService.decode(clientId);
+      } catch {
+        throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
+      }
+      const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+      if (!app) {
+        throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+      }
+
+      try {
+        assertRedirectUriMatchesApp(redirectUri, app.url);
+      } catch (err) {
+        this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
+          context: 'TokenController',
+          appId: clientId,
+          attemptedOrigin: (() => { try { return new URL(redirectUri).origin; } catch { return '<unparseable>'; } })(),
+        });
+        throw err;
+      }
+
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.headers),
+      });
+      if (!session) {
+        throw new UnauthorizedException();
+      }
+
+      const saUser = await prisma.saUser.findFirst({
+        where: { betterAuthUserId: session.user.id },
+        include: { org: true },
+      });
+      if (!saUser) {
+        throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+      }
+      if (saUser.org.appId !== app.id) {
+        throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
+      }
+
+      const code = this.oauthService.generateCode(
+        saUser.publicId,
+        app.publicId,
+        codeChallenge,
+        'S256',
+      );
+      const url = new URL(redirectUri);
+      url.searchParams.set('code', code);
+      if (state) url.searchParams.set('state', state);
+
+      this.logger.getWinstonLogger().info('OAuth authorization code issued', {
         context: 'TokenController',
         appId: clientId,
-        attemptedOrigin: (() => { try { return new URL(redirectUri).origin; } catch { return '<unparseable>'; } })(),
+        userId: saUser.publicId,
+        pkceMethod: 'S256',
+        redirectUriOrigin: new URL(redirectUri).origin,
       });
-      throw err;
+      Sentry.setTag('authFlow', 'oauth');
+      Sentry.setTag('appId', clientId);
+
+      return { url: url.toString(), statusCode: 302 };
+    } catch (err) {
+      // UnauthorizedException keeps the existing login-redirect flow — Nest's
+      // global filter handles it. Anything not Http (5xx programming errors)
+      // also propagates so Sentry sees it.
+      if (err instanceof UnauthorizedException) throw err;
+      if (!(err instanceof HttpException)) throw err;
+      const status = err.getStatus();
+      if (status < 400 || status >= 500) throw err;
+
+      const adminUrl = process.env.ADMIN_URL;
+      const code = extractTokenErrorCode(err);
+      if (!adminUrl || !code) throw err; // fall back to JSON
+
+      return {
+        url: buildOauthErrorRedirectUrl(adminUrl, code, clientId),
+        statusCode: 302,
+      };
     }
-
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers),
-    });
-    if (!session) {
-      throw new UnauthorizedException();
-    }
-
-    const saUser = await prisma.saUser.findFirst({
-      where: { betterAuthUserId: session.user.id },
-      include: { org: true },
-    });
-    if (!saUser) {
-      throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
-    }
-    if (saUser.org.appId !== app.id) {
-      throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
-    }
-
-    const code = this.oauthService.generateCode(
-      saUser.publicId,
-      app.publicId,
-      codeChallenge,
-      'S256',
-    );
-    const url = new URL(redirectUri);
-    url.searchParams.set('code', code);
-    if (state) url.searchParams.set('state', state);
-
-    this.logger.getWinstonLogger().info('OAuth authorization code issued', {
-      context: 'TokenController',
-      appId: clientId,
-      userId: saUser.publicId,
-      pkceMethod: 'S256',
-      redirectUriOrigin: new URL(redirectUri).origin,
-    });
-    Sentry.setTag('authFlow', 'oauth');
-    Sentry.setTag('appId', clientId);
-
-    return { url: url.toString(), statusCode: 302 };
   }
 
   /**
