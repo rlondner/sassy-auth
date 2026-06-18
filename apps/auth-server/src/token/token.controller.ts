@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpException,
   NotFoundException,
   Post,
   Query,
@@ -27,6 +28,8 @@ import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
+import { assertRedirectUriMatchesApp } from './redirect-uri';
+import { buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { LoggerService } from '../common/logger/logger.service';
 
 @ApiTags('Token')
@@ -56,55 +59,95 @@ export class TokenController {
   async oauthAuthorize(
     @Query('client_id') clientId: string,
     @Query('redirect_uri') redirectUri: string,
+    @Query('code_challenge') codeChallenge: string,
+    @Query('code_challenge_method') codeChallengeMethod: string,
     @Query('state') state: string = '',
     @Req() req: Request,
   ) {
-    // Validate app exists
-    let numericId: number;
     try {
-      numericId = this.sqidService.decode(clientId);
-    } catch {
-      throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
-    }
-    const app = await prisma.saApp.findUnique({ where: { id: numericId } });
-    if (!app) {
-      throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
-    }
+      if (!codeChallenge || codeChallengeMethod !== 'S256') {
+        throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
+      }
 
-    // Require active BetterAuth session
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers),
-    });
-    if (!session) {
-      throw new UnauthorizedException();
+      let numericId: number;
+      try {
+        numericId = this.sqidService.decode(clientId);
+      } catch {
+        throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
+      }
+      const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+      if (!app) {
+        throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+      }
+
+      try {
+        assertRedirectUriMatchesApp(redirectUri, app.url);
+      } catch (err) {
+        this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
+          context: 'TokenController',
+          appId: clientId,
+          attemptedOrigin: (() => { try { return new URL(redirectUri).origin; } catch { return '<unparseable>'; } })(),
+        });
+        throw err;
+      }
+
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.headers),
+      });
+      if (!session) {
+        throw new UnauthorizedException();
+      }
+
+      const saUser = await prisma.saUser.findFirst({
+        where: { betterAuthUserId: session.user.id },
+        include: { org: true },
+      });
+      if (!saUser) {
+        throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+      }
+      if (saUser.org.appId !== app.id) {
+        throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
+      }
+
+      const code = this.oauthService.generateCode(
+        saUser.publicId,
+        app.publicId,
+        codeChallenge,
+        'S256',
+      );
+      const url = new URL(redirectUri);
+      url.searchParams.set('code', code);
+      if (state) url.searchParams.set('state', state);
+
+      this.logger.getWinstonLogger().info('OAuth authorization code issued', {
+        context: 'TokenController',
+        appId: clientId,
+        userId: saUser.publicId,
+        pkceMethod: 'S256',
+        redirectUriOrigin: new URL(redirectUri).origin,
+      });
+      Sentry.setTag('authFlow', 'oauth');
+      Sentry.setTag('appId', clientId);
+
+      return { url: url.toString(), statusCode: 302 };
+    } catch (err) {
+      // UnauthorizedException keeps the existing login-redirect flow — Nest's
+      // global filter handles it. Anything not Http (5xx programming errors)
+      // also propagates so Sentry sees it.
+      if (err instanceof UnauthorizedException) throw err;
+      if (!(err instanceof HttpException)) throw err;
+      const status = err.getStatus();
+      if (status < 400 || status >= 500) throw err;
+
+      const adminUrl = process.env.ADMIN_URL;
+      const code = extractTokenErrorCode(err);
+      if (!adminUrl || !code) throw err; // fall back to JSON
+
+      return {
+        url: buildOauthErrorRedirectUrl(adminUrl, code, clientId),
+        statusCode: 302,
+      };
     }
-
-    // Look up sa_user for this BetterAuth user
-    const saUser = await prisma.saUser.findFirst({
-      where: { betterAuthUserId: session.user.id },
-      include: { org: true },
-    });
-    if (!saUser) {
-      throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
-    }
-    if (saUser.org.appId !== app.id) {
-      throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
-    }
-
-    const code = this.oauthService.generateCode(saUser.publicId, app.publicId);
-    const url = new URL(redirectUri);
-    url.searchParams.set('code', code);
-    if (state) url.searchParams.set('state', state);
-
-    this.logger.getWinstonLogger().info('OAuth authorization code issued', {
-      context: 'TokenController',
-      appId: clientId,
-      userId: saUser.publicId,
-    });
-    Sentry.setTag('authFlow', 'oauth');
-    Sentry.setTag('appId', clientId);
-
-    return { url: url.toString(), statusCode: 302 };
   }
 
   /**
@@ -114,10 +157,46 @@ export class TokenController {
    */
   @Post('oauth/token')
   async oauthToken(@Body() dto: OauthTokenExchangeDto) {
-    const { userId: userPublicId, appPublicId } = this.oauthService.exchangeCode(
-      dto.code,
-      dto.client_id,
-    );
+    let numericId: number;
+    try {
+      numericId = this.sqidService.decode(dto.client_id);
+    } catch {
+      throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
+    }
+    const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+    if (!app) {
+      throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+    }
+
+    try {
+      assertRedirectUriMatchesApp(dto.redirect_uri, app.url);
+    } catch (err) {
+      this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
+        context: 'TokenController',
+        appId: dto.client_id,
+        attemptedOrigin: (() => { try { return new URL(dto.redirect_uri).origin; } catch { return '<unparseable>'; } })(),
+      });
+      throw err;
+    }
+
+    let userPublicId: string;
+    let appPublicId: string;
+    try {
+      const exchanged = this.oauthService.exchangeCode(
+        dto.code,
+        dto.client_id,
+        dto.code_verifier,
+      );
+      userPublicId = exchanged.userId;
+      appPublicId = exchanged.appPublicId;
+    } catch (err) {
+      this.logger.getWinstonLogger().warn('oauth.pkce.verify_failed', {
+        context: 'TokenController',
+        appId: dto.client_id,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
 
     const saUser = await prisma.saUser.findFirst({
       where: { publicId: userPublicId },
@@ -138,6 +217,7 @@ export class TokenController {
       context: 'TokenController',
       appId: appPublicId,
       userId: userPublicId,
+      pkceMethod: 'S256',
     });
 
     return { access_token: token, token_type: 'Bearer', expires_in: 3600 };

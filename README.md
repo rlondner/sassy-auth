@@ -26,11 +26,12 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
     - [Observability (optional)](#observability-optional)
     - [Social providers (optional)](#social-providers-optional)
   - [Auth Flows](#auth-flows)
-    - [Flow A: OAuth2 Authorization Code](#flow-a-oauth2-authorization-code)
+    - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
     - [Flow B: Direct Login](#flow-b-direct-login)
     - [Flow C: Invite + Accept](#flow-c-invite--accept)
   - [JWKS and Token Verification](#jwks-and-token-verification)
   - [API Reference](#api-reference)
+  - [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
   - [Admin Console](#admin-console-1)
   - [Observability](#observability)
   - [Running Tests](#running-tests)
@@ -166,7 +167,9 @@ The seed script is idempotent — safe to run multiple times. It creates:
 pnpm --filter @sassy-auth/db db:seed
 ```
 
-To also seed demo data for the FastAPI resource server (app, org, roles, permissions, 2 demo users):
+The seed also creates 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `p@sa.io`, `s@sa.io`), each with password `Pass@word1234`. `s@sa.io` is the super admin and is the recommended account for first sign-in.
+
+**Optional — demo resource server data.** Set `SEED_DEMO=1` to additionally create a sample app (`resourceserver01`), an org (`Citadel`), 8 `rs.*` permissions, 2 roles, and 2 demo users (`m@cpm.io`, `i@cpm.io`) used by the [FastAPI sample resource server](apps/resource-server-fastapi/README.md):
 
 ```bash
 SEED_DEMO=1 pnpm --filter @sassy-auth/db db:seed
@@ -212,8 +215,9 @@ Copy the two output lines directly into your `.env.local` file.
 | `DATABASE_URL`        | PostgreSQL connection string                                   |
 | `RSA_PRIVATE_KEY`     | Base64-encoded PKCS8 PEM private key (for signing JWTs)        |
 | `RSA_PUBLIC_KEY`      | Base64-encoded SPKI PEM public key (served via JWKS endpoint)  |
+| `JWT_KEY_ID`          | `kid` written into every issued JWT header and the JWKS document. Resource servers use it to pick the right key from the JWKS. Rotate together with the RSA key pair. Default: `sassy-auth-1` |
 | `BETTER_AUTH_SECRET`  | Random string, 32+ characters                                  |
-| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`      |
+| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`. Also used as the JWT `iss` claim. |
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
 
 ### Admin console
@@ -224,6 +228,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `http://localhost:3000`      |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | Comma-separated origins allowed by `/login?next=` redirect validation (in addition to `AUTH_SERVER_URL`). Default: empty |
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
+| `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
 
 ### Observability (optional)
 
@@ -259,42 +264,45 @@ Omit the client ID and secret for any provider you do not want to enable.
 
 ## Auth Flows
 
-### Flow A: OAuth2 Authorization Code + PKCE (S256)
+### Flow A: OAuth2 Authorization Code with PKCE (S256)
 
-Use this flow for third-party or external resource servers that redirect users to SassyAuth for login. PKCE is **required** — the server rejects authorize requests without a code challenge.
+Use this flow for third-party or external resource servers that redirect users to SassyAuth for login. PKCE is **required** — only the `S256` method is accepted.
 
-**Step 1 — Generate PKCE verifier and challenge**
+**Step 0 — Generate a PKCE pair (client-side)**
 
 ```javascript
-const verifier = crypto.randomBytes(64).toString('base64url'); // 43-128 chars
-const challenge = crypto
-  .createHash('sha256')
-  .update(verifier)
-  .digest('base64url');
+const crypto = require('crypto');
+const code_verifier = crypto.randomBytes(64).toString('base64url');
+const code_challenge = crypto
+  .createHash('sha256').update(code_verifier).digest('base64')
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// Keep `code_verifier` server-side. Send `code_challenge` on the authorize call.
 ```
 
-**Step 2 — Redirect the user to the authorization endpoint**
+**Step 1 — Redirect the user to the authorization endpoint**
 
 ```
 GET /api/token/oauth/authorize
   ?client_id=<appPublicId>
   &redirect_uri=<uri>
-  &code_challenge=<challenge>
+  &code_challenge=<S256 challenge>
   &code_challenge_method=S256
   &state=<state>
 ```
 
 The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple, GitHub).
 
-**Step 3 — Receive the authorization code**
+The `redirect_uri` must share an origin (scheme + host + port) with the `url` registered on the `sa_app` row. If it doesn't, the authorize call returns `400 invalid_redirect_uri`. `localhost` URIs are allowed for development.
 
-After successful authentication, SassyAuth validates that the user's org is associated with the requested app, that the `redirect_uri` origin matches the app's registered URL, then redirects to:
+**Step 2 — Receive the authorization code**
+
+After successful authentication, SassyAuth validates that the user's org belongs to the requested app, then redirects to:
 
 ```
 <redirect_uri>?code=<code>&state=<state>
 ```
 
-**Step 4 — Exchange the code for a JWT**
+**Step 3 — Exchange the code + verifier for a JWT**
 
 ```bash
 curl -X POST http://localhost:3000/api/token/oauth/token \
@@ -302,8 +310,8 @@ curl -X POST http://localhost:3000/api/token/oauth/token \
   -d '{
     "code": "<authorization-code>",
     "client_id": "<appPublicId>",
-    "code_verifier": "<verifier>",
-    "redirect_uri": "<redirect_uri>"
+    "code_verifier": "<the verifier from Step 0>",
+    "redirect_uri": "<same redirect_uri used in Step 1>"
   }'
 ```
 
@@ -317,7 +325,7 @@ Response:
 }
 ```
 
-> **Note:** The `redirect_uri` must use the same origin (scheme + host + port) as the app's registered URL. `localhost` URIs are allowed for development.
+Authorization codes are single-use and stored in-process (see [Known Limitations](#known-limitations)). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
 
 ### Flow B: Direct Login
 
@@ -339,7 +347,7 @@ The `identifier` field is auto-detected and accepts:
 - Phone number — `+15551234567`
 - Username — `johndoe`
 
-The password is validated against the bcrypt hash stored by BetterAuth. No BetterAuth session is created; only a JWT is returned.
+The password is validated against the scrypt hash stored by BetterAuth (format `<saltHex>:<hashHex>`). No BetterAuth session is created; only a JWT is returned.
 
 Response:
 
@@ -391,17 +399,25 @@ curl http://localhost:3000/api/token/jwks
 }
 ```
 
+**JWT header:**
+
+| Field          | Description                                        |
+|----------------|----------------------------------------------------|
+| `alg`          | `RS256`                                            |
+| `typ`          | `JWT`                                              |
+| `kid`          | Matches the `kid` of the key in the JWKS document. Controlled by `JWT_KEY_ID`. |
+
 **JWT payload structure:**
 
-| Claim          | Description                                        |
-|----------------|----------------------------------------------------|
-| `iss`          | Issuer — base URL of the SassyAuth server          |
-| `sub`          | User public ID (Sqid)                              |
-| `aud`          | App public ID (Sqid)                               |
-| `org`          | Org public ID (Sqid)                               |
-| `scope`        | Space-separated permission names (sorted, deduplicated) |
-| `iat`          | Issued at (Unix timestamp)                         |
-| `exp`          | Expiry — 1 hour after issuance                     |
+| Claim          | Description                                                                   |
+|----------------|-------------------------------------------------------------------------------|
+| `sub`          | User public ID (Sqid)                                                         |
+| `aud`          | App public ID (Sqid)                                                          |
+| `org`          | Org public ID (Sqid)                                                          |
+| `iss`          | Value of `BETTER_AUTH_URL` at issuance time                                   |
+| `scope`        | Space-separated list of effective permission names (OAuth 2.0 `scope` claim)  |
+| `iat`          | Issued at (Unix timestamp)                                                    |
+| `exp`          | Expiry — 1 hour after issuance                                                |
 
 **Example verification in Node.js:**
 
@@ -419,17 +435,29 @@ function getKey(header, callback) {
   });
 }
 
-jwt.verify(token, getKey, { algorithms: ['RS256'] }, (err, decoded) => {
-  if (err) throw err;
-  // decoded.sub   — user public ID
-  // decoded.aud   — app public ID
-  // decoded.org   — org public ID
-  // decoded.scope — space-separated permissions, e.g. "rs.properties.read rs.properties.update"
-  const permissions = decoded.scope.split(' ');
-});
+jwt.verify(
+  token,
+  getKey,
+  {
+    algorithms: ['RS256'],
+    issuer: process.env.BETTER_AUTH_URL,
+    audience: '<your-app-publicId>',
+  },
+  (err, decoded) => {
+    if (err) throw err;
+    // decoded.sub   — user public ID
+    // decoded.aud   — app public ID
+    // decoded.org   — org public ID
+    // decoded.scope — space-separated permission names, e.g. "rs.properties.read rs.inspections.read"
+    const scopes = new Set(String(decoded.scope ?? '').split(' '));
+    if (!scopes.has('rs.properties.read')) throw new Error('insufficient_scope');
+  },
+);
 ```
 
-Cache the JWKS document locally and refresh it only when you encounter a key ID you do not recognise. Do not fetch it on every request.
+A Python/FastAPI example using `pyjwt[crypto]` and `PyJWKClient` is in [`apps/resource-server-fastapi/`](apps/resource-server-fastapi/README.md).
+
+Cache the JWKS document locally and refresh it only when you encounter a `kid` you do not recognise. Do not fetch it on every request.
 
 ---
 
@@ -484,6 +512,14 @@ Full OpenAPI spec is in `docs/`.
 
 ---
 
+## Sample Resource Server (FastAPI)
+
+A runnable Python/FastAPI sample lives at [`apps/resource-server-fastapi/`](apps/resource-server-fastapi/README.md). It demonstrates the full Flow A (PKCE) round-trip from a non-Node consumer: starting the authorize redirect, exchanging the code, verifying the JWT against the JWKS endpoint, and scope-gating a protected endpoint.
+
+The sample relies on the `SEED_DEMO=1` data (`resourceserver01` app, `Citadel` org, demo users `m@cpm.io` / `i@cpm.io`). The RS app's own README walks through both the seed-driven setup and a manual admin-UI alternative for users who want to provision everything from scratch.
+
+---
+
 ## Admin Console
 
 The admin console is a Next.js 15 app at `apps/admin/` listening on **port 3001**.
@@ -506,53 +542,6 @@ i18n is wired with `next-intl` (locales: `en`, `fr`). Strings live in `apps/admi
 The admin console talks to `auth-server` via `AUTH_SERVER_URL` (default `http://localhost:3000`). All API calls forward the BetterAuth session cookie via the helpers in `apps/admin/lib/api.ts`.
 
 The login page supports a `next=<url>` query parameter for post-login redirect (e.g., from a resource server's OAuth flow). URLs are validated against an allowlist (`AUTH_SERVER_URL` + `LOGIN_NEXT_ALLOWED_ORIGINS` env var) to prevent open redirects.
-
----
-
-## Resource Server (FastAPI)
-
-A reference resource server is at `apps/resource-server-fastapi/`. It demonstrates how a third-party application integrates with SassyAuth using OAuth2 PKCE.
-
-**Prerequisites:** Python 3.11+, pip or uv.
-
-```bash
-cd apps/resource-server-fastapi
-python -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -e ".[dev]"
-```
-
-**Configure:**
-
-```bash
-cp .env.example .env
-# Edit .env — set SASSY_CLIENT_ID to the app's publicId from the seed
-```
-
-| Variable              | Description                                                   |
-|-----------------------|---------------------------------------------------------------|
-| `AUTH_SERVER_URL`     | SassyAuth base URL (default `http://localhost:3000`)          |
-| `ADMIN_URL`           | Admin console URL for login redirect (default `http://localhost:3001`) |
-| `SASSY_CLIENT_ID`    | `sa_app.publicId` for this resource server (from seed output) |
-| `RS_BASE_URL`        | Public URL of this server (e.g. `http://localhost:8010`)      |
-| `REDIRECT_URI`       | OAuth callback URL (e.g. `http://localhost:8010/auth/callback`) |
-
-**Run:**
-
-```bash
-uvicorn app.main:app --port 8010 --reload
-```
-
-**Test:**
-
-```bash
-pytest
-```
-
-Routes:
-- `/` — landing page with login button
-- `/auth/login` — initiates PKCE flow → redirects to SassyAuth
-- `/auth/callback` — receives authorization code, exchanges for JWT
-- `/api/properties` — protected endpoint; requires Bearer token with `rs.properties.read` scope
 
 ---
 

@@ -10,10 +10,12 @@ export class OauthTokenExchangeDto {
   @IsNotEmpty()
   client_id!: string;
 
+  /** PKCE code verifier — the plaintext that was used to derive the
+   *  code_challenge sent on the authorize call. */
   @IsString()
   @IsNotEmpty()
-  client_secret!: string;
+  code_verifier!: string;
 
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   redirect_uri!: string;
 }

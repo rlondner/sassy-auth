@@ -434,5 +434,43 @@
     "submit": "Activate Account",
     "expired": "This invitation link has expired or is invalid. Contact your administrator for a new one.",
     "success": "Account activated! You can now sign in."
+  },
+  "oauthError": {
+    "pageTitle": "Authorization error — SassyAuth",
+    "fallbackHeading": "Authorization request rejected",
+    "fallbackBody": "SassyAuth couldn't process the authorization request.",
+    "fallbackHint": "Contact a platform administrator with the URL you tried to load.",
+    "appLabel": "Application ID:",
+    "actions": {
+      "returnToSignIn": "Return to sign-in",
+      "contactAdministrator": "Contact administrator"
+    },
+    "codes": {
+      "invalid_request": {
+        "heading": "Authorization request rejected",
+        "body": "The request is missing PKCE parameters or used an unsupported challenge method.",
+        "hint": "The client must send code_challenge and code_challenge_method=S256."
+      },
+      "APP_NOT_FOUND": {
+        "heading": "Application not found",
+        "body": "The requesting application isn't registered with SassyAuth.",
+        "hint": "Verify the client_id (a Sqid) matches a row in the Apps list."
+      },
+      "invalid_redirect_uri": {
+        "heading": "Redirect URL doesn't match",
+        "body": "The redirect URL the application sent doesn't match the URL registered for it.",
+        "hint": "Open Apps, find this row, and update URL so its origin matches the redirect endpoint."
+      },
+      "USER_NOT_FOUND": {
+        "heading": "Account not provisioned",
+        "body": "Your sign-in succeeded, but no SassyAuth account is linked to it.",
+        "hint": "Ask a platform admin to create a SassyAuth user record for your email and assign you to an org."
+      },
+      "USER_ORG_MISMATCH": {
+        "heading": "Not authorized for this application",
+        "body": "Your account is provisioned in SassyAuth but isn't scoped to the application you tried to access.",
+        "hint": "Ask a platform admin to add you to an org associated with this application."
+      }
+    }
   }
 }

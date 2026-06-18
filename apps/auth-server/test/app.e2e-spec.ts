@@ -145,7 +145,7 @@ describe('SassyAuth E2E', () => {
       expect(decoded.sub).toBe(userPublicId);
       expect(decoded.aud).toBe(platformAppPublicId);
       expect(decoded.iss).toBe('http://localhost:3000');
-      expect(Array.isArray(decoded.permissions)).toBe(true);
+      expect(typeof decoded.scope).toBe('string');
     });
 
     it('returns 401 for wrong password', async () => {
@@ -184,15 +184,176 @@ describe('SassyAuth E2E', () => {
     });
 
     it('POST /api/token/oauth/token returns 401 for invalid code', async () => {
-      await request(httpServer)
+      // The DTO uses @IsUrl({ require_tld: false }) so localhost URLs work in
+      // dev/test without any test-side URL mutation.
+      const platformApp = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+      const res = await request(httpServer)
         .post('/api/token/oauth/token')
         .send({
-          code: 'bogus-code',
-          client_id: platformAppPublicId,
-          client_secret: 'any',
-          redirect_uri: 'https://app.example.com/callback',
+          code: 'definitely-not-a-real-code',
+          client_id: platformApp.publicId,
+          code_verifier: 'a'.repeat(64),
+          redirect_uri: `${platformApp.url.replace(/\/$/, '')}/cb`,
         })
         .expect(401);
+      expect(res.body.message).toContain('invalid_grant');
+    });
+
+    describe('OAuth PKCE round-trip', () => {
+      function s256(verifier: string): string {
+        return crypto
+          .createHash('sha256')
+          .update(verifier)
+          .digest('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+      }
+
+      it('authorize → token returns a JWT with scope (string)', async () => {
+        // 1. Establish a BetterAuth session via sign-in (super admin from seed).
+        const signInRes = await request(httpServer)
+          .post('/api/auth/sign-in/email')
+          .send({ email: 's@sa.io', password: 'Pass@word1234' });
+        expect([200, 201]).toContain(signInRes.status);
+        const cookies = (signInRes.headers['set-cookie'] as unknown as string[]) || [];
+        const sessionCookie = cookies.find((c) =>
+          c.startsWith('better-auth.session_token='),
+        );
+        expect(sessionCookie).toBeTruthy();
+
+        // 2. Look up the platform app's publicId from the seed.
+        // OauthTokenExchangeDto now uses @IsUrl({ require_tld: false }) so the
+        // seeded http://localhost:3000 URL is accepted as-is for the redirect_uri
+        // origin match — no test-side mutation needed.
+        const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+
+        // 3. Build PKCE pair and call /api/token/oauth/authorize.
+        const verifier = 'a'.repeat(64);
+        const challenge = s256(verifier);
+        const redirectUri = `${app.url.replace(/\/$/, '')}/cb`;
+        const authorizeRes = await request(httpServer)
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: app.publicId,
+            redirect_uri: redirectUri,
+            code_challenge: challenge,
+            code_challenge_method: 'S256',
+            state: 'xyz',
+          })
+          .set('Cookie', sessionCookie!.split(';')[0])
+          .expect(302);
+        const location = authorizeRes.headers.location as string;
+        const code = new URL(location).searchParams.get('code');
+        expect(code).toBeTruthy();
+
+        // 4. Exchange the code.
+        const tokenRes = await request(httpServer)
+          .post('/api/token/oauth/token')
+          .send({
+            code,
+            client_id: app.publicId,
+            code_verifier: verifier,
+            redirect_uri: redirectUri,
+          })
+          .expect(201);
+        expect(tokenRes.body.access_token).toBeTruthy();
+
+        // 5. Verify the JWT carries `scope` (string) and not `permissions`.
+        const decoded = jwt.verify(tokenRes.body.access_token, publicPem, {
+          algorithms: ['RS256'],
+        }) as Record<string, unknown>;
+        expect(typeof decoded.scope).toBe('string');
+        expect('permissions' in decoded).toBe(false);
+
+        // 6. The JWT header `kid` must match the JWKS key — JWKS-based
+        // verifiers (e.g. FastAPI's PyJWKClient) look up the signing key by
+        // this id. If the signer ever drops it or drifts from the JWKS,
+        // every RS call would 401.
+        const completed = jwt.decode(tokenRes.body.access_token, {
+          complete: true,
+        }) as { header: { kid?: string } };
+        const jwksRes = await request(httpServer).get('/api/token/jwks').expect(200);
+        const jwksKid = jwksRes.body.keys[0]?.kid;
+        expect(completed.header.kid).toBeTruthy();
+        expect(jwksKid).toBeTruthy();
+        expect(completed.header.kid).toBe(jwksKid);
+      });
+    });
+
+    describe('OAuth authorize error redirect', () => {
+      // The authorize endpoint is browser-only. On 4xx errors, it must
+      // redirect to the admin's /oauth-error page when ADMIN_URL is set,
+      // and fall back to the historical JSON body when ADMIN_URL is unset.
+      const ORIGINAL_ADMIN_URL = process.env.ADMIN_URL;
+
+      afterEach(() => {
+        if (ORIGINAL_ADMIN_URL === undefined) {
+          delete process.env.ADMIN_URL;
+        } else {
+          process.env.ADMIN_URL = ORIGINAL_ADMIN_URL;
+        }
+      });
+
+      it('redirects to admin /oauth-error with code+app when ADMIN_URL is set and redirect_uri origin mismatches', async () => {
+        process.env.ADMIN_URL = 'http://localhost:3001';
+
+        // Sign in to obtain a BetterAuth session — the authorize endpoint
+        // requires one before it inspects the redirect_uri.
+        const signInRes = await request(httpServer)
+          .post('/api/auth/sign-in/email')
+          .send({ email: 's@sa.io', password: 'Pass@word1234' });
+        expect([200, 201]).toContain(signInRes.status);
+        const cookies = (signInRes.headers['set-cookie'] as unknown as string[]) || [];
+        const sessionCookie = cookies.find((c) => c.startsWith('better-auth.session_token='));
+        expect(sessionCookie).toBeTruthy();
+
+        const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+
+        const res = await request(httpServer)
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: app.publicId,
+            redirect_uri: 'http://evil.example.com/cb', // wrong origin
+            code_challenge: 'x'.repeat(43),
+            code_challenge_method: 'S256',
+            state: 'xyz',
+          })
+          .set('Cookie', sessionCookie!.split(';')[0])
+          .expect(302);
+
+        const location = res.headers.location as string;
+        const url = new URL(location);
+        expect(url.origin + url.pathname).toBe('http://localhost:3001/oauth-error');
+        expect(url.searchParams.get('code')).toBe('invalid_redirect_uri');
+        expect(url.searchParams.get('app')).toBe(app.publicId);
+      });
+
+      it('returns the historical JSON 400 body when ADMIN_URL is unset', async () => {
+        delete process.env.ADMIN_URL;
+
+        const signInRes = await request(httpServer)
+          .post('/api/auth/sign-in/email')
+          .send({ email: 's@sa.io', password: 'Pass@word1234' });
+        const cookies = (signInRes.headers['set-cookie'] as unknown as string[]) || [];
+        const sessionCookie = cookies.find((c) => c.startsWith('better-auth.session_token='));
+
+        const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+
+        const res = await request(httpServer)
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: app.publicId,
+            redirect_uri: 'http://evil.example.com/cb',
+            code_challenge: 'x'.repeat(43),
+            code_challenge_method: 'S256',
+            state: 'xyz',
+          })
+          .set('Cookie', sessionCookie!.split(';')[0])
+          .expect(400);
+
+        expect(res.body.message).toBe('invalid_redirect_uri');
+      });
     });
   });
 
