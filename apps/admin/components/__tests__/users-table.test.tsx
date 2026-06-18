@@ -50,8 +50,14 @@ const mockUsers: User[] = [
 
 const mockOrgs: Org[] = [{ id: 'org1', name: 'Acme Corp', appId: 'app1', isPlatform: true }]
 
+import { TooltipProvider } from '@sassy-auth/ui'
+
 function withIntl(node: React.ReactNode) {
-  return <NextIntlClientProvider locale="en" messages={en}>{node}</NextIntlClientProvider>
+  return (
+    <NextIntlClientProvider locale="en" messages={en}>
+      <TooltipProvider>{node}</TooltipProvider>
+    </NextIntlClientProvider>
+  )
 }
 
 describe('UsersTable', () => {

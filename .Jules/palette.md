@@ -1,0 +1,3 @@
+## 2025-05-15 - [Tooltip Accessibility and Testing]
+**Learning:** Adding Tooltips to icon-only buttons improves accessibility and provides visual cues for users. However, in this application's architecture, adding `Tooltip` components requires a `TooltipProvider` at the root of the component tree. In unit tests, components using tooltips will fail to render unless they are also wrapped in a `TooltipProvider` or the tooltip components are mocked.
+**Action:** Always ensure `TooltipProvider` is present in the application's root layout when using tooltips. Update unit test helpers (like `withIntl`) to include `TooltipProvider` to maintain test suite stability.
