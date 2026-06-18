@@ -147,6 +147,7 @@ model SaRole {
   permissions SaRolePermission[]
   users       SaUserRole[]
 
+  @@unique([appId, name])
   @@index([appId])
 }
 

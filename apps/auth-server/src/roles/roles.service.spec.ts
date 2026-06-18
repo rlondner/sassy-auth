@@ -181,6 +181,69 @@ describe('RolesService', () => {
       (prisma.$transaction as jest.Mock).mockRejectedValueOnce({ code: 'P2002' });
       await expect(makeService().createRole('ba-caller', { name: 'Admin', appId: 'sq_app1' })).rejects.toBeInstanceOf(ConflictException);
     });
+
+    describe('role name uniqueness is scoped per app', () => {
+      // The DB enforces @@unique([appId, name]) on SaRole. These tests stand in
+      // for that constraint at the unit-test layer by replaying what Prisma
+      // would return: P2002 only when (appId, name) collides. Each expected
+      // createRole call must queue one mockImplementationOnce to avoid leaking
+      // into sibling tests.
+      function queueUniqueScopedCreate(seen: Array<{ appId: number; name: string }>) {
+        (prisma.$transaction as jest.Mock).mockImplementationOnce(async (cb: (tx: unknown) => unknown) => {
+          const tx = {
+            saRole: {
+              create: jest.fn().mockImplementation(async ({ data }: { data: { appId: number; name: string } }) => {
+                if (seen.some((r) => r.appId === data.appId && r.name === data.name)) {
+                  throw { code: 'P2002' };
+                }
+                seen.push({ appId: data.appId, name: data.name });
+                return { id: 100 + seen.length, name: data.name, appId: data.appId, publicId: 'placeholder' };
+              }),
+              update: jest.fn().mockImplementation(async ({ data }: { data: { publicId: string } }) => ({
+                id: 100 + seen.length, publicId: data.publicId,
+                name: seen[seen.length - 1].name, appId: seen[seen.length - 1].appId,
+                app: { publicId: 'sq_app_x', name: 'App X' },
+                permissions: [],
+              })),
+            },
+            saRolePermission: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+          };
+          return cb(tx);
+        });
+      }
+
+      it('rejects a second create with the same name under the same app (ConflictException)', async () => {
+        mocks.saApp.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_app1' });
+        mocks.saPermission.findMany.mockResolvedValue([]);
+        const seen: Array<{ appId: number; name: string }> = [];
+        queueUniqueScopedCreate(seen);
+        queueUniqueScopedCreate(seen);
+
+        const svc = makeService();
+        const first = await svc.createRole('ba-caller', { name: 'Editor', appId: 'sq_app1' });
+        expect(first.name).toBe('Editor');
+
+        await expect(svc.createRole('ba-caller', { name: 'Editor', appId: 'sq_app1' }))
+          .rejects.toBeInstanceOf(ConflictException);
+      });
+
+      it('allows the same name in two different apps', async () => {
+        mocks.saApp.findUnique
+          .mockResolvedValueOnce({ id: 1, publicId: 'sq_app1' })
+          .mockResolvedValueOnce({ id: 2, publicId: 'sq_app2' });
+        mocks.saPermission.findMany.mockResolvedValue([]);
+        const seen: Array<{ appId: number; name: string }> = [];
+        queueUniqueScopedCreate(seen);
+        queueUniqueScopedCreate(seen);
+
+        const svc = makeService();
+        const inApp1 = await svc.createRole('ba-caller', { name: 'Editor', appId: 'sq_app1' });
+        const inApp2 = await svc.createRole('ba-caller', { name: 'Editor', appId: 'sq_app2' });
+
+        expect(inApp1.name).toBe('Editor');
+        expect(inApp2.name).toBe('Editor');
+      });
+    });
   });
 
   describe('updateRole', () => {
