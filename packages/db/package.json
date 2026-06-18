@@ -6,6 +6,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch --preserveWatchOutput",
     "db:generate": "dotenv -e ../../.env.local -- prisma generate",
     "db:migrate": "dotenv -e ../../.env.local -- prisma migrate dev",
     "db:push": "dotenv -e ../../.env.local -- prisma db push",

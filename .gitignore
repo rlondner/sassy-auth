@@ -43,3 +43,5 @@ apps/auth-server/.env
 .worktrees/
 
 .gstack/
+/tmp
+.claude/scheduled_tasks.lock
