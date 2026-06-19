@@ -80,7 +80,7 @@ describe('OrgsService', () => {
         }],
         total: 1, page: 1, pageSize: 25,
       });
-      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.orgs.manage', 'org.users.manage']);
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.orgs.manage', 'platform.users.manage', 'org.users.manage']);
     });
 
     it('applies q filter to name (ILIKE)', async () => {
@@ -234,7 +234,7 @@ describe('OrgsService', () => {
         publicId: 'sq_10', name: 'Acme', isPlatform: false, userCount: 3,
         app: { publicId: 'sq_1', name: 'Customer Portal' },
       });
-      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.orgs.manage', 'org.users.manage']);
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.orgs.manage', 'platform.users.manage', 'org.users.manage']);
     });
 
     it('throws NotFoundException when org missing', async () => {

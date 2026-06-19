@@ -31,9 +31,15 @@ import { TokenService } from './token.service';
 import { assertRedirectUriMatchesApp } from './redirect-uri';
 import { buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { LoggerService } from '../common/logger/logger.service';
+import {
+  JWKS_ROUTE,
+  OAUTH_AUTHORIZE_ROUTE,
+  OAUTH_TOKEN_ROUTE,
+  TOKEN_CONTROLLER_PATH,
+} from './oauth-metadata';
 
 @ApiTags('Token')
-@Controller('token')
+@Controller(TOKEN_CONTROLLER_PATH)
 export class TokenController {
   constructor(
     private readonly tokenService: TokenService,
@@ -43,7 +49,7 @@ export class TokenController {
   ) {}
 
   /** GET /api/token/jwks */
-  @Get('jwks')
+  @Get(JWKS_ROUTE)
   getJwks() {
     return this.tokenService.getJwks();
   }
@@ -54,7 +60,7 @@ export class TokenController {
    * Validates the client_id (app), checks the requester has an active
    * BetterAuth session, issues an authorization code, and returns redirect info.
    */
-  @Get('oauth/authorize')
+  @Get(OAUTH_AUTHORIZE_ROUTE)
   @Redirect()
   async oauthAuthorize(
     @Query('client_id') clientId: string,
@@ -155,7 +161,7 @@ export class TokenController {
    *
    * Exchanges an authorization code for a signed RS256 JWT.
    */
-  @Post('oauth/token')
+  @Post(OAUTH_TOKEN_ROUTE)
   async oauthToken(@Body() dto: OauthTokenExchangeDto) {
     let numericId: number;
     try {

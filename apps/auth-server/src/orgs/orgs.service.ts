@@ -42,7 +42,15 @@ export class OrgsService {
   ) {}
 
   async listOrgs(callerBaId: string, q: ListOrgsQueryDto = {}) {
-    await checkPermission(callerBaId, ['platform.orgs.manage', 'org.users.manage']);
+    // platform.users.manage included so the /users admin page can populate
+    // its org-filter dropdown without a cross-page permission grant. Mirrors
+    // the apps.list pattern where sibling-area admins get read access to the
+    // resource they need to *select* against.
+    await checkPermission(callerBaId, [
+      'platform.orgs.manage',
+      'platform.users.manage',
+      'org.users.manage',
+    ]);
     const page = q.page ?? 1;
     const pageSize = q.pageSize ?? 25;
 
@@ -65,7 +73,11 @@ export class OrgsService {
   }
 
   async getOrg(callerBaId: string, publicId: string) {
-    await checkPermission(callerBaId, ['platform.orgs.manage', 'org.users.manage']);
+    await checkPermission(callerBaId, [
+      'platform.orgs.manage',
+      'platform.users.manage',
+      'org.users.manage',
+    ]);
     const org = await prisma.saOrg.findUnique({ where: { publicId }, include: ORG_INCLUDE });
     if (!org) throw new NotFoundException();
     return formatOrg(org);

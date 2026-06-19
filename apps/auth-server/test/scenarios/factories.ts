@@ -8,12 +8,12 @@ import * as crypto from 'crypto';
 import express from 'express';
 import request, { Response as SuperResponse } from 'supertest';
 import { Test } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { toNodeHandler } from 'better-auth/node';
 import { AppModule } from '../../src/app.module';
 import { auth } from '../../src/auth/auth.config';
-import { SentryExceptionFilter } from '../../src/common/filters/sentry-exception.filter';
+import { configureNestApp } from '../../src/configure-nest-app';
 import { LoggerService } from '../../src/common/logger/logger.service';
 
 export const DEMO_PASSWORD = 'Pass@word1234';
@@ -66,9 +66,7 @@ export async function bootScenarioApp() {
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication(new ExpressAdapter(expressApp));
-  app.setGlobalPrefix('api');
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.useGlobalFilters(new SentryExceptionFilter(new LoggerService()));
+  configureNestApp(app, new LoggerService());
   await app.init();
 
   sharedApp = app;

@@ -83,7 +83,7 @@ describe('PermissionsService', () => {
 
       const result = await makeService().listPermissions('ba-caller', { q: 'apps', appId: 'sq_app5', page: 1, pageSize: 25 });
 
-      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.permissions.manage');
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.permissions.manage', 'platform.users.manage']);
       expect(mocks.saPermission.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { appId: 5, name: { contains: 'apps', mode: 'insensitive' } } }),
       );

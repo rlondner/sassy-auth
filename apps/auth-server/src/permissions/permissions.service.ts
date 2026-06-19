@@ -44,7 +44,13 @@ export class PermissionsService {
   ) {}
 
   async listPermissions(callerBaId: string, q: ListPermissionsQueryDto = {}) {
-    await checkPermission(callerBaId, 'platform.permissions.manage');
+    // platform.users.manage included so the /users admin page can populate
+    // the permission picker in the user-access drawer without a cross-page
+    // permission grant.
+    await checkPermission(callerBaId, [
+      'platform.permissions.manage',
+      'platform.users.manage',
+    ]);
     const page = q.page ?? 1;
     const pageSize = q.pageSize ?? 25;
 
@@ -90,7 +96,10 @@ export class PermissionsService {
   }
 
   async getPermission(callerBaId: string, publicId: string) {
-    await checkPermission(callerBaId, 'platform.permissions.manage');
+    await checkPermission(callerBaId, [
+      'platform.permissions.manage',
+      'platform.users.manage',
+    ]);
     const p = await prisma.saPermission.findUnique({ where: { publicId }, include: PERMISSION_DETAIL_INCLUDE });
     if (!p) throw new NotFoundException();
     const row = p as unknown as {

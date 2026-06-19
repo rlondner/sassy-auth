@@ -52,8 +52,8 @@ const GATE: Record<ResourceArea, Partial<Record<Op, readonly string[]>>> = {
     delete: ['platform.apps.manage'],
   },
   orgs: {
-    list:   ['platform.orgs.manage', 'org.users.manage'],
-    get:    ['platform.orgs.manage', 'org.users.manage'],
+    list:   ['platform.orgs.manage', 'platform.users.manage', 'org.users.manage'],
+    get:    ['platform.orgs.manage', 'platform.users.manage', 'org.users.manage'],
     create: ['platform.orgs.manage'],
     update: ['platform.orgs.manage'],
     delete: ['platform.orgs.manage'],
@@ -66,8 +66,8 @@ const GATE: Record<ResourceArea, Partial<Record<Op, readonly string[]>>> = {
     delete: ['platform.roles.manage'],
   },
   permissions: {
-    list:   ['platform.permissions.manage'],
-    get:    ['platform.permissions.manage'],
+    list:   ['platform.permissions.manage', 'platform.users.manage'],
+    get:    ['platform.permissions.manage', 'platform.users.manage'],
     create: ['platform.permissions.manage'],
     update: ['platform.permissions.manage'],
     delete: ['platform.permissions.manage'],
