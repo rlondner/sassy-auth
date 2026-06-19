@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { AdminShell } from '@/components/admin-shell'
+import { getMyPermissions, getMyProfile } from '@/lib/api'
 import { getAvailableLocales, getLocale } from '@/lib/locale'
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
@@ -36,9 +37,16 @@ export default async function AdminLayout({
     email: session.user.email ?? '',
   }
 
+  const [perms, profile] = await Promise.all([
+    getMyPermissions().catch(() => [] as string[]),
+    getMyProfile().catch(() => null),
+  ])
+
   return (
     <AdminShell
       user={user}
+      perms={perms}
+      profile={profile}
       currentLocale={currentLocale}
       availableLocales={availableLocales}
     >
