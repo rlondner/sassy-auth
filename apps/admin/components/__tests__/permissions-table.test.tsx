@@ -38,8 +38,8 @@ const apps: App[] = [
 
 const initial = {
   items: [
-    { publicId: 'sq_p1', name: 'apps.read', app: { publicId: 'sq_a1', name: 'Customer Portal' }, roleCount: 0, userCount: 0 },
-    { publicId: 'sq_p2', name: 'platform.users.manage', app: { publicId: 'sq_a2', name: 'SassyAuth' }, roleCount: 1, userCount: 0 },
+    { publicId: 'sq_p1', name: 'apps.read', app: { publicId: 'sq_a1', name: 'Customer Portal' }, roleCount: 0, userCount: 0, isSystem: false },
+    { publicId: 'sq_p2', name: 'platform.users.manage', app: { publicId: 'sq_a2', name: 'SassyAuth' }, roleCount: 1, userCount: 0, isSystem: true },
   ] satisfies PermissionRow[],
   total: 2, page: 1, pageSize: 25,
 }

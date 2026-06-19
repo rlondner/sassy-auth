@@ -14,6 +14,7 @@ jest.mock('@/app/(admin)/permissions/actions', () => ({
     publicId: 'sq_p1', name: 'apps.read',
     app: { publicId: 'sq_a1', name: 'Portal' },
     roleCount: 2, userCount: 1,
+    isSystem: false,
     roles: [
       { publicId: 'sq_r1', name: 'Editor', appName: 'Portal' },
       { publicId: 'sq_r2', name: 'Viewer', appName: 'Portal' },
@@ -28,6 +29,7 @@ const permission: PermissionRow = {
   publicId: 'sq_p1', name: 'apps.read',
   app: { publicId: 'sq_a1', name: 'Portal' },
   roleCount: 2, userCount: 1,
+  isSystem: false,
 }
 
 describe('PermissionViewDrawer', () => {
