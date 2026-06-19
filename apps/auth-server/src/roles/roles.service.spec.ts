@@ -15,6 +15,7 @@ jest.mock('@sassy-auth/db', () => ({
     saPermission: { findMany: jest.fn() },
     saRolePermission: { count: jest.fn(), groupBy: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn() },
     saUserRole: { count: jest.fn(), groupBy: jest.fn() },
+    saUser: { findUnique: jest.fn() },
     $transaction: jest.fn(async (cb: (tx: unknown) => unknown) => {
       const txStub = {
         saRole: {
@@ -45,8 +46,13 @@ jest.mock('../common/permissions/check-permission', () => ({
   checkPermission: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../common/permissions/check-permission-for-app', () => ({
+  checkPermissionForApp: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { prisma } from '@sassy-auth/db';
 import { checkPermission } from '../common/permissions/check-permission';
+import { checkPermissionForApp } from '../common/permissions/check-permission-for-app';
 
 const mocks = prisma as unknown as {
   saRole: Record<string, jest.Mock>;
@@ -54,6 +60,7 @@ const mocks = prisma as unknown as {
   saPermission: Record<string, jest.Mock>;
   saRolePermission: Record<string, jest.Mock>;
   saUserRole: Record<string, jest.Mock>;
+  saUser: Record<string, jest.Mock>;
 };
 
 function makeService() {
@@ -68,6 +75,7 @@ describe('RolesService', () => {
 
   describe('listRoles', () => {
     it('uses default empty-object for q when called with no second arg', async () => {
+      mocks.saUser.findUnique.mockResolvedValue({ org: { appId: 7 } });
       mocks.saRole.findMany.mockResolvedValue([]);
       mocks.saRole.count.mockResolvedValue(0);
       const result = await makeService().listRoles('ba-caller');
@@ -77,6 +85,7 @@ describe('RolesService', () => {
     });
 
     it('returns empty permGroups/userGroups when there are no roles', async () => {
+      mocks.saUser.findUnique.mockResolvedValue({ org: { appId: 7 } });
       mocks.saRole.findMany.mockResolvedValue([]);
       mocks.saRole.count.mockResolvedValue(0);
       const result = await makeService().listRoles('ba-caller', {});
@@ -85,6 +94,7 @@ describe('RolesService', () => {
     });
 
     it('returns rows with permissionCount/userCount and respects q + appId filters', async () => {
+      mocks.saUser.findUnique.mockResolvedValue({ org: { appId: 7 } });
       mocks.saApp.findUnique.mockResolvedValue({ id: 5, publicId: 'sq_app5' });
       mocks.saRole.findMany.mockResolvedValue([
         { id: 1, publicId: 'sq_r1', name: 'Editor', app: { publicId: 'sq_app5', name: 'Portal' } },
@@ -96,7 +106,11 @@ describe('RolesService', () => {
 
       const result = await makeService().listRoles('ba-caller', { q: 'Ed', appId: 'sq_app5', page: 1, pageSize: 25 });
 
-      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.permissions.manage', 'org.permissions.manage']);
+      expect(checkPermissionForApp).toHaveBeenCalledWith(
+        'ba-caller',
+        ['platform.roles.manage', 'org.roles.manage'],
+        { targetAppId: 5, callerAppId: 7 },
+      );
       expect(mocks.saRole.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { appId: 5, name: { contains: 'Ed', mode: 'insensitive' } } }),
       );
@@ -107,26 +121,62 @@ describe('RolesService', () => {
       expect(result.total).toBe(2);
     });
 
+    it('passes targetAppId: -1 when q.appId is not provided (forces cross-app to require platform.roles.manage)', async () => {
+      mocks.saUser.findUnique.mockResolvedValue({ org: { appId: 7 } });
+      mocks.saRole.findMany.mockResolvedValue([]);
+      mocks.saRole.count.mockResolvedValue(0);
+
+      await makeService().listRoles('ba-caller', {});
+
+      expect(checkPermissionForApp).toHaveBeenCalledWith(
+        'ba-caller',
+        ['platform.roles.manage', 'org.roles.manage'],
+        { targetAppId: -1, callerAppId: 7 },
+      );
+    });
+
+    it('resolves the app id when q.appId is provided and forwards targetAppId + callerAppId', async () => {
+      mocks.saUser.findUnique.mockResolvedValue({ org: { appId: 7 } });
+      mocks.saApp.findUnique.mockResolvedValue({ id: 11, publicId: 'sq_app11' });
+      mocks.saRole.findMany.mockResolvedValue([]);
+      mocks.saRole.count.mockResolvedValue(0);
+
+      await makeService().listRoles('ba-caller', { appId: 'sq_app11' });
+
+      expect(checkPermissionForApp).toHaveBeenCalledWith(
+        'ba-caller',
+        ['platform.roles.manage', 'org.roles.manage'],
+        { targetAppId: 11, callerAppId: 7 },
+      );
+    });
+
     it('throws NotFound when appId filter does not match an app', async () => {
+      mocks.saUser.findUnique.mockResolvedValue({ org: { appId: 7 } });
       mocks.saApp.findUnique.mockResolvedValue(null);
       await expect(makeService().listRoles('ba-caller', { appId: 'bogus' })).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('getRole', () => {
-    it('returns the row with permissions list + userCount', async () => {
+    it('returns the row with permissions list + userCount and gates via checkPermissionForApp', async () => {
       mocks.saRole.findUnique.mockResolvedValue({
-        id: 7, publicId: 'sq_r7', name: 'Editor',
+        id: 7, appId: 5, publicId: 'sq_r7', name: 'Editor',
         app: { publicId: 'sq_app1', name: 'Portal' },
         permissions: [
           { permission: { publicId: 'sq_p1', name: 'apps.read' } },
           { permission: { publicId: 'sq_p2', name: 'apps.write' } },
         ],
       });
+      mocks.saUser.findUnique.mockResolvedValue({ org: { appId: 5 } });
       mocks.saUserRole.count.mockResolvedValue(3);
 
       const result = await makeService().getRole('ba-caller', 'sq_r7');
 
+      expect(checkPermissionForApp).toHaveBeenCalledWith(
+        'ba-caller',
+        ['platform.roles.manage', 'org.roles.manage'],
+        { targetAppId: 5, callerAppId: 5 },
+      );
       expect(result.publicId).toBe('sq_r7');
       expect(result.userCount).toBe(3);
       expect(result.permissionCount).toBe(2);
@@ -170,6 +220,7 @@ describe('RolesService', () => {
       mocks.saApp.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_app1' });
       mocks.saPermission.findMany.mockResolvedValue([]);
       const result = await makeService().createRole('ba-caller', { name: 'Admin', appId: 'sq_app1' });
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.roles.manage');
       expect(result.publicId).toBe('sq_42');
       expect(result.name).toBe('Admin');
       expect(result.userCount).toBe(0);
@@ -271,6 +322,7 @@ describe('RolesService', () => {
       mocks.saPermission.findMany.mockResolvedValue([{ id: 10, publicId: 'sq_p1', appId: 1 }]);
       mocks.saUserRole.count.mockResolvedValue(0);
       const result = await makeService().updateRole('ba-caller', 'sq_r1', { name: 'Editor v2', permissionIds: ['sq_p1'] });
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.roles.manage');
       expect(result.publicId).toBe('sq_r1');
       // The default txStub.saRole.findUnique returns one permission, ensuring map callback is exercised
       expect(result.permissions).toEqual([{ publicId: 'sq_p1', name: 'apps.read' }]);
@@ -349,6 +401,7 @@ describe('RolesService', () => {
     it('happy path deletes', async () => {
       mocks.saRole.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_r1', name: 'Editor' });
       await expect(makeService().deleteRole('ba-caller', 'sq_r1')).resolves.toBeUndefined();
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.roles.manage');
     });
 
     it('throws NotFound when the role does not exist', async () => {
