@@ -4,6 +4,7 @@
  */
 import 'dotenv/config';
 import * as crypto from 'crypto';
+import * as path from 'path';
 import express from 'express';
 import request, { Response as SuperResponse } from 'supertest';
 import { Test } from '@nestjs/testing';
@@ -46,10 +47,10 @@ export async function bootApp() {
   // Migrations + seed only on first boot per process.
   if (!process.env.MATRIX_DB_READY) {
     const { execSync } = await import('child_process');
-    execSync(
-      'npx prisma migrate deploy --schema=../../packages/db/schema.prisma',
-      { stdio: 'inherit' },
-    );
+    const dbRoot = path.resolve(__dirname, '../../../../packages/db');
+    const prismaBin = path.join(dbRoot, 'node_modules/.bin/prisma');
+    const schemaPath = path.join(dbRoot, 'schema.prisma');
+    execSync(`${prismaBin} migrate deploy --schema=${schemaPath}`, { stdio: 'inherit' });
     execSync('pnpm seed', { stdio: 'inherit', cwd: process.cwd() });
     process.env.MATRIX_DB_READY = '1';
   }

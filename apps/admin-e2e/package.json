@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "test:e2e": "playwright test",
+    "test:e2e": "mkdir -p ../../test-results && playwright test 2>&1 | tee ../../test-results/admin-e2e-$(date +%Y%m%d-%H%M%S).txt",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",

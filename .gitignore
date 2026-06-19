@@ -3,6 +3,7 @@
 **/server-stopped
 
 logs/
+test-results/
 .mcp.json
 
 # Build outputs
