@@ -17,9 +17,14 @@ import { RoleEditDrawer } from './role-edit-drawer'
 import { DeleteAlertDialog } from './delete-alert-dialog'
 import { PageHeader } from './page-header'
 
-interface Props { initial: ListRolesResponse; apps: App[] }
+interface Props {
+  initial: ListRolesResponse
+  apps: App[]
+  canWrite?: boolean
+  canPickApp?: boolean
+}
 
-export function RolesTable({ initial, apps }: Props) {
+export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }: Props) {
   const t = useTranslations()
   const [data, setData] = React.useState(initial)
   const [query, setQuery] = React.useState('')
@@ -124,22 +129,26 @@ export function RolesTable({ initial, apps }: Props) {
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(r); setViewOpen(true) }}>
                 {t('roles.actions.view')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(r); setEditOpen(true) }}>
-                {t('roles.actions.edit')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (inUse) return
-                  setSelected(r); setDeleteError(null); setDeleteOpen(true)
-                }}
-                title={inUse ? t('roles.drawer.inUseTooltip', { userCount: r.userCount }) : undefined}
-                data-disabled={inUse ? '' : undefined}
-              >
-                {t('roles.actions.delete')}
-              </DropdownMenuItem>
+              {canWrite && (
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(r); setEditOpen(true) }}>
+                  {t('roles.actions.edit')}
+                </DropdownMenuItem>
+              )}
+              {canWrite && <DropdownMenuSeparator />}
+              {canWrite && (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (inUse) return
+                    setSelected(r); setDeleteError(null); setDeleteOpen(true)
+                  }}
+                  title={inUse ? t('roles.drawer.inUseTooltip', { userCount: r.userCount }) : undefined}
+                  data-disabled={inUse ? '' : undefined}
+                >
+                  {t('roles.actions.delete')}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )
@@ -171,20 +180,22 @@ export function RolesTable({ initial, apps }: Props) {
         ]}
         actions={
           <>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="sr-only">{t('roles.filter.appLabel')}</span>
-              <select
-                aria-label={t('roles.filter.appLabel')}
-                value={appFilter}
-                onChange={(e) => { setAppFilter(e.target.value); setPage(1) }}
-                className="h-9 rounded-md border border-input bg-card px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">{t('roles.filter.allApps')}</option>
-                {apps.map((a) => (
-                  <option key={a.publicId} value={a.publicId}>{a.name}</option>
-                ))}
-              </select>
-            </label>
+            {canPickApp && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="sr-only">{t('roles.filter.appLabel')}</span>
+                <select
+                  aria-label={t('roles.filter.appLabel')}
+                  value={appFilter}
+                  onChange={(e) => { setAppFilter(e.target.value); setPage(1) }}
+                  className="h-9 rounded-md border border-input bg-card px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">{t('roles.filter.allApps')}</option>
+                  {apps.map((a) => (
+                    <option key={a.publicId} value={a.publicId}>{a.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -195,12 +206,14 @@ export function RolesTable({ initial, apps }: Props) {
                 className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <ButtonGroup>
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
-                <Plus className="h-4 w-4" />
-                {t('roles.create')}
-              </Button>
-            </ButtonGroup>
+            {canWrite && (
+              <ButtonGroup>
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  {t('roles.create')}
+                </Button>
+              </ButtonGroup>
+            )}
           </>
         }
       />
@@ -234,7 +247,7 @@ export function RolesTable({ initial, apps }: Props) {
           onOpenChange={setEditOpen}
         />
       )}
-      <RoleCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} />
+      {canWrite && <RoleCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} />}
       {selected && (
         <DeleteAlertDialog
           open={deleteOpen}

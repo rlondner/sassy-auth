@@ -13,6 +13,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { resolveRoleIdsForApp, resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
+import { assertCallerCanGrantSystemPerms } from '../common/permissions/assert-caller-can-grant-system-perms';
 import { LoggerService } from '../common/logger/logger.service';
 
 const USER_INCLUDE = {
@@ -152,6 +153,39 @@ export class UsersService {
       callerBaId,
       ['platform.users.manage', 'org.users.manage'],
       { targetOrgId: org.id },
+    );
+
+    // Escalation guard for initial direct perms.
+    const initialPerms = (dto.directPermissionIds ?? []).length === 0
+      ? []
+      : await prisma.saPermission.findMany({
+          where: { publicId: { in: dto.directPermissionIds ?? [] } },
+          select: { name: true, isSystem: true },
+        });
+    const directSystemPermNames = initialPerms
+      .filter((p) => p.isSystem)
+      .map((p) => p.name);
+
+    // Escalation guard for initial roles.
+    const initialRoles = (dto.roleIds ?? []).length === 0
+      ? []
+      : await prisma.saRole.findMany({
+          where: { publicId: { in: dto.roleIds ?? [] } },
+          select: {
+            permissions: {
+              select: { permission: { select: { name: true, isSystem: true } } },
+            },
+          },
+        });
+    const roleSystemPermNames = Array.from(new Set(
+      initialRoles.flatMap((r) =>
+        r.permissions.filter((rp) => rp.permission.isSystem).map((rp) => rp.permission.name),
+      ),
+    ));
+
+    await assertCallerCanGrantSystemPerms(
+      callerBaId,
+      Array.from(new Set([...directSystemPermNames, ...roleSystemPermNames])),
     );
 
     // Resolve + app-scope-validate role/permission ids BEFORE entering the
@@ -297,8 +331,18 @@ export class UsersService {
       { targetOrgId: user.orgId },
     );
 
-    const role = await prisma.saRole.findUnique({ where: { publicId: dto.roleId } });
+    const role = await prisma.saRole.findUnique({
+      where: { publicId: dto.roleId },
+      include: {
+        permissions: { include: { permission: { select: { name: true, isSystem: true } } } },
+      },
+    });
     if (!role) throw new NotFoundException('Role not found');
+
+    const systemPermNames = role.permissions
+      .filter((rp) => rp.permission.isSystem)
+      .map((rp) => rp.permission.name);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
 
     try {
       await prisma.saUserRole.create({ data: { userId: user.id, roleId: role.id } });
@@ -360,6 +404,25 @@ export class UsersService {
 
     const org = await prisma.saOrg.findUnique({ where: { id: user.orgId } });
     if (!org) throw new NotFoundException('User org not found');
+
+    // Apply escalation guard: collect every isSystem perm in every role
+    // about to be assigned, then assert the caller can grant them.
+    const rolesWithPerms = roleIds.length === 0
+      ? []
+      : await prisma.saRole.findMany({
+          where: { publicId: { in: roleIds } },
+          select: {
+            permissions: {
+              select: { permission: { select: { name: true, isSystem: true } } },
+            },
+          },
+        });
+    const systemPermNames = Array.from(new Set(
+      rolesWithPerms.flatMap((r) =>
+        r.permissions.filter((rp) => rp.permission.isSystem).map((rp) => rp.permission.name),
+      ),
+    ));
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
 
     const numericIds = await resolveRoleIdsForApp(org.appId, roleIds);
 
@@ -427,6 +490,19 @@ export class UsersService {
 
     const org = await prisma.saOrg.findUnique({ where: { id: user.orgId } });
     if (!org) throw new NotFoundException('User org not found');
+
+    // Load the permissions about to be granted so we can filter the
+    // system ones and apply the escalation guard before resolution.
+    const requestedPerms = permissionIds.length === 0
+      ? []
+      : await prisma.saPermission.findMany({
+          where: { publicId: { in: permissionIds } },
+          select: { name: true, isSystem: true },
+        });
+    const systemPermNames = requestedPerms
+      .filter((p) => p.isSystem)
+      .map((p) => p.name);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
 
     const numericIds = await resolvePermissionIdsForApp(org.appId, permissionIds);
 

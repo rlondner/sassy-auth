@@ -28,6 +28,13 @@ export interface Permission {
   id: string
   name: string
   appId: string
+  isSystem?: boolean
+}
+
+export interface MeProfile {
+  userId: string
+  org: { id: string; name: string; isPlatform: boolean }
+  app: { id: string; name: string; isPlatform: boolean }
 }
 
 export interface CreateUserPayload {
@@ -119,6 +126,7 @@ export interface PermissionRow {
   app: { publicId: string; name: string }
   roleCount: number
   userCount: number
+  isSystem: boolean
 }
 
 export interface PermissionDetail extends PermissionRow {

@@ -12,9 +12,10 @@ const PLATFORM_PERMISSIONS = [
   'platform.orgs.manage',
   'platform.apps.manage',
   'platform.users.manage',
+  'platform.roles.manage',
   'platform.permissions.manage',
   'org.users.manage',
-  'org.permissions.manage',
+  'org.roles.manage',
 ] as const;
 
 const ADMIN_PASSWORD = 'Pass@word1234';
@@ -32,6 +33,7 @@ const PLATFORM_ADMINS: ReadonlyArray<{
   { email: 'u@sa.io', firstName: 'Users', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.users.manage' } },
   { email: 'o@sa.io', firstName: 'Orgs',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.orgs.manage' } },
   { email: 'a@sa.io', firstName: 'Apps',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.apps.manage' } },
+  { email: 'r@sa.io', firstName: 'Roles', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.roles.manage' } },
   { email: 'p@sa.io', firstName: 'Perms', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.permissions.manage' } },
   { email: 's@sa.io', firstName: 'Super', lastName: 'Admin', grant: { kind: 'role',   role: 'Platform Super Admin' } },
 ];
@@ -188,18 +190,32 @@ async function main() {
     console.log(`Platform org already exists: publicId=${platformOrg.publicId}`);
   }
 
-  // 3. Platform permissions (immutable — create if absent, never update)
+  // 3. Platform permissions (immutable — create if absent, never rename)
   for (const name of PLATFORM_PERMISSIONS) {
+    const isSystem = name.startsWith('org.');
     const existing = await prisma.saPermission.findUnique({ where: { name } });
     if (!existing) {
       await prisma.$transaction(async (tx) => {
         const c = await tx.saPermission.create({
-          data: { publicId: 'placeholder', name, appId: platformApp!.id },
+          data: { publicId: 'placeholder', name, appId: platformApp!.id, isSystem },
         });
         const publicId = sqids.encode([c.id]);
         return tx.saPermission.update({ where: { id: c.id }, data: { publicId } });
       });
-      console.log(`Created permission: ${name}`);
+      console.log(`Created permission: ${name} (isSystem=${isSystem})`);
+    } else if (existing.isSystem !== isSystem) {
+      await prisma.saPermission.update({
+        where: { id: existing.id },
+        data: { isSystem },
+      });
+      console.log(`Updated permission ${name}: isSystem=${isSystem}`);
+    } else if (existing.publicId.startsWith('pending-')) {
+      const publicId = sqids.encode([existing.id]);
+      await prisma.saPermission.update({
+        where: { id: existing.id },
+        data: { publicId },
+      });
+      console.log(`Backfilled placeholder publicId for ${name}: ${publicId}`);
     }
   }
 
@@ -214,6 +230,11 @@ async function main() {
   if (process.env.SEED_DEMO === '1') {
     const { seedDemoResourceServer } = await import('./demo-resource-server');
     await seedDemoResourceServer();
+  }
+
+  if (process.env.SEED_DEMO_MULTITENANT === '1') {
+    const { seedDemoMultitenant } = await import('./demo-multitenant');
+    await seedDemoMultitenant();
   }
 
   console.log('Seed complete.');

@@ -1,7 +1,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
+import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, MeProfile, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -212,6 +212,11 @@ export async function getMyPermissions(): Promise<string[]> {
   const res = await apiFetch('/api/me/permissions');
   const body: { permissions: string[] } = await res.json();
   return body.permissions;
+}
+
+export async function getMyProfile(): Promise<MeProfile> {
+  const res = await apiFetch('/api/me');
+  return res.json();
 }
 
 export async function getPermissions(params: ListPermissionsParams = {}): Promise<ListPermissionsResponse> {

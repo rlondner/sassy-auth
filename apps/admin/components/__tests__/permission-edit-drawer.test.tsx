@@ -7,13 +7,14 @@ jest.mock('next-intl', () => ({
 }))
 
 jest.mock('@/app/(admin)/permissions/actions', () => ({
-  updatePermissionAction: jest.fn().mockResolvedValue({ permission: { publicId: 'sq_p1', name: 'apps.list', app: { publicId: 'sq_a1', name: 'Portal' }, roleCount: 0, userCount: 0 } }),
+  updatePermissionAction: jest.fn().mockResolvedValue({ permission: { publicId: 'sq_p1', name: 'apps.list', app: { publicId: 'sq_a1', name: 'Portal' }, roleCount: 0, userCount: 0, isSystem: false } }),
 }))
 
 const permission: PermissionRow = {
   publicId: 'sq_p1', name: 'apps.read',
   app: { publicId: 'sq_a1', name: 'Portal' },
   roleCount: 0, userCount: 0,
+  isSystem: false,
 }
 
 describe('PermissionEditDrawer', () => {

@@ -77,9 +77,9 @@ export class PermissionsService {
 
     return {
       items: rows.map((r) => {
-        const row = r as { id: number; publicId: string; name: string; app: { publicId: string; name: string } };
+        const row = r as { id: number; publicId: string; name: string; isSystem: boolean; app: { publicId: string; name: string } };
         return {
-          publicId: row.publicId, name: row.name,
+          publicId: row.publicId, name: row.name, isSystem: row.isSystem,
           app: { publicId: row.app.publicId, name: row.app.name },
           roleCount: roleMap.get(row.id) ?? 0,
           userCount: userMap.get(row.id) ?? 0,
@@ -94,7 +94,7 @@ export class PermissionsService {
     const p = await prisma.saPermission.findUnique({ where: { publicId }, include: PERMISSION_DETAIL_INCLUDE });
     if (!p) throw new NotFoundException();
     const row = p as unknown as {
-      id: number; publicId: string; name: string;
+      id: number; publicId: string; name: string; isSystem: boolean;
       app: { publicId: string; name: string };
       roles: Array<{ role: { publicId: string; name: string; app: { name: string } } }>;
       users: Array<{ user: { publicId: string; firstName: string; lastName: string; betterAuthUser: { email: string } } }>;
@@ -104,7 +104,7 @@ export class PermissionsService {
       prisma.saUserPermission.count({ where: { permissionId: row.id } }),
     ]);
     return {
-      publicId: row.publicId, name: row.name,
+      publicId: row.publicId, name: row.name, isSystem: row.isSystem,
       app: { publicId: row.app.publicId, name: row.app.name },
       roleCount, userCount,
       roles: row.roles.map((rp) => ({ publicId: rp.role.publicId, name: rp.role.name, appName: rp.role.app.name })),
@@ -134,9 +134,9 @@ export class PermissionsService {
         });
       });
       this.logger.getWinstonLogger().info('Permission created', { context: 'PermissionsService', permissionId: created.publicId });
-      const row = created as unknown as { publicId: string; name: string; app: { publicId: string; name: string } };
+      const row = created as unknown as { publicId: string; name: string; isSystem?: boolean; app: { publicId: string; name: string } };
       return {
-        publicId: row.publicId, name: row.name,
+        publicId: row.publicId, name: row.name, isSystem: row.isSystem ?? false,
         app: { publicId: row.app.publicId, name: row.app.name },
         roleCount: 0, userCount: 0,
       };
@@ -153,7 +153,7 @@ export class PermissionsService {
     }
     const existing = await prisma.saPermission.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
-    if (isPlatform(existing.name)) {
+    if (isPlatform(existing.name) || existing.isSystem) {
       throw new ForbiddenException('Platform-system permissions cannot be modified');
     }
     try {
@@ -161,13 +161,13 @@ export class PermissionsService {
         where: { publicId }, data: { name: dto.name }, include: PERMISSION_INCLUDE,
       });
       this.logger.getWinstonLogger().info('Permission updated', { context: 'PermissionsService', permissionId: publicId });
-      const row = updated as unknown as { id: number; publicId: string; name: string; app: { publicId: string; name: string } };
+      const row = updated as unknown as { id: number; publicId: string; name: string; isSystem: boolean; app: { publicId: string; name: string } };
       const [roleCount, userCount] = await Promise.all([
         prisma.saRolePermission.count({ where: { permissionId: row.id } }),
         prisma.saUserPermission.count({ where: { permissionId: row.id } }),
       ]);
       return {
-        publicId: row.publicId, name: row.name,
+        publicId: row.publicId, name: row.name, isSystem: row.isSystem,
         app: { publicId: row.app.publicId, name: row.app.name },
         roleCount, userCount,
       };
@@ -181,7 +181,7 @@ export class PermissionsService {
     await checkPermission(callerBaId, 'platform.permissions.manage');
     const existing = await prisma.saPermission.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
-    if (isPlatform(existing.name)) {
+    if (isPlatform(existing.name) || existing.isSystem) {
       throw new ForbiddenException('Platform-system permissions cannot be modified');
     }
     try {
