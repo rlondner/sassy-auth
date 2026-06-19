@@ -19,11 +19,13 @@ interface UsersTableProps {
   users: User[]
   orgs: Org[]
   initialOrgId?: string
+  canPickOrg?: boolean
 }
 
-export function UsersTable({ users, orgs, initialOrgId }: UsersTableProps) {
+export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: UsersTableProps) {
   const t = useTranslations()
   void initialOrgId
+  void canPickOrg
   const [globalFilter, setGlobalFilter] = React.useState('')
   const [selectedUser, setSelectedUser] = React.useState<User | null>(null)
   const [viewOpen, setViewOpen] = React.useState(false)
