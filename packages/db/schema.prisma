@@ -131,6 +131,7 @@ model SaPermission {
   publicId String             @unique
   name     String             @unique
   appId    Int
+  isSystem Boolean            @default(false)
   app      SaApp              @relation(fields: [appId], references: [id])
   roles    SaRolePermission[]
   users    SaUserPermission[]
