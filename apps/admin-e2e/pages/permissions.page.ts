@@ -9,7 +9,9 @@ export class PermissionsPage {
 
   constructor(page: Page) {
     this.page = page
-    this.heading = page.getByRole('heading', { name: new RegExp(`^${escapeRe(t('permissions.title'))}\\b`) })
+    // PageHeader renders the title inside <BreadcrumbPage> (role="link",
+    // aria-current="page"), not as a heading element. Match that marker.
+    this.heading = page.locator('[aria-current="page"]').filter({ hasText: t('permissions.title') })
     this.createButton = page.getByRole('button', { name: t('permissions.create') })
     this.accessDenied = page.getByTestId('access-denied-panel')
   }
@@ -24,25 +26,33 @@ export class PermissionsPage {
 
   async createPermission({ name, appName }: { name: string; appName: string }) {
     await this.createButton.click()
-    await this.page.getByLabel(t('permissions.fields.name')).fill(name)
-    await this.page.getByLabel(t('permissions.fields.app')).click()
+    const drawer = this.page.getByRole('dialog')
+    await drawer.getByLabel(t('permissions.fields.name')).fill(name)
+    await drawer.getByLabel(t('permissions.fields.app')).click()
     await this.page.getByRole('option', { name: appName }).click()
-    await this.page.getByRole('button', { name: t('common.save') }).click()
+    await drawer.getByRole('button', { name: t('permissions.drawer.createTitle') }).click()
     await raceSuccessOrError(this.page, t('permissions.toast.created'))
   }
 
   async editPermission(name: string, patch: { name?: string }) {
-    await this.rowByName(name).getByRole('button', { name: t('common.edit') }).click()
+    // Row actions are inside a DropdownMenu triggered by the "more actions" button.
+    await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
+    await this.page.getByRole('menuitem', { name: t('permissions.actions.edit') }).click()
+    const drawer = this.page.getByRole('dialog')
     if (patch.name !== undefined) {
-      await this.page.getByLabel(t('permissions.fields.name')).fill(patch.name)
+      await drawer.getByLabel(t('permissions.fields.name')).fill(patch.name)
     }
-    await this.page.getByRole('button', { name: t('common.save') }).click()
+    await drawer.getByRole('button', { name: t('permissions.drawer.save') }).click()
     await raceSuccessOrError(this.page, t('permissions.toast.updated'))
   }
 
   async deletePermission(name: string) {
-    await this.rowByName(name).getByRole('button', { name: t('common.delete') }).click()
-    await this.page.getByRole('button', { name: t('common.confirm') }).click()
+    await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
+    await this.page.getByRole('menuitem', { name: t('permissions.actions.delete') }).click()
+    await this.page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: t('permissions.confirmDelete.button') })
+      .click()
     await raceSuccessOrError(this.page, t('permissions.toast.deleted'))
   }
 }

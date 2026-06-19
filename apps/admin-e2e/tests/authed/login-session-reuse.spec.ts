@@ -28,6 +28,14 @@ test.describe('/login session reuse (super-admin authed)', () => {
     )
 
     const loginUrl = `${ADMIN_URL}/login?next=${encodeURIComponent(authorizeUrl)}`
+
+    // Stub the redirect_uri origin so the test doesn't depend on platformApp.url
+    // being a DNS-resolvable host. The auth-server's 302 still lands the browser
+    // on this URL — we just short-circuit the final fetch so page.url() is observable.
+    await page.route(`${new URL(redirectUri).origin}/**`, (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '' }),
+    )
+
     await page.goto(loginUrl)
 
     const finalUrl = new URL(page.url())

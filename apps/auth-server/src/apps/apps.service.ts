@@ -24,7 +24,14 @@ export class AppsService {
   ) {}
 
   async listApps(callerBaId: string, q: ListAppsQueryDto) {
-    await checkPermission(callerBaId, 'platform.apps.manage');
+    // Orgs, permissions and roles are scoped per-app, so those admin pages need
+    // to read the apps list to drive their App filter dropdown.
+    await checkPermission(callerBaId, [
+      'platform.apps.manage',
+      'platform.orgs.manage',
+      'platform.permissions.manage',
+      'platform.roles.manage',
+    ]);
     const page = q.page ?? 1;
     const pageSize = q.pageSize ?? 25;
     const where = q.q

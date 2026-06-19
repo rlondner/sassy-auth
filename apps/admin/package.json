@@ -6,7 +6,7 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start --port 3001",
-    "test": "jest"
+    "test": "node ../../scripts/log-test.mjs admin jest"
   },
   "dependencies": {
     "@sassy-auth/ui": "workspace:*",

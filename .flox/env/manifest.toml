@@ -29,9 +29,9 @@ uv.pkg-path = "uv"
 ## -------------------------------------------------------------------
 [vars]
 PGHOST = "localhost"
-PGPORT = "5433"
+PGPORT = "5432"
 PGUSER = "postgres"
-PGDATABASE = "sassyauth"
+PGDATABASE = "sassyauth_0.1"
 BETTER_AUTH_URL = "http://localhost:3000"
 ADMIN_URL = "http://localhost:3001"
 AUTH_SERVER_URL = "http://localhost:3000"

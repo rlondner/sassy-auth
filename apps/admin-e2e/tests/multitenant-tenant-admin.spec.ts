@@ -43,11 +43,12 @@ test.describe('Tenant admin (acme-admin) sees only their own scope', () => {
     await expect(sidebar.getByRole('link', { name: /^permissions$/i })).toHaveCount(0)
 
     // Users list scope — all three Acme rows must be present, and zero
-    // Globex rows. The users-table renders the email in a <p> inside each
-    // row, so getByText matches the rendered cell content.
-    await expect(page.getByText(DEMO_TENANT_USERS.acmeAdmin.email)).toBeVisible()
-    await expect(page.getByText(DEMO_TENANT_USERS.acmeAlice.email)).toBeVisible()
-    await expect(page.getByText(DEMO_TENANT_USERS.acmeBob.email)).toBeVisible()
-    await expect(page.getByText(/globex-/)).toHaveCount(0)
+    // Globex rows. Scope to the table because the sidebar user card also
+    // renders the signed-in user's email, which would trip strict mode.
+    const usersTable = page.getByRole('table')
+    await expect(usersTable.getByText(DEMO_TENANT_USERS.acmeAdmin.email)).toBeVisible()
+    await expect(usersTable.getByText(DEMO_TENANT_USERS.acmeAlice.email)).toBeVisible()
+    await expect(usersTable.getByText(DEMO_TENANT_USERS.acmeBob.email)).toBeVisible()
+    await expect(usersTable.getByText(/globex-/)).toHaveCount(0)
   })
 })

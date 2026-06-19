@@ -61,7 +61,12 @@ describe('AppsService', () => {
       items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false }],
       total: 1, page: 1, pageSize: 25,
     });
-    expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.apps.manage');
+    expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
+      'platform.apps.manage',
+      'platform.orgs.manage',
+      'platform.permissions.manage',
+      'platform.roles.manage',
+    ]);
   });
 
   it('listApps applies q filter to name and url (ILIKE)', async () => {

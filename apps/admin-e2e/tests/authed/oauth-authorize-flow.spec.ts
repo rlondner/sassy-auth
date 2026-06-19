@@ -129,10 +129,15 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     const { challenge } = newPkce()
 
     // redirect_uri shares the platform app's origin so the redirect-uri
-    // origin check passes. The /cb path does not exist on the auth-server
-    // and yields a 404 page, but that's fine — we only need to inspect
-    // the URL the browser landed on after following the 302.
+    // origin check passes. We stub the redirect_uri origin so the test
+    // doesn't depend on platformApp.url being a DNS-resolvable host — the
+    // browser still ends on this URL after the 302, we just short-circuit
+    // the final fetch so page.url() is observable.
     const redirectUri = `${platformApp.url.replace(/\/$/, '')}/cb`
+
+    await page.route(`${new URL(redirectUri).origin}/**`, (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '' }),
+    )
 
     await page.goto(
       buildAuthorizeUrl({

@@ -9,7 +9,9 @@ export class AppsPage {
 
   constructor(page: Page) {
     this.page = page
-    this.heading = page.getByRole('heading', { name: new RegExp(`^${escapeRe(t('apps.title'))}\\b`) })
+    // PageHeader renders the title inside <BreadcrumbPage> (role="link",
+    // aria-current="page"), not as a heading element. Match that marker.
+    this.heading = page.locator('[aria-current="page"]').filter({ hasText: t('apps.title') })
     // The create button label is defined per UI convention via i18n key apps.create.
     this.createButton = page.getByRole('button', { name: t('apps.create') })
     this.accessDenied = page.getByTestId('access-denied-panel')
@@ -25,29 +27,37 @@ export class AppsPage {
 
   async createApp({ name, url }: { name: string; url: string }) {
     await this.createButton.click()
-    await this.page.getByLabel(t('apps.fields.name')).fill(name)
-    await this.page.getByLabel(t('apps.fields.url')).fill(url)
-    await this.page.getByRole('button', { name: t('common.save') }).click()
-    // Race: success-toast OR visible error.
+    // Scope to the drawer — the drawer's submit button label collides with
+    // the page-level "Create New App" CTA (apps.create === apps.drawer.createTitle).
+    const drawer = this.page.getByRole('dialog')
+    await drawer.getByLabel(t('apps.fields.name')).fill(name)
+    await drawer.getByLabel(t('apps.fields.url')).fill(url)
+    await drawer.getByRole('button', { name: t('apps.drawer.createTitle') }).click()
     await raceSuccessOrError(this.page, t('apps.toast.created'))
   }
 
   async editApp(name: string, patch: { name?: string; url?: string }) {
-    await this.rowByName(name).getByRole('button', { name: t('common.edit') }).click()
+    // Row actions are inside a DropdownMenu triggered by the "more actions" button.
+    await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
+    await this.page.getByRole('menuitem', { name: t('apps.actions.edit') }).click()
+    const drawer = this.page.getByRole('dialog')
     if (patch.name !== undefined) {
-      await this.page.getByLabel(t('apps.fields.name')).fill(patch.name)
+      await drawer.getByLabel(t('apps.fields.name')).fill(patch.name)
     }
     if (patch.url !== undefined) {
-      await this.page.getByLabel(t('apps.fields.url')).fill(patch.url)
+      await drawer.getByLabel(t('apps.fields.url')).fill(patch.url)
     }
-    await this.page.getByRole('button', { name: t('common.save') }).click()
+    await drawer.getByRole('button', { name: t('apps.drawer.save') }).click()
     await raceSuccessOrError(this.page, t('apps.toast.updated'))
   }
 
   async deleteApp(name: string) {
-    await this.rowByName(name).getByRole('button', { name: t('common.delete') }).click()
-    // Confirmation dialog
-    await this.page.getByRole('button', { name: t('common.confirm') }).click()
+    await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
+    await this.page.getByRole('menuitem', { name: t('apps.actions.delete') }).click()
+    await this.page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: t('apps.confirmDelete.button') })
+      .click()
     await raceSuccessOrError(this.page, t('apps.toast.deleted'))
   }
 }

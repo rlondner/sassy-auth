@@ -46,7 +46,7 @@ export type Op =
 /** Which permission gates each (area, op). Derived from each service's checkPermission call. */
 const GATE: Record<ResourceArea, Partial<Record<Op, readonly string[]>>> = {
   apps: {
-    list:   ['platform.apps.manage'],
+    list:   ['platform.apps.manage', 'platform.orgs.manage', 'platform.permissions.manage', 'platform.roles.manage'],
     create: ['platform.apps.manage'],
     update: ['platform.apps.manage'],
     delete: ['platform.apps.manage'],
