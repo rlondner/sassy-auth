@@ -29,7 +29,7 @@ uv.pkg-path = "uv"
 ## -------------------------------------------------------------------
 [vars]
 PGHOST = "localhost"
-PGPORT = "5432"
+PGPORT = "5433"
 PGUSER = "postgres"
 PGDATABASE = "sassyauth"
 BETTER_AUTH_URL = "http://localhost:3000"
@@ -43,16 +43,10 @@ TRUSTED_ORIGINS = "http://localhost:3001"
 ## -------------------------------------------------------------------
 [hook]
 on-activate = """
-  export PGDATA="$FLOX_ENV_CACHE/postgres/data"
+  export PGDATA="$HOME/.local/share/sassy-auth/postgres/data"
   export DATABASE_URL="postgresql://$PGUSER@$PGHOST:$PGPORT/$PGDATABASE"
 
-  # Initialize Postgres data directory and create database on first activation
-  if [ ! -d "$PGDATA" ]; then
-    initdb --username="$PGUSER" --auth=trust -q
-    pg_ctl start -D "$PGDATA" -o "-p $PGPORT" -w -l "$PGDATA/postgres.log" -q
-    createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDATABASE"
-    pg_ctl stop -D "$PGDATA" -m fast -w -q
-  fi
+  pnpm install
 
   # Generate .env.local with secrets pre-filled on first activation
   if [ ! -f .env.local ]; then
@@ -116,7 +110,16 @@ ENVEOF
     echo "✓ Generated .env.local"
   fi
 
-  pnpm install
+  # Initialize Postgres, run migrations and seed on first activation
+  if [ ! -d "$PGDATA" ]; then
+    initdb --username="$PGUSER" --auth=trust
+    pg_ctl start -D "$PGDATA" -o "-p $PGPORT -k /tmp" -w -l "$PGDATA/postgres.log"
+    createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDATABASE"
+    pnpm --filter @sassy-auth/db db:generate
+    pnpm --filter @sassy-auth/db db:migrate:deploy
+    pnpm --filter @sassy-auth/db db:seed
+    pg_ctl stop -D "$PGDATA" -m fast -w
+  fi
 """
 
 
@@ -142,7 +145,7 @@ ENVEOF
 ##  $ flox activate --start-services  <- Activates & starts all
 ## ------------------------------------------------------------------
 [services]
-postgres.command = "postgres -p $PGPORT"
+postgres.command = "postgres -p $PGPORT -k /tmp"
 
 
 ## Include ----------------------------------------------------------
