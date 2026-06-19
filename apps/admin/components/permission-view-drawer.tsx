@@ -26,6 +26,8 @@ export function PermissionViewDrawer({ permission, open, onOpenChange, onEdit, o
   const [copied, setCopied] = React.useState<string | null>(null)
 
   const isPlatform = permission.name.startsWith('platform.')
+  const isSystem = !isPlatform && (permission.isSystem ?? false)
+  const isImmutable = isPlatform || isSystem
 
   React.useEffect(() => {
     if (!open) return
@@ -58,9 +60,10 @@ export function PermissionViewDrawer({ permission, open, onOpenChange, onEdit, o
             </div>
             <SheetTitle className="font-mono">{permission.name}</SheetTitle>
             {isPlatform && <Badge variant="secondary">{t('permissions.badges.platform')}</Badge>}
+            {isSystem && <Badge variant="secondary">{t('permissions.badges.system')}</Badge>}
           </div>
           <div className="flex items-center gap-2">
-            {!isPlatform && (
+            {!isImmutable && (
               <ButtonGroup>
                 <Button size="sm" variant="outline" onClick={onEdit}>{t('permissions.actions.edit')}</Button>
                 <Button

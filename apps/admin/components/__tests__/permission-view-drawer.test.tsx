@@ -51,6 +51,16 @@ describe('PermissionViewDrawer', () => {
     expect(screen.queryByRole('button', { name: 'permissions.actions.delete' })).not.toBeInTheDocument()
   })
 
+  it('shows the System badge for isSystem permissions', () => {
+    const systemPerm: PermissionRow = { ...permission, name: 'org.users.manage', isSystem: true }
+    render(<PermissionViewDrawer permission={systemPerm} open={true} onOpenChange={() => {}} onEdit={() => {}} onDelete={() => {}} />)
+    expect(screen.getByText('permissions.badges.system')).toBeInTheDocument()
+    expect(screen.queryByText('permissions.badges.platform')).not.toBeInTheDocument()
+    // Edit/Delete buttons are absent for isSystem
+    expect(screen.queryByRole('button', { name: 'permissions.actions.edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'permissions.actions.delete' })).not.toBeInTheDocument()
+  })
+
   it('disables Delete and surfaces tooltip when in-use', async () => {
     render(<PermissionViewDrawer permission={permission} open={true} onOpenChange={() => {}} onEdit={() => {}} onDelete={() => {}} />)
     await waitFor(() => expect(screen.getByText('Editor')).toBeInTheDocument())

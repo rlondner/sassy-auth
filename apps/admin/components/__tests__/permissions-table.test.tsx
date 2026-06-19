@@ -77,6 +77,33 @@ describe('PermissionsTable', () => {
     expect(dialog).toHaveTextContent(/apps\.read/)
   })
 
+  it('renders the System badge for isSystem rows (and not the Platform badge)', () => {
+    const systemInitial = {
+      items: [
+        { publicId: 'sq_p1', name: 'org.users.manage', isSystem: true, app: { publicId: 'sq_a1', name: 'SassyAuth' }, roleCount: 0, userCount: 0 },
+      ] satisfies PermissionRow[],
+      total: 1, page: 1, pageSize: 25,
+    }
+    render(withIntl(<PermissionsTable initial={systemInitial} apps={apps} />))
+    expect(screen.getByText(en.permissions.badges.system)).toBeInTheDocument()
+    expect(screen.queryByText(en.permissions.badges.platform)).not.toBeInTheDocument()
+  })
+
+  it('hides Edit and Delete menu items for isSystem rows', () => {
+    const systemInitial = {
+      items: [
+        { publicId: 'sq_p1', name: 'org.users.manage', isSystem: true, app: { publicId: 'sq_a1', name: 'SassyAuth' }, roleCount: 0, userCount: 0 },
+      ] satisfies PermissionRow[],
+      total: 1, page: 1, pageSize: 25,
+    }
+    render(withIntl(<PermissionsTable initial={systemInitial} apps={apps} />))
+    // Only View should be present for an isSystem row
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1)
+    expect(screen.getByRole('menuitem', { name: en.permissions.actions.view })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: en.permissions.actions.edit })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: en.permissions.actions.delete })).not.toBeInTheDocument()
+  })
+
   it('app filter triggers listPermissionsAction with appId', async () => {
     jest.useFakeTimers()
     ;(actions.listPermissionsAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })

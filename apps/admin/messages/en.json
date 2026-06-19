@@ -191,7 +191,7 @@
       "rolesShort": "roles",
       "usersShort": "users"
     },
-    "badges": { "platform": "Platform" },
+    "badges": { "platform": "Platform", "system": "System" },
     "actions": {
       "view": "View",
       "edit": "Edit",

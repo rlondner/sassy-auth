@@ -58,7 +58,8 @@ export function PermissionsTable({ initial, apps }: Props) {
       header: t('permissions.columns.nameAndApp'),
       cell: ({ row }) => {
         const p = row.original
-        const platform = p.name.startsWith('platform.')
+        const isPlatform = p.name.startsWith('platform.')
+        const isSystem = !isPlatform && (p.isSystem ?? false)
         return (
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded border border-border bg-muted text-primary">
@@ -67,7 +68,8 @@ export function PermissionsTable({ initial, apps }: Props) {
             <div>
               <div className="flex items-center gap-2">
                 <code className="font-mono text-body-sm font-semibold">{p.name}</code>
-                {platform && <Badge variant="secondary">{t('permissions.badges.platform')}</Badge>}
+                {isPlatform && <Badge variant="secondary">{t('permissions.badges.platform')}</Badge>}
+                {isSystem && <Badge variant="secondary">{t('permissions.badges.system')}</Badge>}
               </div>
               <p className="text-label-md text-muted-foreground">{p.app.name}</p>
             </div>
@@ -116,7 +118,9 @@ export function PermissionsTable({ initial, apps }: Props) {
       header: '',
       cell: ({ row }) => {
         const p = row.original
-        const platform = p.name.startsWith('platform.')
+        const isPlatform = p.name.startsWith('platform.')
+        const isSystem = !isPlatform && (p.isSystem ?? false)
+        const isImmutable = isPlatform || isSystem
         const inUse = p.roleCount + p.userCount > 0
         return (
           <DropdownMenu>
@@ -129,13 +133,13 @@ export function PermissionsTable({ initial, apps }: Props) {
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(p); setViewOpen(true) }}>
                 {t('permissions.actions.view')}
               </DropdownMenuItem>
-              {!platform && (
+              {!isImmutable && (
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(p); setEditOpen(true) }}>
                   {t('permissions.actions.edit')}
                 </DropdownMenuItem>
               )}
-              {!platform && <DropdownMenuSeparator />}
-              {!platform && (
+              {!isImmutable && <DropdownMenuSeparator />}
+              {!isImmutable && (
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={(e) => {
