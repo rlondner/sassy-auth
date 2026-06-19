@@ -6,7 +6,7 @@ import { ColumnDef } from '@tanstack/react-table'
 import { Plus, Search } from 'lucide-react'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger, StatusChip, UserAvatar,
+  DropdownMenuSeparator, DropdownMenuTrigger, StatusChip, UserAvatar, Tooltip, TooltipContent, TooltipTrigger,
 } from '@sassy-auth/ui'
 import type { User, Org } from '@/lib/types'
 import { UserViewDrawer } from './user-view-drawer'
@@ -87,11 +87,16 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
         const u = row.original
         return (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
-                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
-              </button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <button aria-label={t('common.moreActions')} className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+                    <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>{t('common.moreActions')}</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedUser(u); setViewOpen(true) }}>
                 {t('users.actions.edit')}

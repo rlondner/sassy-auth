@@ -30,6 +30,10 @@ jest.mock('@sassy-auth/ui', () => {
     DropdownMenuContent: Passthrough,
     DropdownMenuItem: Item,
     DropdownMenuSeparator: () => <hr />,
+    Tooltip: Passthrough,
+    TooltipTrigger: Trigger,
+    TooltipContent: Passthrough,
+    TooltipProvider: Passthrough,
     // SidebarTrigger calls useSidebar() which throws without a SidebarProvider.
     // Replace with a noop button so PageHeader can render in tests.
     SidebarTrigger: () => <button type="button" aria-label="Toggle Sidebar" />,
