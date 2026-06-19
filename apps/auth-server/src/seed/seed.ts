@@ -232,6 +232,11 @@ async function main() {
     await seedDemoResourceServer();
   }
 
+  if (process.env.SEED_DEMO_MULTITENANT === '1') {
+    const { seedDemoMultitenant } = await import('./demo-multitenant');
+    await seedDemoMultitenant();
+  }
+
   console.log('Seed complete.');
 }
 
