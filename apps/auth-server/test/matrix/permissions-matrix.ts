@@ -6,7 +6,7 @@
 
 export const ADMIN_PASSWORD = 'Pass@word1234';
 
-export type AdminKey = 'apps' | 'orgs' | 'users' | 'perms' | 'super';
+export type AdminKey = 'apps' | 'orgs' | 'users' | 'roles' | 'perms' | 'super';
 
 export interface SeedAdmin {
   key: AdminKey;
@@ -19,6 +19,7 @@ export const SEED_ADMINS: readonly SeedAdmin[] = [
   { key: 'apps',  email: 'a@sa.io', perms: ['platform.apps.manage'] },
   { key: 'orgs',  email: 'o@sa.io', perms: ['platform.orgs.manage'] },
   { key: 'users', email: 'u@sa.io', perms: ['platform.users.manage'] },
+  { key: 'roles', email: 'r@sa.io', perms: ['platform.roles.manage'] },
   { key: 'perms', email: 'p@sa.io', perms: ['platform.permissions.manage'] },
   {
     key: 'super',
@@ -27,9 +28,10 @@ export const SEED_ADMINS: readonly SeedAdmin[] = [
       'platform.apps.manage',
       'platform.orgs.manage',
       'platform.users.manage',
+      'platform.roles.manage',
       'platform.permissions.manage',
       'org.users.manage',
-      'org.permissions.manage',
+      'org.roles.manage',
     ],
   },
 ];
@@ -57,11 +59,11 @@ const GATE: Record<ResourceArea, Partial<Record<Op, readonly string[]>>> = {
     delete: ['platform.orgs.manage'],
   },
   roles: {
-    list:   ['platform.permissions.manage', 'org.permissions.manage'],
-    get:    ['platform.permissions.manage', 'org.permissions.manage'],
-    create: ['platform.permissions.manage'],
-    update: ['platform.permissions.manage'],
-    delete: ['platform.permissions.manage'],
+    list:   ['platform.roles.manage', 'org.roles.manage'],
+    get:    ['platform.roles.manage', 'org.roles.manage'],
+    create: ['platform.roles.manage'],
+    update: ['platform.roles.manage'],
+    delete: ['platform.roles.manage'],
   },
   permissions: {
     list:   ['platform.permissions.manage'],
