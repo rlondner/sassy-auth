@@ -160,6 +160,15 @@ describe('PermissionsService', () => {
       await expect(makeService().updatePermission('ba-caller', 'sq_p1', { name: 'platform.users.manage.x' })).rejects.toBeInstanceOf(ForbiddenException);
     });
 
+    it('rejects when isSystem is true (Forbidden)', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue({
+        id: 1, publicId: 'sq_p1', name: 'org.users.manage', appId: 1, isSystem: true,
+      });
+      await expect(
+        makeService().updatePermission('ba-caller', 'sq_p1', { name: 'org.users.manage.x' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
     it('rejects empty patch with BadRequest', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'apps.read', appId: 1 });
       await expect(makeService().updatePermission('ba-caller', 'sq_p1', {})).rejects.toBeInstanceOf(BadRequestException);
@@ -186,6 +195,15 @@ describe('PermissionsService', () => {
     it('rejects platform.* with Forbidden', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'platform.users.manage' });
       await expect(makeService().deletePermission('ba-caller', 'sq_p1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects deleting isSystem with Forbidden', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue({
+        id: 1, publicId: 'sq_p1', name: 'org.users.manage', appId: 1, isSystem: true,
+      });
+      await expect(
+        makeService().deletePermission('ba-caller', 'sq_p1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('translates Prisma P2003 to ConflictException with a useful message', async () => {

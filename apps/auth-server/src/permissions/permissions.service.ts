@@ -153,7 +153,7 @@ export class PermissionsService {
     }
     const existing = await prisma.saPermission.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
-    if (isPlatform(existing.name)) {
+    if (isPlatform(existing.name) || existing.isSystem) {
       throw new ForbiddenException('Platform-system permissions cannot be modified');
     }
     try {
@@ -181,7 +181,7 @@ export class PermissionsService {
     await checkPermission(callerBaId, 'platform.permissions.manage');
     const existing = await prisma.saPermission.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
-    if (isPlatform(existing.name)) {
+    if (isPlatform(existing.name) || existing.isSystem) {
       throw new ForbiddenException('Platform-system permissions cannot be modified');
     }
     try {
