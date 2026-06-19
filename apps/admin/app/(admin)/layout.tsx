@@ -37,9 +37,18 @@ export default async function AdminLayout({
     email: session.user.email ?? '',
   }
 
+  // Both fallbacks degrade gracefully into an empty sidebar instead of a 500,
+  // but a transient /me outage that hides every nav item is exactly the kind
+  // of regression we want to learn about — capture the cause to Sentry.
   const [perms, profile] = await Promise.all([
-    getMyPermissions().catch(() => [] as string[]),
-    getMyProfile().catch(() => null),
+    getMyPermissions().catch((e) => {
+      Sentry.captureException(e)
+      return [] as string[]
+    }),
+    getMyProfile().catch((e) => {
+      Sentry.captureException(e)
+      return null
+    }),
   ])
 
   return (
