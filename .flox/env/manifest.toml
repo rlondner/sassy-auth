@@ -47,6 +47,7 @@ on-activate = """
   export DATABASE_URL="postgresql://$PGUSER@$PGHOST:$PGPORT/$PGDATABASE"
 
   pnpm install
+  pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
 
   # Generate .env.local with secrets pre-filled on first activation
   if [ ! -f .env.local ]; then
