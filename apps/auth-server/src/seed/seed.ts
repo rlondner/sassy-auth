@@ -209,6 +209,13 @@ async function main() {
         data: { isSystem },
       });
       console.log(`Updated permission ${name}: isSystem=${isSystem}`);
+    } else if (existing.publicId.startsWith('pending-')) {
+      const publicId = sqids.encode([existing.id]);
+      await prisma.saPermission.update({
+        where: { id: existing.id },
+        data: { publicId },
+      });
+      console.log(`Backfilled placeholder publicId for ${name}: ${publicId}`);
     }
   }
 
