@@ -85,4 +85,21 @@ describe('checkPermissionForApp', () => {
       checkPermissionForApp('ba-1', ['platform.roles.manage', 'org.roles.manage']),
     ).resolves.toBeUndefined();
   });
+
+  it('aggregates permissions held via a role (not just direct grants)', async () => {
+    mockPrisma.saUser.findUnique.mockResolvedValue({
+      orgId: 1,
+      roles: [
+        { role: { permissions: [{ permission: { name: 'platform.roles.manage' } }] } },
+      ],
+      directPermissions: [],
+    });
+    await expect(
+      checkPermissionForApp(
+        'ba-1',
+        ['platform.roles.manage', 'org.roles.manage'],
+        { targetAppId: 99, callerAppId: 1 },
+      ),
+    ).resolves.toBeUndefined();
+  });
 });

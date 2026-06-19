@@ -44,7 +44,7 @@ export async function checkPermissionForApp(
     if (r.startsWith('platform.') && perms.has(r)) return;
   }
 
-  // org.* allowed only when the caller's app matches the target app.
+  // non-platform permissions allowed only when the caller's app matches the target app.
   for (const r of requiredList) {
     if (r.startsWith('platform.')) continue;
     if (!perms.has(r)) continue;
