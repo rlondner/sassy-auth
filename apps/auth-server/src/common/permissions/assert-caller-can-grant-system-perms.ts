@@ -2,6 +2,13 @@ import { ForbiddenException } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 
 /**
+ * The platform-tier trust signal for user-assignment surfaces. A caller
+ * holding this perm is trusted to grant any system perm; the escalation
+ * guard below short-circuits on it.
+ */
+const PLATFORM_USERS_MANAGE = 'platform.users.manage';
+
+/**
  * Closes horizontal escalation within the org.* tier. A non-platform
  * caller can only grant a system perm `X` to another user if they hold
  * `X` themselves. Holders of `platform.users.manage` bypass — that
@@ -39,7 +46,7 @@ export async function assertCallerCanGrantSystemPerms(
   saUser.directPermissions.forEach((up) => callerPerms.add(up.permission.name));
 
   // Platform-tier bypass.
-  if (callerPerms.has('platform.users.manage')) return;
+  if (callerPerms.has(PLATFORM_USERS_MANAGE)) return;
 
   const missing = systemPermNames.filter((n) => !callerPerms.has(n));
   if (missing.length > 0) {

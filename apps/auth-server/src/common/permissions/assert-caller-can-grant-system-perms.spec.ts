@@ -17,6 +17,13 @@ const callerWith = (names: string[]) => ({
   directPermissions: names.map((name) => ({ permission: { name } })),
 });
 
+const callerWithViaRole = (names: string[]) => ({
+  roles: [
+    { role: { permissions: names.map((name) => ({ permission: { name } })) } },
+  ],
+  directPermissions: [],
+});
+
 describe('assertCallerCanGrantSystemPerms', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -58,5 +65,19 @@ describe('assertCallerCanGrantSystemPerms', () => {
     await expect(
       assertCallerCanGrantSystemPerms('ba-1', ['org.users.manage']),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('aggregates the caller perms held via a role (not only direct grants)', async () => {
+    mockPrisma.saUser.findUnique.mockResolvedValue(callerWithViaRole(['org.users.manage']));
+    await expect(
+      assertCallerCanGrantSystemPerms('ba-1', ['org.users.manage']),
+    ).resolves.toBeUndefined();
+  });
+
+  it('honors the platform.users.manage bypass when held via a role', async () => {
+    mockPrisma.saUser.findUnique.mockResolvedValue(callerWithViaRole(['platform.users.manage']));
+    await expect(
+      assertCallerCanGrantSystemPerms('ba-1', ['org.users.manage', 'org.roles.manage']),
+    ).resolves.toBeUndefined();
   });
 });
