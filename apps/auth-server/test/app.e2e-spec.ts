@@ -3,6 +3,7 @@
 // own dotenv but the Prisma client runtime does not.
 import 'dotenv/config';
 import * as crypto from 'crypto';
+import * as path from 'path';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import express from 'express';
@@ -37,10 +38,10 @@ describe('SassyAuth E2E', () => {
     // not apps/auth-server, so pass --schema explicitly — without it the
     // CLI looks in cwd/prisma/schema.prisma and fails.
     const { execSync } = await import('child_process');
-    execSync(
-      'npx prisma migrate deploy --schema=../../packages/db/schema.prisma',
-      { stdio: 'inherit' },
-    );
+    const dbRoot = path.resolve(__dirname, '../../../packages/db');
+    const prismaBin = path.join(dbRoot, 'node_modules/.bin/prisma');
+    const schemaPath = path.join(dbRoot, 'schema.prisma');
+    execSync(`${prismaBin} migrate deploy --schema=${schemaPath}`, { stdio: 'inherit' });
 
     // Build NestJS app with Express adapter + BetterAuth mount
     const expressApp = express();
