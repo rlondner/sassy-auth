@@ -39,6 +39,54 @@ beforeEach(() => {
   jest.setMock('next/headers', nextHeadersMock)
 })
 
+jest.mock('@radix-ui/react-tooltip', () => {
+  const React = require('react')
+  const Passthrough = ({ children }: any) => React.createElement(React.Fragment, null, children)
+  const Trigger = ({ children, asChild }: any) => {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as any)
+    }
+    return React.createElement('div', null, children)
+  }
+  return {
+    Provider: Passthrough,
+    Root: Passthrough,
+    Trigger,
+    Content: Passthrough,
+  }
+})
+
+jest.mock('@radix-ui/react-dropdown-menu', () => {
+  const React = require('react')
+  const Passthrough = ({ children }: any) => React.createElement(React.Fragment, null, children)
+  const Trigger = ({ children, asChild }: any) => {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as any)
+    }
+    return React.createElement('div', null, children)
+  }
+  const Sub = { displayName: 'Sub' }
+  return {
+    Root: Passthrough,
+    Trigger,
+    Content: Passthrough,
+    Item: ({ children, onClick }: any) =>
+      React.createElement('div', { role: 'menuitem', onClick }, children),
+    Separator: () => React.createElement('hr'),
+    Portal: Passthrough,
+    Sub,
+    SubTrigger: { ...Sub, displayName: 'SubTrigger' },
+    SubContent: { ...Sub, displayName: 'SubContent' },
+    Group: Passthrough,
+    Label: Passthrough,
+    CheckboxItem: Passthrough,
+    RadioGroup: Passthrough,
+    RadioItem: Passthrough,
+    Shortcut: Passthrough,
+    Arrow: Passthrough,
+  }
+})
+
 jest.mock('@sentry/nextjs', () => ({
   addBreadcrumb: jest.fn(),
   setUser: jest.fn(),
