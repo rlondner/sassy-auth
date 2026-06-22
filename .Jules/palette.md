@@ -1,0 +1,3 @@
+## 2026-06-22 - [Standardized Table Row Actions with Tooltips]
+**Learning:** In complex administrative interfaces with repetitive row actions (e.g., 'more_vert' dropdowns), accessibility and visual clarity often lag behind functionality. Consistently wrapping these icon-only triggers in Tooltips with localized ARIA labels provides immediate feedback for both sighted and screen-reader users without cluttering the UI.
+**Action:** Always wrap icon-only action triggers in tables with a Tooltip and ensure the trigger button has a localized aria-label. Use a global Jest mock for Tooltip components in the test setup to avoid repeating context provider boilerplate in every unit test.

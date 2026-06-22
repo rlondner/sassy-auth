@@ -1,4 +1,27 @@
 import '@testing-library/jest-dom'
+import * as React from 'react'
+
+// Radix Tooltip components require a TooltipProvider context which is often
+// missing in unit tests. Mock them globally as simple passthroughs to avoid
+// context errors and keep tests focused on the component under test.
+// We mock @sassy-auth/ui here, but since many tests also mock it, we need to
+// be careful. However, global mocks in jest.setup.ts are usually overridden
+// by jest.mock() in test files.
+jest.mock('@sassy-auth/ui', () => {
+  const actual = jest.requireActual('@sassy-auth/ui')
+  return {
+    ...actual,
+    TooltipProvider: ({ children }: any) => React.createElement(React.Fragment, null, children),
+    Tooltip: ({ children }: any) => React.createElement(React.Fragment, null, children),
+    TooltipTrigger: ({ children, asChild }: any) => {
+      if (asChild && React.isValidElement(children)) {
+        return React.cloneElement(children as React.ReactElement, { ...(children as React.ReactElement).props })
+      }
+      return React.createElement(React.Fragment, null, children)
+    },
+    TooltipContent: ({ children }: any) => React.createElement(React.Fragment, null, children),
+  }
+})
 
 /**
  * This setup file ensures mock function identity is stable across jest.resetModules().
@@ -38,6 +61,7 @@ beforeEach(() => {
   jest.setMock('fs', fsMock)
   jest.setMock('next/headers', nextHeadersMock)
 })
+
 
 jest.mock('@sentry/nextjs', () => ({
   addBreadcrumb: jest.fn(),

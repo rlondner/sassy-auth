@@ -7,6 +7,7 @@ import { KeyRound, Plus, Search } from 'lucide-react'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
+  Tooltip, TooltipContent, TooltipTrigger,
 } from '@sassy-auth/ui'
 import { copyToClipboard } from '@/lib/clipboard'
 import { deletePermissionAction, listPermissionsAction } from '@/app/(admin)/permissions/actions'
@@ -88,7 +89,7 @@ export function PermissionsTable({ initial, apps }: Props) {
             <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-label-md">{p.publicId}</code>
             <button
               type="button"
-              aria-label={t('permissions.actions.copy')}
+              aria-label={t('common.copy')}
               onClick={(e) => {
                 e.stopPropagation()
                 copyToClipboard(p.publicId, () => {
@@ -124,11 +125,16 @@ export function PermissionsTable({ initial, apps }: Props) {
         const inUse = p.roleCount + p.userCount > 0
         return (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
-                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
-              </button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <button aria-label={t('common.moreActions')} className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+                    <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>{t('common.moreActions')}</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(p); setViewOpen(true) }}>
                 {t('permissions.actions.view')}
