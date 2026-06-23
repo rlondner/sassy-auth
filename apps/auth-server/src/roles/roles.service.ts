@@ -74,15 +74,15 @@ export class RolesService {
       prisma.saRole.count({ where }),
     ])) as [Array<{ id: number; publicId: string; name: string; app: { publicId: string; name: string } }>, number];
 
-    const ids = rows.map((r) => r.id);
+    const ids = rows.map((r: any) => r.id);
     const [permGroups, userGroups] = ids.length === 0
       ? [[], []] as [Array<{ roleId: number; _count: { _all: number } }>, Array<{ roleId: number; _count: { _all: number } }>]
       : (await Promise.all([
           prisma.saRolePermission.groupBy({ by: ['roleId'], where: { roleId: { in: ids } }, _count: { _all: true } }),
           prisma.saUserRole.groupBy({ by: ['roleId'], where: { roleId: { in: ids } }, _count: { _all: true } }),
         ])) as [Array<{ roleId: number; _count: { _all: number } }>, Array<{ roleId: number; _count: { _all: number } }>];
-    const permMap = new Map(permGroups.map((g) => [g.roleId, g._count._all]));
-    const userMap = new Map(userGroups.map((g) => [g.roleId, g._count._all]));
+    const permMap = new Map(permGroups.map((g: any) => [g.roleId, g._count._all]));
+    const userMap = new Map(userGroups.map((g: any) => [g.roleId, g._count._all]));
 
     return {
       items: rows.map((row) => ({
@@ -121,7 +121,7 @@ export class RolesService {
       publicId: row.publicId, name: row.name,
       app: { publicId: row.app.publicId, name: row.app.name },
       permissionCount: row.permissions.length, userCount,
-      permissions: row.permissions.map((rp) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
+      permissions: row.permissions.map((rp: any) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
     };
   }
 
@@ -133,7 +133,7 @@ export class RolesService {
     const permissionIds = await resolvePermissionIdsForApp(app.id, dto.permissionIds ?? []);
 
     try {
-      type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+      type Tx = any;
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saRole.create({
           data: { publicId: 'placeholder', name: dto.name, appId: app.id },
@@ -159,7 +159,7 @@ export class RolesService {
         publicId: row.publicId, name: row.name,
         app: { publicId: row.app.publicId, name: row.app.name },
         permissionCount: row.permissions.length, userCount: 0,
-        permissions: row.permissions.map((rp) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
+        permissions: row.permissions.map((rp: any) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
       };
     } catch (e: unknown) {
       if (isPrismaCode(e, 'P2002')) throw new ConflictException('Role with this name already exists in this app');
@@ -180,7 +180,7 @@ export class RolesService {
       : await resolvePermissionIdsForApp(existing.appId, dto.permissionIds);
 
     try {
-      type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+      type Tx = any;
       const updated = await prisma.$transaction(async (tx: Tx) => {
         if (dto.name !== undefined) {
           await tx.saRole.update({ where: { publicId }, data: { name: dto.name } });
@@ -206,7 +206,7 @@ export class RolesService {
         publicId: row.publicId, name: row.name,
         app: { publicId: row.app.publicId, name: row.app.name },
         permissionCount: row.permissions.length, userCount,
-        permissions: row.permissions.map((rp) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
+        permissions: row.permissions.map((rp: any) => ({ publicId: rp.permission.publicId, name: rp.permission.name })),
       };
     } catch (e: unknown) {
       if (isPrismaCode(e, 'P2002')) throw new ConflictException('Role with this name already exists in this app');
@@ -219,7 +219,7 @@ export class RolesService {
     const existing = await prisma.saRole.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
     try {
-      type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+      type Tx = any;
       await prisma.$transaction(async (tx: Tx) => {
         await tx.saRolePermission.deleteMany({ where: { roleId: existing.id } });
         await tx.saRole.delete({ where: { publicId } });

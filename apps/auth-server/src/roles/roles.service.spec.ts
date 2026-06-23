@@ -244,7 +244,7 @@ describe('RolesService', () => {
           const tx = {
             saRole: {
               create: jest.fn().mockImplementation(async ({ data }: { data: { appId: number; name: string } }) => {
-                if (seen.some((r) => r.appId === data.appId && r.name === data.name)) {
+                if (seen.some((r: any) => r.appId === data.appId && r.name === data.name)) {
                   throw { code: 'P2002' };
                 }
                 seen.push({ appId: data.appId, name: data.name });

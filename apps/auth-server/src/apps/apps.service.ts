@@ -47,7 +47,7 @@ export class AppsService {
   async createApp(callerBaId: string, dto: CreateAppDto) {
     await checkPermission(callerBaId, 'platform.apps.manage');
     try {
-      type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+      type Tx = any;
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
           data: { publicId: 'placeholder', name: dto.name, url: dto.url, isPlatform: false },

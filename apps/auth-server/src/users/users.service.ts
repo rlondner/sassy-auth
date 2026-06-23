@@ -112,11 +112,11 @@ export class UsersService {
       { targetOrgId: user.orgId },
     );
 
-    return user.roles.map((ur) => ({
+    return user.roles.map((ur: any) => ({
       publicId: ur.role.publicId,
       name: ur.role.name,
       appId: ur.role.app.publicId,
-      permissions: ur.role.permissions.map((rp) => ({
+      permissions: ur.role.permissions.map((rp: any) => ({
         publicId: rp.permission.publicId,
         name: rp.permission.name,
         appId: ur.role.app.publicId,
@@ -140,8 +140,8 @@ export class UsersService {
     );
 
     const names = new Set<string>();
-    user.roles.forEach((ur) => ur.role.permissions.forEach((rp) => names.add(rp.permission.name)));
-    user.directPermissions.forEach((up) => names.add(up.permission.name));
+    user.roles.forEach((ur: any) => ur.role.permissions.forEach((rp: any) => names.add(rp.permission.name)));
+    user.directPermissions.forEach((up: any) => names.add(up.permission.name));
 
     return { userId: publicId, permissions: Array.from(names).sort() };
   }
@@ -163,8 +163,8 @@ export class UsersService {
           select: { name: true, isSystem: true },
         });
     const directSystemPermNames = initialPerms
-      .filter((p) => p.isSystem)
-      .map((p) => p.name);
+      .filter((p: any) => p.isSystem)
+      .map((p: any) => p.name);
 
     // Escalation guard for initial roles.
     const initialRoles = (dto.roleIds ?? []).length === 0
@@ -178,8 +178,8 @@ export class UsersService {
           },
         });
     const roleSystemPermNames = Array.from(new Set(
-      initialRoles.flatMap((r) =>
-        r.permissions.filter((rp) => rp.permission.isSystem).map((rp) => rp.permission.name),
+      initialRoles.flatMap((r: any) =>
+        r.permissions.filter((rp: any) => rp.permission.isSystem).map((rp: any) => rp.permission.name),
       ),
     ));
 
@@ -202,7 +202,7 @@ export class UsersService {
     let saUser: Prisma.SaUserGetPayload<{ include: typeof USER_INCLUDE }>;
     let invitation: Awaited<ReturnType<typeof prisma.saInvitation.create>>;
     try {
-      ({ saUser, invitation } = await prisma.$transaction(async (tx) => {
+      ({ saUser, invitation } = await prisma.$transaction(async (tx: any) => {
         await tx.user.create({
           data: {
             id: baUserId,
@@ -340,9 +340,9 @@ export class UsersService {
     if (!role) throw new NotFoundException('Role not found');
 
     const systemPermNames = role.permissions
-      .filter((rp) => rp.permission.isSystem)
-      .map((rp) => rp.permission.name);
-    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
+      .filter((rp: any) => rp.permission.isSystem)
+      .map((rp: any) => rp.permission.name);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames as string[]);
 
     try {
       await prisma.saUserRole.create({ data: { userId: user.id, roleId: role.id } });
@@ -418,15 +418,15 @@ export class UsersService {
           },
         });
     const systemPermNames = Array.from(new Set(
-      rolesWithPerms.flatMap((r) =>
-        r.permissions.filter((rp) => rp.permission.isSystem).map((rp) => rp.permission.name),
+      rolesWithPerms.flatMap((r: any) =>
+        r.permissions.filter((rp: any) => rp.permission.isSystem).map((rp: any) => rp.permission.name),
       ),
     ));
-    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames as string[]);
 
     const numericIds = await resolveRoleIdsForApp(org.appId, roleIds);
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.saUserRole.deleteMany({ where: { userId: user.id } });
       if (numericIds.length > 0) {
         await tx.saUserRole.createMany({
@@ -465,7 +465,7 @@ export class UsersService {
     // the app publicId via this query path. Match that convention.
     return (user as unknown as {
       directPermissions: Array<{ permission: { publicId: string; name: string; appId: number } }>;
-    }).directPermissions.map((up) => ({
+    }).directPermissions.map((up: any) => ({
       id: up.permission.publicId,
       name: up.permission.name,
       appId: '',
@@ -500,13 +500,13 @@ export class UsersService {
           select: { name: true, isSystem: true },
         });
     const systemPermNames = requestedPerms
-      .filter((p) => p.isSystem)
-      .map((p) => p.name);
-    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
+      .filter((p: any) => p.isSystem)
+      .map((p: any) => p.name);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames as string[]);
 
     const numericIds = await resolvePermissionIdsForApp(org.appId, permissionIds);
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.saUserPermission.deleteMany({ where: { userId: user.id } });
       if (numericIds.length > 0) {
         await tx.saUserPermission.createMany({

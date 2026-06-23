@@ -55,7 +55,7 @@ export class InvitationsService {
     const now = new Date();
     const baUserId = inv.user.betterAuthUser.id;
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Atomically claim the invitation: only updates rows where
       // usedAt IS NULL and the token has not expired. count === 1 means
       // we won the race; count === 0 means another concurrent acceptance

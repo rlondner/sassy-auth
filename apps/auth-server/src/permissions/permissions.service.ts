@@ -71,18 +71,18 @@ export class PermissionsService {
     ]);
 
     // Single roundtrip for role/user counts across this page (no N+1).
-    const ids = rows.map((r) => (r as { id: number }).id);
+    const ids = rows.map((r: any) => (r as { id: number }).id);
     const [roleGroups, userGroups] = ids.length === 0
       ? [[], []] as [Array<{ permissionId: number; _count: { _all: number } }>, Array<{ permissionId: number; _count: { _all: number } }>]
       : await Promise.all([
           prisma.saRolePermission.groupBy({ by: ['permissionId'], where: { permissionId: { in: ids } }, _count: { _all: true } }),
           prisma.saUserPermission.groupBy({ by: ['permissionId'], where: { permissionId: { in: ids } }, _count: { _all: true } }),
         ]);
-    const roleMap = new Map(roleGroups.map((g) => [g.permissionId, g._count._all]));
-    const userMap = new Map(userGroups.map((g) => [g.permissionId, g._count._all]));
+    const roleMap = new Map(roleGroups.map((g: any) => [g.permissionId, g._count._all]));
+    const userMap = new Map(userGroups.map((g: any) => [g.permissionId, g._count._all]));
 
     return {
-      items: rows.map((r) => {
+      items: rows.map((r: any) => {
         const row = r as { id: number; publicId: string; name: string; isSystem: boolean; app: { publicId: string; name: string } };
         return {
           publicId: row.publicId, name: row.name, isSystem: row.isSystem,
@@ -116,8 +116,8 @@ export class PermissionsService {
       publicId: row.publicId, name: row.name, isSystem: row.isSystem,
       app: { publicId: row.app.publicId, name: row.app.name },
       roleCount, userCount,
-      roles: row.roles.map((rp) => ({ publicId: rp.role.publicId, name: rp.role.name, appName: rp.role.app.name })),
-      users: row.users.map((up) => ({
+      roles: row.roles.map((rp: any) => ({ publicId: rp.role.publicId, name: rp.role.name, appName: rp.role.app.name })),
+      users: row.users.map((up: any) => ({
         publicId: up.user.publicId,
         email: up.user.betterAuthUser.email,
         firstName: up.user.firstName,
@@ -131,7 +131,7 @@ export class PermissionsService {
     const app = await prisma.saApp.findUnique({ where: { publicId: dto.appId } });
     if (!app) throw new NotFoundException('App not found');
     try {
-      type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+      type Tx = any;
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saPermission.create({
           data: { publicId: 'placeholder', name: dto.name, appId: app.id },
