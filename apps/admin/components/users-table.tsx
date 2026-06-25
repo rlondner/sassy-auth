@@ -188,6 +188,7 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
               return
             }
             setDeleteOpen(false)
+            setViewOpen(false)
           }}
         />
       )}
