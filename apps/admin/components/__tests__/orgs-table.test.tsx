@@ -11,26 +11,6 @@ jest.mock('@/app/(admin)/orgs/actions', () => ({
   listOrgsAction: jest.fn(),
 }))
 
-jest.mock('@sassy-auth/ui', () => {
-  const actual = jest.requireActual('@sassy-auth/ui')
-  const Passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>
-  const Trigger = ({ children, asChild: _asChild, ...rest }: { children?: React.ReactNode; asChild?: boolean }) =>
-    React.isValidElement(children) ? React.cloneElement(children, rest as object) : <>{children}</>
-  const Item = ({ children, onClick, className }: { children?: React.ReactNode; onClick?: (e: React.MouseEvent) => void; className?: string }) => (
-    <div role="menuitem" tabIndex={-1} className={className} onClick={onClick}>{children}</div>
-  )
-  return {
-    ...actual,
-    DropdownMenu: Passthrough,
-    DropdownMenuTrigger: Trigger,
-    DropdownMenuContent: Passthrough,
-    DropdownMenuItem: Item,
-    DropdownMenuSeparator: () => <hr />,
-    // SidebarTrigger calls useSidebar() which throws without a SidebarProvider.
-    // Replace with a noop button so PageHeader can render in tests.
-    SidebarTrigger: () => <button type="button" aria-label="Toggle Sidebar" />,
-  }
-})
 
 const apps: App[] = [
   { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false },
@@ -60,7 +40,7 @@ describe('OrgsTable', () => {
 
   it('clicking Delete on an ordinary org opens ConfirmDialog with the org name', async () => {
     render(withIntl(<OrgsTable initial={initial} apps={apps} />))
-    const menuButtons = screen.getAllByRole('button', { name: /more/i })
+    const menuButtons = screen.getAllByRole('button', { name: en.common.moreActions })
     fireEvent.click(menuButtons[0])
     fireEvent.click(await screen.findByRole('menuitem', { name: en.orgs.actions.delete }))
     const dialog = await screen.findByRole('alertdialog')

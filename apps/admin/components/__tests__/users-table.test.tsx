@@ -22,26 +22,6 @@ jest.mock('../user-create-drawer', () => ({
 // always-open passthrough so menu items are queryable. This preserves the
 // test intent: verify that clicking "Delete" surfaces the ConfirmDialog
 // scoped to the correct user.
-jest.mock('@sassy-auth/ui', () => {
-  const actual = jest.requireActual('@sassy-auth/ui')
-  const Passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>
-  const Trigger = ({ children, asChild: _asChild, ...rest }: { children?: React.ReactNode; asChild?: boolean }) =>
-    React.isValidElement(children) ? React.cloneElement(children, rest as object) : <>{children}</>
-  const Item = ({ children, onClick, className }: { children?: React.ReactNode; onClick?: (e: React.MouseEvent) => void; className?: string }) => (
-    <div role="menuitem" tabIndex={-1} className={className} onClick={onClick}>{children}</div>
-  )
-  return {
-    ...actual,
-    DropdownMenu: Passthrough,
-    DropdownMenuTrigger: Trigger,
-    DropdownMenuContent: Passthrough,
-    DropdownMenuItem: Item,
-    DropdownMenuSeparator: () => <hr />,
-    // SidebarTrigger calls useSidebar() which throws without a SidebarProvider.
-    // Replace with a noop button so PageHeader can render in tests.
-    SidebarTrigger: () => <button type="button" aria-label="Toggle Sidebar" />,
-  }
-})
 
 const mockUsers: User[] = [
   { id: '1', firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', status: 'active', orgId: 'org1', phoneNumber: null, username: null },
