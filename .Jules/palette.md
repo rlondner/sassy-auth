@@ -1,0 +1,3 @@
+## 2026-06-27 - Standardizing Table Row Actions and Copy Tooltips
+**Learning:** Icon-only buttons in administrative tables (row actions and copy sqid) were missing consistent tooltips and localized aria-labels, impacting accessibility and discoverability. Radix UI primitives like Tooltip and DropdownMenu require specific passthrough mocks in Jest to avoid context errors and ensure 'asChild' behavior works correctly during unit testing.
+**Action:** Always wrap icon-only table buttons in a Tooltip using 'common.moreActions' or 'common.copy' keys. Use the centralized mock in 'apps/admin/jest.setup.ts' for @sassy-auth/ui to ensure test stability when adding these components.

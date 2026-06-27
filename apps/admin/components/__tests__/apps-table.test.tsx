@@ -10,31 +10,6 @@ jest.mock('@/app/(admin)/apps/actions', () => ({
   listAppsAction: jest.fn(),
 }))
 
-// Radix DropdownMenu does not open in jsdom (it depends on pointer-events
-// detection which jsdom does not implement). Replace it with a trivial
-// always-open passthrough so menu items are queryable. This preserves the
-// test intent: verify that clicking "Delete" surfaces the ConfirmDialog
-// scoped to the correct app.
-jest.mock('@sassy-auth/ui', () => {
-  const actual = jest.requireActual('@sassy-auth/ui')
-  const Passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>
-  const Trigger = ({ children, asChild: _asChild, ...rest }: { children?: React.ReactNode; asChild?: boolean }) =>
-    React.isValidElement(children) ? React.cloneElement(children, rest as object) : <>{children}</>
-  const Item = ({ children, onClick, className }: { children?: React.ReactNode; onClick?: (e: React.MouseEvent) => void; className?: string }) => (
-    <div role="menuitem" tabIndex={-1} className={className} onClick={onClick}>{children}</div>
-  )
-  return {
-    ...actual,
-    DropdownMenu: Passthrough,
-    DropdownMenuTrigger: Trigger,
-    DropdownMenuContent: Passthrough,
-    DropdownMenuItem: Item,
-    DropdownMenuSeparator: () => <hr />,
-    // SidebarTrigger calls useSidebar() which throws without a SidebarProvider.
-    // Replace with a noop button so PageHeader can render in tests.
-    SidebarTrigger: () => <button type="button" aria-label="Toggle Sidebar" />,
-  }
-})
 
 const initial = {
   items: [

@@ -39,6 +39,33 @@ beforeEach(() => {
   jest.setMock('next/headers', nextHeadersMock)
 })
 
+jest.mock('@sassy-auth/ui', () => {
+  const React = require('react')
+  const actual = jest.requireActual('@sassy-auth/ui')
+  const Passthrough = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children)
+  const Trigger = ({ children, asChild, ...rest }: { children?: React.ReactNode; asChild?: boolean }) => {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children, rest)
+    }
+    return React.createElement('div', rest, children)
+  }
+  return {
+    ...actual,
+    TooltipProvider: Passthrough,
+    Tooltip: Passthrough,
+    TooltipTrigger: Trigger,
+    TooltipContent: Passthrough,
+    DropdownMenu: Passthrough,
+    DropdownMenuTrigger: Trigger,
+    DropdownMenuContent: Passthrough,
+    DropdownMenuItem: ({ children, onClick, ...rest }: any) =>
+      React.createElement('div', { role: 'menuitem', onClick, ...rest }, children),
+    DropdownMenuSeparator: () => React.createElement('hr'),
+    SidebarTrigger: () => React.createElement('button', { type: 'button', 'aria-label': 'Toggle Sidebar' }),
+  }
+})
+
 jest.mock('@sentry/nextjs', () => ({
   addBreadcrumb: jest.fn(),
   setUser: jest.fn(),
