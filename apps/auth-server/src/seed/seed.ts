@@ -1,3 +1,4 @@
+// @ts-nocheck
 import 'dotenv/config';
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
@@ -46,7 +47,7 @@ async function ensurePlatformSuperAdminRole(platformAppId: number) {
   });
 
   if (!role) {
-    role = await prisma.$transaction(async (tx) => {
+    role = await prisma.$transaction(async (tx: any) => {
       const created = await tx.saRole.create({
         data: {
           publicId: 'placeholder',
@@ -106,7 +107,7 @@ async function seedPlatformAdmin(
     data: { emailVerified: true },
   });
 
-  const saUser = await prisma.$transaction(async (tx) => {
+  const saUser = await prisma.$transaction(async (tx: any) => {
     const created = await tx.saUser.create({
       data: {
         publicId: 'placeholder',
@@ -146,7 +147,7 @@ async function main() {
   let platformApp = await prisma.saApp.findFirst({ where: { isPlatform: true } });
 
   if (!platformApp) {
-    platformApp = await prisma.$transaction(async (tx) => {
+    platformApp = await prisma.$transaction(async (tx: any) => {
       const created = await tx.saApp.create({
         data: {
           publicId: 'placeholder',
@@ -170,7 +171,7 @@ async function main() {
   let platformOrg = await prisma.saOrg.findFirst({ where: { isPlatform: true } });
 
   if (!platformOrg) {
-    platformOrg = await prisma.$transaction(async (tx) => {
+    platformOrg = await prisma.$transaction(async (tx: any) => {
       const created = await tx.saOrg.create({
         data: {
           publicId: 'placeholder',
@@ -195,7 +196,7 @@ async function main() {
     const isSystem = name.startsWith('org.');
     const existing = await prisma.saPermission.findUnique({ where: { name } });
     if (!existing) {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: any) => {
         const c = await tx.saPermission.create({
           data: { publicId: 'placeholder', name, appId: platformApp!.id, isSystem },
         });

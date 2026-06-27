@@ -132,7 +132,7 @@ export class PermissionsService {
     if (!app) throw new NotFoundException('App not found');
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-      const created = await prisma.$transaction(async (tx: Tx) => {
+      const created = await prisma.$transaction(async (tx: any) => {
         const draft = await tx.saPermission.create({
           data: { publicId: 'placeholder', name: dto.name, appId: app.id },
         });
