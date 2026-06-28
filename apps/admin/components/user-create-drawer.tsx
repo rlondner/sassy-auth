@@ -226,7 +226,6 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
                   {serverError}
                 </p>
               )}
-              </form>
             </SheetBody>
 
             <SheetFooter>
@@ -237,7 +236,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
                 </Button>
               </ButtonGroup>
             </SheetFooter>
-          </>
+          </form>
         )}
       </SheetContent>
     </Sheet>
