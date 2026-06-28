@@ -88,7 +88,7 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
                 <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
               </button>
             </DropdownMenuTrigger>
