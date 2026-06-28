@@ -39,6 +39,37 @@ beforeEach(() => {
   jest.setMock('next/headers', nextHeadersMock)
 })
 
+const React = require('react')
+
+// Mock UI primitives to avoid TooltipProvider context issues in unit tests
+jest.mock('@sassy-auth/ui', () => {
+  const actual = jest.requireActual('@sassy-auth/ui')
+  const React = require('react')
+
+  const Passthrough = ({ children }: { children: any }) =>
+    React.createElement(React.Fragment, null, children)
+
+  const Trigger = ({ children, asChild, ...props }: any) => {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children, props)
+    }
+    return React.createElement('button', props, children)
+  }
+
+  return {
+    ...actual,
+    Tooltip: Passthrough,
+    TooltipTrigger: Trigger,
+    TooltipContent: () => null,
+    TooltipProvider: Passthrough,
+    DropdownMenu: Passthrough,
+    DropdownMenuTrigger: Trigger,
+    DropdownMenuContent: Passthrough,
+    DropdownMenuItem: Passthrough,
+    DropdownMenuSeparator: () => null,
+  }
+})
+
 jest.mock('@sentry/nextjs', () => ({
   addBreadcrumb: jest.fn(),
   setUser: jest.fn(),
