@@ -408,6 +408,8 @@
       "selfDeleteError": "You cannot delete your own account."
     },
     "errors": {
+      "required": "Required",
+      "emailInvalid": "Invalid email",
       "forbidden": "You do not have permission to perform this action.",
       "generic": "Something went wrong. Please try again.",
       "rolesSetFailed": "Failed to update roles.",

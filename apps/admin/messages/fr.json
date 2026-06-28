@@ -408,6 +408,8 @@
       "selfDeleteError": "Vous ne pouvez pas supprimer votre propre compte."
     },
     "errors": {
+      "required": "Obligatoire",
+      "emailInvalid": "Adresse e-mail invalide",
       "forbidden": "Vous n’avez pas la permission d’effectuer cette action.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "rolesSetFailed": "Échec de la mise à jour des rôles.",
