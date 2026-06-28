@@ -170,7 +170,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
             </SheetFooter>
           </>
         ) : (
-          <>
+          <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
             <SheetBody className="flex flex-col gap-6">
               <section>
                 <h3 className="mb-4 text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('users.drawer.basicInfo')}</h3>
@@ -226,12 +226,13 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
                   {serverError}
                 </p>
               )}
+              </form>
             </SheetBody>
 
             <SheetFooter>
               <ButtonGroup>
-                <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={submitting}>{t('users.drawer.cancel')}</Button>
-                <Button onClick={handleSubmit} disabled={submitting}>
+                <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={submitting}>{t('users.drawer.cancel')}</Button>
+                <Button type="submit" disabled={submitting}>
                   {submitting ? '…' : t('users.drawer.create')}
                 </Button>
               </ButtonGroup>
