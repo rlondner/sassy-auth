@@ -73,6 +73,7 @@ model SaApp {
   publicId    String         @unique
   name        String         @unique
   url         String
+  callbackUrl String?
   isPlatform  Boolean        @default(false)
   orgs        SaOrg[]
   permissions SaPermission[]
