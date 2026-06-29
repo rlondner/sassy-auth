@@ -25,6 +25,7 @@ export function AppCreateDrawer({ open, onOpenChange }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState('')
   const [url, setUrl] = React.useState('')
+  const [callbackUrl, setCallbackUrl] = React.useState('')
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
   const [pending, startTransition] = React.useTransition()
 
@@ -32,6 +33,7 @@ export function AppCreateDrawer({ open, onOpenChange }: Props) {
     if (!open) {
       setName('')
       setUrl('')
+      setCallbackUrl('')
       setErrorKey(null)
     }
   }, [open])
@@ -44,7 +46,11 @@ export function AppCreateDrawer({ open, onOpenChange }: Props) {
     }
     setErrorKey(null)
     startTransition(async () => {
-      const result = await createAppAction({ name: name.trim(), url: url.trim() })
+      const result = await createAppAction({
+        name: name.trim(),
+        url: url.trim(),
+        callbackUrl: callbackUrl.trim() || null,
+      })
       if ('errorKey' in result) setErrorKey(result.errorKey)
       else onOpenChange(false)
     })
@@ -82,6 +88,19 @@ export function AppCreateDrawer({ open, onOpenChange }: Props) {
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.urlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="appCallbackUrl">{t('apps.fields.callbackUrl')}</Label>
+              <Input
+                id="appCallbackUrl"
+                type="url"
+                value={callbackUrl}
+                onChange={(e) => setCallbackUrl(e.target.value)}
+                placeholder="https://app.example.com/auth/callback"
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.callbackUrlHint')}
               </p>
             </div>
             <div className="rounded border border-border bg-muted p-3 text-body-sm text-muted-foreground">
