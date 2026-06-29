@@ -96,6 +96,9 @@ describe('AppsService', () => {
     const result = await service.createApp('ba-caller', {
       name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: 'https://portal.example.com/cb',
     });
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ callbackUrl: 'https://portal.example.com/cb' }),
+    }));
     expect(result.callbackUrl).toBe('https://portal.example.com/cb');
   });
 
@@ -104,7 +107,7 @@ describe('AppsService', () => {
     await expect(service.createApp('ba-caller', { name: 'x', url: 'https://x' })).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('updateApp throws BadRequestException when both name and url are absent', async () => {
+  it('updateApp throws BadRequestException when name, url, and callbackUrl are all absent', async () => {
     await expect(service.updateApp('ba-caller', 'sq_1', {})).rejects.toBeInstanceOf(BadRequestException);
     expect(mockPrisma.saApp.findUnique).not.toHaveBeenCalled();
   });

@@ -71,7 +71,7 @@
       "forbidden": "You no longer have permission to perform this action.",
       "generic": "Something went wrong. Please try again.",
       "urlInvalid": "Please enter a valid URL.",
-      "urlInsecure": "In production, app and callback URLs must use https and a public host.",
+      "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
       "nameRequired": "App name is required."
     },
     "badges": {
