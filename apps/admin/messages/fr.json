@@ -36,6 +36,9 @@
     "fields": {
       "name": "Nom de l’application",
       "url": "URL de l’application",
+      "callbackUrl": "URL de rappel",
+      "callbackUrlHint": "Laissez vide pour accepter tout rappel sous l’URL de l’application. Indiquez une URL complète pour exiger une correspondance exacte du redirect_uri.",
+      "callbackUrlDefault": "Par défaut (tout chemin sous l’URL de l’application)",
       "publicId": "ID Public",
       "urlHint": "URL de base principale de cette application."
     },
@@ -67,7 +70,8 @@
       "platformProtected": "Les applications plateforme ne peuvent pas être modifiées.",
       "forbidden": "Vous n’avez plus la permission d’effectuer cette action.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
-      "urlInvalid": "Veuillez saisir une URL valide commençant par https://.",
+      "urlInvalid": "Veuillez saisir une URL valide.",
+      "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
       "nameRequired": "Le nom de l’application est requis."
     },
     "badges": {

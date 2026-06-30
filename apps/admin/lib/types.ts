@@ -63,17 +63,20 @@ export interface App {
   publicId: string;
   name: string;
   url: string;
+  callbackUrl?: string | null;
   isPlatform: boolean;
 }
 
 export interface CreateAppPayload {
   name: string;
   url: string;
+  callbackUrl?: string | null;
 }
 
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
+  callbackUrl?: string | null;
 }
 
 export interface ListAppsParams {

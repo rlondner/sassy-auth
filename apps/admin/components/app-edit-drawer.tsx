@@ -27,6 +27,7 @@ export function AppEditDrawer({ app, open, onOpenChange }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
+  const [callbackUrl, setCallbackUrl] = React.useState(app.callbackUrl ?? '')
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
@@ -34,17 +35,19 @@ export function AppEditDrawer({ app, open, onOpenChange }: Props) {
   React.useEffect(() => {
     setName(app.name)
     setUrl(app.url)
+    setCallbackUrl(app.callbackUrl ?? '')
     setErrorKey(null)
   }, [app])
 
-  const dirty = name !== app.name || url !== app.url
+  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '')
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!dirty) return
-    const patch: { name?: string; url?: string } = {}
+    const patch: { name?: string; url?: string; callbackUrl?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
+    if (callbackUrl !== (app.callbackUrl ?? '')) patch.callbackUrl = callbackUrl.trim() || null
     startTransition(async () => {
       const result = await updateAppAction(app.publicId, patch)
       if ('errorKey' in result) setErrorKey(result.errorKey)
@@ -78,6 +81,19 @@ export function AppEditDrawer({ app, open, onOpenChange }: Props) {
                 onChange={(e) => setUrl(e.target.value)}
                 required
               />
+            </div>
+            <div>
+              <Label htmlFor="appCallbackUrl">{t('apps.fields.callbackUrl')}</Label>
+              <Input
+                id="appCallbackUrl"
+                type="url"
+                value={callbackUrl}
+                onChange={(e) => setCallbackUrl(e.target.value)}
+                placeholder="https://app.example.com/auth/callback"
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.callbackUrlHint')}
+              </p>
             </div>
             <div>
               <Label htmlFor="appPublicId">{t('apps.fields.publicId')}</Label>

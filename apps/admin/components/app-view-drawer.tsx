@@ -60,6 +60,26 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             copied={copied === 'url'}
             copyLabel={t('apps.actions.copy')}
           />
+          {app.callbackUrl ? (
+            <DetailRow
+              label={t('apps.fields.callbackUrl')}
+              value={app.callbackUrl}
+              onCopy={() => copy(app.callbackUrl as string, 'callbackUrl')}
+              copied={copied === 'callbackUrl'}
+              copyLabel={t('apps.actions.copy')}
+            />
+          ) : (
+            <div>
+              <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">
+                {t('apps.fields.callbackUrl')}
+              </p>
+              <div className="mt-1 rounded border border-border bg-card px-3 py-2">
+                <span className="text-body-sm text-muted-foreground">
+                  {t('apps.fields.callbackUrlDefault')}
+                </span>
+              </div>
+            </div>
+          )}
           <DetailRow
             label={t('apps.fields.publicId')}
             value={app.publicId}
