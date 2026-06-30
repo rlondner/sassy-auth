@@ -217,6 +217,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `BETTER_AUTH_SECRET`  | Random string, 32+ characters                                  |
 | `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`. Also used as the JWT `iss` claim. |
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
+| `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
 
 ### Admin console
 
@@ -302,13 +303,18 @@ The user authenticates using any method BetterAuth supports: email/password, mag
 
 **Step 3 — Receive the authorization code**
 
-After successful authentication, SassyAuth validates that the user's org is associated with the requested app, that the `redirect_uri` origin matches the app's registered URL, then redirects to:
+After successful authentication, SassyAuth validates that the user's org is associated with the requested app and that the `redirect_uri` is allowed for that app, then redirects to:
 
 ```
 <redirect_uri>?code=<code>&state=<state>
 ```
 
-The `redirect_uri` must share an origin (scheme + host + port) with the `url` registered on the `sa_app` row. If it doesn't, the authorize call returns `400 invalid_redirect_uri`. `localhost` URIs are allowed for development.
+How the `redirect_uri` is validated depends on the app's `sa_app` row:
+
+- **Default (no `callbackUrl` set):** the `redirect_uri` must share an origin (scheme + host + port) with the app's registered `url`. Any path under that origin is accepted.
+- **With `callbackUrl` set:** the `redirect_uri` must equal the configured `callbackUrl` exactly. A trailing-slash difference is tolerated; scheme, host, port, path, and query string must otherwise match.
+
+A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_redirect_uri`. Note that registering an app whose `url` or `callbackUrl` uses `http` or a `localhost`/loopback host requires the auth server to run with `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true`; by default both must be `https` with a public host (see [Environment Variables](#environment-variables)).
 
 
 **Step 4 — Exchange the code + verifier for a JWT**
@@ -334,7 +340,7 @@ Response:
 }
 ```
 
-> **Note:** The `redirect_uri` must use the same origin (scheme + host + port) as the app's registered URL. `localhost` URIs are allowed for development.
+> **Note:** The `redirect_uri` sent here must match the one validated at the authorize step — by origin against the app's `url`, or exactly against the app's `callbackUrl` when one is configured.
 Authorization codes are single-use and stored in-process (see [Known Limitations](#known-limitations)). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
 
 ### Flow B: Direct Login
@@ -675,8 +681,8 @@ The following items are deferred to later sub-projects and are not yet productio
 **In-memory OAuth code store.**
 Authorization codes from Flow A are stored in memory. They are lost on server restart and the server cannot run as multiple instances behind a load balancer. Replace with Redis or a database table before deploying to production. Tracked as **bug-0039**.
 
-**`redirect_uri` origin-only validation.**
-`redirect_uri` is validated against the app's registered URL origin (scheme + host + port). Any path under that origin is accepted. A per-app allowlist of specific redirect paths (stored in `SaApp`) should be added for tighter control. Tracked as **bug-0047**.
+**`redirect_uri` validation granularity.**
+By default `redirect_uri` is validated against the app's registered `url` origin (scheme + host + port), and any path under that origin is accepted. Apps that need tighter control can now set an optional `callbackUrl` on the `SaApp` row, which forces an exact `redirect_uri` match (trailing-slash tolerant). A full allowlist of multiple distinct redirect paths per app is still not supported. Partially addresses **bug-0047**.
 
 **PKCE `code_verifier` format not validated.**
 The `code_verifier` field is checked for presence but not for RFC 7636 format (43-128 chars of unreserved characters). Tracked as **bug-0041**.
