@@ -17,7 +17,7 @@ interface WindowEntry {
  */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
-  readonly store = new Map<string, WindowEntry>();
+  private readonly store = new Map<string, WindowEntry>();
 
   private get limit(): number {
     const raw = process.env.REGISTER_RATE_LIMIT;

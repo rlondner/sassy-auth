@@ -68,22 +68,26 @@ describe('RateLimitGuard', () => {
 
   it('resets the counter after the window expires', () => {
     process.env.REGISTER_RATE_LIMIT = '1';
-    process.env.REGISTER_RATE_WINDOW_MS = '1'; // 1ms window — expires immediately
+    process.env.REGISTER_RATE_WINDOW_MS = '1000'; // 1000ms window
     const guard = new RateLimitGuard();
     const ctx = makeCtx('10.0.0.3');
+    const ip = '10.0.0.3';
 
+    // First request from this IP passes and creates an entry
     expect(guard.canActivate(ctx)).toBe(true);
-    // Window of 1ms has passed — should reset
-    // Small delay to let the window pass
-    const past = Date.now() - 10;
-    // Simulate by manipulating the internal state
-    // We'll just create a fresh guard with a very small window
-    const guard2 = new RateLimitGuard();
-    // Access the internal map to backdate the window start
-    const internalMap = (guard2 as unknown as { store: Map<string, { count: number; windowStart: number }> }).store;
-    internalMap.set('10.0.0.3', { count: 1, windowStart: past });
-    // Now the window should have expired (1ms ago, window is 1ms)
-    expect(guard2.canActivate(ctx)).toBe(true); // window expired, reset to 1
+
+    // Access the internal store to backdate the window start so it appears expired
+    const store = (guard as unknown as { store: Map<string, { count: number; windowStart: number }> }).store;
+    const windowMs = 1000;
+    const now = Date.now();
+    // Backdate: make windowStart strictly older than the window
+    store.set(ip, { count: 1, windowStart: now - (windowMs + 1) });
+
+    // Next request from the same IP should be allowed because the old window expired
+    expect(guard.canActivate(ctx)).toBe(true); // Should NOT throw 429
+    // Verify the counter was reset (should be 1, not 2)
+    const entry = store.get(ip);
+    expect(entry?.count).toBe(1);
   });
 
   it('allows all requests when REGISTER_RATE_LIMIT is 0 (dev mode)', () => {
