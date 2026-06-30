@@ -486,6 +486,7 @@ Cache the JWKS document locally and refresh it only when you encounter a `kid` y
 | POST   | `/api/token/oauth/token`                      | Exchange authorization code for JWT              |
 | POST   | `/api/token/direct/login`                     | Direct credential login — returns JWT            |
 | ALL    | `/api/auth/*`                                 | BetterAuth: sign-up, sign-in, magic link, OTP, social login |
+| POST   | `/api/register`                               | **Self-serve signup** — atomically create org + user + org↔app association (see below) |
 | GET    | `/api/users`                                  | List users (filter by `orgId`, `appId`)          |
 | GET    | `/api/users/:id`                              | Get user                                         |
 | POST   | `/api/users`                                  | Create user + invitation                         |
@@ -525,6 +526,54 @@ Cache the JWKS document locally and refresh it only when you encounter a `kid` y
 BetterAuth mounts on Express before NestJS and intercepts all `/api/auth/*` routes directly. NestJS handles all other routes.
 
 Full OpenAPI spec is in `docs/`.
+
+---
+
+## Self-serve Registration (`POST /api/register`)
+
+A public endpoint for resource-server-driven customer signup. It atomically creates an org, a BetterAuth user, and the org↔app association in a single transaction.
+
+### Request
+
+```json
+POST /api/register
+Content-Type: application/json
+
+{
+  "email":       "user@example.com",
+  "password":    "s3cr3tP@ss",
+  "companyName": "Acme Corp",
+  "appPublicId": "<sa_app.publicId>"
+}
+```
+
+| Field         | Type   | Rules                    |
+|---------------|--------|--------------------------|
+| `email`       | string | valid email              |
+| `password`    | string | min 8 characters         |
+| `companyName` | string | min 1 character          |
+| `appPublicId` | string | must match an existing app |
+
+### Responses
+
+| Status | Meaning                                     |
+|--------|---------------------------------------------|
+| `201`  | `{ "ok": true }` — org + user created       |
+| `400`  | Validation error (missing/invalid fields)   |
+| `404`  | Unknown `appPublicId`                       |
+| `409`  | Email already registered                    |
+| `429`  | Rate limit exceeded (see below)             |
+
+### Rate limiting
+
+The endpoint is guarded by an in-memory per-IP fixed-window rate limiter. Configure it via env vars:
+
+| Variable                 | Description                                                              | Default      |
+|--------------------------|--------------------------------------------------------------------------|--------------|
+| `REGISTER_RATE_LIMIT`    | Max requests per IP per window. `0` or unset = unlimited (dev/trusted)  | `10`         |
+| `REGISTER_RATE_WINDOW_MS`| Window length in milliseconds                                            | `3600000` (1 h) |
+
+> **Multi-instance note:** the rate-limit store is in-process. In a horizontally-scaled deployment (multiple pods / workers), each instance maintains its own counter. For consistent enforcement across pods, replace the in-memory store with a shared backend such as Redis.
 
 ---
 
