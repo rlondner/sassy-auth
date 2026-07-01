@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle,
   Button, ButtonGroup, Input, Label,
@@ -14,9 +15,10 @@ interface Props {
   org: OrgRow
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
+export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(org.name)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -35,8 +37,13 @@ export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
     if (!dirty) return
     startTransition(async () => {
       const result = await updateOrgAction(org.publicId, { name: name.trim() })
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('orgs.toast.updated'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 

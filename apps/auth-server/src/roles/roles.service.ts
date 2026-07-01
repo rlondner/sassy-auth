@@ -50,9 +50,12 @@ export class RolesService {
       targetAppId = -1; // force cross-app to require platform.roles.manage
     }
 
+    // platform.users.manage included so the /users admin page can populate
+    // the role picker in the user-access drawer without a cross-page
+    // permission grant. Mirrors the orgs/permissions read pattern.
     await checkPermissionForApp(
       callerBaId,
-      ['platform.roles.manage', 'org.roles.manage'],
+      ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
       { targetAppId, callerAppId: caller.org.appId },
     );
 
@@ -112,7 +115,7 @@ export class RolesService {
 
     await checkPermissionForApp(
       callerBaId,
-      ['platform.roles.manage', 'org.roles.manage'],
+      ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
       { targetAppId: row.appId, callerAppId: caller.org.appId },
     );
 

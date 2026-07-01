@@ -4,6 +4,148 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-07-01
+
+Ships the toast/refresh admin UX, the OAuth issuer DRY refactor, and the E2E raceSuccessOrError scoping fix that had been accumulating on the working tree. Roles read gates broadened so the `/users` role picker works without a cross-page permission grant. Docs catch up on Flox, the multi-tenant demo seed, the `/.well-known/oauth-authorization-server` and `/api/me` endpoints, and the CR/BUGS/TODO daily-file convention.
+
+### Added
+
+#### admin — Toast notifications & post-mutation refresh
+- **Sonner integration** — `sonner@^1.7.0` dependency; `<Toaster />` mounted in the root layout inside `ThemeProvider` and `NextIntlClientProvider`, forwards `next-themes` resolved theme so manual light/dark toggles take effect. (`apps/admin/components/toaster.tsx`, `apps/admin/app/layout.tsx`)
+- **15 success toasts** on every CRUD path — create/update/delete for apps, orgs, permissions, roles, and users. All strings via i18n keys (`apps.toast.created`, `orgs.toast.updated`, …). Covers all 5 tables + 10 drawer variants.
+- **`onSuccess?: () => void` prop** on every drawer (create + edit + view) so parent tables can pass a post-mutation refresh callback.
+- **Table refresh helpers** — `apps-table`, `orgs-table`, `permissions-table`, `roles-table` each extract a `refresh` `useCallback` that re-fetches list data via the existing server action and is passed to their create/edit drawers. `users-table` uses `router.refresh()` since the Users page is a Server Component paired with `revalidatePath` in the mutating action.
+
+#### auth-server — OAuth issuer resolution (DRY)
+- **`resolveIssuer()` + `ISSUER_PLACEHOLDER`** exported from `oauth-metadata.ts`. Single source of truth for both the RFC 8414 discovery `issuer` field and the JWT `iss` claim, so the two cannot drift on a trailing slash or on the `https://auth.example.com` fallback. Strips a trailing slash from `BETTER_AUTH_URL` (RFC 8414 issuer matching is string-exact). (`apps/auth-server/src/token/oauth-metadata.ts`)
+- **`NEST_GLOBAL_PREFIX` exported** — the `'api'` prefix is now defined once in `oauth-metadata.ts` and consumed by `configure-nest-app.ts`, replacing the previous duplicate string constant.
+- **`DiscoveryController` startup warning** — logs a `console.warn` when `BETTER_AUTH_URL` is unset so a misconfigured prod deploy that would advertise the `https://auth.example.com` placeholder is observable. (`apps/auth-server/src/token/discovery.controller.ts`)
+- **Test coverage** — `resolveIssuer()` unit tests (verbatim, trailing-slash strip, placeholder fallback, agreement between discovery + JWT paths); `DiscoveryController` startup-warn / no-warn tests. (`apps/auth-server/src/token/oauth-metadata.spec.ts`, `apps/auth-server/src/token/discovery.controller.spec.ts`)
+
+#### docs
+- **README — Flox quick-start** block pointing at `flox activate` for zero-config Node/pnpm/Postgres/Python provisioning. (`README.md`)
+- **README — `SEED_DEMO_MULTITENANT`** documented (app01 + Acme/Globex orgs) alongside the existing `SEED_DEMO`.
+- **README — API surface** now lists `GET /.well-known/oauth-authorization-server`, `GET /api/me`, and the `/oauth-error` admin route; adds a note that all admin CRUD flows show Sonner toasts.
+- **README — Known Limitations** entry for `BETTER_AUTH_URL` not being validated at startup (bug-0115), and for the incomplete escalation-guard coverage on `removeRole` / `checkPermissionForApp` (bug-0094, bug-0097).
+- **README — bug/CR paths** now reference `bugs/BUGS_*.md` and `todo/TODO_*.md` daily-file convention instead of the legacy `TODO.md` / `BUGs.md`.
+- **`.env.example`** — adds `SEED_DEMO_MULTITENANT=` alongside `SEED_DEMO=`, so developers copying `.env.example` discover the multi-tenant demo seed.
+- **`.gitignore`** — ignore `/.roborev/` snapshots.
+
+### Changed
+
+- **`TokenService.issueJwt`** — uses `resolveIssuer()` instead of inline `process.env.BETTER_AUTH_URL ?? 'https://auth.example.com'`, so the JWT `iss` claim and the discovery `issuer` field share the same normalization path. (`apps/auth-server/src/token/token.service.ts`)
+- **`DiscoveryController.getOAuthAuthorizationServerMetadata`** — now calls `resolveIssuer()` (was reading `process.env.BETTER_AUTH_URL` directly). (`apps/auth-server/src/token/discovery.controller.ts`)
+- **`RolesService.listRoles` / `getRole` read gates** — accept `platform.users.manage` in addition to `platform.roles.manage` / `org.roles.manage`, so the `/users` admin page can populate the role picker in the user-access drawer without needing a cross-page grant. Mirrors the orgs/permissions read pattern. Matrix test rotation and unit tests updated. (`apps/auth-server/src/roles/roles.service.ts`, `apps/auth-server/src/roles/roles.service.spec.ts`, `apps/auth-server/test/matrix/permissions-matrix.ts`)
+- **`raceSuccessOrError` (E2E)** — all 5 admin-e2e page objects (`apps`, `orgs`, `permissions`, `roles`, `users`) scope error detection to `[data-sonner-toaster], [role="dialog"], [role="alertdialog"]` instead of the whole page. Next.js Dev Tools mounts a persistent empty `role="alert"` placeholder at the page root; a global `page.getByRole('alert')` matched it on every poll and made the error race always win.
+- **OAuth authorize E2E route mock** — `oauth-authorize-flow.spec.ts` narrows the `page.route` stub from `${origin}/**` to exactly `origin === redirectUriOrigin && pathname === '/cb'`. The broad mock intercepted `/api/token/oauth/authorize` itself when `platformApp.url` shares the auth-server's origin (the default `BETTER_AUTH_URL=http://localhost:3000` case), causing the test to hang on the authorize endpoint with an empty body.
+- **Playwright workers** — `CI_TESTS ? 1 : 1` (both branches serialize). Preserves the earlier local finding that Next.js dev-mode route compilation gets overwhelmed on cold-start parallel first-hits at 30s test timeout.
+
+### Known open bugs
+
+Daily bug/CR/TODO snapshots continue to live under `bugs/BUGS_*.md`, `code_reviews/CR_*.md`, and `todo/TODO_*.md`. Notable open items observed during the review window (bug-0112 … bug-0130) — French toast i18n untranslated (bug-0112), `refresh()` errors unhandled after mutations (bug-0114), `resolveIssuer()` accepts non-URL strings (bug-0115), `DeleteAlertDialog` error `<div>` missing `role="alert"` (bug-0120), `OrgsService` cross-tenant listing (bug-0121), double `stripTrailingSlash` (bug-0122) — remain open and are not addressed here.
+
+---
+
+## [Unreleased] — 2026-06-19
+
+Massive day — 48 commits across two major feature branches (#114 feat/flox, #115 feat/org-scoped-admin), OAuth AS discovery, E2E fixes, and infrastructure cleanup. The org-scoped multi-tenant admin feature is the highlight: `SaPermission.isSystem`, app-scoped RBAC helpers, escalation guards, `GET /api/me` profile, permission-driven sidebar, and comprehensive scenario tests.
+
+### Added
+
+#### auth-server — Org-scoped multi-tenant administration (PR #115)
+
+- **`SaPermission.isSystem` column** — new boolean column on permissions marking system-level perms that bypass app-scope checks. Migration sets `isSystem = true` on all `org.*` permissions. (`cc2c476`)
+- **`checkPermissionForApp` helper** — app-scoped permission check for routes that operate within a single app's context. Non-platform permissions are rejected when the caller's app doesn't match the target app. (`b22f85f`)
+- **`resolvePermissionIdsForApp`** honors `isSystem` flag — system permissions bypass the app-scope filter, allowing them to be assigned cross-app. (`efe06b3`)
+- **`assertCallerCanGrantSystemPerms` escalation guard** — prevents privilege escalation by verifying the caller holds (directly or via roles) every system permission they're trying to grant. (`a4f6285`)
+- **Escalation guard wired into user-assignment paths** — `assignRole`, `setUserRoles`, `setUserDirectPermissions`, and `createUser` all invoke the escalation guard before modifying grants. (`2a1c972`)
+- **`GET /api/me` profile endpoint** — returns the caller's org, app context, and effective permissions for the admin UI's permission-driven behavior. (`f982259`)
+- **Roles service: app-scoped gates** — `listRoles`/`createRole`/`updateRole`/`deleteRole` now check `platform.roles.manage` or `org.roles.manage` and scope reads by app. (`91f4a07`)
+- **Permissions service: expose `isSystem`** — list and get responses include the `isSystem` flag. Immutability check extended to `isSystem` permissions. (`7424530`, `e7ee534`)
+- **Orgs/permissions reads opened to `platform.users.manage`** — org-scoped admins with user management permission can now list orgs and permissions within their app scope. (`4e06f17`)
+- **`SaRole @@unique([appId, name])` constraint** — role names are now enforced unique per app via DB constraint + migration. (`a13b1b7`)
+- **Permission catalog migration** — split `platform.permissions.manage`, added `platform.roles.manage` + `org.roles.manage`, dropped `org.permissions.manage` with grant re-pointing. (`86d8a3a`)
+- **Seed: `platform.roles.manage` + `org.roles.manage`** — new platform permissions seeded; added `r@sa.io` admin user. (`60a4912`)
+- **Seed: `SEED_DEMO_MULTITENANT`** — new scenario creating `app01` with Acme and Globex orgs, 3 users each, with `org.users.manage` + `org.roles.manage` + custom app permissions. (`2e414f1`)
+
+#### admin — Org-scoped UI (PR #115)
+
+- **Permission-driven sidebar** — admin shell fetches `GET /api/me/permissions` and conditionally shows nav items based on the caller's effective permissions. (`4df9ee7`)
+- **`getMyProfile` client** — `lib/api.ts` client helper for `GET /api/me`. (`b72dae7`)
+- **`Permission.isSystem` type + System badge** — permissions table renders a "System" badge for `isSystem` permissions and locks edit/delete actions. (`b72dae7`, `0c5a67`)
+- **Roles page: app-scoped** — non-platform callers see only their own app's roles; write affordances gated behind `canWrite`. (`c9d64aa`)
+- **Users page: org-scoped default** — non-platform callers' Users page filters default to their own org. (`5999425`)
+- **Sentry capture for /me failures** — `/api/me` fetch failures in the admin layout are reported to Sentry instead of silently swallowed. (`07f7d2a`)
+
+#### auth-server — OAuth AS Discovery (latest on master)
+
+- **`GET /.well-known/oauth-authorization-server`** — RFC 8414 OAuth Authorization Server metadata document exposing issuer, authorization/token/jwks endpoints, supported response types, grant types, and code challenge methods. (`4e06f17`)
+- **`DiscoveryController`** — NestJS controller mounted outside the global prefix at `/.well-known/`. (`4e06f17`)
+
+#### Flox environment (PR #114)
+
+- **`.flox/env/manifest.toml`** — Flox environment with `nodejs_26`, `pnpm`, `postgresql`, `python311`, `uv`. (`6602267`)
+- **Postgres service** — auto-provisioned via Flox services with `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE` env vars. (`97c3b35`)
+- **Auto-generate `.env.local`** — on first `flox activate`, generates RSA key pair, `BETTER_AUTH_SECRET`, and all other required env vars. (`97c3b35`)
+- **Auto-run migrations and seed** — first activation runs `prisma migrate deploy` and `db:seed` automatically. (`1e1b34c`)
+
+#### Testing
+
+- **Multi-tenant scenario tests** — `bootScenarioApp` + demo-user helpers, visibility isolation spec (Acme/Globex admins see only their org's users), grant-ceiling spec (escalation guard blocks cross-permission-level grants). (`9d7c425`, `8962f65`, `20e2d7d`)
+- **Migration verification test** — verifies `org.roles.manage` re-point and `org.permissions.manage` drop. (`3aef3e2`)
+- **E2E multi-tenant tenant admin** — Playwright spec verifying tenant admin sees only their own org's users and scoped sidebar. (`c9910fd`)
+- **Sidebar unit tests** — platform super, tenant admin, and single-perm holder sidebar visibility. (`477a536`)
+- **Matrix test rotation** — updated for `platform.roles.manage` split. (`701ace6`)
+- **Prisma binary resolution** — E2E tests now resolve prisma via absolute path instead of npx. (`1e22059`)
+
+#### Infrastructure
+
+- **Timestamped test results** — `scripts/log-test.mjs` writes test results to `test-results/` with timestamps. (`0370241`)
+- **Code review files moved** — historical code review reports moved to `code_reviews/` directory. (`681bf68`)
+- **`.gitignore` updates** — ignore `.claude/worktrees/`, `test-results/`, turbo watch config. (`70515ea`, `155d036`)
+
+### Fixed
+
+- **bug-0027 / bug-0078** — Role name uniqueness: `@@unique([appId, name])` constraint added via migration `20260618215604`. (`a13b1b7`)
+- **E2E test fixes** — Playwright page objects refactored with `raceSuccessOrError` pattern, users page object expanded, Flox manifest fixes. (`ac648f6`)
+
+### Bugs found (18 new)
+
+See [TODO_2026-06-19.md](./todo/TODO_2026-06-19.md) and [BUGS_2026-06-19.md](./bugs/BUGS_2026-06-19.md).
+
+#### Critical
+
+- **bug-0094** — `checkPermissionForApp` silently grants access when `targetAppId` is undefined — any non-platform permission holder gets unconditional access.
+- **bug-0099** — Migration 20260618220100 uses literal `publicId` strings that violate the unique constraint on re-run (partial migration recovery).
+- **bug-0101** — `closeScenarioApp()` in the first scenario spec's `afterAll` tears down the shared NestJS server; second spec fails with `ERR_SERVER_NOT_RUNNING`.
+
+#### Warning
+
+- **bug-0095** — TOCTOU race in OAuth authorize vs code exchange: user's org/app membership not re-validated at code exchange.
+- **bug-0096** — `updatePermission` allows renaming a non-platform permission to a `platform.*` prefix.
+- **bug-0097** — `removeRole` has no escalation guard (asymmetric with `assignRole`).
+- **bug-0098** — Migration isSystem bulk UPDATE affects all apps' `org.*` permissions, not just the platform app.
+- **bug-0100** — New permissions from migration left with `pending-*` placeholder publicIds until the next seed.
+- **bug-0102** — Grant-ceiling scenario tests are order-dependent with no teardown.
+- **bug-0103** — `permissions-table.tsx` has no `canWrite` prop; edit/delete shown based on name heuristic only.
+- **bug-0104** — `users-table.tsx` `initialOrgId`/`canPickOrg` props accepted but voided; org filtering non-functional.
+- **bug-0105** — `permission-view-drawer.tsx` fetch error silently swallowed; sections appear empty with no feedback.
+- **bug-0106** — Admin layout uses `notFound()` instead of `redirect('/login')` for unauthenticated sessions.
+- **bug-0107** — `roles/page.tsx` throws raw `allSettled` rejection to error boundary, leaking API paths.
+- **bug-0108** — `raceSuccessOrError` in E2E page objects resolves silently when both timeout (false positive).
+
+#### Minor
+
+- **bug-0109** — `playwright.config.ts` workers ternary is a dead branch (`CI_TESTS ? 1 : 1`).
+- **bug-0110** — `roles.service.ts` `updateRole` missing null check after `findUnique` in transaction.
+- **bug-0111** — `me.controller.ts` unsafe cast to extract `betterAuthUser` without optional chaining.
+
+### Project health note
+
+After today's review: 2 bugs fixed (bug-0027, bug-0078), 18 new bugs found. Net bug count: **109 open** (93 prior - 2 fixed + 18 new). The org-scoped admin feature is a significant architectural improvement, but the migration safety issues (bug-0098, bug-0099, bug-0100) and the escalation guard coverage gaps (bug-0094, bug-0096, bug-0097) should be addressed before deploying to a multi-tenant production environment. The 5 original critical bugs (bug-0001, bug-0038, bug-0039, bug-0054, bug-0074) remain open. Day 23 with zero fixes merged to production.
+
+---
+
 ## [Unreleased] — 2026-06-18
 
 ### Changed (palette/table-action-tooltips branch — PR #107, not merged)

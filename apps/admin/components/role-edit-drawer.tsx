@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle,
   Button, ButtonGroup, Input, Label,
@@ -17,9 +18,10 @@ interface Props {
   role: RoleRow
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function RoleEditDrawer({ role, open, onOpenChange }: Props) {
+export function RoleEditDrawer({ role, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(role.name)
   const [initialPermIds, setInitialPermIds] = React.useState<string[]>([])
@@ -82,8 +84,13 @@ export function RoleEditDrawer({ role, open, onOpenChange }: Props) {
     if (permsDirty) patch.permissionIds = currentIds
     startTransition(async () => {
       const result = await updateRoleAction(role.publicId, patch)
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('roles.toast.updated'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 

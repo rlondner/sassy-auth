@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet,
   SheetBody,
@@ -19,9 +20,10 @@ import { createAppAction } from '@/app/(admin)/apps/actions'
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function AppCreateDrawer({ open, onOpenChange }: Props) {
+export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState('')
   const [url, setUrl] = React.useState('')
@@ -45,8 +47,13 @@ export function AppCreateDrawer({ open, onOpenChange }: Props) {
     setErrorKey(null)
     startTransition(async () => {
       const result = await createAppAction({ name: name.trim(), url: url.trim() })
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('apps.toast.created'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 

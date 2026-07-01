@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import { KeyRound, Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
@@ -160,6 +161,13 @@ export function PermissionsTable({ initial, apps }: Props) {
     },
   ]
 
+  const refresh = React.useCallback(async () => {
+    const refreshed = await listPermissionsAction({
+      q: query || undefined, appId: appFilter || undefined, page, pageSize,
+    })
+    if (refreshed && 'items' in refreshed) setData(refreshed)
+  }, [query, appFilter, page, pageSize])
+
   async function handleDelete() {
     if (!selected) return
     const result = await deletePermissionAction(selected.publicId)
@@ -169,10 +177,8 @@ export function PermissionsTable({ initial, apps }: Props) {
     }
     setDeleteOpen(false)
     setViewOpen(false)
-    const refreshed = await listPermissionsAction({
-      q: query || undefined, appId: appFilter || undefined, page, pageSize,
-    })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    toast.success(t('permissions.toast.deleted'))
+    await refresh()
   }
 
   return (
@@ -245,9 +251,10 @@ export function PermissionsTable({ initial, apps }: Props) {
           permission={selected}
           open={editOpen}
           onOpenChange={setEditOpen}
+          onSuccess={refresh}
         />
       )}
-      <PermissionCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} />
+      <PermissionCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} onSuccess={refresh} />
       {selected && (
         <DeleteAlertDialog
           open={deleteOpen}

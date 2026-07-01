@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet,
   SheetBody,
@@ -21,9 +22,10 @@ interface Props {
   app: App
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function AppEditDrawer({ app, open, onOpenChange }: Props) {
+export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
@@ -47,8 +49,13 @@ export function AppEditDrawer({ app, open, onOpenChange }: Props) {
     if (url !== app.url) patch.url = url.trim()
     startTransition(async () => {
       const result = await updateAppAction(app.publicId, patch)
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('apps.toast.updated'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 

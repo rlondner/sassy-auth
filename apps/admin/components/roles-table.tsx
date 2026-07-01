@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import { ShieldEllipsis, Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -156,6 +157,13 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
     },
   ]
 
+  const refresh = React.useCallback(async () => {
+    const refreshed = await listRolesAction({
+      q: query || undefined, appId: appFilter || undefined, page, pageSize,
+    })
+    if (refreshed && 'items' in refreshed) setData(refreshed)
+  }, [query, appFilter, page, pageSize])
+
   async function handleDelete() {
     if (!selected) return
     const result = await deleteRoleAction(selected.publicId)
@@ -165,10 +173,8 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
     }
     setDeleteOpen(false)
     setViewOpen(false)
-    const refreshed = await listRolesAction({
-      q: query || undefined, appId: appFilter || undefined, page, pageSize,
-    })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    toast.success(t('roles.toast.deleted'))
+    await refresh()
   }
 
   return (
@@ -245,9 +251,10 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
           role={selected}
           open={editOpen}
           onOpenChange={setEditOpen}
+          onSuccess={refresh}
         />
       )}
-      {canWrite && <RoleCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} />}
+      {canWrite && <RoleCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} onSuccess={refresh} />}
       {selected && (
         <DeleteAlertDialog
           open={deleteOpen}

@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetContent, SheetHeader, SheetBody, SheetClose, SheetTitle,
   Button, ButtonGroup, UserAvatar, StatusChip, Badge,
@@ -30,6 +31,7 @@ interface UserViewDrawerProps {
   orgs: Org[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
 interface ProfileSnapshot {
@@ -39,7 +41,7 @@ interface ProfileSnapshot {
   username: string
 }
 
-export function UserViewDrawer({ user, orgs, open, onOpenChange }: UserViewDrawerProps) {
+export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: UserViewDrawerProps) {
   const t = useTranslations()
   const [roles, setRoles] = React.useState<Role[]>([])
   const [permissions, setPermissions] = React.useState<Permission[]>([])
@@ -212,7 +214,11 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange }: UserViewDrawe
     }
 
     setSaving(false)
-    if (allOk) setEditing(false)
+    if (allOk) {
+      toast.success(t('users.toast.updated'))
+      setEditing(false)
+      onSuccess?.()
+    }
   }
 
   function handleCancel() {
@@ -400,6 +406,8 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange }: UserViewDrawe
             setDeleteError(t(result.errorKey))
             return
           }
+          toast.success(t('users.toast.deleted'))
+          onSuccess?.()
           onOpenChange(false)
         }}
       />

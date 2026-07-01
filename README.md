@@ -47,6 +47,8 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
 - pnpm >= 9
 - PostgreSQL 14+
 
+**Alternative: Flox (zero-config).** If you have [Flox](https://flox.dev) installed, run `flox activate` in the project root. It provisions Node.js, pnpm, PostgreSQL, Python, and uv automatically, generates `.env.local` with RSA keys and all required variables, runs database migrations, and seeds platform data. Skip to [step 6](#6-start-the-development-servers) after activation.
+
 ---
 
 ## Project Structure
@@ -161,7 +163,8 @@ The seed script is idempotent — safe to run multiple times. It creates:
 
 - The platform app (`isPlatform: true`, name "SassyAuth")
 - The platform org (`isPlatform: true`, name "Platform")
-- Platform permissions: `platform.orgs.manage`, `platform.apps.manage`, `platform.users.manage`, `platform.permissions.manage`, `org.users.manage`, `org.permissions.manage`
+- Platform permissions: `platform.orgs.manage`, `platform.apps.manage`, `platform.users.manage`, `platform.permissions.manage`, `platform.roles.manage`, `org.users.manage`, `org.roles.manage`
+- System permissions (`isSystem: true`): `org.users.manage`, `org.roles.manage` — these bypass app-scope checks
 
 ```bash
 pnpm --filter @sassy-auth/db db:seed
@@ -169,7 +172,9 @@ pnpm --filter @sassy-auth/db db:seed
 
 The seed also creates 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `p@sa.io`, `s@sa.io`), each with password `Pass@word1234`. `s@sa.io` is the super admin and is the recommended account for first sign-in.
 
-**Optional — demo resource server data.** Set `SEED_DEMO=1` to additionally create a sample app (`resourceserver01`), an org (`Citadel`), 8 `rs.*` permissions, 2 roles, and 2 demo users (`m@cpm.io`, `i@cpm.io`) used by the [FastAPI sample resource server](apps/resource-server-fastapi/README.md):
+**Optional — demo resource server data.** Set `SEED_DEMO=1` to additionally create a sample app (`resourceserver01`), an org (`Citadel`), 8 `rs.*` permissions, 2 roles, and 2 demo users (`m@cpm.io`, `i@cpm.io`) used by the [FastAPI sample resource server](apps/resource-server-fastapi/README.md).
+
+**Optional — multi-tenant demo data.** Set `SEED_DEMO_MULTITENANT=1` to create a second sample app (`app01`) with two orgs (Acme, Globex), 3 users each, and org-scoped permissions (`contracts.read`, `contracts.create`, `org.users.manage`, `org.roles.manage`). Useful for testing the org-scoped admin experience.
 
 
 
@@ -226,6 +231,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `http://localhost:3000`      |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | Comma-separated origins allowed by `/login?next=` redirect validation (in addition to `AUTH_SERVER_URL`). Default: empty |
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
+| `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
 | `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
 
 ### Observability (optional)
@@ -475,10 +481,12 @@ Cache the JWKS document locally and refresh it only when you encounter a `kid` y
 
 | Method | Path                                          | Description                                      |
 |--------|-----------------------------------------------|--------------------------------------------------|
+| GET    | `/.well-known/oauth-authorization-server`     | RFC 8414 OAuth AS metadata (issuer, endpoints, supported methods) |
 | GET    | `/api/token/jwks`                             | JWKS document with RS256 public key              |
 | GET    | `/api/token/oauth/authorize`                  | OAuth2 authorization — initiates login flow      |
 | POST   | `/api/token/oauth/token`                      | Exchange authorization code for JWT              |
 | POST   | `/api/token/direct/login`                     | Direct credential login — returns JWT            |
+| GET    | `/api/me`                                     | Caller's profile: org, app context, effective permissions |
 | ALL    | `/api/auth/*`                                 | BetterAuth: sign-up, sign-in, magic link, OTP, social login |
 | GET    | `/api/users`                                  | List users (filter by `orgId`, `appId`)          |
 | GET    | `/api/users/:id`                              | Get user                                         |
@@ -541,11 +549,14 @@ pnpm --filter @sassy-auth/admin dev
 Routes:
 - `/login` — credential login (proxies BetterAuth via Server Action)
 - `/accept-invite?token=...` — invitation landing
+- `/oauth-error` — OAuth error page (shown when the authorize flow fails; optionally links to `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`)
 - `/users` — users management (TanStack Table, view/edit/create drawers)
 - `/orgs` — org management
 - `/apps` — app management
 - `/roles` — role management with inline permission assignment
 - `/permissions` — permission management with role/user detail view
+
+All CRUD operations (create, update, delete) show success toast notifications via [Sonner](https://sonner.emilkowal.dev/). The `<Toaster />` is mounted in the root layout and respects the user's light/dark theme preference.
 
 i18n is wired with `next-intl` (locales: `en`, `fr`). Strings live in `apps/admin/messages/`. The active locale is detected from the `Accept-Language` header and can be overridden via the `LocaleSwitcher` in the shell.
 
@@ -670,7 +681,7 @@ Tests are in `apps/admin-e2e/tests/`. In CI, the Playwright config automatically
 
 ## Known Limitations
 
-The following items are deferred to later sub-projects and are not yet production-ready. See `TODO.md` for the full follow-up list and `BUGs.md` for catalogued bugs.
+The following items are deferred to later sub-projects and are not yet production-ready. See `todo/TODO_*.md` for daily follow-up lists and `bugs/BUGS_*.md` for the full bug catalog.
 
 **In-memory OAuth code store.**
 Authorization codes from Flow A are stored in memory. They are lost on server restart and the server cannot run as multiple instances behind a load balancer. Replace with Redis or a database table before deploying to production. Tracked as **bug-0039**.
@@ -693,8 +704,14 @@ Neither the OAuth authorize flow nor the direct login flow checks `saUser.status
 **No rate limiting on authentication endpoints.**
 The `/api/token/direct/login` and `/api/invitations/:token` endpoints accept unlimited requests. Brute-force password attacks are unthrottled. Tracked as **bug-0080**.
 
+**Escalation guard coverage is incomplete.**
+The `assertCallerCanGrantSystemPerms` guard is applied to `assignRole` and `setUserRoles` but not to `removeRole`. `checkPermissionForApp` has a silent bypass when `targetAppId` is undefined. Tracked as **bug-0094** and **bug-0097**.
+
 **CI — E2E only, no typecheck/lint.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. Typecheck and lint are not yet wired into CI. Note: the e2e workflow excludes `@sassy-auth/auth-server` from `turbo build` due to pre-existing build errors (tracked as **bug-0092**).
 
 **Set-replace DTOs lack array size limits.**
 The `PUT /users/:id/roles` and `PUT /users/:id/direct-permissions` endpoints accept arrays of any size (including empty). No `@ArrayMaxSize` is enforced. Tracked as **bug-0034**.
+
+**`BETTER_AUTH_URL` not validated at startup.**
+`resolveIssuer()` accepts any string — empty, whitespace, or non-URL values produce a malformed `issuer` in the OAuth AS discovery document and in every JWT's `iss` claim. A warning is logged when the variable is unset, but not when it is set to an invalid value. Tracked as **bug-0115**.

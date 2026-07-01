@@ -67,17 +67,24 @@ function escapeRe(s: string): string {
 }
 
 async function raceSuccessOrError(page: Page, successText: string) {
+  // Scope error detection to sonner's toast container + any open dialog/
+  // alertdialog. Next.js Dev Tools mounts a persistent empty role="alert"
+  // placeholder at the page root — a global page.getByRole('alert') would
+  // match it on every poll and the error race would always win.
+  const errorScope = page.locator(
+    '[data-sonner-toaster], [role="dialog"], [role="alertdialog"]',
+  )
   const success = page.getByText(successText)
     .waitFor({ state: 'visible', timeout: 10_000 })
     .then(() => 'success' as const)
     .catch(() => null)
-  const error = page.getByRole('alert')
+  const error = errorScope.getByRole('alert')
     .waitFor({ state: 'visible', timeout: 10_000 })
     .then(() => 'error' as const)
     .catch(() => null)
   const outcome = await Promise.race([success, error])
   if (outcome === 'error') {
-    const text = (await page.getByRole('alert').textContent())?.trim() ?? '<unknown>'
+    const text = (await errorScope.getByRole('alert').textContent())?.trim() ?? '<unknown>'
     throw new Error(`UI rendered error toast: "${text}"`)
   }
 }

@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
@@ -133,6 +134,11 @@ export function AppsTable({ initial }: Props) {
     },
   ]
 
+  const refresh = React.useCallback(async () => {
+    const refreshed = await listAppsAction({ q: query || undefined, page, pageSize })
+    if (refreshed && 'items' in refreshed) setData(refreshed)
+  }, [query, page, pageSize])
+
   async function handleDelete() {
     if (!selected) return
     const result = await deleteAppAction(selected.publicId)
@@ -142,8 +148,8 @@ export function AppsTable({ initial }: Props) {
     }
     setDeleteOpen(false)
     setViewOpen(false)
-    const refreshed = await listAppsAction({ q: query || undefined, page, pageSize })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    toast.success(t('apps.toast.deleted'))
+    await refresh()
   }
 
   return (
@@ -202,9 +208,10 @@ export function AppsTable({ initial }: Props) {
           app={selected}
           open={editOpen}
           onOpenChange={setEditOpen}
+          onSuccess={refresh}
         />
       )}
-      <AppCreateDrawer open={createOpen} onOpenChange={setCreateOpen} />
+      <AppCreateDrawer open={createOpen} onOpenChange={setCreateOpen} onSuccess={refresh} />
       {selected && (
         <DeleteAlertDialog
           open={deleteOpen}

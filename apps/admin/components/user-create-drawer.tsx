@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetContent, SheetHeader, SheetBody, SheetFooter, SheetClose, SheetTitle, SheetDescription,
   Button, ButtonGroup, FormField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -17,6 +18,7 @@ interface UserCreateDrawerProps {
   orgs: Org[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
 interface FormState {
@@ -35,7 +37,7 @@ const EMPTY: FormState = {
   orgId: '', roleIds: [], directPermissionIds: [],
 }
 
-export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerProps) {
+export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCreateDrawerProps) {
   const t = useTranslations()
   const [form, setForm] = React.useState<FormState>(EMPTY)
   const [roles, setRoles] = React.useState<RoleOption[]>([])
@@ -111,8 +113,13 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
           directPermissionIds: Array.from(new Set(form.directPermissionIds.filter((id) => id !== ''))),
         }),
       })
-      if ('error' in result) setServerError(result.error)
-      else setInviteUrl(result.inviteUrl)
+      if ('error' in result) {
+        setServerError(result.error)
+      } else {
+        toast.success(t('users.toast.created'))
+        setInviteUrl(result.inviteUrl)
+        onSuccess?.()
+      }
     } finally {
       setSubmitting(false)
     }

@@ -47,3 +47,6 @@ apps/auth-server/.env
 .gstack/
 /tmp
 .claude/scheduled_tasks.lock
+# roborev snapshots
+/.roborev/
+pnpm-lock.yaml
