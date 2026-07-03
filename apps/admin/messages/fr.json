@@ -13,13 +13,10 @@
     "switchToDark": "Passer en mode sombre"
   },
   "common": {
-    "save": "Enregistrer",
-    "edit": "Modifier",
-    "delete": "Supprimer",
-    "confirm": "Confirmer",
-    "moreActions": "Plus d'actions",
-    "copy": "Copier",
-    "copied": "Copié !"
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm"
   },
   "apps": {
     "title": "Applications",

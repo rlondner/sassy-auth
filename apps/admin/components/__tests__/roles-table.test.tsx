@@ -25,10 +25,6 @@ jest.mock('@sassy-auth/ui', () => {
   )
   return {
     ...actual,
-    TooltipProvider: Passthrough,
-    Tooltip: Passthrough,
-    TooltipTrigger: Trigger,
-    TooltipContent: Passthrough,
     DropdownMenu: Passthrough,
     DropdownMenuTrigger: Trigger,
     DropdownMenuContent: Passthrough,
