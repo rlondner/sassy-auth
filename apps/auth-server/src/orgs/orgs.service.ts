@@ -90,7 +90,7 @@ export class OrgsService {
     if (app.isPlatform) throw new ForbiddenException('Cannot create orgs under a platform app');
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-      const created = await prisma.$transaction(async (tx: Tx) => {
+      const created = await prisma.$transaction(async (tx: any) => {
         const draft = await tx.saOrg.create({
           data: { publicId: 'placeholder', name: dto.name, appId: app.id, isPlatform: false },
         });

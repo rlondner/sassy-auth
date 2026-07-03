@@ -41,7 +41,7 @@ describe('migration 20260618220100: drop org.permissions.manage', () => {
       include: { permissions: { include: { permission: true } } },
     });
     expect(superRole).not.toBeNull();
-    const permNames = superRole!.permissions.map((rp) => rp.permission.name);
+    const permNames = superRole!.permissions.map((rp: any) => rp.permission.name);
     expect(permNames).toContain('platform.roles.manage');
   });
 });

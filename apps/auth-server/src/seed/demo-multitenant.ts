@@ -35,7 +35,7 @@ const USERS: readonly UserSeed[] = [
 async function ensureApp() {
   const found = await prisma.saApp.findUnique({ where: { name: APP_NAME } });
   if (found) return found;
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     const created = await tx.saApp.create({
       data: { publicId: 'placeholder', name: APP_NAME, url: APP_URL, isPlatform: false },
     });
@@ -49,7 +49,7 @@ async function ensureApp() {
 async function ensureOrg(appId: number, name: string) {
   const found = await prisma.saOrg.findFirst({ where: { appId, name } });
   if (found) return found;
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     const created = await tx.saOrg.create({
       data: { publicId: 'placeholder', name, appId, isPlatform: false },
     });
@@ -63,7 +63,7 @@ async function ensureOrg(appId: number, name: string) {
 async function ensureAppPermission(appId: number, name: string) {
   let perm = await prisma.saPermission.findUnique({ where: { name } });
   if (perm) return perm;
-  perm = await prisma.$transaction(async (tx) => {
+  perm = await prisma.$transaction(async (tx: any) => {
     const c = await tx.saPermission.create({
       data: { publicId: 'placeholder', name, appId, isSystem: false },
     });
@@ -90,7 +90,7 @@ async function ensureUser(seed: UserSeed, orgIdByName: Record<string, number>, s
 
   let saUser = await prisma.saUser.findFirst({ where: { betterAuthUserId: baUserId } });
   if (!saUser) {
-    saUser = await prisma.$transaction(async (tx) => {
+    saUser = await prisma.$transaction(async (tx: any) => {
       const c = await tx.saUser.create({
         data: {
           publicId: 'placeholder',

@@ -134,7 +134,7 @@ export class RolesService {
 
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-      const created = await prisma.$transaction(async (tx: Tx) => {
+      const created = await prisma.$transaction(async (tx: any) => {
         const draft = await tx.saRole.create({
           data: { publicId: 'placeholder', name: dto.name, appId: app.id },
         });
@@ -181,7 +181,7 @@ export class RolesService {
 
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-      const updated = await prisma.$transaction(async (tx: Tx) => {
+      const updated = await prisma.$transaction(async (tx: any) => {
         if (dto.name !== undefined) {
           await tx.saRole.update({ where: { publicId }, data: { name: dto.name } });
         }
@@ -220,7 +220,7 @@ export class RolesService {
     if (!existing) throw new NotFoundException();
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-      await prisma.$transaction(async (tx: Tx) => {
+      await prisma.$transaction(async (tx: any) => {
         await tx.saRolePermission.deleteMany({ where: { roleId: existing.id } });
         await tx.saRole.delete({ where: { publicId } });
       });

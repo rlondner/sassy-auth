@@ -48,7 +48,7 @@ export class RegistrationService {
     // 3. Atomically create saOrg (with publicId) + saUser linked to the BA user
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-      const org = await prisma.$transaction(async (tx: Tx) => {
+      const org = await prisma.$transaction(async (tx: any) => {
         const draft = await tx.saOrg.create({
           data: { publicId: 'placeholder', name: dto.companyName, appId: app.id, isPlatform: false },
         });

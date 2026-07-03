@@ -40,10 +40,10 @@ export async function assertCallerCanGrantSystemPerms(
   if (!saUser) throw new ForbiddenException();
 
   const callerPerms = new Set<string>();
-  saUser.roles.forEach((ur) =>
-    ur.role.permissions.forEach((rp) => callerPerms.add(rp.permission.name)),
+  saUser.roles.forEach((ur: any) =>
+    ur.role.permissions.forEach((rp: any) => callerPerms.add(rp.permission.name)),
   );
-  saUser.directPermissions.forEach((up) => callerPerms.add(up.permission.name));
+  saUser.directPermissions.forEach((up: any) => callerPerms.add(up.permission.name));
 
   // Platform-tier bypass.
   if (callerPerms.has(PLATFORM_USERS_MANAGE)) return;

@@ -32,10 +32,10 @@ export async function checkPermissionForApp(
   if (!saUser) throw new ForbiddenException();
 
   const perms = new Set<string>();
-  saUser.roles.forEach((ur) =>
-    ur.role.permissions.forEach((rp) => perms.add(rp.permission.name)),
+  saUser.roles.forEach((ur: any) =>
+    ur.role.permissions.forEach((rp: any) => perms.add(rp.permission.name)),
   );
-  saUser.directPermissions.forEach((up) => perms.add(up.permission.name));
+  saUser.directPermissions.forEach((up: any) => perms.add(up.permission.name));
 
   const requiredList = Array.isArray(required) ? required : [required];
 
