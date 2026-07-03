@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Manrope } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
+import { TooltipProvider } from '@sassy-auth/ui'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
@@ -31,7 +32,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={`${manrope.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <NextIntlClientProvider locale={locale} messages={messages}>
-            {children}
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
           </NextIntlClientProvider>
         </ThemeProvider>
       </body>

@@ -1,0 +1,3 @@
+## 2026-07-03 - Standardized Icon-only Button Accessibility and Feedback
+**Learning:** Icon-only buttons in admin tables (like 'more_vert' and 'content_copy') lack immediate textual context for screen readers and visual feedback for users. Standardizing these with localized `aria-label` attributes and `Tooltip` components significantly improves both accessibility and the "feel" of the interface.
+**Action:** Always wrap icon-only buttons in a `Tooltip` and ensure they have a descriptive `aria-label`. Use shared localization keys (e.g., `common.moreActions`, `common.copy`) to maintain consistency across the application.
