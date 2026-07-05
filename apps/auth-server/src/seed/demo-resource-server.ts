@@ -56,7 +56,7 @@ const PASSWORD = 'Pass@word1234';
 async function ensureApp() {
   const found = await prisma.saApp.findUnique({ where: { name: APP_NAME } });
   if (found) return found;
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     const created = await tx.saApp.create({
       data: { publicId: 'placeholder', name: APP_NAME, url: APP_URL, isPlatform: false },
     });
@@ -70,7 +70,7 @@ async function ensureApp() {
 async function ensureOrg(appId: number) {
   const found = await prisma.saOrg.findFirst({ where: { appId, name: ORG_NAME } });
   if (found) return found;
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     const created = await tx.saOrg.create({
       data: { publicId: 'placeholder', name: ORG_NAME, appId, isPlatform: false },
     });
@@ -86,7 +86,7 @@ async function ensurePermissions(appId: number) {
   for (const name of PERMISSIONS) {
     let perm = await prisma.saPermission.findUnique({ where: { name } });
     if (!perm) {
-      perm = await prisma.$transaction(async (tx) => {
+      perm = await prisma.$transaction(async (tx: any) => {
         const c = await tx.saPermission.create({
           data: { publicId: 'placeholder', name, appId },
         });
@@ -96,7 +96,7 @@ async function ensurePermissions(appId: number) {
         });
       });
     }
-    out.set(name, { id: perm.id });
+    out.set(name, { id: perm!.id });
   }
   return out;
 }
@@ -108,7 +108,7 @@ async function ensureRole(
 ) {
   let role = await prisma.saRole.findFirst({ where: { appId, name: roleName } });
   if (!role) {
-    role = await prisma.$transaction(async (tx) => {
+    role = await prisma.$transaction(async (tx: any) => {
       const c = await tx.saRole.create({
         data: { publicId: 'placeholder', name: roleName, appId },
       });
@@ -120,8 +120,8 @@ async function ensureRole(
   }
   for (const permissionId of permIds) {
     await prisma.saRolePermission.upsert({
-      where: { roleId_permissionId: { roleId: role.id, permissionId } },
-      create: { roleId: role.id, permissionId },
+      where: { roleId_permissionId: { roleId: role!.id, permissionId } },
+      create: { roleId: role!.id, permissionId },
       update: {},
     });
   }
@@ -149,7 +149,7 @@ async function ensureUser(
 
   let saUser = await prisma.saUser.findFirst({ where: { betterAuthUserId: baUserId } });
   if (!saUser) {
-    saUser = await prisma.$transaction(async (tx) => {
+    saUser = await prisma.$transaction(async (tx: any) => {
       const c = await tx.saUser.create({
         data: {
           publicId: 'placeholder',
@@ -168,8 +168,8 @@ async function ensureUser(
   }
 
   await prisma.saUserRole.upsert({
-    where: { userId_roleId: { userId: saUser.id, roleId } },
-    create: { userId: saUser.id, roleId },
+    where: { userId_roleId: { userId: saUser!.id, roleId } },
+    create: { userId: saUser!.id, roleId },
     update: {},
   });
 }
@@ -191,8 +191,8 @@ export async function seedDemoResourceServer() {
     ROLE_PERMS[ROLE_INSPECTORS].map((n) => perms.get(n)!.id),
   );
   const rolesByName: Record<string, number> = {
-    [ROLE_PROPERTY_MANAGERS]: rolePM.id,
-    [ROLE_INSPECTORS]: roleIns.id,
+    [ROLE_PROPERTY_MANAGERS]: rolePM!.id,
+    [ROLE_INSPECTORS]: roleIns!.id,
   };
 
   for (const u of USERS) {
