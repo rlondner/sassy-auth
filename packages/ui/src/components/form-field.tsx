@@ -11,7 +11,8 @@ interface FormFieldProps extends React.ComponentProps<typeof Input> {
 }
 
 export function FormField({ label, error, hint, required, className, id, ...props }: FormFieldProps) {
-  const fieldId = id ?? label.toLowerCase().replace(/\s+/g, '-')
+  const generatedId = React.useId()
+  const fieldId = id ?? generatedId
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       <Label htmlFor={fieldId}>
