@@ -8,7 +8,7 @@ log = logging.getLogger("rs")
 
 
 @router.get("/api/properties")
-def list_properties(claims: dict = Depends(require_scope("rs.properties.create"))):
+def list_properties(claims: dict = Depends(require_scope("rs.properties.read"))):
     log.info("api.properties.granted", extra={"sub": claims.get("sub")})
     return {
         "result": "Authorized",
