@@ -5,8 +5,8 @@ export class CreateUserDto {
   @IsString() @MinLength(1) lastName: string;
   @IsEmail() email: string;
   @IsString() @IsNotEmpty() orgId: string;
-  @IsString() @IsOptional() username?: string;
-  @IsString() @IsOptional() phoneNumber?: string;
+  @IsString() @MinLength(1) @IsOptional() username?: string;
+  @IsString() @MinLength(1) @IsOptional() phoneNumber?: string;
 
   @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true })
   roleIds?: string[];
