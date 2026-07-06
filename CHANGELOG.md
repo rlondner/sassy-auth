@@ -4,6 +4,206 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-07-06
+
+No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), reviewed across four prior daily reviews (2026-07-02 through 2026-07-05). Today's review is a **test infrastructure, configuration, and schema audit** covering: E2E test reliability/cleanup, RBAC matrix coverage gaps, environment variable validation, Prisma schema missing indexes, permissions service privilege escalation, invitation endpoint hardening, and admin type contract drift. 16 new bugs found (1 critical, 7 warning, 7 minor, 1 info). No bugs fixed.
+
+### Bugs found (16 new)
+
+See [BUGS_2026-07-06.md](./bugs/BUGS_2026-07-06.md) and [TODO_2026-07-06.md](./todo/TODO_2026-07-06.md).
+
+#### Critical (1)
+
+- **bug-0183** — `createPermission` allows `platform.*`-prefixed names — any admin with `platform.permissions.manage` can mint arbitrary platform privileges (privilege escalation).
+
+#### Warning (7)
+
+- **bug-0173** — E2E `afterAll` cleanup commented out — test data leaks across runs.
+- **bug-0174** — Matrix harness missing `put()` method — PUT set-replace endpoints have zero RBAC matrix coverage.
+- **bug-0175** — Social provider asymmetric env validation — app crashes if client ID set but secret missing.
+- **bug-0179** — Missing database indexes on BetterAuth `Session.userId`, `Account.userId`, `Verification.identifier` — auth perf degrades linearly with table size.
+- **bug-0184** — `AcceptInvitationDto` password has no `@MaxLength()` — hash-DoS on unauthenticated endpoint.
+- **bug-0185** — `ADMIN_URL` silently falls back to `http://localhost:3001` for invitation emails — no startup warning.
+- **bug-0186** — Admin `User` type declares phantom `lastLoginAt` and `createdAt` fields the API never returns.
+
+#### Minor (7)
+
+- **bug-0176** — No E2E coverage for `GET /api/invitations/:token` endpoint.
+- **bug-0177** — No E2E coverage for `GET /api/me` and OAuth AS discovery document.
+- **bug-0178** — Missing `prisma.$disconnect()` in matrix harness and scenario factory cleanup.
+- **bug-0180** — `multitenant-visibility.spec.ts` fragile exact-count assertions coupled to seed data.
+- **bug-0181** — Scenario factory uses `npx prisma` with relative path — fragile in CI.
+- **bug-0187** — Redundant `@@index([token])` on `SaInvitation` — `@unique` already provides an index.
+- **bug-0188** — LIKE wildcard characters (`%`, `_`) not escaped in search `q` parameter across all list endpoints.
+
+#### Info (1)
+
+- **bug-0182** — CORS E2E test coupled to implicit default `TRUSTED_ORIGINS` — no explicit env setup.
+
+### Known open bugs
+
+All previously tracked bugs remain open. The critical bug count rose from 8 to 9 with the discovery of **bug-0183** (privilege escalation via permission naming). Day 5 with zero commits and zero critical fixes merged. Total open bugs: 188 (172 prior + 16 new).
+
+### Project health note
+
+**bug-0183** is the most significant finding — it allows privilege escalation through the permission naming system. Combined with the existing bug-0096 (rename to `platform.*`), the permission system has two independent escalation vectors. **bug-0179** (missing BetterAuth indexes) is the highest-impact performance finding — authentication queries on Session, Account, and Verification tables fall back to sequential scans. **bug-0184** (password hash-DoS) is actionable with a one-line fix. The 5-day commit freeze with 9 critical bugs is a project health concern.
+
+---
+
+## [Unreleased] — 2026-07-05
+
+No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), already reviewed on 2026-07-02, deep-scanned on 2026-07-03, and multi-agent targeted on 2026-07-04. Today's review is a **cross-cutting sweep** of: resource server demo code correctness, admin middleware performance/availability, DTO validation gaps, UI component accessibility, and dead-code detection. 9 new bugs found (0 critical, 2 warning, 6 minor, 1 info). No bugs fixed.
+
+### Bugs found (9 new)
+
+See [BUGS_2026-07-05.md](./bugs/BUGS_2026-07-05.md) and [TODO_2026-07-05.md](./todo/TODO_2026-07-05.md).
+
+#### Warning (2)
+
+- **bug-0164** — `GET /api/apps/:id` endpoint is documented in README but missing from `AppsController` — no `getApp` route or service method exists.
+- **bug-0165** — Admin middleware validates session on every request with no caching — each navigation triggers a full round-trip `fetch` to auth-server.
+
+#### Minor (6)
+
+- **bug-0166** — Admin middleware `fetch` to auth-server has no explicit timeout — if auth-server is slow, all admin requests hang.
+- **bug-0167** — Resource server `GET /api/properties` requires `rs.properties.create` scope but README and seed data say `rs.properties.read`.
+- **bug-0168** — `UpdateUserDto` allows empty strings for `firstName`, `lastName`, `username`, `phoneNumber` — no `@MinLength(1)`, unlike `CreateUserDto`.
+- **bug-0169** — `CreateUserDto.email` has no `@MaxLength()` — arbitrarily long email strings accepted and stored.
+- **bug-0170** — `FormField` component auto-generates IDs from label text — duplicate labels in the same form produce duplicate HTML IDs, breaking accessibility.
+- **bug-0171** — Copy-to-clipboard handlers across all admin table/drawer components silently swallow clipboard API failures — no error feedback to user.
+
+#### Info (1)
+
+- **bug-0172** — `UsersTable` receives `initialOrgId` and `canPickOrg` props but immediately voids them — dead code from an unfinished feature.
+
+### Known open bugs
+
+All previously tracked bugs remain open. The 8 critical bugs (bug-0001, bug-0038, bug-0039, bug-0054, bug-0074, bug-0094, bug-0147, bug-0148) remain unfixed. Day 29 with zero critical fixes merged to production. Total open bugs: 172 (163 prior + 9 new).
+
+### Project health note
+
+No new commits for four consecutive days. Today's sweep focused on integration seams and validation gaps missed by prior targeted scans. **bug-0164** (missing getApp endpoint) is the most actionable — the README promises an endpoint that doesn't exist, which will confuse any developer building integrations. **bug-0165** (middleware session caching) is the most impactful at scale — every admin page load triggers at least one uncached fetch to the auth-server, adding latency to all authenticated requests. The DTO validation gaps (bug-0168, bug-0169) are straightforward one-line fixes but represent a parity gap between create and update DTOs. The resource server scope mismatch (bug-0167) affects the demo experience for anyone following the README.
+
+---
+
+## [Unreleased] — 2026-07-04
+
+No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), already reviewed on 2026-07-02 and deep-scanned on 2026-07-03. Today's review is a **multi-agent targeted scan** of: OAuth protocol compliance, token issuance security, BetterAuth session/cookie configuration, database schema integrity (uniqueness constraints, concurrency safety, orphaned records), production hardening (Helmet, Swagger gating), and admin component lifecycle. 17 new bugs found (2 critical, 8 warning, 6 minor, 1 info). No bugs fixed.
+
+### Bugs found (17 new)
+
+See [BUGS_2026-07-04.md](./bugs/BUGS_2026-07-04.md) and [TODO_2026-07-04.md](./todo/TODO_2026-07-04.md).
+
+#### Critical (2)
+
+- **bug-0147** — `username`/`phoneNumber` direct-login lookup uses `findFirst` on non-unique columns — `SaUser` has no `@@unique` on `username` or `phoneNumber`, so collisions across orgs cause cross-tenant authentication or incorrect rejection.
+- **bug-0148** — All entity-creation flows race on a shared literal `publicId: 'placeholder'` — concurrent creates hit the unique constraint, producing wrong "name already exists" errors.
+
+#### Warning (8)
+
+- **bug-0149** — OAuth authorize returns JSON 401 to unauthenticated browser users instead of redirecting to login (RFC 6749 §4.1.1 violation).
+- **bug-0150** — `redirect_uri` at `/token` is not bound to the code issued at `/authorize` (RFC 6749 §4.1.3 violation); only origin-level validation, no exact-match check.
+- **bug-0151** — `deleteUser` only removes `SaUser` — BetterAuth `User`/`Account`/`Session` rows persist (email blocked, sessions live, credentials orphaned).
+- **bug-0152** — `updateUser` allows `pending` → `active` without invitation acceptance, producing an active user with no credential.
+- **bug-0153** — Swagger/OpenAPI docs (`/api/docs`) unconditionally exposed in all environments, no `NODE_ENV` gate.
+- **bug-0154** — No Helmet security headers on any auth-server response.
+- **bug-0155** — Uncancelled `setTimeout` for "copied" feedback state in 13 admin components — stale timers flip wrong row icons or fire after unmount.
+- **bug-0156** — `SaUser`/`SaInvitation` publicIds derived from slicing a single UUID — correlated, not independently random, and inconsistent with the collision-safe `sqids.encode(id)` pattern used by all other models.
+
+#### Minor (6)
+
+- **bug-0157** — `TokenService.resolvePermissions` returns all user permissions unscoped by app — JWT `scope` claim lacks defense-in-depth filter.
+- **bug-0158** — BetterAuth session lifetime and cookie security config entirely unconfigured — implicit library defaults only, fragile to `BETTER_AUTH_URL` misconfiguration.
+- **bug-0159** — `NEXT_LOCALE` cookie has no `maxAge` — locale preference lost on browser close.
+- **bug-0160** — Unmanaged `setTimeout` redirect timer in accept-invite flow.
+- **bug-0161** — Seed script idempotency gap: partial BetterAuth `User` creation without `SaUser` is permanently unrecoverable by re-running seed.
+- **bug-0162** — Duplicate deep permission-graph queries per request in user mutation endpoints (performance).
+
+#### Info (1)
+
+- **bug-0163** — Magic link/OTP dev callbacks log sensitive tokens to console with no production guard.
+
+### Known open bugs
+
+All previously tracked bugs remain open. The 8 critical bugs (bug-0001, bug-0038, bug-0039, bug-0054, bug-0074, bug-0094, bug-0147, bug-0148) remain unfixed. Day 28 with zero critical fixes merged to production. Total open bugs: 163 (146 prior + 17 new).
+
+### Project health note
+
+Today's multi-agent review (auth-server flows, admin client, DB schema) uncovered two new critical bugs. **bug-0147** (username/phone login collision) is the most impactful: any two users sharing a username across different orgs can collide on direct login, with `findFirst` returning an arbitrary match. **bug-0148** (placeholder publicId race) affects every entity-creation flow under concurrent use. bug-0151 (deleteUser orphaning BetterAuth rows) means "deleted" users retain live sessions and permanently consume their email address. On the production-hardening front, the Swagger docs, missing Helmet headers, unconfigured BetterAuth session settings, and magic-link/OTP dev callbacks combine into a weak production posture. The 13-component setTimeout timer pattern (bug-0155) is the most systematic admin-side finding — identical fix template applies to all.
+
+---
+
+## [Unreleased] — 2026-07-03
+
+No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), already reviewed on 2026-07-02. Today's review is a **deep codebase scan** of existing code on `master`, focused on race conditions, missing validation, error handling gaps, data integrity, and authorization. 11 new bugs found (5 warning, 6 minor). No bugs fixed.
+
+### Bugs found (11 new)
+
+See [BUGS_2026-07-03.md](./bugs/BUGS_2026-07-03.md) and [TODO_2026-07-03.md](./todo/TODO_2026-07-03.md).
+
+#### Warning (5)
+
+- **bug-0136** — `apiFetch` doesn't handle HTTP 401 — expired sessions show cryptic "API error 401" toasts instead of redirecting to `/login`.
+- **bug-0137** — Table search/filter `useEffect`s in 4 table components lack `cancelled` flag — stale async responses can overwrite newer search results on slow networks.
+- **bug-0138** — `removeRole` missing P2025 try-catch — returns raw 500 with Prisma stack trace when removing a role that isn't assigned.
+- **bug-0139** — `resendInvitation` expire + create not wrapped in `$transaction` — partial failure orphans users with zero valid invitation tokens.
+- **bug-0140** — `listUsers` returns unbounded results with no pagination — only list endpoint without `take`/`skip`.
+
+#### Minor (6)
+
+- **bug-0141** — `AppEditDrawer` and `OrgEditDrawer` allow whitespace-only name submission (create drawers validate, edit drawers don't).
+- **bug-0142** — `UserViewDrawer` edit-mode `useEffect` missing `roles`/`directPermissions` in dependency array — stale closure can show empty role/permission editors.
+- **bug-0143** — `deletePermission` P2003 guard unreachable due to cascade delete — permission deletion silently revokes all role/user assignments.
+- **bug-0144** — `SaInvitation` model missing `@@index([expiresAt])` — expiry-based queries will degrade at scale.
+- **bug-0145** — `PermissionViewDrawer` and `RoleViewDrawer` fetch effects have no cancellation guard — rapid drawer switching shows stale data.
+- **bug-0146** — Sentry breadcrumb for `createUser` logs raw user email (PII) — all other breadcrumbs correctly use `publicId`.
+
+### Known open bugs — no change
+
+All previously tracked bugs remain open. The 6 critical bugs (bug-0001, bug-0038, bug-0039, bug-0054, bug-0074, bug-0094) remain unfixed. Day 27 with zero critical fixes merged to production. Total open bugs: 146 (135 prior + 11 new).
+
+### Project health note
+
+Today's deep scan uncovered systemic patterns across the codebase: (1) inconsistent `cancelled` flag usage in async `useEffect`s (6 components lack it), (2) create vs. edit drawer validation asymmetry, (3) missing error boundaries on auth pages, (4) `Promise.all` without `.catch()` in multiple admin drawers. The most impactful finding is bug-0140 (`listUsers` unbounded pagination) which is the only list endpoint without page/size limits. bug-0139 (`resendInvitation` non-atomic) and bug-0143 (`deletePermission` silent cascade) are the riskiest data integrity issues found.
+
+---
+
+## [Unreleased] — 2026-07-02
+
+Daily review of commit `37f738a` (2026-07-01). One commit in the last 24 hours — a large single commit touching 45 files (+534 / -86 lines) shipping the Sonner toast + refresh UX across all admin CRUD paths, the `resolveIssuer()` DRY refactor for OAuth metadata, broadened roles read gates for the user admin page, scoped E2E `raceSuccessOrError` error detection, and docs cleanup. 5 new bugs found (1 warning, 3 minor, 1 info). bug-0129 (`SEED_DEMO_MULTITENANT` missing from `.env.example`) is now fixed.
+
+### Fixed (from previous reviews)
+
+- **bug-0129** — `.env.example` now includes `SEED_DEMO_MULTITENANT=` alongside `SEED_DEMO=`. Developers copying `.env.example` will discover the multi-tenant demo seed option.
+
+### Bugs found (5 new)
+
+See [BUGS_2026-07-02.md](./bugs/BUGS_2026-07-02.md) and [TODO_2026-07-02.md](./todo/TODO_2026-07-02.md).
+
+#### Warning
+
+- **bug-0131** — `raceSuccessOrError` success text check is unscoped — matches anywhere on the page, not just inside the Sonner toast container. Can false-positive if a table cell or page body contains the success text. Error detection is correctly scoped to `[data-sonner-toaster]` but success detection uses a bare `page.getByText()`.
+
+#### Minor
+
+- **bug-0132** — `user-create-drawer.tsx` uses raw `result.error` string for server errors instead of `result.errorKey` with `t()` like every other drawer, so server errors appear untranslated.
+- **bug-0133** — `roles.service.spec.ts` double-awaits `rejects` on the same promise reference in the `deleteRole` P2003 test, which is unreliable across Jest versions.
+- **bug-0134** — `permissions-matrix.ts` does not include an `apps.get` operation — the `apps` area defines list/create/update/delete but omits `get`, unlike orgs/roles/permissions which all define `get`.
+
+#### Info
+
+- **bug-0135** — `user-create-drawer.tsx` stale role/permission IDs on org switch — when the user changes the org dropdown, role options are refetched but previously selected `roleIds`/`directPermissionIds` are not cleared, so IDs from the previous org persist in form state.
+
+### Known open bugs — no change
+
+All previously tracked bugs remain open. Notable: bug-0112 (French toast i18n strings are untranslated English — 15 strings still in English in `fr.json`), bug-0126 (raceSuccessOrError null-outcome false positive), bug-0115 (`resolveIssuer()` accepts invalid URLs), bug-0116–0125. Total open bugs: 131 (130 prior - 1 fixed + 5 new - 3 duplicates of existing). Net: 131.
+
+### Project health note
+
+After today's review: 1 bug fixed (bug-0129), 5 new bugs found. The Sonner toast and refresh UX is a solid quality-of-life improvement. The `resolveIssuer()` DRY refactor correctly unifies the JWT `iss` claim and discovery `issuer` normalization. The E2E scoping fix for `raceSuccessOrError` addresses the Dev Tools `role="alert"` false-win, but the success-text unscoped check (bug-0131) and the existing null-outcome gap (bug-0126) remain. The 5 original critical bugs (bug-0001, bug-0038, bug-0039, bug-0054, bug-0074) remain open. Day 26 with zero critical fixes merged to production.
+
+---
+
 ## [Unreleased] — 2026-07-01
 
 Ships the toast/refresh admin UX, the OAuth issuer DRY refactor, and the E2E raceSuccessOrError scoping fix that had been accumulating on the working tree. Roles read gates broadened so the `/users` role picker works without a cross-page permission grant. Docs catch up on Flox, the multi-tenant demo seed, the `/.well-known/oauth-authorization-server` and `/api/me` endpoints, and the CR/BUGS/TODO daily-file convention.

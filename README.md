@@ -715,3 +715,30 @@ The `PUT /users/:id/roles` and `PUT /users/:id/direct-permissions` endpoints acc
 
 **`BETTER_AUTH_URL` not validated at startup.**
 `resolveIssuer()` accepts any string — empty, whitespace, or non-URL values produce a malformed `issuer` in the OAuth AS discovery document and in every JWT's `iss` claim. A warning is logged when the variable is unset, but not when it is set to an invalid value. Tracked as **bug-0115**.
+
+**Username/phone direct-login collision across tenants.**
+`username` and `phoneNumber` on `SaUser` have no uniqueness constraint (not even per-org). The `directLogin` endpoint uses `findFirst` — if two users in different orgs share a username, the wrong user may be authenticated or a valid login may be rejected. Tracked as **bug-0147**.
+
+**Concurrent entity creation races on `publicId: 'placeholder'`.**
+All create flows (apps, orgs, roles, permissions) insert a shared literal `'placeholder'` as `publicId` before updating it to the real Sqid. Two concurrent creates hit the unique constraint, producing a misleading "name already exists" error. Tracked as **bug-0148**.
+
+**`deleteUser` does not remove BetterAuth identity.**
+Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
+
+**Swagger/OpenAPI docs exposed in all environments.**
+`/api/docs` and `/api/docs-json` are mounted unconditionally — no `NODE_ENV` gate. The full API surface is publicly discoverable in production. Tracked as **bug-0153**.
+
+**No security headers (Helmet).**
+The auth-server sets no `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, or `Content-Security-Policy` headers. Tracked as **bug-0154**.
+
+**`GET /api/apps/:id` endpoint missing.**
+The API Reference table documents `GET /api/apps/:id` but no such route exists in `AppsController`. All other entity controllers (orgs, roles, permissions, users) have a get-by-id handler. Tracked as **bug-0164**.
+
+**Admin middleware session validation not cached.**
+The Next.js Edge middleware calls the auth-server's `get-session` endpoint on every authenticated request with `cache: 'no-store'`. No session caching is applied, so each page load incurs a full round-trip to the auth-server. Tracked as **bug-0165**.
+
+**`createPermission` allows `platform.*` names (privilege escalation).**
+The `createPermission` endpoint does not block names starting with `platform.`. An admin with `platform.permissions.manage` can create a permission named `platform.anything.new` and assign it to themselves, effectively minting arbitrary platform privileges. Tracked as **bug-0183**.
+
+**Missing database indexes on BetterAuth tables.**
+The `Session`, `Account`, and `Verification` tables lack indexes on their most-queried foreign key and lookup columns (`Session.userId`, `Account.userId`, `Verification.identifier`). Authentication performance degrades linearly with table size. Tracked as **bug-0179**.
