@@ -34,8 +34,9 @@ export class AppsService {
     ]);
     const page = q.page ?? 1;
     const pageSize = q.pageSize ?? 25;
-    const where = q.q
-      ? { OR: [{ name: { contains: q.q, mode: 'insensitive' as const } }, { url: { contains: q.q, mode: 'insensitive' as const } }] }
+    const escaped = q.q ? q.q.replace(/%/g, '\\%').replace(/_/g, '\\_') : undefined;
+    const where = escaped
+      ? { OR: [{ name: { contains: escaped, mode: 'insensitive' as const } }, { url: { contains: escaped, mode: 'insensitive' as const } }] }
       : {};
     const [rows, total] = await Promise.all([
       prisma.saApp.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { id: 'desc' } }),

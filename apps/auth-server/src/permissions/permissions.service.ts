@@ -60,7 +60,10 @@ export class PermissionsService {
       if (!app) throw new NotFoundException('App not found');
       where.appId = app.id;
     }
-    if (q.q) where.name = { contains: q.q, mode: 'insensitive' };
+    if (q.q) {
+      const escaped = q.q.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      where.name = { contains: escaped, mode: 'insensitive' };
+    }
 
     const [rows, total] = await Promise.all([
       prisma.saPermission.findMany({

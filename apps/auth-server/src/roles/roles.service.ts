@@ -64,7 +64,10 @@ export class RolesService {
       // q.appId was already validated above; reuse targetAppId to avoid a second lookup.
       where.appId = targetAppId;
     }
-    if (q.q) where.name = { contains: q.q, mode: 'insensitive' };
+    if (q.q) {
+      const escaped = q.q.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      where.name = { contains: escaped, mode: 'insensitive' };
+    }
 
     const [rows, total] = (await Promise.all([
       prisma.saRole.findMany({
