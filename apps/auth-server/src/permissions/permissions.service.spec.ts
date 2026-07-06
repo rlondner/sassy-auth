@@ -173,6 +173,12 @@ describe('PermissionsService', () => {
       (prisma.$transaction as jest.Mock).mockRejectedValue({ code: 'P2002' });
       await expect(makeService().createPermission('ba-caller', { name: 'apps.read', appId: 'sq_app1' })).rejects.toBeInstanceOf(ConflictException);
     });
+
+    it('rejects platform.* names with ForbiddenException', async () => {
+      await expect(
+        makeService().createPermission('ba-caller', { name: 'platform.test.escalation', appId: 'sq_app1' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 
   describe('updatePermission', () => {

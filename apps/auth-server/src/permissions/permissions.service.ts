@@ -128,6 +128,7 @@ export class PermissionsService {
 
   async createPermission(callerBaId: string, dto: CreatePermissionDto) {
     await checkPermission(callerBaId, 'platform.permissions.manage');
+    if (isPlatform(dto.name)) throw new ForbiddenException('Platform-system permissions cannot be modified');
     const app = await prisma.saApp.findUnique({ where: { publicId: dto.appId } });
     if (!app) throw new NotFoundException('App not found');
     try {
