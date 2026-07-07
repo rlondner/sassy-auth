@@ -163,6 +163,11 @@ model SaInvitation {
   // above already provisions a btree unique index, so a second
   // non-unique index on the same column was pure overhead.
   @@index([userId])
+  // bug-0144: invitations are queried by `expiresAt` in two spots —
+  // `validateToken` compares against now(), and any cleanup job
+  // scanning for expired unused tokens would filter on the same
+  // column. A supporting index keeps both cheap as the table grows.
+  @@index([expiresAt])
 }
 
 model SaPermission {

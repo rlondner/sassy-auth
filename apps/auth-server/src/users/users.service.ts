@@ -404,7 +404,23 @@ export class UsersService {
       .map((rp) => rp.permission.name);
     await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
 
-    await prisma.saUserRole.delete({ where: { userId_roleId: { userId: user.id, roleId: role.id } } });
+    // bug-0138: catch Prisma P2025 ("record not found") so a caller
+    // who tries to remove a role that isn't currently assigned gets
+    // a 200 (idempotent) rather than a 500 with a raw Prisma stack.
+    // Symmetric with assignRole's P2002 idempotency swallow above.
+    try {
+      await prisma.saUserRole.delete({ where: { userId_roleId: { userId: user.id, roleId: role.id } } });
+    } catch (e: unknown) {
+      if (
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        (e as { code?: string }).code === 'P2025'
+      ) {
+        return;
+      }
+      throw e;
+    }
     this.logger.getWinstonLogger().info('Role removed from user', {
       context: 'UsersService',
       userId: userPublicId,
@@ -558,18 +574,24 @@ export class UsersService {
     );
     if (user.status !== 'pending') throw new BadRequestException('User is not pending — invitation cannot be resent');
 
-    // Expire all existing unused tokens for this user
-    await prisma.saInvitation.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { expiresAt: new Date(0) },
-    });
-
     const token = crypto.randomBytes(32).toString('hex');
     const publicId = crypto.randomUUID().slice(0, 12);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const invitation = await prisma.saInvitation.create({
-      data: { publicId, token, userId: user.id, expiresAt },
+    // bug-0139: expire-then-create must be transactional. Previously
+    // the two writes were separate — a crash / connection drop
+    // between them left the user with ZERO valid invitation tokens
+    // AND ALL prior tokens force-expired. They'd need admin
+    // intervention to recover. Wrapping in $transaction gives us
+    // all-or-nothing semantics.
+    const invitation = await prisma.$transaction(async (tx) => {
+      await tx.saInvitation.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { expiresAt: new Date(0) },
+      });
+      return tx.saInvitation.create({
+        data: { publicId, token, userId: user.id, expiresAt },
+      });
     });
 
     this.logger.getWinstonLogger().info('Invitation resent', {
