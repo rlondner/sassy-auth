@@ -23,7 +23,22 @@ import { fromNodeHeaders } from 'better-auth/node';
 // BetterAuth hashes passwords with scrypt by default (format `<saltHex>:<hashHex>`),
 // not bcrypt — use its own verifier so direct-login stays compatible with any
 // account created via BetterAuth (sign-up, seed, admin invite, etc.).
-import { verifyPassword } from 'better-auth/crypto';
+import { hashPassword, verifyPassword } from 'better-auth/crypto';
+
+// bug-0209: pre-compute a dummy scrypt hash lazily so the user-not-found
+// path can spend equivalent CPU time as the user-found path. Without this,
+// a fast reject on "no matching row" vs. slow scrypt verify on "matched
+// but wrong password" is measurable — an attacker times responses to
+// enumerate which identifiers (emails / usernames / phones) exist.
+// The dummy input is a fixed string, so the resulting hash is stable
+// across requests within one process, and the verify always fails.
+let dummyHashPromise: Promise<string> | null = null;
+function getDummyPasswordHash(): Promise<string> {
+  if (!dummyHashPromise) {
+    dummyHashPromise = hashPassword('bug-0209-timing-guard-dummy-input');
+  }
+  return dummyHashPromise;
+}
 import { SqidService } from '../common/sqid/sqid.service';
 import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
@@ -147,10 +162,28 @@ export class TokenController {
 
       return { url: url.toString(), statusCode: 302 };
     } catch (err) {
-      // UnauthorizedException keeps the existing login-redirect flow — Nest's
-      // global filter handles it. Anything not Http (5xx programming errors)
-      // also propagates so Sentry sees it.
-      if (err instanceof UnauthorizedException) throw err;
+      // bug-0149: a browser hitting /authorize without a session
+      // previously got JSON 401 — confusing for a top-level nav.
+      // Redirect to the admin console's /login and preserve the
+      // full authorize URL as `next` so the user lands back here
+      // after signing in. Only when ADMIN_URL is set (dev without
+      // it still falls through to the JSON path below).
+      if (err instanceof UnauthorizedException) {
+        const adminUrl = process.env.ADMIN_URL;
+        if (adminUrl) {
+          const query = new URLSearchParams({
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            code_challenge: codeChallenge,
+            code_challenge_method: codeChallengeMethod,
+          });
+          if (state) query.set('state', state);
+          const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
+          const loginUrl = `${adminUrl.replace(/\/$/, '')}/login?next=${encodeURIComponent(nextPath)}`;
+          return { url: loginUrl, statusCode: 302 };
+        }
+        throw err;
+      }
       if (!(err instanceof HttpException)) throw err;
       const status = err.getStatus();
       if (status < 400 || status >= 500) throw err;
@@ -293,6 +326,8 @@ export class TokenController {
         include: { org: true, betterAuthUser: true },
       }) as SaUserWithOrg | null;
       if (!found) {
+        // bug-0209: equalize timing with the user-found path.
+        await verifyPassword({ hash: await getDummyPasswordHash(), password: dto.password });
         this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
           context: 'TokenController',
           identifierType: detectIdentifierType(dto.identifier),
@@ -314,6 +349,8 @@ export class TokenController {
         include: { org: true, betterAuthUser: true },
       }) as SaUserWithOrg | null;
       if (!found) {
+        // bug-0209: equalize timing with the user-found path.
+        await verifyPassword({ hash: await getDummyPasswordHash(), password: dto.password });
         this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
           context: 'TokenController',
           identifierType: detectIdentifierType(dto.identifier),
@@ -331,6 +368,8 @@ export class TokenController {
         include: { org: true, betterAuthUser: true },
       }) as SaUserWithOrg | null;
       if (!found) {
+        // bug-0209: equalize timing with the user-found path.
+        await verifyPassword({ hash: await getDummyPasswordHash(), password: dto.password });
         this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
           context: 'TokenController',
           identifierType: detectIdentifierType(dto.identifier),
