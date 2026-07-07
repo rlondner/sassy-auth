@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
+import { generatePendingPublicId } from '../common/pending-public-id';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -49,7 +50,7 @@ async function ensurePlatformSuperAdminRole(platformAppId: number) {
     role = await prisma.$transaction(async (tx) => {
       const created = await tx.saRole.create({
         data: {
-          publicId: 'placeholder',
+          publicId: generatePendingPublicId(),
           name: SUPER_ADMIN_ROLE_NAME,
           appId: platformAppId,
         },
@@ -109,7 +110,7 @@ async function seedPlatformAdmin(
   const saUser = await prisma.$transaction(async (tx) => {
     const created = await tx.saUser.create({
       data: {
-        publicId: 'placeholder',
+        publicId: generatePendingPublicId(),
         betterAuthUserId: baUserId,
         orgId: platformOrgId,
         firstName: admin.firstName,
@@ -149,7 +150,7 @@ async function main() {
     platformApp = await prisma.$transaction(async (tx) => {
       const created = await tx.saApp.create({
         data: {
-          publicId: 'placeholder',
+          publicId: generatePendingPublicId(),
           name: 'SassyAuth',
           url: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
           isPlatform: true,
@@ -173,7 +174,7 @@ async function main() {
     platformOrg = await prisma.$transaction(async (tx) => {
       const created = await tx.saOrg.create({
         data: {
-          publicId: 'placeholder',
+          publicId: generatePendingPublicId(),
           name: 'Platform',
           appId: platformApp!.id,
           isPlatform: true,
@@ -197,7 +198,7 @@ async function main() {
     if (!existing) {
       await prisma.$transaction(async (tx) => {
         const c = await tx.saPermission.create({
-          data: { publicId: 'placeholder', name, appId: platformApp!.id, isSystem },
+          data: { publicId: generatePendingPublicId(), name, appId: platformApp!.id, isSystem },
         });
         const publicId = sqids.encode([c.id]);
         return tx.saPermission.update({ where: { id: c.id }, data: { publicId } });

@@ -6,6 +6,7 @@ import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { CreateOrgDto } from './dto/create-org.dto';
 import { UpdateOrgDto } from './dto/update-org.dto';
 import { ListOrgsQueryDto } from './dto/list-orgs-query.dto';
@@ -92,7 +93,7 @@ export class OrgsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saOrg.create({
-          data: { publicId: 'placeholder', name: dto.name, appId: app.id, isPlatform: false },
+          data: { publicId: generatePendingPublicId(), name: dto.name, appId: app.id, isPlatform: false },
         });
         return tx.saOrg.update({
           where: { id: draft.id },

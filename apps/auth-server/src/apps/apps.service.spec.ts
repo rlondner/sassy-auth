@@ -84,7 +84,15 @@ describe('AppsService', () => {
     mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
     mockPrisma.saApp.update.mockResolvedValue(appRow);
     const result = await service.createApp('ba-caller', { name: 'Customer Portal', url: 'https://portal.example.com' });
-    expect(mockPrisma.saApp.create).toHaveBeenCalledWith({ data: { publicId: 'placeholder', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false } });
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith({
+      data: {
+        publicId: expect.stringMatching(/^pending-/),
+        name: 'Customer Portal',
+        url: 'https://portal.example.com',
+        callbackUrl: null,
+        isPlatform: false,
+      },
+    });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
     expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false });
   });

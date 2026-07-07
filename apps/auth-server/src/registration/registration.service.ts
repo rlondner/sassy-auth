@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';
 import { SqidService } from '../common/sqid/sqid.service';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { RegisterDto } from './register.dto';
 
 /**
@@ -50,7 +51,7 @@ export class RegistrationService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const org = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saOrg.create({
-          data: { publicId: 'placeholder', name: dto.companyName, appId: app.id, isPlatform: false },
+          data: { publicId: generatePendingPublicId(), name: dto.companyName, appId: app.id, isPlatform: false },
         });
         const created = await tx.saOrg.update({
           where: { id: draft.id },

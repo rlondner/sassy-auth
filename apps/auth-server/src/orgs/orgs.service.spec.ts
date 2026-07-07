@@ -134,7 +134,7 @@ describe('OrgsService', () => {
       const result = await service.createOrg('ba-caller', { name: 'Acme', appId: 'sq_1' });
 
       expect(mockPrisma.saOrg.create).toHaveBeenCalledWith({
-        data: { publicId: 'placeholder', name: 'Acme', appId: 1, isPlatform: false },
+        data: { publicId: expect.stringMatching(/^pending-/), name: 'Acme', appId: 1, isPlatform: false },
       });
       expect(mockPrisma.saOrg.update).toHaveBeenCalledWith({
         where: { id: 10 }, data: { publicId: 'sq_10' },

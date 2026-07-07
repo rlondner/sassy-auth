@@ -6,6 +6,7 @@ import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { CreatePermissionDto } from './dto/create-permission.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { ListPermissionsQueryDto } from './dto/list-permissions-query.dto';
@@ -145,7 +146,7 @@ export class PermissionsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saPermission.create({
-          data: { publicId: 'placeholder', name: dto.name, appId: app.id },
+          data: { publicId: generatePendingPublicId(), name: dto.name, appId: app.id },
         });
         return tx.saPermission.update({
           where: { id: draft.id },

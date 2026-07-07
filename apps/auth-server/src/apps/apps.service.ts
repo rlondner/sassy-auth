@@ -3,6 +3,7 @@ import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppDto } from './dto/update-app.dto';
 import { ListAppsQueryDto } from './dto/list-apps-query.dto';
@@ -50,7 +51,7 @@ export class AppsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
-          data: { publicId: 'placeholder', name: dto.name, url: dto.url, callbackUrl: dto.callbackUrl || null, isPlatform: false },
+          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, callbackUrl: dto.callbackUrl || null, isPlatform: false },
         });
         return tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
       });

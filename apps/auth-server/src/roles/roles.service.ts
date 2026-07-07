@@ -6,6 +6,7 @@ import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
 import { checkPermissionForApp } from '../common/permissions/check-permission-for-app';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -139,7 +140,7 @@ export class RolesService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saRole.create({
-          data: { publicId: 'placeholder', name: dto.name, appId: app.id },
+          data: { publicId: generatePendingPublicId(), name: dto.name, appId: app.id },
         });
         if (permissionIds.length > 0) {
           await tx.saRolePermission.createMany({
