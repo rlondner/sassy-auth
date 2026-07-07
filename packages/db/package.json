@@ -20,6 +20,7 @@
     "@types/node": "^20.0.0",
     "dotenv-cli": "^8.0.0",
     "prisma": "^5.14.0",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.4.0",
     "ts-node": "^10.9.0"
   }

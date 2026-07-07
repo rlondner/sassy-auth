@@ -31,7 +31,7 @@ jest.mock('better-auth/crypto', () => ({ verifyPassword: jest.fn().mockResolvedV
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';
 
-const mockGetSession = auth.api.getSession as jest.Mock;
+const mockGetSession = auth.api.getSession as unknown as jest.Mock;
 
 const mockPrisma = prisma as unknown as {
   saApp: { findUnique: jest.Mock };

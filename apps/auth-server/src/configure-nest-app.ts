@@ -15,7 +15,9 @@ export function configureNestApp(app: INestApplication, loggerService: LoggerSer
   // RFC 8414 mandates the OAuth discovery doc be served at the host root, so
   // exclude it from the /api global prefix.
   app.setGlobalPrefix(NEST_GLOBAL_PREFIX, { exclude: [OAUTH_AS_METADATA_PATH] });
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+  );
   app.useGlobalFilters(new SentryExceptionFilter(loggerService));
   app.enableCors({ origin: TRUSTED_ORIGINS, credentials: true });
 }

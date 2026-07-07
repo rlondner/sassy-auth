@@ -31,6 +31,10 @@ async function bootstrap() {
 
   configureNestApp(app, loggerService);
 
+  // Ensure NestJS lifecycle hooks (OnModuleDestroy, OnApplicationShutdown) fire on
+  // SIGTERM/SIGINT so Prisma disconnects cleanly and Sentry flushes buffered events.
+  app.enableShutdownHooks();
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Sassy Auth API')
     .setDescription('Multi-tenant auth and user management')
@@ -65,4 +69,7 @@ async function bootstrap() {
   loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3000}`, 'Bootstrap');
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('Fatal: auth-server bootstrap failed', err);
+  process.exit(1);
+});

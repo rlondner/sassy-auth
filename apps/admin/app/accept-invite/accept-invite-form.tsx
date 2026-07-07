@@ -23,15 +23,13 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (password !== confirm) { setError('Passwords do not match.'); return }
+    if (password !== confirm) { setError(t('acceptInvite.errors.passwordMismatch')); return }
     if (password.length < 12) {
-      setError('Password must be at least 12 characters.')
+      setError(t('acceptInvite.errors.passwordTooShort'))
       return
     }
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(password)) {
-      setError(
-        'Password must contain an uppercase letter, a lowercase letter, and a digit.',
-      )
+      setError(t('acceptInvite.errors.passwordComplexity'))
       return
     }
     setError(null)
@@ -41,7 +39,7 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
       setSuccess(true)
       setTimeout(() => router.push('/login'), 2000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      setError(err instanceof Error ? err.message : t('acceptInvite.errors.genericError'))
     } finally {
       setSubmitting(false)
     }

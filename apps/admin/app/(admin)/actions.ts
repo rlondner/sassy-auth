@@ -25,13 +25,20 @@ export async function signOutAction() {
   const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
   const cookieStore = await cookies()
   const origin = await getForwardedOrigin()
-  await fetch(`${AUTH_SERVER}/api/auth/sign-out`, {
-    method: 'POST',
-    headers: {
-      Cookie: cookieStore.toString(),
-      ...(origin && { Origin: origin }),
-    },
-  })
+  // Always drop the local session cookie and redirect, even if the auth-server is
+  // unreachable — the server-side session will expire on its own, and stranding the
+  // user with a stale cookie on a transient outage is worse than a best-effort logout.
+  try {
+    await fetch(`${AUTH_SERVER}/api/auth/sign-out`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookieStore.toString(),
+        ...(origin && { Origin: origin }),
+      },
+    })
+  } catch (err) {
+    Sentry.captureException(err)
+  }
   cookieStore.delete('better-auth.session_token')
   Sentry.addBreadcrumb({
     category: 'auth',

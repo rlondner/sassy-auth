@@ -203,19 +203,21 @@ async function main() {
         return tx.saPermission.update({ where: { id: c.id }, data: { publicId } });
       });
       console.log(`Created permission: ${name} (isSystem=${isSystem})`);
-    } else if (existing.isSystem !== isSystem) {
-      await prisma.saPermission.update({
-        where: { id: existing.id },
-        data: { isSystem },
-      });
-      console.log(`Updated permission ${name}: isSystem=${isSystem}`);
-    } else if (existing.publicId.startsWith('pending-')) {
-      const publicId = sqids.encode([existing.id]);
-      await prisma.saPermission.update({
-        where: { id: existing.id },
-        data: { publicId },
-      });
-      console.log(`Backfilled placeholder publicId for ${name}: ${publicId}`);
+    } else {
+      // Both fields may need repair on the same row (e.g. after a migration
+      // that inserts placeholder publicIds). Combining avoids requiring a
+      // second seed run to fix the second field.
+      const needsSystemFix = existing.isSystem !== isSystem;
+      const needsPublicIdFix = existing.publicId.startsWith('pending-');
+      if (needsSystemFix || needsPublicIdFix) {
+        const data: { isSystem?: boolean; publicId?: string } = {};
+        if (needsSystemFix) data.isSystem = isSystem;
+        if (needsPublicIdFix) data.publicId = sqids.encode([existing.id]);
+        await prisma.saPermission.update({ where: { id: existing.id }, data });
+        if (needsSystemFix) console.log(`Updated permission ${name}: isSystem=${isSystem}`);
+        if (needsPublicIdFix)
+          console.log(`Backfilled placeholder publicId for ${name}: ${data.publicId}`);
+      }
     }
   }
 

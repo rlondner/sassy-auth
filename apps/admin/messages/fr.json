@@ -437,7 +437,13 @@
     "confirmPassword": "Confirmer le mot de passe",
     "submit": "Activer le compte",
     "expired": "Ce lien d’invitation a expiré ou est invalide. Contactez votre administrateur pour en obtenir un nouveau.",
-    "success": "Compte activé ! Vous pouvez maintenant vous connecter."
+    "success": "Compte activé ! Vous pouvez maintenant vous connecter.",
+    "errors": {
+      "passwordMismatch": "Les mots de passe ne correspondent pas.",
+      "passwordTooShort": "Le mot de passe doit contenir au moins 12 caractères.",
+      "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
+      "genericError": "Une erreur est survenue."
+    }
   },
   "oauthError": {
     "pageTitle": "Erreur d'autorisation — SassyAuth",
