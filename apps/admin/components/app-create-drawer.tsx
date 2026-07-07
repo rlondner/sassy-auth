@@ -53,8 +53,13 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
         url: url.trim(),
         callbackUrl: callbackUrl.trim() || null,
       })
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('apps.toast.created'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 
