@@ -111,7 +111,12 @@ describe('SassyAuth E2E', () => {
       // Get platform org
       const platformOrg = await prisma.saOrg.findFirst({ where: { isPlatform: true } });
 
-      // Create sa_user linked to BetterAuth user + platform org
+      // Create sa_user linked to BetterAuth user + platform org.
+      // bug-0074: directLogin now rejects users whose status is not
+      // 'active', so this e2e user (which will exercise directLogin
+      // below) is explicitly created active. In production a user
+      // becomes 'active' by accepting an invitation; here we short-
+      // circuit that setup step.
       const saUserRecord = await prisma.saUser.create({
         data: {
           publicId: 'placeholder',
@@ -119,6 +124,7 @@ describe('SassyAuth E2E', () => {
           orgId: platformOrg!.id,
           firstName: 'E2E',
           lastName: 'User',
+          status: 'active',
         },
       });
       // Compute and store publicId via Sqids
