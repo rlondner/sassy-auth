@@ -51,6 +51,18 @@ function validateStartupEnv(): void {
       'BETTER_AUTH_SECRET must be at least 32 characters (see .env.example). Regenerate with `openssl rand -base64 48`.',
     );
   }
+  // bug-0185: ADMIN_URL is used to build invitation emails and the
+  // OAuth error redirect. When unset in prod the code silently falls
+  // back to http://localhost:3001 and mails invitation links that
+  // land on the operator's laptop, not the intended admin console.
+  // Warn (don't throw) so the auth-server still starts in dev with no
+  // admin console reachable — a common workflow when hacking on the
+  // auth-server in isolation.
+  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_URL) {
+    console.warn(
+      '[bug-0185] ADMIN_URL is unset in production. Invitation emails and OAuth-error redirects will point at http://localhost:3001 — invitees will not be able to accept.',
+    );
+  }
 }
 
 async function bootstrap() {

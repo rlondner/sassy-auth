@@ -91,29 +91,35 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  // bug-0175: gate each social provider on BOTH the id AND the secret.
+  // Previously the truthy check on the id was paired with a non-null
+  // assertion (`!`) on the secret — an operator who set the id but
+  // forgot the secret got an `undefined` cast to string, which crashed
+  // deep inside BetterAuth's OAuth flow or silently misbehaved. The
+  // symmetric guard falls back to "provider disabled" instead.
   socialProviders: {
-    ...(process.env.GOOGLE_CLIENT_ID && {
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       },
     }),
-    ...(process.env.MICROSOFT_CLIENT_ID && {
+    ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && {
       microsoft: {
         clientId: process.env.MICROSOFT_CLIENT_ID,
-        clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
+        clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
       },
     }),
-    ...(process.env.APPLE_CLIENT_ID && {
+    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET && {
       apple: {
         clientId: process.env.APPLE_CLIENT_ID,
-        clientSecret: process.env.APPLE_CLIENT_SECRET!,
+        clientSecret: process.env.APPLE_CLIENT_SECRET,
       },
     }),
-    ...(process.env.GITHUB_CLIENT_ID && {
+    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET && {
       github: {
         clientId: process.env.GITHUB_CLIENT_ID,
-        clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET,
       },
     }),
   },

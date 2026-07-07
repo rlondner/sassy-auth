@@ -70,11 +70,19 @@ async function validateSession(request: NextRequest): Promise<boolean> {
     }
   }
 
+  // bug-0166: bound the auth-server fetch so a slow / hung auth-server
+  // does not stall every admin request until Next.js's default timeout
+  // fires. 3s is generous for a healthy auth-server (typical latency
+  // is a few ms) and short enough that a real outage produces a
+  // definitive "bounce to /login" rather than a spinning admin page.
+  // AbortSignal.timeout is Edge-runtime-safe.
+  const abortSignal = AbortSignal.timeout(3_000)
   try {
     const res = await fetch(`${AUTH_SERVER}/api/auth/get-session`, {
       headers: { Cookie: cookieHeader },
       // Edge runtime — must not cache or be revalidated.
       cache: 'no-store',
+      signal: abortSignal,
     })
     if (!res.ok) {
       sessionCache.set(token, { at: now, ok: false })
