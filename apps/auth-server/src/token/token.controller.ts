@@ -126,6 +126,7 @@ export class TokenController {
       const code = this.oauthService.generateCode(
         saUser.publicId,
         app.publicId,
+        redirectUri,
         codeChallenge,
         'S256',
       );
@@ -199,6 +200,7 @@ export class TokenController {
       const exchanged = this.oauthService.exchangeCode(
         dto.code,
         dto.client_id,
+        dto.redirect_uri,
         dto.code_verifier,
       );
       userPublicId = exchanged.userId;
