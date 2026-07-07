@@ -738,29 +738,17 @@ Tests are in `apps/admin-e2e/tests/`. In CI, the Playwright config automatically
 
 The following items are deferred to later sub-projects and are not yet production-ready. See `todo/TODO_*.md` for daily follow-up lists and `bugs/BUGS_*.md` for the full bug catalog.
 
-**In-memory OAuth code store.**
-Authorization codes from Flow A are stored in memory. They are lost on server restart and the server cannot run as multiple instances behind a load balancer. Replace with Redis or a database table before deploying to production. Tracked as **bug-0039**.
-
 **`redirect_uri` validation granularity.**
 By default `redirect_uri` is validated against the app's registered `url` origin (scheme + host + port), and any path under that origin is accepted. Apps that need tighter control can now set an optional `callbackUrl` on the `SaApp` row, which forces an exact `redirect_uri` match (trailing-slash tolerant). A full allowlist of multiple distinct redirect paths per app is still not supported. Partially addresses **bug-0047**.
 
 **PKCE `code_verifier` format not validated.**
 The `code_verifier` field is checked for presence but not for RFC 7636 format (43-128 chars of unreserved characters). Tracked as **bug-0041**.
 
-**JWT payload breaking change (`scope` replaces `permissions`).**
-The JWT `permissions` claim (string array) was replaced with `scope` (space-separated string) on the `docs/pkce-resource-server-design` branch. No migration path or version marker exists. Tracked as **bug-0038**.
-
-**RBAC not org-scoped.**
-`checkPermission` only verifies that the caller holds the named permission — it does not constrain by `orgId`. A user with `org.users.manage` in org A can currently act on users in org B. Tracked as **bug-0001**.
-
-**Inactive users can still authenticate.**
-Neither the OAuth authorize flow nor the direct login flow checks `saUser.status` before issuing a JWT. Setting a user to `inactive` via the API has no effect on their ability to log in and receive tokens. Tracked as **bug-0074**.
-
 **No rate limiting on authentication endpoints.**
 The `/api/token/direct/login` and `/api/invitations/:token` endpoints accept unlimited requests. Brute-force password attacks are unthrottled. Tracked as **bug-0080**.
 
-**Escalation guard coverage is incomplete.**
-The `assertCallerCanGrantSystemPerms` guard is applied to `assignRole` and `setUserRoles` but not to `removeRole`. `checkPermissionForApp` has a silent bypass when `targetAppId` is undefined. Tracked as **bug-0094** and **bug-0097**.
+**Escalation guard coverage is incomplete for `removeRole`.**
+The `assertCallerCanGrantSystemPerms` guard is applied to `assignRole` and `setUserRoles` but not to `removeRole`. Tracked as **bug-0097**.
 
 **CI — E2E only, no typecheck/lint.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. Typecheck and lint are not yet wired into CI. Note: the e2e workflow excludes `@sassy-auth/auth-server` from `turbo build` due to pre-existing build errors (tracked as **bug-0092**).
@@ -770,12 +758,6 @@ The `PUT /users/:id/roles` and `PUT /users/:id/direct-permissions` endpoints acc
 
 **`BETTER_AUTH_URL` not validated at startup.**
 `resolveIssuer()` accepts any string — empty, whitespace, or non-URL values produce a malformed `issuer` in the OAuth AS discovery document and in every JWT's `iss` claim. A warning is logged when the variable is unset, but not when it is set to an invalid value. Tracked as **bug-0115**.
-
-**Username/phone direct-login collision across tenants.**
-`username` and `phoneNumber` on `SaUser` have no uniqueness constraint (not even per-org). The `directLogin` endpoint uses `findFirst` — if two users in different orgs share a username, the wrong user may be authenticated or a valid login may be rejected. Tracked as **bug-0147**.
-
-**Concurrent entity creation races on `publicId: 'placeholder'`.**
-All create flows (apps, orgs, roles, permissions) insert a shared literal `'placeholder'` as `publicId` before updating it to the real Sqid. Two concurrent creates hit the unique constraint, producing a misleading "name already exists" error. Tracked as **bug-0148**.
 
 **`deleteUser` does not remove BetterAuth identity.**
 Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
@@ -792,14 +774,8 @@ The API Reference table documents `GET /api/apps/:id` but no such route exists i
 **Admin middleware session validation not cached.**
 The Next.js Edge middleware calls the auth-server's `get-session` endpoint on every authenticated request with `cache: 'no-store'`. No session caching is applied, so each page load incurs a full round-trip to the auth-server. Tracked as **bug-0165**.
 
-**`createPermission` allows `platform.*` names (privilege escalation).**
-The `createPermission` endpoint does not block names starting with `platform.`. An admin with `platform.permissions.manage` can create a permission named `platform.anything.new` and assign it to themselves, effectively minting arbitrary platform privileges. Tracked as **bug-0183**.
-
 **Missing database indexes on BetterAuth tables.**
 The `Session`, `Account`, and `Verification` tables lack indexes on their most-queried foreign key and lookup columns (`Session.userId`, `Account.userId`, `Verification.identifier`). Authentication performance degrades linearly with table size. Tracked as **bug-0179**.
-
-**No graceful shutdown hooks on auth-server.**
-The auth-server does not call `app.enableShutdownHooks()`. When a container orchestrator sends SIGTERM, in-flight requests (including mid-OAuth token exchanges) are dropped immediately. Prisma connections are not cleanly released and Sentry loses buffered reports. Tracked as **bug-0193**.
 
 **Admin Next.js app missing security headers.**
 The admin console does not set `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, or `Cache-Control` on authenticated pages. The admin dashboard is vulnerable to clickjacking, and sensitive data may persist in browser cache after sign-out. Tracked as **bug-0191**.
