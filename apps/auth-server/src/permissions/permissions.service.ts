@@ -32,8 +32,11 @@ function isPrismaCode(e: unknown, code: string): boolean {
   return typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === code;
 }
 
+// bug-0183: name.toLowerCase() so `Platform.super.admin`, `PLATFORM.foo`,
+// etc. cannot bypass the guard by casing. Postgres string collations may
+// differ but we treat `platform.*` as reserved regardless of case.
 function isPlatform(name: string): boolean {
-  return name.startsWith('platform.');
+  return name.toLowerCase().startsWith('platform.');
 }
 
 @Injectable()
@@ -128,6 +131,14 @@ export class PermissionsService {
 
   async createPermission(callerBaId: string, dto: CreatePermissionDto) {
     await checkPermission(callerBaId, 'platform.permissions.manage');
+    // bug-0183: `platform.*` is a reserved prefix — the seed owns those names
+    // and they are the RBAC's escalation surface. An admin with
+    // `platform.permissions.manage` must not be able to mint arbitrary
+    // `platform.*` privileges through this endpoint (or through
+    // updatePermission's rename path below).
+    if (isPlatform(dto.name)) {
+      throw new ForbiddenException('Permissions with the `platform.` prefix are reserved');
+    }
     const app = await prisma.saApp.findUnique({ where: { publicId: dto.appId } });
     if (!app) throw new NotFoundException('App not found');
     try {
@@ -164,6 +175,15 @@ export class PermissionsService {
     if (!existing) throw new NotFoundException();
     if (isPlatform(existing.name) || existing.isSystem) {
       throw new ForbiddenException('Platform-system permissions cannot be modified');
+    }
+    // bug-0183 (sister of the createPermission guard, also tracked as
+    // bug-0096): block RENAMING an ordinary permission INTO the reserved
+    // `platform.*` prefix. The check above only rejects modifying an
+    // already-platform.* row; without this, an admin could take an ordinary
+    // permission they hold and rename it to `platform.foo`, mounting the
+    // same escalation.
+    if (isPlatform(dto.name)) {
+      throw new ForbiddenException('Permissions with the `platform.` prefix are reserved');
     }
     try {
       const updated = await prisma.saPermission.update({
