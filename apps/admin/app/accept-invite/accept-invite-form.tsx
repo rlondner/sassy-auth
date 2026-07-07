@@ -20,6 +20,17 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
+  // bug-0160: track the redirect timer in a ref so unmount can
+  // cancel it. Previously the setTimeout could fire after the user
+  // navigated away, triggering a router.push into a stale route.
+  const redirectTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(
+    () => () => {
+      if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current)
+    },
+    [],
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -37,7 +48,7 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
     try {
       await acceptInvitation(token, password)
       setSuccess(true)
-      setTimeout(() => router.push('/login'), 2000)
+      redirectTimerRef.current = setTimeout(() => router.push('/login'), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('acceptInvite.errors.genericError'))
     } finally {

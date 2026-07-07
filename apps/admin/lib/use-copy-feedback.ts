@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { copyToClipboard } from './clipboard'
 
 /**
@@ -43,7 +44,15 @@ export function useCopyFeedback(resetMs = 2000) {
   const copy = useCallback(
     async (text: string, key: string): Promise<boolean> => {
       const ok = await copyToClipboard(text)
-      if (!ok) return false
+      if (!ok) {
+        // bug-0171: previously the clipboard failure was silently
+        // swallowed — the user got no "check" icon and no error, so
+        // they thought the click didn't register. Surface a toast so
+        // they know to try again (e.g. after granting the clipboard
+        // permission on their browser).
+        toast.error('Failed to copy — clipboard access denied')
+        return false
+      }
       if (timerRef.current !== null) clearTimeout(timerRef.current)
       setCopiedKey(key)
       timerRef.current = setTimeout(() => {

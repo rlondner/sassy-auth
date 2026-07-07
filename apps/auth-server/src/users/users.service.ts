@@ -84,7 +84,19 @@ export class UsersService {
     const where: Record<string, unknown> = {};
     if (filters.orgPublicId) where['org'] = { publicId: filters.orgPublicId };
 
-    const users = await prisma.saUser.findMany({ where, include: USER_INCLUDE });
+    // bug-0140: hard cap the response so a single request can't return
+    // an arbitrarily large payload. Full paginated response with
+    // {items, total, page, pageSize} is a follow-up — a breaking
+    // change on the admin API contract; this cap is the immediate
+    // DoS mitigation. 500 is comfortably above any real org's active
+    // user list and well below the point where the JSON payload
+    // starts to matter for memory / latency.
+    const users = await prisma.saUser.findMany({
+      where,
+      include: USER_INCLUDE,
+      take: 500,
+      orderBy: { id: 'desc' },
+    });
     return users.map(formatUser);
   }
 
