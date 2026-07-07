@@ -88,6 +88,10 @@ jest.mock('@sassy-auth/ui', () => {
     return <option value={value}>{children}</option>
   }
 
+  const Passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>
+  const Trigger = ({ children, asChild: _asChild, ...rest }: { children?: React.ReactNode; asChild?: boolean }) =>
+    React.isValidElement(children) ? React.cloneElement(children, rest as object) : <>{children}</>
+
   return {
     ...actual,
     Select,
@@ -95,6 +99,9 @@ jest.mock('@sassy-auth/ui', () => {
     SelectContent,
     SelectValue,
     SelectItem,
+    Tooltip: Passthrough,
+    TooltipTrigger: Trigger,
+    TooltipContent: Passthrough,
   }
 })
 

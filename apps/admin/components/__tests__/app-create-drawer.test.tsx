@@ -9,6 +9,26 @@ jest.mock('@/app/(admin)/apps/actions', () => ({
   createAppAction: jest.fn(),
 }))
 
+jest.mock('@sassy-auth/ui', () => {
+  const actual = jest.requireActual('@sassy-auth/ui')
+  const Passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>
+  const Trigger = ({ children, asChild: _asChild, ...rest }: { children?: React.ReactNode; asChild?: boolean }) =>
+    React.isValidElement(children) ? React.cloneElement(children, rest as object) : <>{children}</>
+  return {
+    ...actual,
+    Sheet: Passthrough,
+    SheetContent: Passthrough,
+    SheetHeader: Passthrough,
+    SheetTitle: Passthrough,
+    SheetDescription: Passthrough,
+    SheetFooter: Passthrough,
+    SheetBody: Passthrough,
+    Tooltip: Passthrough,
+    TooltipTrigger: Trigger,
+    TooltipContent: Passthrough,
+  }
+})
+
 function withIntl(node: React.ReactNode) {
   return (
     <NextIntlClientProvider locale="en" messages={en}>
@@ -30,7 +50,11 @@ describe('AppCreateDrawer', () => {
     fireEvent.change(screen.getByLabelText(en.apps.fields.url), { target: { value: 'https://x.example' } })
     fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.createTitle }))
     await waitFor(() =>
-      expect(actions.createAppAction).toHaveBeenCalledWith({ name: 'X', url: 'https://x.example' }),
+      expect(actions.createAppAction).toHaveBeenCalledWith({
+        name: 'X',
+        url: 'https://x.example',
+        callbackUrl: null,
+      }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
