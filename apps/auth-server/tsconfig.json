@@ -18,9 +18,13 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
-    "strictBindCallApply": true,
+    // bug-0197: `strict: true` bundles strictNullChecks + noImplicitAny +
+    // strictBindCallApply (already on) plus strictFunctionTypes,
+    // strictPropertyInitialization, noImplicitThis, alwaysStrict, and
+    // useUnknownInCatchVariables. The auth-server is the most security-
+    // critical package in the workspace and now gets the strongest type
+    // safety.
+    "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true

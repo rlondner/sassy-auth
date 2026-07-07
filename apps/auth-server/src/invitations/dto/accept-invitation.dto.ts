@@ -11,5 +11,5 @@ export class AcceptInvitationDto {
     message:
       'Password must be at least 12 characters and contain an uppercase letter, a lowercase letter, and a digit.',
   })
-  password: string;
+  password!: string;
 }

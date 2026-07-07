@@ -4,5 +4,5 @@ export class SetUserRolesDto {
   @IsArray()
   @ArrayUnique()
   @IsString({ each: true })
-  roleIds: string[];
+  roleIds!: string[];
 }
