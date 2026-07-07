@@ -7,7 +7,7 @@ import {
   Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle,
   Button, ButtonGroup, Badge, UserAvatar,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { getPermissionAction } from '@/app/(admin)/permissions/actions'
 import type { PermissionRow, PermissionDetail } from '@/lib/types'
 
@@ -23,7 +23,7 @@ export function PermissionViewDrawer({ permission, open, onOpenChange, onEdit, o
   const t = useTranslations()
   const [detail, setDetail] = React.useState<PermissionDetail | null>(null)
   const [loading, setLoading] = React.useState(false)
-  const [copied, setCopied] = React.useState<string | null>(null)
+  const { copiedKey: copied, copy } = useCopyFeedback()
 
   const isPlatform = permission.name.startsWith('platform.')
   const isSystem = !isPlatform && (permission.isSystem ?? false)
@@ -37,13 +37,6 @@ export function PermissionViewDrawer({ permission, open, onOpenChange, onEdit, o
       .then((res) => { if ('publicId' in res) setDetail(res) })
       .finally(() => setLoading(false))
   }, [open, permission.publicId])
-
-  function copy(text: string, key: string) {
-    copyToClipboard(text, () => {
-      setCopied(key)
-      setTimeout(() => setCopied(null), 2000)
-    })
-  }
 
   const roles = detail?.roles ?? []
   const users = detail?.users ?? []

@@ -9,7 +9,7 @@ import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteRoleAction, listRolesAction } from '@/app/(admin)/roles/actions'
 import type { App, RoleRow, ListRolesResponse } from '@/lib/types'
 import { RoleViewDrawer } from './role-view-drawer'
@@ -38,7 +38,7 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
-  const [copiedSqid, setCopiedSqid] = React.useState<string | null>(null)
+  const { copiedKey: copiedSqid, copy: copySqid } = useCopyFeedback()
   const initialRefRef = React.useRef(true)
 
   React.useEffect(() => {
@@ -91,10 +91,7 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
               aria-label={t('roles.actions.copy')}
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(r.publicId, () => {
-                  setCopiedSqid(r.publicId)
-                  setTimeout(() => setCopiedSqid(null), 2000)
-                })
+                void copySqid(r.publicId, r.publicId)
               }}
               className="text-muted-foreground hover:text-primary"
             >

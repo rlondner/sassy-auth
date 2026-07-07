@@ -9,7 +9,7 @@ import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteAppAction, listAppsAction } from '@/app/(admin)/apps/actions'
 import type { App, ListAppsResponse } from '@/lib/types'
 import { AppViewDrawer } from './app-view-drawer'
@@ -32,7 +32,7 @@ export function AppsTable({ initial }: Props) {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
-  const [copiedSqid, setCopiedSqid] = React.useState<string | null>(null)
+  const { copiedKey: copiedSqid, copy: copySqid } = useCopyFeedback()
   const initialRefRef = React.useRef(true)
 
   // Debounced refetch when query / page / pageSize change.
@@ -84,10 +84,7 @@ export function AppsTable({ initial }: Props) {
               aria-label={t('apps.actions.copy')}
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(a.publicId, () => {
-                  setCopiedSqid(a.publicId)
-                  setTimeout(() => setCopiedSqid(null), 2000)
-                })
+                void copySqid(a.publicId, a.publicId)
               }}
               className="text-muted-foreground hover:text-primary"
             >

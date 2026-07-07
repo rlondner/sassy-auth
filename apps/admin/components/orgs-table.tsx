@@ -9,7 +9,7 @@ import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteOrgAction, listOrgsAction } from '@/app/(admin)/orgs/actions'
 import type { App, OrgRow, ListOrgsResponse } from '@/lib/types'
 import { OrgViewDrawer } from './org-view-drawer'
@@ -33,7 +33,7 @@ export function OrgsTable({ initial, apps }: Props) {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
-  const [copiedSqid, setCopiedSqid] = React.useState<string | null>(null)
+  const { copiedKey: copiedSqid, copy: copySqid } = useCopyFeedback()
   const initialRefRef = React.useRef(true)
 
   React.useEffect(() => {
@@ -95,10 +95,7 @@ export function OrgsTable({ initial, apps }: Props) {
               aria-label={t('orgs.actions.copy')}
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(o.publicId, () => {
-                  setCopiedSqid(o.publicId)
-                  setTimeout(() => setCopiedSqid(null), 2000)
-                })
+                void copySqid(o.publicId, o.publicId)
               }}
               className="text-muted-foreground hover:text-primary"
             >

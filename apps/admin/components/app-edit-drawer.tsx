@@ -15,7 +15,7 @@ import {
   Label,
 } from '@sassy-auth/ui'
 import { updateAppAction } from '@/app/(admin)/apps/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { App } from '@/lib/types'
 
 interface Props {
@@ -31,7 +31,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [url, setUrl] = React.useState(app.url)
   const [callbackUrl, setCallbackUrl] = React.useState(app.callbackUrl ?? '')
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -116,10 +117,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                   variant="outline"
                   aria-label={t('apps.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(app.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(app.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">

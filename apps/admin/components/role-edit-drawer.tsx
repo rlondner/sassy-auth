@@ -10,7 +10,7 @@ import {
 import {
   updateRoleAction, getRoleAction, listAppPermissionsAction,
 } from '@/app/(admin)/roles/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { RoleRow, RoleDetail } from '@/lib/types'
 import { PermissionRowsEditor, type PermOption } from './role-permission-rows-editor'
 
@@ -30,7 +30,8 @@ export function RoleEditDrawer({ role, open, onOpenChange, onSuccess }: Props) {
   const [loadingDetail, setLoadingDetail] = React.useState(false)
   const [loadingPerms, setLoadingPerms] = React.useState(false)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -129,10 +130,7 @@ export function RoleEditDrawer({ role, open, onOpenChange, onSuccess }: Props) {
                   variant="outline"
                   aria-label={t('roles.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(role.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(role.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">

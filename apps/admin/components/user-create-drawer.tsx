@@ -11,6 +11,7 @@ import {
   createUserAction, getRolesAction, getAppPermissionsAction,
 } from '@/app/(admin)/users/actions'
 import type { Org, Role } from '@/lib/types'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { RoleRowsEditor, type RoleOption } from './user-role-rows-editor'
 import { PermissionRowsEditor, type PermOption } from './role-permission-rows-editor'
 
@@ -47,7 +48,8 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
   const [errors, setErrors] = React.useState<Partial<Record<keyof FormState, string>>>({})
   const [submitting, setSubmitting] = React.useState(false)
   const [inviteUrl, setInviteUrl] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [serverError, setServerError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -56,7 +58,6 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
       setErrors({})
       setInviteUrl(null)
       setServerError(null)
-      setCopied(false)
     }
   }, [open])
 
@@ -127,9 +128,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
 
   async function handleCopy() {
     if (!inviteUrl) return
-    await navigator.clipboard.writeText(inviteUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    await copy(inviteUrl, 'invite-url')
   }
 
   const selectedOrg = orgs.find((o) => o.id === form.orgId)

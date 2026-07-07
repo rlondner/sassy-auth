@@ -8,7 +8,7 @@ import {
   Button, ButtonGroup, Input, Label,
 } from '@sassy-auth/ui'
 import { updateOrgAction } from '@/app/(admin)/orgs/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { OrgRow } from '@/lib/types'
 
 interface Props {
@@ -22,7 +22,8 @@ export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(org.name)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -86,10 +87,7 @@ export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
                   variant="outline"
                   aria-label={t('orgs.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(org.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(org.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">

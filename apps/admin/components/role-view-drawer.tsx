@@ -7,7 +7,7 @@ import {
   Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle,
   Button, ButtonGroup, Badge,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { getRoleAction } from '@/app/(admin)/roles/actions'
 import type { RoleRow, RoleDetail } from '@/lib/types'
 
@@ -23,7 +23,7 @@ export function RoleViewDrawer({ role, open, onOpenChange, onEdit, onDelete }: P
   const t = useTranslations()
   const [detail, setDetail] = React.useState<RoleDetail | null>(null)
   const [loading, setLoading] = React.useState(false)
-  const [copied, setCopied] = React.useState<string | null>(null)
+  const { copiedKey: copied, copy } = useCopyFeedback()
 
   React.useEffect(() => {
     if (!open) return
@@ -33,13 +33,6 @@ export function RoleViewDrawer({ role, open, onOpenChange, onEdit, onDelete }: P
       .then((res) => { if ('publicId' in res) setDetail(res) })
       .finally(() => setLoading(false))
   }, [open, role.publicId])
-
-  function copy(text: string, key: string) {
-    copyToClipboard(text, () => {
-      setCopied(key)
-      setTimeout(() => setCopied(null), 2000)
-    })
-  }
 
   const permissions = detail?.permissions ?? []
   const permissionCount = detail?.permissionCount ?? role.permissionCount
