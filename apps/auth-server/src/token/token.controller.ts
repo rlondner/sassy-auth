@@ -123,7 +123,7 @@ export class TokenController {
         throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
       }
 
-      const code = this.oauthService.generateCode(
+      const code = await this.oauthService.generateCode(
         saUser.publicId,
         app.publicId,
         redirectUri,
@@ -197,7 +197,7 @@ export class TokenController {
     let userPublicId: string;
     let appPublicId: string;
     try {
-      const exchanged = this.oauthService.exchangeCode(
+      const exchanged = await this.oauthService.exchangeCode(
         dto.code,
         dto.client_id,
         dto.redirect_uri,

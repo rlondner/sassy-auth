@@ -186,3 +186,25 @@ model SaUserPermission {
 
   @@id([userId, permissionId])
 }
+
+// bug-0039: OAuth authorization codes moved from an in-memory Map on a
+// single OauthService instance to a shared DB table so the auth-server
+// can run multiple replicas behind a load balancer. Codes are one-shot:
+// generated at /api/token/oauth/authorize and deleted on /api/token/oauth/token
+// (or on any validation failure — see OauthService.exchangeCode). The
+// row also carries the fields bound at issuance for PKCE + redirect_uri
+// verification per RFC 6749 §4.1.3 (bug-0054). Rows accumulate past
+// `expiresAt` but the exchange path rejects them, so a periodic cleanup
+// job is optional (not shipped in v1).
+model SaOauthCode {
+  code                String   @id
+  userId              String
+  appPublicId         String
+  redirectUri         String
+  codeChallenge       String
+  codeChallengeMethod String
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+
+  @@index([expiresAt])
+}
