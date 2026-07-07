@@ -24,7 +24,25 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Response>
   // route handler catches, so this works cleanly in both server
   // actions and RSC page renders.
   if (res.status === 401) redirect('/login')
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`)
+  if (!res.ok) {
+    // bug-0050 / bug-0200 / bug-0201: previously threw only
+    // "API error ${status}: ${path}" and discarded the response body.
+    // Callers that wanted to distinguish (e.g. self-delete
+    // "cannot delete your own account" vs generic 403; "already
+    // exists" vs generic 409) had no signal to key off. Now the
+    // Nest error message is appended when parseable, so callers can
+    // reliably `.includes(...)` on both the status code and the
+    // server-side reason.
+    let detail = ''
+    try {
+      const body = await res.clone().json() as { message?: string | string[] }
+      if (typeof body?.message === 'string') detail = ` ${body.message}`
+      else if (Array.isArray(body?.message)) detail = ` ${body.message.join(', ')}`
+    } catch {
+      // non-JSON body — leave detail empty
+    }
+    throw new Error(`API error ${res.status}: ${path}${detail}`)
+  }
   return res
 }
 

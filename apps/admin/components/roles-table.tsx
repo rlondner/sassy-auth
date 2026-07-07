@@ -244,6 +244,7 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
           onOpenChange={setViewOpen}
           onEdit={() => { setViewOpen(false); setEditOpen(true) }}
           onDelete={() => { setDeleteError(null); setDeleteOpen(true) }}
+          canWrite={canWrite}
         />
       )}
       {selected && (
