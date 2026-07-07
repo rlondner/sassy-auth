@@ -129,6 +129,19 @@ model SaUser {
   phoneNumber      String?            @unique
   username         String?            @unique
   status           UserStatus         @default(pending)
+  // bug-0186: `createdAt` records when the admin provisioned the user
+  // (or when they self-registered), NOT when the BetterAuth `User`
+  // row was created — those diverge for platform admins seeded before
+  // this column existed (backfilled with the migration's default) and
+  // for BetterAuth users that lose their SaUser via bug-0151. This is
+  // the field the /users admin table's "Created" column reads.
+  createdAt        DateTime           @default(now())
+  // `lastLoginAt` is denormalized and updated on every login-shaped
+  // event: BetterAuth `sign-in/*` (via a databaseHooks.session.create
+  // hook in auth.config.ts) and `POST /api/token/direct/login` (in
+  // token.controller.ts, on successful JWT issuance). Null means the
+  // user has never signed in — most commonly a pending invitee.
+  lastLoginAt      DateTime?
   roles            SaUserRole[]
   directPermissions SaUserPermission[]
   invitations       SaInvitation[]

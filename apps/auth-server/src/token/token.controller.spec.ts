@@ -17,7 +17,10 @@ jest.mock('@sentry/nestjs', () => ({
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
     saApp: { findUnique: jest.fn() },
-    saUser: { findUnique: jest.fn(), findFirst: jest.fn() },
+    // `update` covers the bug-0186 fire-and-forget lastLoginAt bump
+    // in directLogin. Default it to resolve so the tests that don't
+    // care about the write don't need to touch it.
+    saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     account: { findFirst: jest.fn() },
   },
 }));
@@ -35,7 +38,7 @@ const mockGetSession = auth.api.getSession as unknown as jest.Mock;
 
 const mockPrisma = prisma as unknown as {
   saApp: { findUnique: jest.Mock };
-  saUser: { findUnique: jest.Mock; findFirst: jest.Mock };
+  saUser: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
   account: { findFirst: jest.Mock };
 };
 
@@ -136,6 +139,28 @@ describe('TokenController', () => {
         expect.objectContaining({ where: { username: 'alice' } }),
       );
       expect(mockPrisma.saUser.findFirst).not.toHaveBeenCalled();
+    });
+
+    // bug-0186: successful directLogin bumps SaUser.lastLoginAt so the
+    // admin console's "Last login" column reflects reality. The update
+    // is fire-and-forget so its rejection cannot fail the login itself.
+    it('bumps SaUser.lastLoginAt on successful directLogin', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+      mockTokenService.issueJwt.mockResolvedValue('jwt.token');
+      mockPrisma.saUser.update.mockResolvedValue({});
+
+      await controller.directLogin({
+        identifier: 'user@example.com',
+        password: 'pw',
+        appId: 'sqid-10',
+      });
+
+      expect(mockPrisma.saUser.update).toHaveBeenCalledWith({
+        where: { id: saUser.id },
+        data: { lastLoginAt: expect.any(Date) },
+      });
     });
 
     it('directLogin (phone branch) uses findUnique on phoneNumber, not findFirst', async () => {

@@ -18,6 +18,38 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
   trustedOrigins: TRUSTED_ORIGINS,
+  // bug-0186: BetterAuth creates a Session row on every successful
+  // sign-in (email/password, magic-link, OTP, social). Hook the
+  // `after` phase of session-create to bump SaUser.lastLoginAt so
+  // the admin console's "Last login" column reflects the truth for
+  // console-backed users. `updateMany` because a session can be
+  // orphaned from an SaUser (bug-0151) — one BetterAuth user with
+  // no SaUser is a no-op that must not fail the sign-in.
+  databaseHooks: {
+    session: {
+      create: {
+        after: async (session: { userId: string }) => {
+          try {
+            await prisma.saUser.updateMany({
+              where: { betterAuthUserId: session.userId },
+              data: { lastLoginAt: new Date() },
+            });
+          } catch (err) {
+            // Log-only — a failure to update lastLoginAt must not
+            // prevent the session from being usable. Matches the
+            // fire-and-forget stance in token.controller.ts
+            // directLogin. Console.error is deliberate: this runs
+            // outside a Nest request context so we don't have the
+            // injected LoggerService here.
+            console.error(
+              `[bug-0186] Failed to update lastLoginAt for BetterAuth user ${session.userId}:`,
+              err,
+            );
+          }
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
   },

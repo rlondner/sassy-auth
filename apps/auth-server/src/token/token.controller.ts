@@ -377,6 +377,22 @@ export class TokenController {
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
     }
 
+    // bug-0186: record the login timestamp. This is the JWT-issuance
+    // path; the BetterAuth sign-in path (email/password, magic-link,
+    // OTP) is tracked separately in the databaseHooks in
+    // auth.config.ts. Fire-and-forget with a catch so a rare DB blip
+    // during the write does not break login itself — the JWT is what
+    // the caller wants.
+    prisma.saUser
+      .update({ where: { id: saUser.id }, data: { lastLoginAt: new Date() } })
+      .catch((err) =>
+        this.logger.getWinstonLogger().warn('Failed to update lastLoginAt on directLogin', {
+          context: 'TokenController',
+          userId: saUser.publicId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+
     // 5. Issue JWT
     const token = await this.tokenService.issueJwt({
       saUserId: saUser.id,

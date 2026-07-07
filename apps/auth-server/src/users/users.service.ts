@@ -28,6 +28,8 @@ function formatUser(u: {
   phoneNumber: string | null;
   username: string | null;
   status: string;
+  createdAt: Date;
+  lastLoginAt: Date | null;
   org: { publicId: string };
   betterAuthUser: { email: string };
 }) {
@@ -40,6 +42,12 @@ function formatUser(u: {
     username: u.username,
     orgId: u.org.publicId,
     status: u.status,
+    // bug-0186: serialize as ISO strings so the JSON payload is
+    // stable across environments (Date instances would be converted
+    // via toJSON anyway, but being explicit avoids client-side
+    // dependence on that implicit behavior).
+    createdAt: u.createdAt.toISOString(),
+    lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
   };
 }
 
