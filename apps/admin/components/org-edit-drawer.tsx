@@ -36,6 +36,12 @@ export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!dirty) return
+    // bug-0141: whitespace-only submissions fail server-side. Catch
+    // at the client for a clearer error.
+    if (name.trim() === '') {
+      setErrorKey('orgs.errors.nameRequired')
+      return
+    }
     startTransition(async () => {
       const result = await updateOrgAction(org.publicId, { name: name.trim() })
       if ('errorKey' in result) {

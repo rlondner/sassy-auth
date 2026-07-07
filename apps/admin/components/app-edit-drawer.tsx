@@ -47,6 +47,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!dirty) return
+    // bug-0141: a submit with whitespace-only fields is a validation
+    // failure at the client layer. Server would reject with a 400
+    // and a generic errorKey, but the UX is cleaner if we flag it
+    // here — an empty trimmed name means "no name," not "clear name."
+    if (name.trim() === '' || url.trim() === '') {
+      setErrorKey('apps.errors.nameRequired')
+      return
+    }
     const patch: { name?: string; url?: string; callbackUrl?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()

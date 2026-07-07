@@ -1,5 +1,6 @@
 import 'server-only'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, MeProfile, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
 
@@ -15,6 +16,14 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Response>
       ...init.headers,
     },
   })
+  // bug-0136: an expired auth-server session previously threw the
+  // opaque "API error 401" that surfaced as a generic toast. Bouncing
+  // to /login mirrors what the admin middleware does on a hard
+  // sign-out and gives the user a clear path forward.
+  // `redirect()` throws a NEXT_REDIRECT sentinel that Next.js's
+  // route handler catches, so this works cleanly in both server
+  // actions and RSC page renders.
+  if (res.status === 401) redirect('/login')
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`)
   return res
 }
@@ -33,7 +42,11 @@ export async function getUser(id: string): Promise<User> {
 export async function createUser(payload: CreateUserPayload): Promise<CreateUserResponse> {
   const res = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(payload) })
   const result: CreateUserResponse = await res.json()
-  Sentry.addBreadcrumb({ category: 'admin.action', message: `User created: ${result.user.email}`, level: 'info' })
+  // bug-0146: log the userId, not the email. Emails are PII and
+  // Sentry breadcrumbs are retained by a third party. The publicId
+  // is the correlation key for support debugging without leaking
+  // any identifying data.
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User created: ${result.user.id}`, level: 'info' })
   return result
 }
 
