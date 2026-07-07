@@ -296,7 +296,13 @@ export class TokenController {
       betterAuthEmail = dto.identifier;
       saUser = found;
     } else if (identifierType === 'username') {
-      const found = await prisma.saUser.findFirst({
+      // bug-0147: findUnique against the newly-@unique username column.
+      // Previously `findFirst` returned an arbitrary matching row when
+      // two users across different orgs shared a username, silently
+      // authenticating the wrong tenant. The DB now rejects duplicate
+      // non-NULL values at insert/update time, so findUnique returns
+      // exactly one match or null.
+      const found = await prisma.saUser.findUnique({
         where: { username: dto.identifier },
         include: { org: true, betterAuthUser: true },
       }) as SaUserWithOrg | null;
@@ -311,8 +317,9 @@ export class TokenController {
       betterAuthEmail = found.betterAuthUser.email;
       saUser = found;
     } else {
-      // phone
-      const found = await prisma.saUser.findFirst({
+      // phone — bug-0147: same story as username, findUnique against
+      // the newly-@unique phoneNumber column.
+      const found = await prisma.saUser.findUnique({
         where: { phoneNumber: dto.identifier },
         include: { org: true, betterAuthUser: true },
       }) as SaUserWithOrg | null;

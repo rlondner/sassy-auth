@@ -119,6 +119,39 @@ describe('TokenController', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
+    // bug-0147 — username / phoneNumber identifier branches now use
+    // findUnique against the newly-@unique columns. Previously they used
+    // findFirst on a non-unique column, so two users across different
+    // orgs sharing a username silently authenticated the wrong tenant
+    // (cross-org auth bug). These tests lock in the correct Prisma call.
+    it('directLogin (username branch) uses findUnique on username, not findFirst', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findUnique.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+      mockTokenService.issueJwt.mockResolvedValue('jwt.token');
+
+      await controller.directLogin({ identifier: 'alice', password: 'pw', appId: 'sqid-10' });
+
+      expect(mockPrisma.saUser.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { username: 'alice' } }),
+      );
+      expect(mockPrisma.saUser.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('directLogin (phone branch) uses findUnique on phoneNumber, not findFirst', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findUnique.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+      mockTokenService.issueJwt.mockResolvedValue('jwt.token');
+
+      await controller.directLogin({ identifier: '+15551234567', password: 'pw', appId: 'sqid-10' });
+
+      expect(mockPrisma.saUser.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { phoneNumber: '+15551234567' } }),
+      );
+      expect(mockPrisma.saUser.findFirst).not.toHaveBeenCalled();
+    });
+
     // bug-0074 — inactive/pending users must not receive a JWT even with the
     // correct password. Kept opaque as INVALID_CREDENTIALS so response does not
     // leak that the account exists.

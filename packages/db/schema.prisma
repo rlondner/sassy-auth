@@ -101,16 +101,23 @@ model SaUser {
   org              SaOrg              @relation(fields: [orgId], references: [id])
   firstName        String
   lastName         String
-  phoneNumber      String?
-  username         String?
+  // bug-0147: partial-unique semantics. Both fields are nullable so
+  // multiple NULL rows coexist (Postgres treats NULLs as distinct in a
+  // standard unique index — CREATE UNIQUE INDEX on a nullable column
+  // enforces uniqueness across NON-NULL values only), and non-NULL
+  // values are enforced unique across the whole table. This lets
+  // `directLogin` do `findUnique({ where: { username } })` /
+  // `findUnique({ where: { phoneNumber } })` without collisions across
+  // orgs (was `findFirst` → returned an arbitrary matching row → cross-
+  // tenant auth bug).
+  phoneNumber      String?            @unique
+  username         String?            @unique
   status           UserStatus         @default(pending)
   roles            SaUserRole[]
   directPermissions SaUserPermission[]
   invitations       SaInvitation[]
 
   @@index([orgId])
-  @@index([username])
-  @@index([phoneNumber])
 }
 
 model SaInvitation {
