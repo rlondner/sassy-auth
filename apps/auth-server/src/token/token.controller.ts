@@ -111,6 +111,14 @@ export class TokenController {
       if (!saUser) {
         throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
       }
+      // Only 'active' users may complete the OAuth flow. 'pending' users have
+      // not yet accepted their invitation; 'inactive' users have been
+      // deactivated by an admin. Both must be blocked here — otherwise a
+      // BetterAuth session (which persists independently of SaUser.status)
+      // would still let them mint a JWT.
+      if (saUser.status !== 'active') {
+        throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+      }
       if (saUser.org.appId !== app.id) {
         throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
       }
@@ -211,6 +219,12 @@ export class TokenController {
     if (!saUser) {
       throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
     }
+    // The code was issued at /authorize time when the user was active, but they
+    // could have been deactivated between /authorize and /token. Re-check here
+    // so a mid-flow status change is honored.
+    if (saUser.status !== 'active') {
+      throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+    }
 
     const token = await this.tokenService.issueJwt({
       saUserId: saUser.id,
@@ -255,6 +269,7 @@ export class TokenController {
       id: number;
       publicId: string;
       betterAuthUserId: string;
+      status: 'active' | 'pending' | 'inactive';
       org: { publicId: string; appId: number };
       betterAuthUser: { email: string };
     };
@@ -337,6 +352,18 @@ export class TokenController {
         context: 'TokenController',
         identifierType: detectIdentifierType(dto.identifier),
         appId: dto.appId,
+      });
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
+    }
+    // Only 'active' users may complete direct login. Placed AFTER password
+    // verification so the response timing does not distinguish inactive-with-
+    // valid-password from wrong-password (kept opaque as INVALID_CREDENTIALS).
+    if (saUser.status !== 'active') {
+      this.logger.getWinstonLogger().warn('Direct login failed: user not active', {
+        context: 'TokenController',
+        identifierType: detectIdentifierType(dto.identifier),
+        appId: dto.appId,
+        userId: saUser.publicId,
       });
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
     }
