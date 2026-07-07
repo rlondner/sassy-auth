@@ -165,7 +165,14 @@ export function PermissionsTable({ initial, apps }: Props) {
     const refreshed = await listPermissionsAction({
       q: query || undefined, appId: appFilter || undefined, page, pageSize,
     })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    if (refreshed && 'items' in refreshed) {
+      setData(refreshed)
+      // bug-0206: rebase `selected` on the refreshed rows so drawers
+      // reflect current data, or clear if the row is gone.
+      setSelected((prev) =>
+        prev ? refreshed.items.find((r) => r.publicId === prev.publicId) ?? null : null,
+      )
+    }
   }, [query, appFilter, page, pageSize])
 
   async function handleDelete() {

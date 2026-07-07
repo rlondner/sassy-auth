@@ -139,7 +139,15 @@ export function AppsTable({ initial }: Props) {
 
   const refresh = React.useCallback(async () => {
     const refreshed = await listAppsAction({ q: query || undefined, page, pageSize })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    if (refreshed && 'items' in refreshed) {
+      setData(refreshed)
+      // bug-0206: point `selected` at the fresh row so any open drawer
+      // reads the new data, not the pre-refresh snapshot. If the row
+      // was removed from the current page, drop the selection.
+      setSelected((prev) =>
+        prev ? refreshed.items.find((r) => r.publicId === prev.publicId) ?? null : null,
+      )
+    }
   }, [query, page, pageSize])
 
   async function handleDelete() {
