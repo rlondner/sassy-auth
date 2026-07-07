@@ -69,6 +69,33 @@ describe('AppsService', () => {
     ]);
   });
 
+  // bug-0164 — sibling of getOrg / getRole / getPermission / getUser.
+  // The README documented `GET /api/apps/:id` but the route was missing
+  // before this bug was closed. The service call goes through the same
+  // required-perms surface as listApps so cross-page callers (orgs /
+  // roles / permissions admin pages) can still name-render the parent
+  // app when displaying one record.
+  it('getApp returns the formatted row when found', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    const result = await service.getApp('ba-caller', 'sq_1');
+    expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
+    expect(result).toEqual({
+      publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
+      callbackUrl: null, isPlatform: false,
+    });
+    expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
+      'platform.apps.manage',
+      'platform.orgs.manage',
+      'platform.permissions.manage',
+      'platform.roles.manage',
+    ]);
+  });
+
+  it('getApp throws NotFoundException when the app does not exist', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(null);
+    await expect(service.getApp('ba-caller', 'nope')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('listApps applies q filter to name and url (ILIKE)', async () => {
     mockPrisma.saApp.findMany.mockResolvedValue([]);
     mockPrisma.saApp.count.mockResolvedValue(0);

@@ -45,6 +45,24 @@ export class AppsService {
     return { items: rows.map(formatApp), total, page, pageSize };
   }
 
+  async getApp(callerBaId: string, publicId: string) {
+    // bug-0164: sibling to orgs/roles/permissions/users `get`. Apps are
+    // read from the same required-perms surface as `listApps` — the
+    // orgs / permissions / roles admin pages need to render the parent
+    // app's name when displaying a single record. Apps are not
+    // org-scoped so no `targetOrgId` is threaded (contrast with
+    // orgs.service.ts::getOrg).
+    await checkPermission(callerBaId, [
+      'platform.apps.manage',
+      'platform.orgs.manage',
+      'platform.permissions.manage',
+      'platform.roles.manage',
+    ]);
+    const app = await prisma.saApp.findUnique({ where: { publicId } });
+    if (!app) throw new NotFoundException();
+    return formatApp(app);
+  }
+
   async createApp(callerBaId: string, dto: CreateAppDto) {
     await checkPermission(callerBaId, 'platform.apps.manage');
     try {
