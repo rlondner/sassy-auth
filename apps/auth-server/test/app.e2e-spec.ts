@@ -66,17 +66,34 @@ describe('SassyAuth E2E', () => {
 
   afterAll(async () => {
     await app.close();
-    // Clean up test data
-    // await prisma.saUserPermission.deleteMany();
-    // await prisma.saUserRole.deleteMany();
-    // await prisma.saRolePermission.deleteMany();
-    // await prisma.saUser.deleteMany();
-    // await prisma.saPermission.deleteMany({ where: { app: { isPlatform: false } } });
-    // await prisma.saRole.deleteMany();
-    // await prisma.saOrg.deleteMany({ where: { isPlatform: false } });
-    // await prisma.account.deleteMany();
-    // await prisma.session.deleteMany();
-    // await prisma.user.deleteMany();
+    // bug-0173: the cleanup queries were commented out — if any
+    // preceding test failed, the "final cleanup" test at the
+    // bottom of this spec was skipped and stale data leaked into
+    // subsequent runs. Runs as afterAll so it fires regardless of
+    // which tests failed. beforeAll re-runs `pnpm seed`, which is
+    // idempotent — so the aggressive wipe below is safe (the next
+    // run's seed restores platform apps, orgs, roles, and
+    // permissions).
+    try {
+      await prisma.saUserPermission.deleteMany();
+      await prisma.saUserRole.deleteMany();
+      await prisma.saRolePermission.deleteMany();
+      await prisma.saInvitation.deleteMany();
+      await prisma.saUser.deleteMany();
+      await prisma.saPermission.deleteMany({ where: { app: { isPlatform: false } } });
+      await prisma.saRole.deleteMany();
+      await prisma.saOrg.deleteMany({ where: { isPlatform: false } });
+      await prisma.saApp.deleteMany({ where: { isPlatform: false } });
+      await prisma.account.deleteMany();
+      await prisma.session.deleteMany();
+      await prisma.user.deleteMany();
+    } catch (err) {
+      // Log-only: cleanup failure must not fail the whole suite.
+      console.warn('[bug-0173] e2e afterAll cleanup encountered:', err);
+    }
+    // bug-0178: always disconnect Prisma so the process can exit
+    // cleanly. Was already present pre-fix; kept last so cleanup
+    // above uses the connection.
     await prisma.$disconnect();
   });
 
