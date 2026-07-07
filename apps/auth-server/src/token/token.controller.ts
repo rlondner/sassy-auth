@@ -28,7 +28,7 @@ import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
-import { assertRedirectUriMatchesApp } from './redirect-uri';
+import { assertRedirectUriAllowed } from './redirect-uri';
 import { buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { LoggerService } from '../common/logger/logger.service';
 import {
@@ -87,7 +87,7 @@ export class TokenController {
       }
 
       try {
-        assertRedirectUriMatchesApp(redirectUri, app.url);
+        assertRedirectUriAllowed(redirectUri, app);
       } catch (err) {
         this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
           context: 'TokenController',
@@ -175,7 +175,7 @@ export class TokenController {
     }
 
     try {
-      assertRedirectUriMatchesApp(dto.redirect_uri, app.url);
+      assertRedirectUriAllowed(dto.redirect_uri, app);
     } catch (err) {
       this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
         context: 'TokenController',

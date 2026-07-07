@@ -394,6 +394,13 @@ After today's review: 2 bugs fixed (bug-0027, bug-0078), 18 new bugs found. Net 
 
 ## [Unreleased] — 2026-06-18
 
+- Apps: optional per-app `callbackUrl`. When set, the PKCE `redirect_uri` must
+  match it exactly (trailing-slash tolerant); when blank, any callback under the
+  app's URL origin is accepted (unchanged behavior).
+- Apps: app and callback URLs now require https + a public host by default.
+  Set `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true` to permit http/localhost URLs in
+  development.
+
 ### Changed (palette/table-action-tooltips branch — PR #107, not merged)
 
 4 commits by `google-labs-jules[bot]` on 2026-06-17 standardizing table row actions across the admin console:
