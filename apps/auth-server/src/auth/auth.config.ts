@@ -50,14 +50,27 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
-        // Wire to your email service in production.
-        // In development, log the link to the console.
-        console.log(`[magic-link] ${email} → ${url}`);
+        // bug-0163: the magic-link URL is a bearer credential —
+        // whoever holds the URL can authenticate as `email`. Console
+        // logging it is fine in dev (visible to the developer running
+        // the server) but in production the log lands in a shared
+        // stream (docker logs, Sentry, Datadog, etc.) that operators
+        // and any log-forwarding pipeline can read — turning every
+        // magic-link send into a credential leak.
+        // Wire the real send in production; dev keeps the log so the
+        // developer flow (click link in terminal) still works.
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[magic-link] ${email} → ${url}`);
+        }
       },
     }),
     emailOTP({
       sendVerificationOTP: async ({ email, otp }: { email: string; otp: string }) => {
-        console.log(`[email-otp] ${email} → ${otp}`);
+        // bug-0163: same story as the magic-link handler — the OTP is
+        // a bearer credential, no logs in prod.
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[email-otp] ${email} → ${otp}`);
+        }
       },
     }),
     openAPI({ disableDefaultReference: true }),
