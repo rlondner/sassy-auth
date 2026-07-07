@@ -41,6 +41,7 @@ export function OrgsTable({ initial, apps }: Props) {
       initialRefRef.current = false
       return
     }
+    let cancelled = false
     const timer = setTimeout(async () => {
       const params = {
         q: query || undefined,
@@ -49,9 +50,12 @@ export function OrgsTable({ initial, apps }: Props) {
         pageSize,
       }
       const result = await listOrgsAction(params)
+      // bug-0137: guard against stale in-flight response overwriting
+      // state after a newer query has superseded this effect.
+      if (cancelled) return
       if (result && 'items' in result) setData(result)
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query, appFilter, page, pageSize])
 
   const columns: ColumnDef<OrgRow>[] = [

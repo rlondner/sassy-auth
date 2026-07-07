@@ -25,13 +25,18 @@ export function RoleViewDrawer({ role, open, onOpenChange, onEdit, onDelete }: P
   const [loading, setLoading] = React.useState(false)
   const { copiedKey: copied, copy } = useCopyFeedback()
 
+  // bug-0145: cancel in-flight fetch on drawer close / role change.
+  // Same story as PermissionViewDrawer — otherwise a slow response
+  // can setDetail after the drawer's context has moved on.
   React.useEffect(() => {
     if (!open) return
+    let cancelled = false
     setLoading(true)
     setDetail(null)
     getRoleAction(role.publicId)
-      .then((res) => { if ('publicId' in res) setDetail(res) })
-      .finally(() => setLoading(false))
+      .then((res) => { if (!cancelled && 'publicId' in res) setDetail(res) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [open, role.publicId])
 
   const permissions = detail?.permissions ?? []

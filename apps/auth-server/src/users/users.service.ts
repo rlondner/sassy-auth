@@ -304,6 +304,18 @@ export class UsersService {
       { targetOrgId: existing.orgId },
     );
 
+    // bug-0152: a `pending` user only becomes `active` by accepting
+    // their invitation (which also sets their password). Allowing the
+    // admin PATCH to flip the status directly bypasses that gate and
+    // produces an "active" user with no credential — they can never
+    // log in, but they show up as active in every count. The correct
+    // way to promote a pending user is `resendInvitation` + accept.
+    if (dto.status === 'active' && existing.status === 'pending') {
+      throw new BadRequestException(
+        'A pending user becomes active only by accepting their invitation. Use /resend-invitation instead.',
+      );
+    }
+
     const updated = await prisma.saUser.update({
       where: { publicId },
       data: {

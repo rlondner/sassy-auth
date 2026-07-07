@@ -41,6 +41,7 @@ export function PermissionsTable({ initial, apps }: Props) {
       initialRefRef.current = false
       return
     }
+    let cancelled = false
     const timer = setTimeout(async () => {
       const params = {
         q: query || undefined,
@@ -48,9 +49,11 @@ export function PermissionsTable({ initial, apps }: Props) {
         page, pageSize,
       }
       const result = await listPermissionsAction(params)
+      // bug-0137: guard against stale in-flight response.
+      if (cancelled) return
       if (result && 'items' in result) setData(result)
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query, appFilter, page, pageSize])
 
   const columns: ColumnDef<PermissionRow>[] = [

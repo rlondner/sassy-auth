@@ -46,6 +46,7 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
       initialRefRef.current = false
       return
     }
+    let cancelled = false
     const timer = setTimeout(async () => {
       const params = {
         q: query || undefined,
@@ -53,9 +54,11 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
         page, pageSize,
       }
       const result = await listRolesAction(params)
+      // bug-0137: guard against stale in-flight response.
+      if (cancelled) return
       if (result && 'items' in result) setData(result)
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query, appFilter, page, pageSize])
 
   const columns: ColumnDef<RoleRow>[] = [

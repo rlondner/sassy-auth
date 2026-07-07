@@ -36,16 +36,22 @@ export function AppsTable({ initial }: Props) {
   const initialRefRef = React.useRef(true)
 
   // Debounced refetch when query / page / pageSize change.
+  // bug-0137: guard the setData with a `cancelled` flag so a slow
+  // in-flight response can't overwrite state after the effect has
+  // been superseded by a newer query. clearTimeout alone only stops
+  // pending timers — it can't cancel a fetch that has already started.
   React.useEffect(() => {
     if (initialRefRef.current) {
       initialRefRef.current = false
       return
     }
+    let cancelled = false
     const timer = setTimeout(async () => {
       const result = await listAppsAction({ q: query || undefined, page, pageSize })
+      if (cancelled) return
       if (result && 'items' in result) setData(result)
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query, page, pageSize])
 
   const columns: ColumnDef<App>[] = [
