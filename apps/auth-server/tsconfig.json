@@ -1,7 +1,13 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "declaration": true,
+    // bug-0092: this is an application, not a library — no downstream
+    // package consumes dist/*.d.ts, and emitting declarations forces
+    // TS to name every inferred type (including BetterAuth's return
+    // type, which transitively references pnpm-internal Zod paths and
+    // fails TS2742 "cannot be named without a reference to ..."). We
+    // don't need the .d.ts output, so turn it off.
+    "declaration": false,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,

@@ -11,7 +11,7 @@ import { AppModule } from './app.module';
 import { auth } from './auth/auth.config';
 import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { mergeOpenApiDocs } from './docs/openapi';
 import { BETTER_AUTH_SESSION_COOKIE } from './common/constants';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -51,7 +51,15 @@ async function bootstrap() {
   let mergedDoc = nestDoc;
   try {
     const betterAuthDoc = await auth.api.generateOpenAPISchema();
-    mergedDoc = mergeOpenApiDocs(nestDoc, betterAuthDoc);
+    // bug-0092: BetterAuth's generateOpenAPISchema() returns an
+    // OpenAPI-shape object where `OpenAPIParameter.name` is
+    // `string | undefined` (its own internal type), while NestJS's
+    // `OpenAPIObject` expects `ParameterObject.name: string` (from
+    // the OpenAPI spec). The shapes are structurally compatible at
+    // runtime — `mergeOpenApiDocs` merges paths / schemas / tags by
+    // key without inspecting individual parameter properties — so
+    // the cast is a documented type-only reconciliation.
+    mergedDoc = mergeOpenApiDocs(nestDoc, betterAuthDoc as unknown as OpenAPIObject);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     loggerService.warn(

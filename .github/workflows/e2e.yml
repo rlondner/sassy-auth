@@ -63,6 +63,15 @@ jobs:
       - name: Apply migrations
         run: pnpm --filter @sassy-auth/db exec prisma migrate deploy --schema=schema.prisma
 
+      # bug-0092: auth-server compilation was previously excluded from CI
+      # because of TS2742 on BetterAuth's inferred type and a shape
+      # mismatch on the OpenAPI merger. Both are fixed on master
+      # (`declaration: false` in tsconfig + a documented cast at the
+      # OpenAPI merge call site), so we can require the build again as
+      # a gate against regressions.
+      - name: Build auth-server (typecheck gate)
+        run: pnpm --filter @sassy-auth/auth-server build
+
       - name: Generate RSA keypair for auth-server
         run: |
           mkdir -p ./keys

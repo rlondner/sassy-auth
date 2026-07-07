@@ -750,8 +750,8 @@ The `/api/token/direct/login` and `/api/invitations/:token` endpoints accept unl
 **Escalation guard coverage is incomplete for `removeRole`.**
 The `assertCallerCanGrantSystemPerms` guard is applied to `assignRole` and `setUserRoles` but not to `removeRole`. Tracked as **bug-0097**.
 
-**CI — E2E only, no typecheck/lint.**
-A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. Typecheck and lint are not yet wired into CI. Note: the e2e workflow excludes `@sassy-auth/auth-server` from `turbo build` due to pre-existing build errors (tracked as **bug-0092**).
+**CI — no lint, single-package typecheck.**
+A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
 
 **Set-replace DTOs lack array size limits.**
 The `PUT /users/:id/roles` and `PUT /users/:id/direct-permissions` endpoints accept arrays of any size (including empty). No `@ArrayMaxSize` is enforced. Tracked as **bug-0034**.
