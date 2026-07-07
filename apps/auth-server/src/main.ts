@@ -17,7 +17,44 @@ import { BETTER_AUTH_SESSION_COOKIE } from './common/constants';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = require('../package.json');
 
+// bug-0115: fail fast on missing / unparseable `BETTER_AUTH_URL`.
+// Previously an empty or malformed value survived until first request,
+// then produced a malformed `issuer` in the OAuth AS discovery doc and
+// every JWT's `iss` claim — a silent-but-broken deploy is the worst
+// failure mode for an auth-server. Called synchronously at the top of
+// bootstrap so a bad config is surfaced by the trailing
+// `bootstrap().catch(process.exit(1))` at the bottom of this file
+// (bug-0210).
+function validateStartupEnv(): void {
+  const url = process.env.BETTER_AUTH_URL;
+  if (!url || url.trim() === '') {
+    throw new Error(
+      'BETTER_AUTH_URL is required (empty or unset). Set it to the auth-server\'s public origin (e.g. https://auth.example.com).',
+    );
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(
+      `BETTER_AUTH_URL is not a valid URL: ${JSON.stringify(url)}. Expected e.g. https://auth.example.com.`,
+    );
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `BETTER_AUTH_URL must use http: or https:, got ${parsed.protocol}. Full value: ${url}.`,
+    );
+  }
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      'BETTER_AUTH_SECRET must be at least 32 characters (see .env.example). Regenerate with `openssl rand -base64 48`.',
+    );
+  }
+}
+
 async function bootstrap() {
+  validateStartupEnv();
   const expressApp = express();
 
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.

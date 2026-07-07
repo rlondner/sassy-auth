@@ -383,8 +383,26 @@ export class UsersService {
       { targetOrgId: user.orgId },
     );
 
-    const role = await prisma.saRole.findUnique({ where: { publicId: rolePublicId } });
+    // bug-0097: mirror the escalation guard from assignRole /
+    // setUserRoles. Otherwise a caller who can revoke roles could
+    // strip an admin of a system perm they themselves are not
+    // authorized to grant — practically the same escalation surface
+    // in reverse, since revoking then re-granting a role can leave
+    // the caller with more effective privilege than they had before.
+    // Fetching the role with its permissions is cheap and matches the
+    // shape of assignRole above.
+    const role = await prisma.saRole.findUnique({
+      where: { publicId: rolePublicId },
+      include: {
+        permissions: { include: { permission: { select: { name: true, isSystem: true } } } },
+      },
+    });
     if (!role) throw new NotFoundException('Role not found');
+
+    const systemPermNames = role.permissions
+      .filter((rp) => rp.permission.isSystem)
+      .map((rp) => rp.permission.name);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
 
     await prisma.saUserRole.delete({ where: { userId_roleId: { userId: user.id, roleId: role.id } } });
     this.logger.getWinstonLogger().info('Role removed from user', {

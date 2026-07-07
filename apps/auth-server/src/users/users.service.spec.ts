@@ -877,6 +877,54 @@ describe('UsersService', () => {
     });
   });
 
+  // bug-0097 — the escalation guard was previously only applied to
+  // assignRole and setUserRoles. removeRole was the asymmetric outlier:
+  // a caller could strip a role from a user even if they weren't
+  // themselves authorized to grant its system perms. Revoke-then-
+  // re-grant is the same escalation surface in reverse.
+  describe('removeRole escalation guard (bug-0097)', () => {
+    it('rejects removing a role whose perms include a system perm the caller lacks', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValueOnce({
+        id: 5,
+        publicId: 'role1',
+        permissions: [
+          { permission: { name: 'org.roles.manage', isSystem: true } },
+        ],
+      });
+      mockAssertGrant.mockRejectedValueOnce(
+        new ForbiddenException('Cannot grant system permission(s) you do not hold: org.roles.manage'),
+      );
+
+      await expect(
+        service.removeRole('ba-caller', 'usr1', 'role1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', ['org.roles.manage']);
+      expect(mockPrisma.saUserRole.delete).not.toHaveBeenCalled();
+    });
+
+    it('allows removing a role with only non-system perms', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValueOnce({
+        id: 5,
+        publicId: 'role1',
+        permissions: [
+          { permission: { name: 'apps.read', isSystem: false } },
+        ],
+      });
+      mockPrisma.saUserRole.delete.mockResolvedValueOnce(undefined);
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await expect(
+        service.removeRole('ba-caller', 'usr1', 'role1'),
+      ).resolves.toBeUndefined();
+
+      expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', []);
+      expect(mockPrisma.saUserRole.delete).toHaveBeenCalled();
+    });
+  });
+
   describe('createUser escalation guard', () => {
     const dto = {
       firstName: 'Jane',
