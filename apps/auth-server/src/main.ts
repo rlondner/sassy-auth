@@ -35,43 +35,50 @@ async function bootstrap() {
   // SIGTERM/SIGINT so Prisma disconnects cleanly and Sentry flushes buffered events.
   app.enableShutdownHooks();
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Sassy Auth API')
-    .setDescription('Multi-tenant auth and user management')
-    .setVersion(pkg.version)
-    .addCookieAuth(
-      BETTER_AUTH_SESSION_COOKIE,
-      { type: 'apiKey', in: 'cookie' },
-      BETTER_AUTH_SESSION_COOKIE,
-    )
-    .build();
+  // bug-0153: Swagger/OpenAPI docs are only mounted outside production.
+  // In prod the full API surface must not be publicly discoverable at
+  // `/api/docs` and `/api/docs-json`. Anyone who needs the OpenAPI spec
+  // in prod should build it from the source (nest CLI) or point a
+  // non-prod deploy at production data.
+  if (process.env.NODE_ENV !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Sassy Auth API')
+      .setDescription('Multi-tenant auth and user management')
+      .setVersion(pkg.version)
+      .addCookieAuth(
+        BETTER_AUTH_SESSION_COOKIE,
+        { type: 'apiKey', in: 'cookie' },
+        BETTER_AUTH_SESSION_COOKIE,
+      )
+      .build();
 
-  const nestDoc = SwaggerModule.createDocument(app, swaggerConfig);
+    const nestDoc = SwaggerModule.createDocument(app, swaggerConfig);
 
-  let mergedDoc = nestDoc;
-  try {
-    const betterAuthDoc = await auth.api.generateOpenAPISchema();
-    // bug-0092: BetterAuth's generateOpenAPISchema() returns an
-    // OpenAPI-shape object where `OpenAPIParameter.name` is
-    // `string | undefined` (its own internal type), while NestJS's
-    // `OpenAPIObject` expects `ParameterObject.name: string` (from
-    // the OpenAPI spec). The shapes are structurally compatible at
-    // runtime — `mergeOpenApiDocs` merges paths / schemas / tags by
-    // key without inspecting individual parameter properties — so
-    // the cast is a documented type-only reconciliation.
-    mergedDoc = mergeOpenApiDocs(nestDoc, betterAuthDoc as unknown as OpenAPIObject);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    loggerService.warn(
-      `Failed to fetch BetterAuth OpenAPI schema; serving Nest-only spec. ${message}`,
-      'Bootstrap',
-    );
+    let mergedDoc = nestDoc;
+    try {
+      const betterAuthDoc = await auth.api.generateOpenAPISchema();
+      // bug-0092: BetterAuth's generateOpenAPISchema() returns an
+      // OpenAPI-shape object where `OpenAPIParameter.name` is
+      // `string | undefined` (its own internal type), while NestJS's
+      // `OpenAPIObject` expects `ParameterObject.name: string` (from
+      // the OpenAPI spec). The shapes are structurally compatible at
+      // runtime — `mergeOpenApiDocs` merges paths / schemas / tags by
+      // key without inspecting individual parameter properties — so
+      // the cast is a documented type-only reconciliation.
+      mergedDoc = mergeOpenApiDocs(nestDoc, betterAuthDoc as unknown as OpenAPIObject);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      loggerService.warn(
+        `Failed to fetch BetterAuth OpenAPI schema; serving Nest-only spec. ${message}`,
+        'Bootstrap',
+      );
+    }
+
+    SwaggerModule.setup('api/docs', app, mergedDoc, {
+      swaggerOptions: { withCredentials: true, persistAuthorization: true },
+      jsonDocumentUrl: 'api/docs-json',
+    });
   }
-
-  SwaggerModule.setup('api/docs', app, mergedDoc, {
-    swaggerOptions: { withCredentials: true, persistAuthorization: true },
-    jsonDocumentUrl: 'api/docs-json',
-  });
 
   await app.listen(process.env.PORT ?? 3000);
   loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3000}`, 'Bootstrap');
