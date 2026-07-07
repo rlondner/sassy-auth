@@ -42,7 +42,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  return NextResponse.next()
+  // bug-0191: authenticated admin pages carry sensitive tenant data
+  // (user lists, org configs, permissions). Set Cache-Control on every
+  // authenticated response so shared caches never store them and the
+  // browser's bfcache doesn't serve them after sign-out. `private`
+  // reinforces that any caller cache treating the response as private
+  // must still honor no-store. Public pages (login, accept-invite,
+  // oauth-error) skip this in the early return above.
+  const response = NextResponse.next()
+  response.headers.set(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, private',
+  )
+  return response
 }
 
 export const config = {
