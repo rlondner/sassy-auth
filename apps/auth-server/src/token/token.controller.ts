@@ -13,6 +13,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import * as Sentry from '@sentry/nestjs';
 import { Request } from 'express';
 import { prisma } from '@sassy-auth/db';
@@ -252,6 +253,12 @@ export class TokenController {
    * Validates credentials directly against BetterAuth's scrypt hash in the
    * account table (no BetterAuth session created). Returns a signed RS256 JWT.
    */
+  // bug-0080: /api/token/direct/login is unauthenticated and does a
+  // scrypt password verification per attempt. Attach the tighter
+  // `auth` throttler bucket so a single-source brute-force is bounded
+  // to 10 attempts/min per IP (see AppModule config). The generic
+  // `default` bucket still applies elsewhere on this controller.
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   @Post('direct/login')
   async directLogin(@Body() dto: DirectLoginDto) {
     // 1. Validate app exists

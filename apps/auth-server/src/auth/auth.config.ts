@@ -13,11 +13,49 @@ export const TRUSTED_ORIGINS = process.env.TRUSTED_ORIGINS
   .map((s) => s.trim())
   .filter(Boolean) ?? ['http://localhost:3001'];
 
+// bug-0158: previously the BetterAuth session lifetime, refresh
+// window, and cookie attributes were entirely implicit — whatever
+// BetterAuth's defaults happened to be for the installed version.
+// That made deploys fragile (a BetterAuth upgrade could silently
+// change session policy) and left the cookie's Secure attribute
+// dependent on `BETTER_AUTH_URL` starting with https:// (the
+// library's inference), rather than an explicit prod check.
+//
+// Pinning these here makes the session policy visible in review and
+// stable across upgrades.
+const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;      // 7 days
+const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;          // extend if used within 24h
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
   trustedOrigins: TRUSTED_ORIGINS,
+  session: {
+    expiresIn: SESSION_EXPIRES_IN_SECONDS,
+    updateAge: SESSION_UPDATE_AGE_SECONDS,
+    // bug-0158: keep the cookie cache off by default — the
+    // per-request session lookup is what the admin middleware
+    // relies on for authoritative logout, and the caching layer
+    // adds a "user logs out on replica A, still sees a valid
+    // cached session on replica B" hazard that isn't worth the
+    // few ms saved.
+    cookieCache: { enabled: false },
+  },
+  advanced: {
+    // bug-0158: explicit cookie attributes. `sameSite: 'lax'`
+    // matches the admin console's first-party flow (top-level
+    // navigations and same-site POSTs). `secure` is forced in
+    // production so the cookie never travels over plain HTTP,
+    // regardless of what `BETTER_AUTH_URL` looks like. `httpOnly`
+    // is on by BetterAuth default but reasserting it here makes
+    // the intent obvious to future readers.
+    defaultCookieAttributes: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    },
+  },
   // bug-0186: BetterAuth creates a Session row on every successful
   // sign-in (email/password, magic-link, OTP, social). Hook the
   // `after` phase of session-create to bump SaUser.lastLoginAt so

@@ -15,6 +15,7 @@
     "@nestjs/core": "^10.3.0",
     "@nestjs/platform-express": "^10.3.0",
     "@nestjs/swagger": "^7.4.0",
+    "@nestjs/throttler": "^6.5.0",
     "@sassy-auth/db": "workspace:*",
     "@sassy-auth/types": "workspace:*",
     "@sentry/nestjs": "^10.54.0",
