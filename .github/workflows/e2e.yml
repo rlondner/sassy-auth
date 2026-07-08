@@ -61,6 +61,13 @@ jobs:
       - name: Apply migrations
         run: pnpm --filter @sassy-auth/db exec prisma migrate deploy --schema=schema.prisma
 
+      # The auth-server and admin apps import the workspace libraries via
+      # their built output (`main: ./dist/index.js`). Compile them so the
+      # dev servers started by Playwright can resolve `@sassy-auth/db` and
+      # `@sassy-auth/types` at runtime.
+      - name: Build shared packages
+        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
+
       # bug-0092: auth-server compilation was previously excluded from CI
       # because of TS2742 on BetterAuth's inferred type and a shape
       # mismatch on the OpenAPI merger. Both are fixed on master
