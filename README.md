@@ -744,41 +744,8 @@ By default `redirect_uri` is validated against the app's registered `url` origin
 **PKCE `code_verifier` format not validated.**
 The `code_verifier` field is checked for presence but not for RFC 7636 format (43-128 chars of unreserved characters). Tracked as **bug-0041**.
 
-**No rate limiting on authentication endpoints.**
-The `/api/token/direct/login` and `/api/invitations/:token` endpoints accept unlimited requests. Brute-force password attacks are unthrottled. Tracked as **bug-0080**.
-
-**Escalation guard coverage is incomplete for `removeRole`.**
-The `assertCallerCanGrantSystemPerms` guard is applied to `assignRole` and `setUserRoles` but not to `removeRole`. Tracked as **bug-0097**.
-
 **CI — no lint, single-package typecheck.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
 
-**Set-replace DTOs lack array size limits.**
-The `PUT /users/:id/roles` and `PUT /users/:id/direct-permissions` endpoints accept arrays of any size (including empty). No `@ArrayMaxSize` is enforced. Tracked as **bug-0034**.
-
-**`BETTER_AUTH_URL` not validated at startup.**
-`resolveIssuer()` accepts any string — empty, whitespace, or non-URL values produce a malformed `issuer` in the OAuth AS discovery document and in every JWT's `iss` claim. A warning is logged when the variable is unset, but not when it is set to an invalid value. Tracked as **bug-0115**.
-
 **`deleteUser` does not remove BetterAuth identity.**
 Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
-
-**Swagger/OpenAPI docs exposed in all environments.**
-`/api/docs` and `/api/docs-json` are mounted unconditionally — no `NODE_ENV` gate. The full API surface is publicly discoverable in production. Tracked as **bug-0153**.
-
-**No security headers (Helmet).**
-The auth-server sets no `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, or `Content-Security-Policy` headers. Tracked as **bug-0154**.
-
-**`GET /api/apps/:id` endpoint missing.**
-The API Reference table documents `GET /api/apps/:id` but no such route exists in `AppsController`. All other entity controllers (orgs, roles, permissions, users) have a get-by-id handler. Tracked as **bug-0164**.
-
-**Admin middleware session validation not cached.**
-The Next.js Edge middleware calls the auth-server's `get-session` endpoint on every authenticated request with `cache: 'no-store'`. No session caching is applied, so each page load incurs a full round-trip to the auth-server. Tracked as **bug-0165**.
-
-**Missing database indexes on BetterAuth tables.**
-The `Session`, `Account`, and `Verification` tables lack indexes on their most-queried foreign key and lookup columns (`Session.userId`, `Account.userId`, `Verification.identifier`). Authentication performance degrades linearly with table size. Tracked as **bug-0179**.
-
-**Admin Next.js app missing security headers.**
-The admin console does not set `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, or `Cache-Control` on authenticated pages. The admin dashboard is vulnerable to clickjacking, and sensitive data may persist in browser cache after sign-out. Tracked as **bug-0191**.
-
-**Auth-server TypeScript strict mode incomplete.**
-The auth-server tsconfig only enables 3 of 7 strict sub-flags. `strictFunctionTypes`, `strictPropertyInitialization`, `noImplicitThis`, and `useUnknownInCatchVariables` are all disabled, giving the most security-critical package weaker type safety than the other packages. Tracked as **bug-0197**.
