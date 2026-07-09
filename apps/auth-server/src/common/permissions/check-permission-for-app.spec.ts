@@ -79,11 +79,28 @@ describe('checkPermissionForApp', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('org.* with no targetAppId is allowed (unscoped read)', async () => {
+  // bug-0094 — previously `checkPermissionForApp` silently granted access
+  // when a caller invoked it with a non-platform permission and no
+  // targetAppId. That was an app-scope bypass: any admin route that forgot
+  // to pass targetAppId would let a caller with only `org.X.manage` act on
+  // rows in a foreign app. Fix requires targetAppId (and callerAppId) to
+  // both be defined for the non-platform branch to grant.
+  it('org.* with no targetAppId is REJECTED (silent-grant bypass)', async () => {
     mockPrisma.saUser.findUnique.mockResolvedValue(saUserWith(['org.roles.manage']));
     await expect(
       checkPermissionForApp('ba-1', ['platform.roles.manage', 'org.roles.manage']),
-    ).resolves.toBeUndefined();
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('org.* with targetAppId but no callerAppId is REJECTED', async () => {
+    mockPrisma.saUser.findUnique.mockResolvedValue(saUserWith(['org.roles.manage']));
+    await expect(
+      checkPermissionForApp(
+        'ba-1',
+        ['platform.roles.manage', 'org.roles.manage'],
+        { targetAppId: 7 },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('aggregates permissions held via a role (not just direct grants)', async () => {

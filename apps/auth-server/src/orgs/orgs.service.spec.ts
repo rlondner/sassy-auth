@@ -18,6 +18,9 @@ jest.mock('@sassy-auth/db', () => ({
 jest.mock('../common/permissions/check-permission', () => ({
   checkPermission: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('../common/permissions/resolve-list-scope', () => ({
+  resolveListScope: jest.fn().mockResolvedValue({ scope: 'platform' }),
+}));
 
 const ORG_INCLUDE_FOR_TEST = {
   app: { select: { publicId: true, name: true } },
@@ -32,6 +35,8 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
 };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { checkPermission } = require('../common/permissions/check-permission') as { checkPermission: jest.Mock };
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { resolveListScope } = require('../common/permissions/resolve-list-scope') as { resolveListScope: jest.Mock };
 
 const sqidFake: Pick<SqidService, 'encode' | 'decode'> = {
   encode: (n: number) => `sq_${n}`,
@@ -66,6 +71,7 @@ describe('OrgsService', () => {
     service = module.get(OrgsService);
     jest.clearAllMocks();
     (checkPermission as jest.Mock).mockResolvedValue(undefined);
+    (resolveListScope as jest.Mock).mockResolvedValue({ scope: 'platform' });
   });
 
   describe('listOrgs', () => {
@@ -80,7 +86,31 @@ describe('OrgsService', () => {
         }],
         total: 1, page: 1, pageSize: 25,
       });
-      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.orgs.manage', 'platform.users.manage', 'org.users.manage']);
+      expect(resolveListScope).toHaveBeenCalledWith('ba-caller', ['platform.orgs.manage', 'platform.users.manage', 'org.users.manage']);
+    });
+
+    // bug-0001 — org-scoped caller sees only their own org row. The
+    // `where.id` filter is added by listOrgs when resolveListScope
+    // returns `{ scope: 'org', orgId }`. Platform-scoped callers (the
+    // default in the beforeEach) get no id filter and see everything.
+    it('filters by caller.orgId when resolveListScope returns org scope', async () => {
+      (resolveListScope as jest.Mock).mockResolvedValueOnce({ scope: 'org', orgId: 42 });
+      mockPrisma.saOrg.findMany.mockResolvedValue([]);
+      mockPrisma.saOrg.count.mockResolvedValue(0);
+      await service.listOrgs('ba-caller', { page: 1, pageSize: 25 });
+      expect(mockPrisma.saOrg.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 42 },
+      }));
+    });
+
+    it('combines the org-scope id filter with a q filter', async () => {
+      (resolveListScope as jest.Mock).mockResolvedValueOnce({ scope: 'org', orgId: 42 });
+      mockPrisma.saOrg.findMany.mockResolvedValue([]);
+      mockPrisma.saOrg.count.mockResolvedValue(0);
+      await service.listOrgs('ba-caller', { page: 1, pageSize: 25, q: 'acm' });
+      expect(mockPrisma.saOrg.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 42, name: { contains: 'acm', mode: 'insensitive' } },
+      }));
     });
 
     it('applies q filter to name (ILIKE)', async () => {
@@ -134,7 +164,7 @@ describe('OrgsService', () => {
       const result = await service.createOrg('ba-caller', { name: 'Acme', appId: 'sq_1' });
 
       expect(mockPrisma.saOrg.create).toHaveBeenCalledWith({
-        data: { publicId: 'placeholder', name: 'Acme', appId: 1, isPlatform: false },
+        data: { publicId: expect.stringMatching(/^pending-/), name: 'Acme', appId: 1, isPlatform: false },
       });
       expect(mockPrisma.saOrg.update).toHaveBeenCalledWith({
         where: { id: 10 }, data: { publicId: 'sq_10' },
@@ -234,7 +264,15 @@ describe('OrgsService', () => {
         publicId: 'sq_10', name: 'Acme', isPlatform: false, userCount: 3,
         app: { publicId: 'sq_1', name: 'Customer Portal' },
       });
-      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.orgs.manage', 'platform.users.manage', 'org.users.manage']);
+      // bug-0001 — getOrg fetches the org first and passes
+      // `{ targetOrgId: org.id }`. Before the fix the target was
+      // omitted, so an org.users.manage holder in any org could read
+      // every other org's detail row.
+      expect(checkPermission).toHaveBeenCalledWith(
+        'ba-caller',
+        ['platform.orgs.manage', 'platform.users.manage', 'org.users.manage'],
+        { targetOrgId: 10 },
+      );
     });
 
     it('throws NotFoundException when org missing', async () => {
