@@ -135,8 +135,16 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     // the final fetch so page.url() is observable.
     const redirectUri = `${platformApp.url.replace(/\/$/, '')}/cb`
 
-    await page.route(`${new URL(redirectUri).origin}/**`, (route) =>
-      route.fulfill({ status: 200, contentType: 'text/html', body: '' }),
+    // Narrow the stub to exactly /cb on the redirect_uri origin. A broader
+    // `${origin}/**` mock intercepts /api/token/oauth/authorize itself when
+    // platformApp.url shares the auth-server's origin (BETTER_AUTH_URL=
+    // http://localhost:3000 by default), so the browser never reaches the
+    // real authorize endpoint and the test sits on /api/token/oauth/authorize
+    // with an empty body.
+    const redirectUriOrigin = new URL(redirectUri).origin
+    await page.route(
+      (url) => url.origin === redirectUriOrigin && url.pathname === '/cb',
+      (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '' }),
     )
 
     await page.goto(
