@@ -55,12 +55,12 @@ See [BUGS_2026-07-08.md](./bugs/BUGS_2026-07-08.md) and [TODO_2026-07-08.md](./t
 #### Minor (7)
 
 - **bug-0222** — `user-view-drawer` initial-load effect lacks cancellation flag — stale data on rapid open/close.
-- **bug-0223** — Admin `next.config.ts` security headers missing HSTS.
-- **bug-0224** — `accept-invite-form` error message lacks `role="alert"`.
-- **bug-0225** — Five search inputs across table components lack accessible labels.
-- **bug-0226** — Pagination page-size selects lack accessible labels.
-- **bug-0227** — `use-copy-feedback` hardcoded English toast bypasses i18n.
-- **bug-0228** — E2E `afterAll` cleanup omits `SaOauthCode` table.
+- **bug-0230** — Admin `next.config.ts` security headers missing HSTS.
+- **bug-0231** — `accept-invite-form` error message lacks `role="alert"`.
+- **bug-0232** — Five search inputs across table components lack accessible labels.
+- **bug-0233** — Pagination page-size selects lack accessible labels.
+- **bug-0234** — `use-copy-feedback` hardcoded English toast bypasses i18n.
+- **bug-0235** — E2E `afterAll` cleanup omits `SaOauthCode` table.
 
 ### Added
 
@@ -90,33 +90,36 @@ Estimated open bugs: **~153** (192 prior − 54 newly fixed + 15 new). All Criti
 
 ## [Unreleased] — 2026-07-09
 
-Reviewing the 15 commits that landed on 2026-07-08 — a massive overnight bug-fixing sprint that closed **~55 bugs** including **all 9 Criticals**. 16 new bugs found in the post-fix review (0 critical, 8 warning, 8 minor). No code changes today.
+Reviewing the 15 commits that landed on 2026-07-08 — a massive overnight bug-fixing sprint that closed **~55 bugs** including **all 9 Criticals**. 16 new bugs found in the post-fix review. A concurrent session (PRs #238–#252) fixed 9 of the 16 and filed+fixed 6 more (using overlapping numbers 0223–0228 for different issues). Colliding entries renumbered to 0230–0235.
 
-### Bugs found (16 new)
+### Bugs found (16) — 9 fixed same-day, 7 open
 
 See [BUGS_2026-07-09.md](./bugs/BUGS_2026-07-09.md) and [TODO_2026-07-09.md](./todo/TODO_2026-07-09.md).
 
-#### Warning (8)
+#### Fixed same-day (9) — PRs #238–#246
 
-- **bug-0214** — `directLogin` org/app mismatch returns 403 before scrypt — timing oracle reveals tenant membership.
-- **bug-0216** — Post-login OAuth `next` path is broken — bug-0149 redirect is non-functional (path lacks `/` prefix).
-- **bug-0217** — Helmet CSP breaks Swagger UI in development (`helmet()` applied unconditionally).
-- **bug-0218** — `updateUser` status guard is one-hop — `pending→inactive→active` bypasses invitation requirement.
-- **bug-0219** — `updateUser` missing self-modification guard — admin can deactivate own account.
-- **bug-0225** — BetterAuth sign-in/sign-up routes bypass NestJS ThrottlerGuard entirely (mounted as raw Express middleware).
-- **bug-0226** — Bug-0206 `selected` rebase fix not applied to UsersTable — stale data in user drawer after refresh.
-- **bug-0227** — `createUserAction` and `updateUserAction` leak raw server error messages to UI after bug-0050 made `apiFetch` richer.
+- **bug-0214** — `directLogin` org/app mismatch timing oracle (PR #238)
+- **bug-0215** — `directLogin` OAuth-only account timing gap (PR #239)
+- **bug-0216** — Post-login OAuth `next` path broken (PR #240)
+- **bug-0217** — Helmet CSP breaks Swagger UI in dev (PR #241)
+- **bug-0218** — `updateUser` status guard one-hop bypass (PR #242)
+- **bug-0219** — `updateUser` missing self-modification guard (PR #243)
+- **bug-0220** — `SaOauthCode` no cleanup job (PR #244)
+- **bug-0221** — `updateUserAction` swallows NEXT_REDIRECT (PR #245)
+- **bug-0222** — `user-view-drawer` lacks cancellation (PR #246)
 
-#### Minor (8)
+#### Still open — Warning (3)
 
-- **bug-0215** — `directLogin` timing guard incomplete — OAuth-only account skips dummy scrypt.
-- **bug-0220** — `SaOauthCode` table has no cleanup job — unbounded row growth from abandoned flows.
-- **bug-0221** — `updateUserAction` swallows Next.js `NEXT_REDIRECT` sentinel — session expiry shows error instead of login.
-- **bug-0222** — `user-view-drawer` initial-load effect lacks cancellation — rapid open/close shows stale data.
-- **bug-0223** — Session validation cache negative-caches 5xx responses — 10s false lockout on transient errors.
-- **bug-0224** — Throttler `@Throttle` decorator values duplicate module config — silently masks central changes.
-- **bug-0228** — `listUsers` silently truncates at 500 with no pagination metadata or indicator.
+- **bug-0232** — BetterAuth sign-in/sign-up routes bypass NestJS ThrottlerGuard entirely (mounted as raw Express middleware).
+- **bug-0233** — Bug-0206 `selected` rebase fix not applied to UsersTable — stale data in user drawer after refresh.
+- **bug-0234** — `createUserAction` and `updateUserAction` leak raw server error messages to UI after bug-0050 made `apiFetch` richer.
+
+#### Still open — Minor (4)
+
 - **bug-0229** — App edit drawer shows "name required" error when URL is empty.
+- **bug-0230** — Session validation cache negative-caches 5xx responses — 10s false lockout on transient errors.
+- **bug-0231** — Throttler `@Throttle` decorator values duplicate module config — silently masks central changes.
+- **bug-0235** — `listUsers` silently truncates at 500 with no pagination metadata or indicator.
 
 ### Summary of 2026-07-08 changes (15 commits)
 
@@ -180,7 +183,7 @@ See [BUGS_2026-07-09.md](./bugs/BUGS_2026-07-09.md) and [TODO_2026-07-09.md](./t
 
 ### Known open bugs
 
-Net open bugs: **~29** (13 from backlog + 16 new today). Down from ~210 at the start of 2026-07-08. All 9 Criticals closed. The legacy backlog (bug-0002–0135) has ambiguous status and needs reconciliation.
+Net open bugs: **~20** (13 from backlog + 7 still-open from today). Down from ~210 at the start of 2026-07-08. All 9 Criticals closed. A concurrent session also fixed 6 additional bugs (0223–0228, different issues from this catalog). The legacy backlog (bug-0002–0135) has ambiguous status and needs reconciliation.
 
 ### Project health note
 
