@@ -13,7 +13,7 @@ export class OrgsPage {
     // aria-current="page"), not as a heading element. Match that marker.
     this.heading = page.locator('[aria-current="page"]').filter({ hasText: t('orgs.title') })
     this.createButton = page.getByRole('button', { name: t('orgs.create') })
-    this.accessDenied = page.getByTestId('access-denied-panel')
+    this.accessDenied = page.getByRole('heading', { name: t('apps.accessDenied.title') })
   }
 
   async goto() {

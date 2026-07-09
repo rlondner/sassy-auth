@@ -47,7 +47,7 @@ test.describe('/permissions UI matrix', () => {
   test('Create row appears in table', async ({ page }, info) => {
     const admin = adminFromProject(info.project.name)
     test.skip(!permittedForArea(admin, 'permissions'), 'admin lacks platform.permissions.manage')
-    test.skip(admin.key !== 'super' && admin.key !== 'perms', 'requires super or perms admin')
+    test.skip(admin.key !== 'super', 'CRUD needs a prerequisite app (apps.manage); only super qualifies')
     const appName = await makeTempApp(page)
     const perms = new PermissionsPage(page)
     await perms.goto()
@@ -63,7 +63,7 @@ test.describe('/permissions UI matrix', () => {
   test('Edit row updates the name', async ({ page }, info) => {
     const admin = adminFromProject(info.project.name)
     test.skip(!permittedForArea(admin, 'permissions'), 'admin lacks platform.permissions.manage')
-    test.skip(admin.key !== 'super' && admin.key !== 'perms', 'requires super or perms admin')
+    test.skip(admin.key !== 'super', 'CRUD needs a prerequisite app (apps.manage); only super qualifies')
     const appName = await makeTempApp(page)
     const perms = new PermissionsPage(page)
     await perms.goto()
@@ -81,7 +81,7 @@ test.describe('/permissions UI matrix', () => {
   test('Delete row removes it from the table', async ({ page }, info) => {
     const admin = adminFromProject(info.project.name)
     test.skip(!permittedForArea(admin, 'permissions'), 'admin lacks platform.permissions.manage')
-    test.skip(admin.key !== 'super' && admin.key !== 'perms', 'requires super or perms admin')
+    test.skip(admin.key !== 'super', 'CRUD needs a prerequisite app (apps.manage); only super qualifies')
     const appName = await makeTempApp(page)
     const perms = new PermissionsPage(page)
     await perms.goto()

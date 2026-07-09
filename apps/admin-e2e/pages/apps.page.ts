@@ -14,7 +14,7 @@ export class AppsPage {
     this.heading = page.locator('[aria-current="page"]').filter({ hasText: t('apps.title') })
     // The create button label is defined per UI convention via i18n key apps.create.
     this.createButton = page.getByRole('button', { name: t('apps.create') })
-    this.accessDenied = page.getByTestId('access-denied-panel')
+    this.accessDenied = page.getByRole('heading', { name: t('apps.accessDenied.title') })
   }
 
   async goto() {
