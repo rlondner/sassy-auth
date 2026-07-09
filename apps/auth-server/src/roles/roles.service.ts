@@ -1,10 +1,12 @@
 import {
-  BadRequestException, ConflictException, Injectable, NotFoundException,
+  BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
+import { checkPermissionForApp } from '../common/permissions/check-permission-for-app';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -34,17 +36,42 @@ export class RolesService {
   ) {}
 
   async listRoles(callerBaId: string, q: ListRolesQueryDto = {}) {
-    await checkPermission(callerBaId, ['platform.permissions.manage', 'org.permissions.manage']);
+    const caller = await prisma.saUser.findUnique({
+      where: { betterAuthUserId: callerBaId },
+      select: { org: { select: { appId: true } } },
+    });
+    if (!caller) throw new ForbiddenException();
+
+    let targetAppId: number;
+    if (q.appId) {
+      const app = await prisma.saApp.findUnique({ where: { publicId: q.appId } });
+      if (!app) throw new NotFoundException('App not found');
+      targetAppId = app.id;
+    } else {
+      targetAppId = -1; // force cross-app to require platform.roles.manage
+    }
+
+    // platform.users.manage included so the /users admin page can populate
+    // the role picker in the user-access drawer without a cross-page
+    // permission grant. Mirrors the orgs/permissions read pattern.
+    await checkPermissionForApp(
+      callerBaId,
+      ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
+      { targetAppId, callerAppId: caller.org.appId },
+    );
+
     const page = q.page ?? 1;
     const pageSize = q.pageSize ?? 25;
 
     const where: { appId?: number; name?: { contains: string; mode: 'insensitive' } } = {};
     if (q.appId) {
-      const app = await prisma.saApp.findUnique({ where: { publicId: q.appId } });
-      if (!app) throw new NotFoundException('App not found');
-      where.appId = app.id;
+      // q.appId was already validated above; reuse targetAppId to avoid a second lookup.
+      where.appId = targetAppId;
     }
-    if (q.q) where.name = { contains: q.q, mode: 'insensitive' };
+    if (q.q) {
+      const escaped = q.q.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      where.name = { contains: escaped, mode: 'insensitive' };
+    }
 
     const [rows, total] = (await Promise.all([
       prisma.saRole.findMany({
@@ -76,14 +103,26 @@ export class RolesService {
   }
 
   async getRole(callerBaId: string, publicId: string) {
-    await checkPermission(callerBaId, ['platform.permissions.manage', 'org.permissions.manage']);
     const r = await prisma.saRole.findUnique({ where: { publicId }, include: ROLE_DETAIL_INCLUDE });
     if (!r) throw new NotFoundException();
     const row = r as unknown as {
-      id: number; publicId: string; name: string;
+      id: number; appId: number; publicId: string; name: string;
       app: { publicId: string; name: string };
       permissions: Array<{ permission: { publicId: string; name: string } }>;
     };
+
+    const caller = await prisma.saUser.findUnique({
+      where: { betterAuthUserId: callerBaId },
+      select: { org: { select: { appId: true } } },
+    });
+    if (!caller) throw new ForbiddenException();
+
+    await checkPermissionForApp(
+      callerBaId,
+      ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
+      { targetAppId: row.appId, callerAppId: caller.org.appId },
+    );
+
     const userCount = await prisma.saUserRole.count({ where: { roleId: row.id } });
     return {
       publicId: row.publicId, name: row.name,
@@ -94,7 +133,7 @@ export class RolesService {
   }
 
   async createRole(callerBaId: string, dto: CreateRoleDto) {
-    await checkPermission(callerBaId, 'platform.permissions.manage');
+    await checkPermission(callerBaId, 'platform.roles.manage');
     const app = await prisma.saApp.findUnique({ where: { publicId: dto.appId } });
     if (!app) throw new NotFoundException('App not found');
 
@@ -104,7 +143,7 @@ export class RolesService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saRole.create({
-          data: { publicId: 'placeholder', name: dto.name, appId: app.id },
+          data: { publicId: generatePendingPublicId(), name: dto.name, appId: app.id },
         });
         if (permissionIds.length > 0) {
           await tx.saRolePermission.createMany({
@@ -136,7 +175,7 @@ export class RolesService {
   }
 
   async updateRole(callerBaId: string, publicId: string, dto: UpdateRoleDto) {
-    await checkPermission(callerBaId, 'platform.permissions.manage');
+    await checkPermission(callerBaId, 'platform.roles.manage');
     if (dto.name === undefined && dto.permissionIds === undefined) {
       throw new BadRequestException('At least one of name or permissionIds must be provided');
     }
@@ -183,7 +222,7 @@ export class RolesService {
   }
 
   async deleteRole(callerBaId: string, publicId: string): Promise<void> {
-    await checkPermission(callerBaId, 'platform.permissions.manage');
+    await checkPermission(callerBaId, 'platform.roles.manage');
     const existing = await prisma.saRole.findUnique({ where: { publicId } });
     if (!existing) throw new NotFoundException();
     try {

@@ -95,4 +95,18 @@ describe('RolesTable', () => {
     await waitFor(() => expect(actions.listRolesAction).toHaveBeenCalledWith({ appId: 'sq_a1', page: 1, pageSize: 25 }))
     jest.useRealTimers()
   })
+
+  it('hides Create/Edit/Delete affordances when canWrite=false', () => {
+    render(withIntl(<RolesTable initial={initial} apps={apps} canWrite={false} />))
+    expect(screen.queryByRole('button', { name: new RegExp(en.roles.create) })).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('menuitem', { name: en.roles.actions.edit })).toHaveLength(0)
+    expect(screen.queryAllByRole('menuitem', { name: en.roles.actions.delete })).toHaveLength(0)
+    // View should remain visible.
+    expect(screen.getAllByRole('menuitem', { name: en.roles.actions.view })).toHaveLength(2)
+  })
+
+  it('hides the app picker when canPickApp=false', () => {
+    render(withIntl(<RolesTable initial={initial} apps={apps} canPickApp={false} />))
+    expect(screen.queryByLabelText(en.roles.filter.appLabel)).not.toBeInTheDocument()
+  })
 })

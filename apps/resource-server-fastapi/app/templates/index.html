@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>resource-server-fastapi</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>resourceserver01</h1>
+    <p>A demo OAuth 2.0 resource server backed by SassyAuth.</p>
+    <p><a class="btn primary" href="/auth/login">Sign In with SassyAuth</a></p>
+    <p id="repeat" hidden>
+      <button id="retest" class="btn">Re-test /api/properties</button>
+    </p>
+  </main>
+  <script>
+    if (sessionStorage.getItem('sa_access_token')) {
+      document.getElementById('repeat').hidden = false;
+      document.getElementById('retest').addEventListener('click', async () => {
+        const token = sessionStorage.getItem('sa_access_token');
+        const res = await fetch('/api/properties', {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        const body = await res.json();
+        alert(JSON.stringify(body, null, 2));
+      });
+    }
+  </script>
+</body>
+</html>

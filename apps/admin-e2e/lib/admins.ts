@@ -6,7 +6,7 @@
 
 export const ADMIN_PASSWORD = 'Pass@word1234'
 
-export type AdminKey = 'apps' | 'orgs' | 'users' | 'perms' | 'super'
+export type AdminKey = 'apps' | 'orgs' | 'users' | 'roles' | 'perms' | 'super'
 
 export interface SeedAdmin {
   key: AdminKey
@@ -39,6 +39,13 @@ export const SEED_ADMINS: readonly SeedAdmin[] = [
     projectName: 'chromium-users',
   },
   {
+    key: 'roles',
+    email: 'r@sa.io',
+    perms: ['platform.roles.manage'],
+    storageStatePath: '.auth/roles-admin.json',
+    projectName: 'chromium-roles',
+  },
+  {
     key: 'perms',
     email: 'p@sa.io',
     perms: ['platform.permissions.manage'],
@@ -52,21 +59,38 @@ export const SEED_ADMINS: readonly SeedAdmin[] = [
       'platform.apps.manage',
       'platform.orgs.manage',
       'platform.users.manage',
+      'platform.roles.manage',
       'platform.permissions.manage',
       'org.users.manage',
-      'org.permissions.manage',
+      'org.roles.manage',
     ],
     storageStatePath: '.auth/super-admin.json',
     projectName: 'chromium-super',
   },
 ]
 
+/**
+ * Demo multi-tenant tenant users (seeded by SEED_DEMO_MULTITENANT=1 against
+ * apps/auth-server/src/seed/demo-multitenant.ts). The two *-admin users hold
+ * `org.users.manage`; the rest are unprivileged tenant members. Used by
+ * tests that exercise the tenant-admin promotion / visibility path.
+ */
+export const DEMO_TENANT_USERS = {
+  acmeAdmin:   { email: 'acme-admin@app01.io',   password: 'Pass@word1234' },
+  acmeAlice:   { email: 'acme-alice@app01.io',   password: 'Pass@word1234' },
+  acmeBob:     { email: 'acme-bob@app01.io',     password: 'Pass@word1234' },
+  globexAdmin: { email: 'globex-admin@app01.io', password: 'Pass@word1234' },
+} as const
+
 export type ResourceArea = 'apps' | 'orgs' | 'roles' | 'permissions' | 'users'
 
 const AREA_TO_PERMS: Record<ResourceArea, readonly string[]> = {
   apps:        ['platform.apps.manage'],
   orgs:        ['platform.orgs.manage', 'org.users.manage'],
-  roles:       ['platform.permissions.manage', 'org.permissions.manage'],
+  // The admin /roles page reads with platform.roles.manage | org.roles.manage
+  // (see app/(admin)/roles/page.tsx). The perms admin (platform.permissions.manage)
+  // is correctly denied, so roles must map to the roles.manage perms.
+  roles:       ['platform.roles.manage', 'org.roles.manage'],
   permissions: ['platform.permissions.manage'],
   users:       ['platform.users.manage', 'org.users.manage'],
 }

@@ -7,8 +7,12 @@ export interface User {
   username: string | null
   orgId: string
   status: 'active' | 'pending' | 'inactive'
-  lastLoginAt?: string | null
-  createdAt?: string
+  // bug-0186: both fields are now real. The API always returns them:
+  // `createdAt` is a NOT-NULL DB column; `lastLoginAt` is nullable in
+  // the DB (null means "never signed in") and preserved as such over
+  // the wire. Both are ISO strings.
+  createdAt: string
+  lastLoginAt: string | null
 }
 
 export interface Org {
@@ -28,6 +32,13 @@ export interface Permission {
   id: string
   name: string
   appId: string
+  isSystem?: boolean
+}
+
+export interface MeProfile {
+  userId: string
+  org: { id: string; name: string; isPlatform: boolean }
+  app: { id: string; name: string; isPlatform: boolean }
 }
 
 export interface CreateUserPayload {
@@ -56,17 +67,20 @@ export interface App {
   publicId: string;
   name: string;
   url: string;
+  callbackUrl?: string | null;
   isPlatform: boolean;
 }
 
 export interface CreateAppPayload {
   name: string;
   url: string;
+  callbackUrl?: string | null;
 }
 
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
+  callbackUrl?: string | null;
 }
 
 export interface ListAppsParams {
@@ -119,6 +133,7 @@ export interface PermissionRow {
   app: { publicId: string; name: string }
   roleCount: number
   userCount: number
+  isSystem: boolean
 }
 
 export interface PermissionDetail extends PermissionRow {

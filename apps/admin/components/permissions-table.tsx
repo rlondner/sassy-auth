@@ -4,11 +4,12 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import { KeyRound, Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deletePermissionAction, listPermissionsAction } from '@/app/(admin)/permissions/actions'
 import type { App, PermissionRow, ListPermissionsResponse } from '@/lib/types'
 import { PermissionViewDrawer } from './permission-view-drawer'
@@ -32,7 +33,7 @@ export function PermissionsTable({ initial, apps }: Props) {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
-  const [copiedSqid, setCopiedSqid] = React.useState<string | null>(null)
+  const { copiedKey: copiedSqid, copy: copySqid } = useCopyFeedback()
   const initialRefRef = React.useRef(true)
 
   React.useEffect(() => {
@@ -40,6 +41,7 @@ export function PermissionsTable({ initial, apps }: Props) {
       initialRefRef.current = false
       return
     }
+    let cancelled = false
     const timer = setTimeout(async () => {
       const params = {
         q: query || undefined,
@@ -47,9 +49,11 @@ export function PermissionsTable({ initial, apps }: Props) {
         page, pageSize,
       }
       const result = await listPermissionsAction(params)
+      // bug-0137: guard against stale in-flight response.
+      if (cancelled) return
       if (result && 'items' in result) setData(result)
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query, appFilter, page, pageSize])
 
   const columns: ColumnDef<PermissionRow>[] = [
@@ -58,7 +62,8 @@ export function PermissionsTable({ initial, apps }: Props) {
       header: t('permissions.columns.nameAndApp'),
       cell: ({ row }) => {
         const p = row.original
-        const platform = p.name.startsWith('platform.')
+        const isPlatform = p.name.startsWith('platform.')
+        const isSystem = !isPlatform && (p.isSystem ?? false)
         return (
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded border border-border bg-muted text-primary">
@@ -67,7 +72,8 @@ export function PermissionsTable({ initial, apps }: Props) {
             <div>
               <div className="flex items-center gap-2">
                 <code className="font-mono text-body-sm font-semibold">{p.name}</code>
-                {platform && <Badge variant="secondary">{t('permissions.badges.platform')}</Badge>}
+                {isPlatform && <Badge variant="secondary">{t('permissions.badges.platform')}</Badge>}
+                {isSystem && <Badge variant="secondary">{t('permissions.badges.system')}</Badge>}
               </div>
               <p className="text-label-md text-muted-foreground">{p.app.name}</p>
             </div>
@@ -89,10 +95,7 @@ export function PermissionsTable({ initial, apps }: Props) {
               aria-label={t('permissions.actions.copy')}
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(p.publicId, () => {
-                  setCopiedSqid(p.publicId)
-                  setTimeout(() => setCopiedSqid(null), 2000)
-                })
+                void copySqid(p.publicId, p.publicId)
               }}
               className="text-muted-foreground hover:text-primary"
             >
@@ -116,7 +119,9 @@ export function PermissionsTable({ initial, apps }: Props) {
       header: '',
       cell: ({ row }) => {
         const p = row.original
-        const platform = p.name.startsWith('platform.')
+        const isPlatform = p.name.startsWith('platform.')
+        const isSystem = !isPlatform && (p.isSystem ?? false)
+        const isImmutable = isPlatform || isSystem
         const inUse = p.roleCount + p.userCount > 0
         return (
           <DropdownMenu>
@@ -129,13 +134,13 @@ export function PermissionsTable({ initial, apps }: Props) {
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(p); setViewOpen(true) }}>
                 {t('permissions.actions.view')}
               </DropdownMenuItem>
-              {!platform && (
+              {!isImmutable && (
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(p); setEditOpen(true) }}>
                   {t('permissions.actions.edit')}
                 </DropdownMenuItem>
               )}
-              {!platform && <DropdownMenuSeparator />}
-              {!platform && (
+              {!isImmutable && <DropdownMenuSeparator />}
+              {!isImmutable && (
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={(e) => {
@@ -156,6 +161,20 @@ export function PermissionsTable({ initial, apps }: Props) {
     },
   ]
 
+  const refresh = React.useCallback(async () => {
+    const refreshed = await listPermissionsAction({
+      q: query || undefined, appId: appFilter || undefined, page, pageSize,
+    })
+    if (refreshed && 'items' in refreshed) {
+      setData(refreshed)
+      // bug-0206: rebase `selected` on the refreshed rows so drawers
+      // reflect current data, or clear if the row is gone.
+      setSelected((prev) =>
+        prev ? refreshed.items.find((r) => r.publicId === prev.publicId) ?? null : null,
+      )
+    }
+  }, [query, appFilter, page, pageSize])
+
   async function handleDelete() {
     if (!selected) return
     const result = await deletePermissionAction(selected.publicId)
@@ -165,10 +184,8 @@ export function PermissionsTable({ initial, apps }: Props) {
     }
     setDeleteOpen(false)
     setViewOpen(false)
-    const refreshed = await listPermissionsAction({
-      q: query || undefined, appId: appFilter || undefined, page, pageSize,
-    })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    toast.success(t('permissions.toast.deleted'))
+    await refresh()
   }
 
   return (
@@ -241,9 +258,10 @@ export function PermissionsTable({ initial, apps }: Props) {
           permission={selected}
           open={editOpen}
           onOpenChange={setEditOpen}
+          onSuccess={refresh}
         />
       )}
-      <PermissionCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} />
+      <PermissionCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} onSuccess={refresh} />
       {selected && (
         <DeleteAlertDialog
           open={deleteOpen}

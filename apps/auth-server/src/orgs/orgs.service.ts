@@ -6,6 +6,8 @@ import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
+import { resolveListScope } from '../common/permissions/resolve-list-scope';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { CreateOrgDto } from './dto/create-org.dto';
 import { UpdateOrgDto } from './dto/update-org.dto';
 import { ListOrgsQueryDto } from './dto/list-orgs-query.dto';
@@ -42,17 +44,35 @@ export class OrgsService {
   ) {}
 
   async listOrgs(callerBaId: string, q: ListOrgsQueryDto = {}) {
-    await checkPermission(callerBaId, ['platform.orgs.manage', 'org.users.manage']);
+    // platform.users.manage included so the /users admin page can populate
+    // its org-filter dropdown without a cross-page permission grant. Mirrors
+    // the apps.list pattern where sibling-area admins get read access to the
+    // resource they need to *select* against.
+    //
+    // bug-0001: `resolveListScope` returns 'platform' for platform.*
+    // holders (unscoped list) and 'org' with the caller's orgId for
+    // callers holding only `org.users.manage`. The latter branch adds
+    // `{ id: scope.orgId }` to the `where` clause so an org admin's
+    // /orgs list contains only their own org — never a foreign tenant.
+    const scope = await resolveListScope(callerBaId, [
+      'platform.orgs.manage',
+      'platform.users.manage',
+      'org.users.manage',
+    ]);
     const page = q.page ?? 1;
     const pageSize = q.pageSize ?? 25;
 
-    const where: { appId?: number; name?: { contains: string; mode: 'insensitive' } } = {};
+    const where: { id?: number; appId?: number; name?: { contains: string; mode: 'insensitive' } } = {};
+    if (scope.scope === 'org') where.id = scope.orgId;
     if (q.appId) {
       const app = await prisma.saApp.findUnique({ where: { publicId: q.appId } });
       if (!app) throw new NotFoundException('App not found');
       where.appId = app.id;
     }
-    if (q.q) where.name = { contains: q.q, mode: 'insensitive' };
+    if (q.q) {
+      const escaped = q.q.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      where.name = { contains: escaped, mode: 'insensitive' };
+    }
 
     const [rows, total] = await Promise.all([
       prisma.saOrg.findMany({
@@ -65,9 +85,23 @@ export class OrgsService {
   }
 
   async getOrg(callerBaId: string, publicId: string) {
-    await checkPermission(callerBaId, ['platform.orgs.manage', 'org.users.manage']);
+    // bug-0001: fetch first, then check with targetOrgId. Previously the
+    // check ran without a target, so `org.users.manage` in ANY org
+    // granted read access to EVERY other org's detail (cross-tenant
+    // IDOR). Passing `targetOrgId: org.id` reduces the check to
+    // `caller.orgId === org.id` for org-scoped callers while platform.*
+    // holders still bypass the org check.
     const org = await prisma.saOrg.findUnique({ where: { publicId }, include: ORG_INCLUDE });
     if (!org) throw new NotFoundException();
+    await checkPermission(
+      callerBaId,
+      [
+        'platform.orgs.manage',
+        'platform.users.manage',
+        'org.users.manage',
+      ],
+      { targetOrgId: org.id },
+    );
     return formatOrg(org);
   }
 
@@ -80,7 +114,7 @@ export class OrgsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saOrg.create({
-          data: { publicId: 'placeholder', name: dto.name, appId: app.id, isPlatform: false },
+          data: { publicId: generatePendingPublicId(), name: dto.name, appId: app.id, isPlatform: false },
         });
         return tx.saOrg.update({
           where: { id: draft.id },

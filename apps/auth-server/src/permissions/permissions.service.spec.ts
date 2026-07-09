@@ -19,7 +19,7 @@ jest.mock('@sassy-auth/db', () => ({
         saPermission: {
           create: jest.fn().mockResolvedValue({ id: 42, name: 'apps.read', appId: 1, publicId: 'placeholder' }),
           update: jest.fn().mockResolvedValue({
-            id: 42, publicId: 'sq_42', name: 'apps.read', appId: 1,
+            id: 42, publicId: 'sq_42', name: 'apps.read', appId: 1, isSystem: false,
             app: { publicId: 'sq_app1', name: 'Customer Portal' },
           }),
         },
@@ -74,8 +74,8 @@ describe('PermissionsService', () => {
     it('returns rows with roleCount/userCount and respects q + appId filters', async () => {
       mocks.saApp.findUnique.mockResolvedValue({ id: 5, publicId: 'sq_app5' });
       mocks.saPermission.findMany.mockResolvedValue([
-        { id: 1, publicId: 'sq_p1', name: 'apps.read', app: { publicId: 'sq_app5', name: 'Portal' } },
-        { id: 2, publicId: 'sq_p2', name: 'apps.write', app: { publicId: 'sq_app5', name: 'Portal' } },
+        { id: 1, publicId: 'sq_p1', name: 'apps.read', isSystem: false, app: { publicId: 'sq_app5', name: 'Portal' } },
+        { id: 2, publicId: 'sq_p2', name: 'apps.write', isSystem: false, app: { publicId: 'sq_app5', name: 'Portal' } },
       ]);
       mocks.saPermission.count.mockResolvedValue(2);
       mocks.saRolePermission.groupBy.mockResolvedValue([{ permissionId: 1, _count: { _all: 3 } }]);
@@ -83,13 +83,13 @@ describe('PermissionsService', () => {
 
       const result = await makeService().listPermissions('ba-caller', { q: 'apps', appId: 'sq_app5', page: 1, pageSize: 25 });
 
-      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.permissions.manage');
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', ['platform.permissions.manage', 'platform.users.manage']);
       expect(mocks.saPermission.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { appId: 5, name: { contains: 'apps', mode: 'insensitive' } } }),
       );
       expect(result.items).toEqual([
-        { publicId: 'sq_p1', name: 'apps.read', app: { publicId: 'sq_app5', name: 'Portal' }, roleCount: 3, userCount: 0 },
-        { publicId: 'sq_p2', name: 'apps.write', app: { publicId: 'sq_app5', name: 'Portal' }, roleCount: 0, userCount: 1 },
+        { publicId: 'sq_p1', name: 'apps.read', isSystem: false, app: { publicId: 'sq_app5', name: 'Portal' }, roleCount: 3, userCount: 0 },
+        { publicId: 'sq_p2', name: 'apps.write', isSystem: false, app: { publicId: 'sq_app5', name: 'Portal' }, roleCount: 0, userCount: 1 },
       ]);
       expect(result.total).toBe(2);
     });
@@ -98,12 +98,25 @@ describe('PermissionsService', () => {
       mocks.saApp.findUnique.mockResolvedValue(null);
       await expect(makeService().listPermissions('ba-caller', { appId: 'bogus' })).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('includes isSystem in each item', async () => {
+      mocks.saPermission.findMany.mockResolvedValue([
+        { id: 1, publicId: 'sq_p1', name: 'org.users.manage', isSystem: true, app: { publicId: 'sq_a1', name: 'SassyAuth' } },
+        { id: 2, publicId: 'sq_p2', name: 'rs.properties.read', isSystem: false, app: { publicId: 'sq_a2', name: 'rs' } },
+      ]);
+      mocks.saPermission.count.mockResolvedValue(2);
+      mocks.saRolePermission.groupBy.mockResolvedValue([]);
+      mocks.saUserPermission.groupBy.mockResolvedValue([]);
+      const result = await makeService().listPermissions('ba-caller', {});
+      expect(result.items[0].isSystem).toBe(true);
+      expect(result.items[1].isSystem).toBe(false);
+    });
   });
 
   describe('getPermission', () => {
     it('returns the row with top-50 roles and users + full counts', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({
-        id: 7, publicId: 'sq_p7', name: 'apps.write',
+        id: 7, publicId: 'sq_p7', name: 'apps.write', isSystem: false,
         app: { publicId: 'sq_app1', name: 'Portal' },
         roles: [{ role: { publicId: 'sq_r1', name: 'Editor', app: { name: 'Portal' } } }],
         users: [{ user: { publicId: 'sq_u1', firstName: 'Alice', lastName: 'Smith', betterAuthUser: { email: 'alice@example.com' } } }],
@@ -114,10 +127,23 @@ describe('PermissionsService', () => {
       const result = await makeService().getPermission('ba-caller', 'sq_p7');
 
       expect(result.publicId).toBe('sq_p7');
+      expect(result.isSystem).toBe(false);
       expect(result.roleCount).toBe(1);
       expect(result.userCount).toBe(1);
       expect(result.roles).toEqual([{ publicId: 'sq_r1', name: 'Editor', appName: 'Portal' }]);
       expect(result.users).toEqual([{ publicId: 'sq_u1', email: 'alice@example.com', firstName: 'Alice', lastName: 'Smith' }]);
+    });
+
+    it('exposes isSystem=true on the returned object', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue({
+        id: 8, publicId: 'sq_p8', name: 'org.users.manage', isSystem: true,
+        app: { publicId: 'sq_app1', name: 'SassyAuth' },
+        roles: [], users: [],
+      });
+      mocks.saRolePermission.count.mockResolvedValue(0);
+      mocks.saUserPermission.count.mockResolvedValue(0);
+      const result = await makeService().getPermission('ba-caller', 'sq_p8');
+      expect(result.isSystem).toBe(true);
     });
 
     it('throws NotFound when the permission does not exist', async () => {
@@ -136,7 +162,7 @@ describe('PermissionsService', () => {
       mocks.saApp.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_app1' });
       const result = await makeService().createPermission('ba-caller', { name: 'apps.read', appId: 'sq_app1' });
       expect(result).toEqual({
-        publicId: 'sq_42', name: 'apps.read',
+        publicId: 'sq_42', name: 'apps.read', isSystem: false,
         app: { publicId: 'sq_app1', name: 'Customer Portal' },
         roleCount: 0, userCount: 0,
       });
@@ -147,6 +173,19 @@ describe('PermissionsService', () => {
       (prisma.$transaction as jest.Mock).mockRejectedValue({ code: 'P2002' });
       await expect(makeService().createPermission('ba-caller', { name: 'apps.read', appId: 'sq_app1' })).rejects.toBeInstanceOf(ConflictException);
     });
+
+    // bug-0183 — the `platform.*` prefix is reserved and cannot be minted
+    // via this endpoint. Guard is case-insensitive so `Platform.foo` and
+    // `PLATFORM.foo` are equally rejected.
+    it.each(['platform.foo', 'Platform.super.admin', 'PLATFORM.anything'])(
+      'rejects creating a permission named %s (reserved prefix)',
+      async (name) => {
+        mocks.saApp.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_app1' });
+        await expect(
+          makeService().createPermission('ba-caller', { name, appId: 'sq_app1' }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      },
+    );
   });
 
   describe('updatePermission', () => {
@@ -155,9 +194,34 @@ describe('PermissionsService', () => {
       await expect(makeService().updatePermission('ba-caller', 'missing', { name: 'apps.new' })).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('rejects when name starts with platform. (Forbidden)', async () => {
+    it('rejects when existing name starts with platform. (Forbidden)', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'platform.users.manage', appId: 1 });
       await expect(makeService().updatePermission('ba-caller', 'sq_p1', { name: 'platform.users.manage.x' })).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // bug-0183 — block RENAMING an ordinary permission INTO the reserved
+    // `platform.*` prefix. Distinct from the "already platform.*" guard
+    // above; without this, an admin could take `org.foo` (ordinary) and
+    // rename it to `platform.foo`, mounting a privilege escalation.
+    it.each(['platform.foo', 'Platform.super.admin', 'PLATFORM.anything'])(
+      'rejects renaming an ordinary permission to %s (reserved prefix)',
+      async (name) => {
+        mocks.saPermission.findUnique.mockResolvedValue({
+          id: 1, publicId: 'sq_p1', name: 'org.users.manage', appId: 1, isSystem: false,
+        });
+        await expect(
+          makeService().updatePermission('ba-caller', 'sq_p1', { name }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      },
+    );
+
+    it('rejects when isSystem is true (Forbidden)', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue({
+        id: 1, publicId: 'sq_p1', name: 'org.users.manage', appId: 1, isSystem: true,
+      });
+      await expect(
+        makeService().updatePermission('ba-caller', 'sq_p1', { name: 'org.users.manage.x' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('rejects empty patch with BadRequest', async () => {
@@ -168,12 +232,13 @@ describe('PermissionsService', () => {
     it('happy path updates and returns the row', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'apps.read', appId: 1 });
       mocks.saPermission.update.mockResolvedValue({
-        publicId: 'sq_p1', name: 'apps.list', app: { publicId: 'sq_app1', name: 'Portal' },
+        publicId: 'sq_p1', name: 'apps.list', isSystem: false, app: { publicId: 'sq_app1', name: 'Portal' },
       });
       mocks.saRolePermission.count.mockResolvedValue(0);
       mocks.saUserPermission.count.mockResolvedValue(0);
       const result = await makeService().updatePermission('ba-caller', 'sq_p1', { name: 'apps.list' });
       expect(result.name).toBe('apps.list');
+      expect(result.isSystem).toBe(false);
     });
   });
 
@@ -186,6 +251,15 @@ describe('PermissionsService', () => {
     it('rejects platform.* with Forbidden', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'platform.users.manage' });
       await expect(makeService().deletePermission('ba-caller', 'sq_p1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects deleting isSystem with Forbidden', async () => {
+      mocks.saPermission.findUnique.mockResolvedValue({
+        id: 1, publicId: 'sq_p1', name: 'org.users.manage', appId: 1, isSystem: true,
+      });
+      await expect(
+        makeService().deletePermission('ba-caller', 'sq_p1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('translates Prisma P2003 to ConflictException with a useful message', async () => {
