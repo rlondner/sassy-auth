@@ -15,13 +15,14 @@ beforeEach(() => {
   })
 })
 
-let getUsers: any, createUser: any
+let getUsers: any, createUser: any, getEffectivePermissions: any
 
 beforeEach(async () => {
   jest.resetModules()
   const mod = await import('../api')
   getUsers = mod.getUsers
   createUser = mod.createUser
+  getEffectivePermissions = mod.getEffectivePermissions
 })
 
 describe('getUsers', () => {
@@ -41,6 +42,25 @@ describe('getUsers', () => {
   it('throws on non-ok response', async () => {
     ;(global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500 })
     await expect(getUsers()).rejects.toThrow('API error 500')
+  })
+})
+
+describe('getEffectivePermissions', () => {
+  it('unwraps server { userId, permissions: string[] } into Permission[]', async () => {
+    // The server returns the union of role-derived + direct permissions as a
+    // sorted string[] wrapped in { userId, permissions }. The drawer expects
+    // Permission[] with id/name/appId. Verify the API client adapts.
+    const serverResponse = {
+      userId: 'usr_123',
+      permissions: ['platform.apps.manage', 'platform.users.manage'],
+    }
+    ;(global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => serverResponse })
+    const result = await getEffectivePermissions('usr_123')
+    expect(Array.isArray(result)).toBe(true)
+    expect(result).toEqual([
+      { id: 'platform.apps.manage', name: 'platform.apps.manage', appId: '' },
+      { id: 'platform.users.manage', name: 'platform.users.manage', appId: '' },
+    ])
   })
 })
 

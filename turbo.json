@@ -6,7 +6,8 @@
       "outputs": ["dist/**"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "cache": false
     },
     "test:e2e": {
       "dependsOn": ["^build"],
@@ -14,6 +15,7 @@
       "env": ["CI_TESTS", "ADMIN_URL", "AUTH_SERVER_URL", "DATABASE_URL", "BETTER_AUTH_URL", "BETTER_AUTH_SECRET", "RSA_PRIVATE_KEY", "RSA_PUBLIC_KEY"]
     },
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     }
