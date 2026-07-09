@@ -118,12 +118,12 @@ export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  disabled={pending}
+                  loading={pending}
                 >
                   {t('orgs.drawer.cancel')}
                 </Button>
                 <Button type="submit" disabled={!dirty || pending}>
-                  {pending ? t('orgs.drawer.saving') : t('orgs.drawer.save')}
+                  {t('orgs.drawer.save')}
                 </Button>
               </ButtonGroup>
             </div>
