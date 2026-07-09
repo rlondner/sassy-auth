@@ -18,7 +18,7 @@ function mapError(message: string, kind: 'create' | 'update' | 'delete'): string
     return 'apps.errors.forbidden'
   }
   if (message.includes('400')) {
-    return 'apps.errors.urlInvalid'
+    return 'apps.errors.urlInsecure'
   }
   return 'apps.errors.generic'
 }
