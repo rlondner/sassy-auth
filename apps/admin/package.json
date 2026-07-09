@@ -6,19 +6,24 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start --port 3001",
-    "test": "jest"
+    "test": "node ../../scripts/log-test.mjs admin jest"
   },
   "dependencies": {
     "@sassy-auth/ui": "workspace:*",
     "@sentry/nextjs": "^10.54.0",
+    "@tanstack/react-table": "^8.20.0",
+    "lucide-react": "^0.577.0",
     "next": "^15.0.0",
     "next-intl": "^3.26.0",
+    "next-themes": "^0.4.6",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "sonner": "^1.7.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/react": "^16.0.0",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
@@ -38,7 +43,8 @@
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
-      "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts"
+      "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts",
+      "^server-only$": "<rootDir>/__mocks__/server-only.ts"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(@sassy-auth)/)"

@@ -4,36 +4,73 @@
 
 @layer base {
   :root {
-    --background: #f8f9ff;
-    --foreground: #0b1c30;
-    --card: #ffffff;
-    --card-foreground: #0b1c30;
-    --primary: #3525cd;
-    --primary-foreground: #ffffff;
-    --secondary: #dae2fd;
-    --secondary-foreground: #5c647a;
-    --muted: #eff4ff;
-    --muted-foreground: #464555;
-    --accent: #eff4ff;
-    --accent-foreground: #0b1c30;
-    --border: #c7c4d8;
-    --ring: #3525cd;
-    --destructive: #ba1a1a;
-    --radius: 0.25rem;
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+    --radius: 0.5rem;
 
-    /* Sidebar */
-    --sidebar-bg: #213145;
-    --sidebar-fg: #e2dfff;
-    --sidebar-active-fg: #c3c0ff;
-    --sidebar-active-border: #3525cd;
+    --sidebar: 222 47% 11%;
+    --sidebar-foreground: 215 16% 65%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 221 83% 53%;
+  }
+
+  .dark {
+    --background: 225 50% 8%;
+    --foreground: 213 27% 84%;
+    --card: 220 39% 11%;
+    --card-foreground: 213 27% 84%;
+    --popover: 220 39% 11%;
+    --popover-foreground: 213 27% 84%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 225 50% 8%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 213 27% 84%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 213 27% 84%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 213 27% 84%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
+
+    --sidebar: 220 47% 5%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 225 50% 8%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 213 27% 84%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 217 91% 60%;
   }
 
   * {
-    border-color: var(--border);
+    @apply border-border;
   }
 
   body {
-    background-color: var(--background);
-    color: var(--foreground);
+    @apply bg-background text-foreground;
   }
 }

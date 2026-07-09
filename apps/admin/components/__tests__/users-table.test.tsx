@@ -5,6 +5,10 @@ import en from '@/messages/en.json'
 import { UsersTable } from '../users-table'
 import type { User, Org } from '@/lib/types'
 
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
+}))
+
 jest.mock('@/app/(admin)/users/actions', () => ({
   deleteUserAction: jest.fn().mockResolvedValue({ ok: true }),
 }))
@@ -37,6 +41,9 @@ jest.mock('@sassy-auth/ui', () => {
     DropdownMenuContent: Passthrough,
     DropdownMenuItem: Item,
     DropdownMenuSeparator: () => <hr />,
+    // SidebarTrigger calls useSidebar() which throws without a SidebarProvider.
+    // Replace with a noop button so PageHeader can render in tests.
+    SidebarTrigger: () => <button type="button" aria-label="Toggle Sidebar" />,
   }
 })
 

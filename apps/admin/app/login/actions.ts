@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
+import { validateNextUrl } from '@/lib/safe-next'
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -32,7 +33,14 @@ function parseSessionCookie(header: string): ParsedSessionCookie | null {
     if (eq < 0) continue
     const name = namePair.slice(0, eq)
     if (name !== 'better-auth.session_token') continue
-    const value = namePair.slice(eq + 1)
+    // The upstream Set-Cookie carries the value in its on-the-wire form
+    // (e.g. base64 `=` arrives as `%3D`). Next.js's cookieStore.set runs
+    // the value through cookie.serialize, which encodeURIComponent's it
+    // again — yielding `%253D` on the wire. better-auth's parser decodes
+    // exactly once, so the signature ends up as `…%3D` (length 48 ≠ 44),
+    // session lookup returns null, and every refresh bounces to /login.
+    // Single-decode here so the round-trip is identity.
+    const value = decodeURIComponent(namePair.slice(eq + 1))
 
     const parsed: ParsedSessionCookie = { value, httpOnly: false }
     for (const attr of attrs) {
@@ -151,5 +159,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
     message: 'Admin login successful',
     level: 'info',
   })
-  redirect('/users')
+  const nextRaw = formData.get('next')
+  const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
+  redirect(nextSafe ?? '/users')
 }
