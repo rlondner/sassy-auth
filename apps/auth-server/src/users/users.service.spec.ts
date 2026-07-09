@@ -75,6 +75,11 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   account: { create: jest.Mock };
 };
 
+// bug-0186: fixed timestamps so assertions on the ISO-serialized
+// output stay stable. `lastLoginAt` defaults to null (never signed
+// in); tests that exercise the login-tracking path override it.
+const FIXTURE_CREATED_AT = new Date('2026-01-15T12:00:00.000Z');
+
 const makeSaUser = (overrides = {}) => ({
   id: 1,
   publicId: 'usr1',
@@ -86,6 +91,8 @@ const makeSaUser = (overrides = {}) => ({
   phoneNumber: null,
   username: null,
   status: 'active',
+  createdAt: FIXTURE_CREATED_AT,
+  lastLoginAt: null,
   org: { publicId: 'org1' },
   betterAuthUser: { email: 'alice@example.com' },
   ...overrides,
@@ -115,6 +122,30 @@ describe('UsersService', () => {
       expect(result[0].id).toBe('usr1');
       expect(result[0].email).toBe('alice@example.com');
       expect(result[0].status).toBe('active');
+    });
+
+    // bug-0186: previously the admin `User` type declared `createdAt`
+    // and `lastLoginAt` fields that the API never returned. Both are
+    // now real: `createdAt` is a NOT-NULL column with a
+    // CURRENT_TIMESTAMP default; `lastLoginAt` is nullable and
+    // populated by (a) `token.controller.ts::directLogin` on success
+    // and (b) the BetterAuth `databaseHooks.session.create.after`
+    // hook in `auth.config.ts`.
+    it('includes createdAt (ISO string) and lastLoginAt (ISO string | null) in list output', async () => {
+      const loginTime = new Date('2026-05-01T09:30:00.000Z');
+      mockPrisma.saUser.findMany.mockResolvedValue([
+        makeSaUser({ lastLoginAt: loginTime }),
+        makeSaUser({ publicId: 'usr2', lastLoginAt: null }),
+      ]);
+      const result = await service.listUsers('ba-caller', {});
+      expect(result[0]).toMatchObject({
+        createdAt: FIXTURE_CREATED_AT.toISOString(),
+        lastLoginAt: loginTime.toISOString(),
+      });
+      expect(result[1]).toMatchObject({
+        createdAt: FIXTURE_CREATED_AT.toISOString(),
+        lastLoginAt: null,
+      });
     });
 
     it('passes orgId filter to prisma when provided', async () => {
@@ -843,6 +874,54 @@ describe('UsersService', () => {
 
       expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', []);
       expect(mockPrisma.saUserRole.create).toHaveBeenCalled();
+    });
+  });
+
+  // bug-0097 — the escalation guard was previously only applied to
+  // assignRole and setUserRoles. removeRole was the asymmetric outlier:
+  // a caller could strip a role from a user even if they weren't
+  // themselves authorized to grant its system perms. Revoke-then-
+  // re-grant is the same escalation surface in reverse.
+  describe('removeRole escalation guard (bug-0097)', () => {
+    it('rejects removing a role whose perms include a system perm the caller lacks', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValueOnce({
+        id: 5,
+        publicId: 'role1',
+        permissions: [
+          { permission: { name: 'org.roles.manage', isSystem: true } },
+        ],
+      });
+      mockAssertGrant.mockRejectedValueOnce(
+        new ForbiddenException('Cannot grant system permission(s) you do not hold: org.roles.manage'),
+      );
+
+      await expect(
+        service.removeRole('ba-caller', 'usr1', 'role1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', ['org.roles.manage']);
+      expect(mockPrisma.saUserRole.delete).not.toHaveBeenCalled();
+    });
+
+    it('allows removing a role with only non-system perms', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValueOnce({
+        id: 5,
+        publicId: 'role1',
+        permissions: [
+          { permission: { name: 'apps.read', isSystem: false } },
+        ],
+      });
+      mockPrisma.saUserRole.delete.mockResolvedValueOnce(undefined);
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await expect(
+        service.removeRole('ba-caller', 'usr1', 'role1'),
+      ).resolves.toBeUndefined();
+
+      expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', []);
+      expect(mockPrisma.saUserRole.delete).toHaveBeenCalled();
     });
   });
 

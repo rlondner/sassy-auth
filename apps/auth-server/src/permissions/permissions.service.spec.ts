@@ -173,6 +173,19 @@ describe('PermissionsService', () => {
       (prisma.$transaction as jest.Mock).mockRejectedValue({ code: 'P2002' });
       await expect(makeService().createPermission('ba-caller', { name: 'apps.read', appId: 'sq_app1' })).rejects.toBeInstanceOf(ConflictException);
     });
+
+    // bug-0183 — the `platform.*` prefix is reserved and cannot be minted
+    // via this endpoint. Guard is case-insensitive so `Platform.foo` and
+    // `PLATFORM.foo` are equally rejected.
+    it.each(['platform.foo', 'Platform.super.admin', 'PLATFORM.anything'])(
+      'rejects creating a permission named %s (reserved prefix)',
+      async (name) => {
+        mocks.saApp.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_app1' });
+        await expect(
+          makeService().createPermission('ba-caller', { name, appId: 'sq_app1' }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      },
+    );
   });
 
   describe('updatePermission', () => {
@@ -181,10 +194,26 @@ describe('PermissionsService', () => {
       await expect(makeService().updatePermission('ba-caller', 'missing', { name: 'apps.new' })).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('rejects when name starts with platform. (Forbidden)', async () => {
+    it('rejects when existing name starts with platform. (Forbidden)', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_p1', name: 'platform.users.manage', appId: 1 });
       await expect(makeService().updatePermission('ba-caller', 'sq_p1', { name: 'platform.users.manage.x' })).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    // bug-0183 — block RENAMING an ordinary permission INTO the reserved
+    // `platform.*` prefix. Distinct from the "already platform.*" guard
+    // above; without this, an admin could take `org.foo` (ordinary) and
+    // rename it to `platform.foo`, mounting a privilege escalation.
+    it.each(['platform.foo', 'Platform.super.admin', 'PLATFORM.anything'])(
+      'rejects renaming an ordinary permission to %s (reserved prefix)',
+      async (name) => {
+        mocks.saPermission.findUnique.mockResolvedValue({
+          id: 1, publicId: 'sq_p1', name: 'org.users.manage', appId: 1, isSystem: false,
+        });
+        await expect(
+          makeService().updatePermission('ba-caller', 'sq_p1', { name }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      },
+    );
 
     it('rejects when isSystem is true (Forbidden)', async () => {
       mocks.saPermission.findUnique.mockResolvedValue({

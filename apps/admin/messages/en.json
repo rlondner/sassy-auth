@@ -36,6 +36,9 @@
     "fields": {
       "name": "App Name",
       "url": "App URL",
+      "callbackUrl": "Callback URL",
+      "callbackUrlHint": "Leave blank to accept any callback under the app's URL. Set a full URL to require an exact redirect_uri match.",
+      "callbackUrlDefault": "Default (any path under app URL)",
       "publicId": "Public ID",
       "urlHint": "The primary base URL for this application."
     },
@@ -67,7 +70,8 @@
       "platformProtected": "Platform apps cannot be modified.",
       "forbidden": "You no longer have permission to perform this action.",
       "generic": "Something went wrong. Please try again.",
-      "urlInvalid": "Please enter a valid URL including https://.",
+      "urlInvalid": "Please enter a valid URL.",
+      "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
       "nameRequired": "App name is required."
     },
     "badges": {
@@ -433,7 +437,13 @@
     "confirmPassword": "Confirm Password",
     "submit": "Activate Account",
     "expired": "This invitation link has expired or is invalid. Contact your administrator for a new one.",
-    "success": "Account activated! You can now sign in."
+    "success": "Account activated! You can now sign in.",
+    "errors": {
+      "passwordMismatch": "Passwords do not match.",
+      "passwordTooShort": "Password must be at least 12 characters.",
+      "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
+      "genericError": "Something went wrong."
+    }
   },
   "oauthError": {
     "pageTitle": "Authorization error — SassyAuth",
