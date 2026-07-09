@@ -23,4 +23,29 @@ export class MeService {
     user.directPermissions.forEach((up: DirectPermRel) => names.add(up.permission.name));
     return { permissions: Array.from(names).sort() };
   }
+
+  async getMyProfile(callerBaId: string): Promise<{
+    userId: string;
+    org: { id: string; name: string; isPlatform: boolean };
+    app: { id: string; name: string; isPlatform: boolean };
+  }> {
+    const user = await prisma.saUser.findUnique({
+      where: { betterAuthUserId: callerBaId },
+      include: { org: { include: { app: true } } },
+    });
+    if (!user) throw new ForbiddenException();
+    return {
+      userId: user.publicId,
+      org: {
+        id: user.org.publicId,
+        name: user.org.name,
+        isPlatform: user.org.isPlatform,
+      },
+      app: {
+        id: user.org.app.publicId,
+        name: user.org.app.name,
+        isPlatform: user.org.app.isPlatform,
+      },
+    };
+  }
 }

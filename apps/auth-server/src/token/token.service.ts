@@ -3,6 +3,7 @@ import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import { prisma } from '@sassy-auth/db';
 import { TokenErrorCode } from '@sassy-auth/types';
+import { resolveIssuer } from './oauth-metadata';
 
 interface IssueJwtParams {
   saUserId: number;
@@ -15,6 +16,7 @@ interface IssueJwtParams {
 export class TokenService {
   private readonly privateKey: string;
   private readonly publicKey: string;
+  private readonly kid: string;
 
   constructor() {
     if (!process.env.RSA_PRIVATE_KEY || !process.env.RSA_PUBLIC_KEY) {
@@ -22,6 +24,7 @@ export class TokenService {
     }
     this.privateKey = Buffer.from(process.env.RSA_PRIVATE_KEY, 'base64').toString('utf-8');
     this.publicKey = Buffer.from(process.env.RSA_PUBLIC_KEY, 'base64').toString('utf-8');
+    this.kid = process.env.JWT_KEY_ID ?? 'sassy-auth-1';
   }
 
   async resolvePermissions(saUserId: number): Promise<string[]> {
@@ -62,7 +65,9 @@ export class TokenService {
 
   async issueJwt(params: IssueJwtParams): Promise<string> {
     const permissions = await this.resolvePermissions(params.saUserId);
-    const issuer = process.env.BETTER_AUTH_URL ?? 'https://auth.example.com';
+    // Share normalization with the RFC 8414 discovery doc so the advertised
+    // `issuer` and the JWT `iss` claim cannot diverge on a trailing slash.
+    const issuer = resolveIssuer();
     const now = Math.floor(Date.now() / 1000);
 
     const payload = {
@@ -72,10 +77,10 @@ export class TokenService {
       iss: issuer,
       iat: now,
       exp: now + 3600,
-      permissions,
+      scope: permissions.join(' '),
     };
 
-    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256' });
+    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
   }
 
   getJwks(): { keys: Record<string, unknown>[] } {
@@ -87,7 +92,7 @@ export class TokenService {
           ...jwk,
           alg: 'RS256',
           use: 'sig',
-          kid: 'sassy-auth-1',
+          kid: this.kid,
         },
       ],
     };

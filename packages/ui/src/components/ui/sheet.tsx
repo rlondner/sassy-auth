@@ -30,8 +30,11 @@ const SheetOverlay = React.forwardRef<
 ))
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
+// `flex flex-col` lets SheetBody's `flex-1 overflow-y-auto` actually scroll
+// independently of SheetHeader/SheetFooter when the body content overflows
+// the viewport. Without this, tall drawers push SheetFooter below the fold.
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+  "fixed z-50 flex flex-col gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
   {
     variants: {
       side: {
