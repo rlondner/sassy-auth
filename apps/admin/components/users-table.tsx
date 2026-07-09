@@ -2,8 +2,10 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, StatusChip, UserAvatar,
@@ -24,6 +26,7 @@ interface UsersTableProps {
 
 export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: UsersTableProps) {
   const t = useTranslations()
+  const router = useRouter()
   void initialOrgId
   void canPickOrg
   const [globalFilter, setGlobalFilter] = React.useState('')
@@ -32,6 +35,11 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
+
+  // No client-side list action for users — the page is a Server Component
+  // that re-fetches on router.refresh() (paired with revalidatePath in the
+  // mutating action). This swaps the table data silently without a navigation.
+  const refresh = React.useCallback(() => router.refresh(), [router])
 
   const orgMap = React.useMemo(
     () => Object.fromEntries(orgs.map((o) => [o.id, o])),
@@ -88,7 +96,7 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
                 <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
               </button>
             </DropdownMenuTrigger>
@@ -166,11 +174,13 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
         orgs={orgs}
         open={viewOpen}
         onOpenChange={setViewOpen}
+        onSuccess={refresh}
       />
       <UserCreateDrawer
         orgs={orgs}
         open={createOpen}
         onOpenChange={setCreateOpen}
+        onSuccess={refresh}
       />
       {selectedUser && (
         <DeleteAlertDialog
@@ -187,7 +197,9 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
               setDeleteError(t(result.errorKey))
               return
             }
+            toast.success(t('users.toast.deleted'))
             setDeleteOpen(false)
+            refresh()
           }}
         />
       )}

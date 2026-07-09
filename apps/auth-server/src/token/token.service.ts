@@ -3,6 +3,7 @@ import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import { prisma } from '@sassy-auth/db';
 import { TokenErrorCode } from '@sassy-auth/types';
+import { resolveIssuer } from './oauth-metadata';
 
 interface IssueJwtParams {
   saUserId: number;
@@ -64,7 +65,9 @@ export class TokenService {
 
   async issueJwt(params: IssueJwtParams): Promise<string> {
     const permissions = await this.resolvePermissions(params.saUserId);
-    const issuer = process.env.BETTER_AUTH_URL ?? 'https://auth.example.com';
+    // Share normalization with the RFC 8414 discovery doc so the advertised
+    // `issuer` and the JWT `iss` claim cannot diverge on a trailing slash.
+    const issuer = resolveIssuer();
     const now = Math.floor(Date.now() / 1000);
 
     const payload = {
