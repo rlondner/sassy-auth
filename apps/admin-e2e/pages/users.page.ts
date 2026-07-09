@@ -1,4 +1,4 @@
-import type { Page, Locator } from '@playwright/test'
+import { expect, type Page, type Locator } from '@playwright/test'
 import { t } from '../lib/i18n'
 
 export class UsersPage {
@@ -72,12 +72,24 @@ export class UsersPage {
     // that are not associated with the inputs, so getByLabel can't match.
     // The editable text fields render in a fixed order: First Name, Last Name,
     // Phone, Username — target the first two positionally.
-    if (patch.firstName !== undefined) {
-      await drawer.getByRole('textbox').nth(0).fill(patch.firstName)
+    //
+    // Entering edit mode kicks off async role/permission fetches; when they
+    // resolve the drawer re-seeds its edit fields from the user prop, which can
+    // clobber a value typed too early (leaving the form not dirty, so Save is a
+    // no-op). Fill inside expect.toPass so a clobber is retried until it sticks.
+    const setField = async (index: number, value: string) => {
+      const input = drawer.getByRole('textbox').nth(index)
+      await expect(async () => {
+        await input.fill(value)
+        // Let any in-flight reseed (from the drawer's on-open role/permission
+        // fetch resolving) fire, then confirm our value survived it. If it was
+        // clobbered, toPass re-fills until the fetches have settled.
+        await this.page.waitForTimeout(700)
+        await expect(input).toHaveValue(value, { timeout: 500 })
+      }).toPass({ timeout: 20_000 })
     }
-    if (patch.lastName !== undefined) {
-      await drawer.getByRole('textbox').nth(1).fill(patch.lastName)
-    }
+    if (patch.firstName !== undefined) await setField(0, patch.firstName)
+    if (patch.lastName !== undefined) await setField(1, patch.lastName)
     await drawer.getByRole('button', { name: t('users.drawer.save') }).click()
     await raceSuccessOrError(this.page, t('users.toast.updated'))
     // Save keeps the drawer open in view mode (showing the now-stale prop)
