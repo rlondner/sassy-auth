@@ -101,12 +101,12 @@ export function PermissionCreateDrawer({ apps, open, onOpenChange, onSuccess }: 
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  disabled={pending}
+                  loading={pending}
                 >
                   {t('permissions.drawer.cancel')}
                 </Button>
-                <Button type="submit" disabled={pending}>
-                  {pending ? t('permissions.drawer.saving') : t('permissions.drawer.createTitle')}
+                <Button type="submit" loading={pending}>
+                  {t('permissions.drawer.createTitle')}
                 </Button>
               </ButtonGroup>
             </div>
