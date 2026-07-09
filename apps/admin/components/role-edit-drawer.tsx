@@ -165,11 +165,11 @@ export function RoleEditDrawer({ role, open, onOpenChange, onSuccess }: Props) {
             )}
             <div className="flex justify-end pt-4">
               <ButtonGroup>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} loading={pending}>
                   {t('roles.drawer.cancel')}
                 </Button>
                 <Button type="submit" disabled={!dirty || pending}>
-                  {pending ? t('roles.drawer.saving') : t('roles.drawer.save')}
+                  {t('roles.drawer.save')}
                 </Button>
               </ButtonGroup>
             </div>
