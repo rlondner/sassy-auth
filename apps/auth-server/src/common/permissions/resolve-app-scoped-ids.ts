@@ -8,14 +8,16 @@ export async function resolvePermissionIdsForApp(
   if (permissionPublicIds.length === 0) return [];
   const perms = (await prisma.saPermission.findMany({
     where: { publicId: { in: permissionPublicIds } },
-    select: { id: true, publicId: true, appId: true },
-  })) as Array<{ id: number; publicId: string; appId: number }>;
+    select: { id: true, publicId: true, appId: true, isSystem: true },
+  })) as Array<{ id: number; publicId: string; appId: number; isSystem: boolean }>;
   if (perms.length !== permissionPublicIds.length) {
     const found = new Set(perms.map((p) => p.publicId));
     const missing = permissionPublicIds.filter((id) => !found.has(id));
     throw new NotFoundException(`Permission(s) not found: ${missing.join(', ')}`);
   }
-  const wrongApp = perms.filter((p) => p.appId !== appId);
+  // System perms (org.*) bypass the app-scope check; everything else
+  // must match the target app exactly.
+  const wrongApp = perms.filter((p) => !p.isSystem && p.appId !== appId);
   if (wrongApp.length > 0) {
     throw new BadRequestException(
       `Permission(s) belong to a different app: ${wrongApp.map((p) => p.publicId).join(', ')}`,

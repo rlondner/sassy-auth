@@ -1,0 +1,27 @@
+[project]
+name = "resource-server-fastapi"
+version = "0.1.0"
+description = "Demo OAuth 2.0 resource server (PKCE) for SassyAuth"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "httpx>=0.27",
+  "pyjwt[crypto]>=2.9",
+  "pydantic-settings>=2.5",
+  "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-asyncio>=0.24",
+  "cryptography>=43",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

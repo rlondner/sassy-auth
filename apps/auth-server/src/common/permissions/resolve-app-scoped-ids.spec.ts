@@ -46,6 +46,36 @@ describe('resolvePermissionIdsForApp', () => {
     ]);
     await expect(resolvePermissionIdsForApp(1, ['pA', 'pC'])).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('lets an isSystem permission through even when its appId differs', async () => {
+    mockPrisma.saPermission.findMany.mockResolvedValue([
+      { id: 10, publicId: 'pA', appId: 1, isSystem: false },
+      { id: 99, publicId: 'pSys', appId: 7, isSystem: true },   // belongs to a different app, but isSystem
+    ]);
+    const ids = await resolvePermissionIdsForApp(1, ['pA', 'pSys']);
+    expect(ids).toEqual([10, 99]);
+  });
+
+  it('still rejects a non-system cross-app perm in a mixed list', async () => {
+    mockPrisma.saPermission.findMany.mockResolvedValue([
+      { id: 99, publicId: 'pSys', appId: 7, isSystem: true },
+      { id: 12, publicId: 'pBad', appId: 2, isSystem: false },  // cross-app and non-system
+    ]);
+    await expect(
+      resolvePermissionIdsForApp(1, ['pSys', 'pBad']),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('selects isSystem in the projection', async () => {
+    mockPrisma.saPermission.findMany.mockResolvedValue([
+      { id: 10, publicId: 'pA', appId: 1, isSystem: false },
+    ]);
+    await resolvePermissionIdsForApp(1, ['pA']);
+    const call = mockPrisma.saPermission.findMany.mock.calls[0][0] as {
+      select: Record<string, boolean>;
+    };
+    expect(call.select.isSystem).toBe(true);
+  });
 });
 
 describe('resolveRoleIdsForApp', () => {

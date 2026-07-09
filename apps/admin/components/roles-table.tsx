@@ -4,11 +4,12 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import { ShieldEllipsis, Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteRoleAction, listRolesAction } from '@/app/(admin)/roles/actions'
 import type { App, RoleRow, ListRolesResponse } from '@/lib/types'
 import { RoleViewDrawer } from './role-view-drawer'
@@ -17,9 +18,14 @@ import { RoleEditDrawer } from './role-edit-drawer'
 import { DeleteAlertDialog } from './delete-alert-dialog'
 import { PageHeader } from './page-header'
 
-interface Props { initial: ListRolesResponse; apps: App[] }
+interface Props {
+  initial: ListRolesResponse
+  apps: App[]
+  canWrite?: boolean
+  canPickApp?: boolean
+}
 
-export function RolesTable({ initial, apps }: Props) {
+export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }: Props) {
   const t = useTranslations()
   const [data, setData] = React.useState(initial)
   const [query, setQuery] = React.useState('')
@@ -32,7 +38,7 @@ export function RolesTable({ initial, apps }: Props) {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
-  const [copiedSqid, setCopiedSqid] = React.useState<string | null>(null)
+  const { copiedKey: copiedSqid, copy: copySqid } = useCopyFeedback()
   const initialRefRef = React.useRef(true)
 
   React.useEffect(() => {
@@ -40,6 +46,7 @@ export function RolesTable({ initial, apps }: Props) {
       initialRefRef.current = false
       return
     }
+    let cancelled = false
     const timer = setTimeout(async () => {
       const params = {
         q: query || undefined,
@@ -47,9 +54,11 @@ export function RolesTable({ initial, apps }: Props) {
         page, pageSize,
       }
       const result = await listRolesAction(params)
+      // bug-0137: guard against stale in-flight response.
+      if (cancelled) return
       if (result && 'items' in result) setData(result)
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query, appFilter, page, pageSize])
 
   const columns: ColumnDef<RoleRow>[] = [
@@ -85,10 +94,7 @@ export function RolesTable({ initial, apps }: Props) {
               aria-label={t('roles.actions.copy')}
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(r.publicId, () => {
-                  setCopiedSqid(r.publicId)
-                  setTimeout(() => setCopiedSqid(null), 2000)
-                })
+                void copySqid(r.publicId, r.publicId)
               }}
               className="text-muted-foreground hover:text-primary"
             >
@@ -124,28 +130,46 @@ export function RolesTable({ initial, apps }: Props) {
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(r); setViewOpen(true) }}>
                 {t('roles.actions.view')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(r); setEditOpen(true) }}>
-                {t('roles.actions.edit')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (inUse) return
-                  setSelected(r); setDeleteError(null); setDeleteOpen(true)
-                }}
-                title={inUse ? t('roles.drawer.inUseTooltip', { userCount: r.userCount }) : undefined}
-                data-disabled={inUse ? '' : undefined}
-              >
-                {t('roles.actions.delete')}
-              </DropdownMenuItem>
+              {canWrite && (
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(r); setEditOpen(true) }}>
+                  {t('roles.actions.edit')}
+                </DropdownMenuItem>
+              )}
+              {canWrite && <DropdownMenuSeparator />}
+              {canWrite && (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (inUse) return
+                    setSelected(r); setDeleteError(null); setDeleteOpen(true)
+                  }}
+                  title={inUse ? t('roles.drawer.inUseTooltip', { userCount: r.userCount }) : undefined}
+                  data-disabled={inUse ? '' : undefined}
+                >
+                  {t('roles.actions.delete')}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )
       },
     },
   ]
+
+  const refresh = React.useCallback(async () => {
+    const refreshed = await listRolesAction({
+      q: query || undefined, appId: appFilter || undefined, page, pageSize,
+    })
+    if (refreshed && 'items' in refreshed) {
+      setData(refreshed)
+      // bug-0206: rebase `selected` on the refreshed rows so drawers
+      // reflect current data, or clear if the row is gone.
+      setSelected((prev) =>
+        prev ? refreshed.items.find((r) => r.publicId === prev.publicId) ?? null : null,
+      )
+    }
+  }, [query, appFilter, page, pageSize])
 
   async function handleDelete() {
     if (!selected) return
@@ -156,10 +180,8 @@ export function RolesTable({ initial, apps }: Props) {
     }
     setDeleteOpen(false)
     setViewOpen(false)
-    const refreshed = await listRolesAction({
-      q: query || undefined, appId: appFilter || undefined, page, pageSize,
-    })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    toast.success(t('roles.toast.deleted'))
+    await refresh()
   }
 
   return (
@@ -171,20 +193,22 @@ export function RolesTable({ initial, apps }: Props) {
         ]}
         actions={
           <>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="sr-only">{t('roles.filter.appLabel')}</span>
-              <select
-                aria-label={t('roles.filter.appLabel')}
-                value={appFilter}
-                onChange={(e) => { setAppFilter(e.target.value); setPage(1) }}
-                className="h-9 rounded-md border border-input bg-card px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">{t('roles.filter.allApps')}</option>
-                {apps.map((a) => (
-                  <option key={a.publicId} value={a.publicId}>{a.name}</option>
-                ))}
-              </select>
-            </label>
+            {canPickApp && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="sr-only">{t('roles.filter.appLabel')}</span>
+                <select
+                  aria-label={t('roles.filter.appLabel')}
+                  value={appFilter}
+                  onChange={(e) => { setAppFilter(e.target.value); setPage(1) }}
+                  className="h-9 rounded-md border border-input bg-card px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">{t('roles.filter.allApps')}</option>
+                  {apps.map((a) => (
+                    <option key={a.publicId} value={a.publicId}>{a.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -195,12 +219,14 @@ export function RolesTable({ initial, apps }: Props) {
                 className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <ButtonGroup>
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
-                <Plus className="h-4 w-4" />
-                {t('roles.create')}
-              </Button>
-            </ButtonGroup>
+            {canWrite && (
+              <ButtonGroup>
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  {t('roles.create')}
+                </Button>
+              </ButtonGroup>
+            )}
           </>
         }
       />
@@ -225,6 +251,7 @@ export function RolesTable({ initial, apps }: Props) {
           onOpenChange={setViewOpen}
           onEdit={() => { setViewOpen(false); setEditOpen(true) }}
           onDelete={() => { setDeleteError(null); setDeleteOpen(true) }}
+          canWrite={canWrite}
         />
       )}
       {selected && (
@@ -232,9 +259,10 @@ export function RolesTable({ initial, apps }: Props) {
           role={selected}
           open={editOpen}
           onOpenChange={setEditOpen}
+          onSuccess={refresh}
         />
       )}
-      <RoleCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} />
+      {canWrite && <RoleCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} onSuccess={refresh} />}
       {selected && (
         <DeleteAlertDialog
           open={deleteOpen}
