@@ -32,13 +32,35 @@ describe('checkPermission', () => {
     await expect(checkPermission('ba-1', 'platform.users.manage')).resolves.toBeUndefined();
   });
 
-  it('resolves when the user has the required permission as a direct grant', async () => {
+  it('resolves when the user has the required permission as a direct grant (with matching targetOrgId)', async () => {
     mockPrisma.saUser.findUnique.mockResolvedValue({
       orgId: 1,
       roles: [],
       directPermissions: [{ permission: { name: 'org.users.manage' } }],
     });
-    await expect(checkPermission('ba-1', 'org.users.manage')).resolves.toBeUndefined();
+    // bug-0001 — non-platform perms require an explicit `targetOrgId`.
+    // Previously this test passed without one (silent grant).
+    await expect(
+      checkPermission('ba-1', 'org.users.manage', { targetOrgId: 1 }),
+    ).resolves.toBeUndefined();
+  });
+
+  // bug-0001 regression — a non-platform perm without `targetOrgId`
+  // must fall through to ForbiddenException. Symmetric to the
+  // check-permission-for-app fix in bug-0094. The two helpers now share
+  // a "fail closed on undefined scope" contract.
+  it('REJECTS org.users.manage when targetOrgId is undefined (bug-0001)', async () => {
+    mockPrisma.saUser.findUnique.mockResolvedValue({
+      orgId: 1,
+      roles: [],
+      directPermissions: [{ permission: { name: 'org.users.manage' } }],
+    });
+    await expect(
+      checkPermission('ba-1', 'org.users.manage'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      checkPermission('ba-1', ['platform.users.manage', 'org.users.manage']),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('throws ForbiddenException when user lacks the permission', async () => {
