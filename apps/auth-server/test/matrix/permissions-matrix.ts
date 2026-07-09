@@ -59,8 +59,8 @@ const GATE: Record<ResourceArea, Partial<Record<Op, readonly string[]>>> = {
     delete: ['platform.orgs.manage'],
   },
   roles: {
-    list:   ['platform.roles.manage', 'org.roles.manage'],
-    get:    ['platform.roles.manage', 'org.roles.manage'],
+    list:   ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
+    get:    ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
     create: ['platform.roles.manage'],
     update: ['platform.roles.manage'],
     delete: ['platform.roles.manage'],

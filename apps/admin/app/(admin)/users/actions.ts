@@ -43,16 +43,39 @@ export async function createUserAction(
   }
 }
 
+// bug-0190: these five pass-through read actions previously propagated
+// any error from the underlying API call to their callers (the user
+// view/create drawers). Because those callers use
+// `Promise.all([...]).then().finally()` WITHOUT a `.catch()`, an API
+// failure (403 after a mid-session permission loss, 404 on a
+// concurrently-deleted user, network flake) surfaced as an unhandled
+// promise rejection and left the drawer showing an empty state with
+// no error indicator. Returning an empty array on failure preserves
+// the drawer's "no data" rendering path — which is honest for a
+// caller that can't read the data — and lets Sentry (via the API
+// client) still capture the underlying failure.
 export async function getUserRolesAction(userId: string): Promise<Role[]> {
-  return getUserRoles(userId)
+  try {
+    return await getUserRoles(userId)
+  } catch {
+    return []
+  }
 }
 
 export async function getEffectivePermissionsAction(userId: string): Promise<Permission[]> {
-  return getEffectivePermissions(userId)
+  try {
+    return await getEffectivePermissions(userId)
+  } catch {
+    return []
+  }
 }
 
 export async function getUserDirectPermissionsAction(userId: string): Promise<Permission[]> {
-  return getUserDirectPermissions(userId)
+  try {
+    return await getUserDirectPermissions(userId)
+  } catch {
+    return []
+  }
 }
 
 export async function setUserRolesAction(
@@ -87,20 +110,32 @@ export async function setUserDirectPermissionsAction(
   }
 }
 
+// bug-0190: same pattern as the three read actions above — callers
+// pull these in `Promise.all` chains without individual `.catch()`
+// handlers, so an empty-array fallback keeps the drawer stable when
+// an API call fails.
 export async function getRolesAction(appId?: string): Promise<Role[]> {
-  const result = await getRoles({ appId, pageSize: 200 })
-  return result.items.map((r) => ({
-    publicId: r.publicId,
-    name: r.name,
-    appId: r.app.publicId,
-  }))
+  try {
+    const result = await getRoles({ appId, pageSize: 200 })
+    return result.items.map((r) => ({
+      publicId: r.publicId,
+      name: r.name,
+      appId: r.app.publicId,
+    }))
+  } catch {
+    return []
+  }
 }
 
 export async function getAppPermissionsAction(
   appId: string,
 ): Promise<Array<{ publicId: string; name: string }>> {
-  const result = await getPermissions({ appId, pageSize: 200 })
-  return result.items.map((p) => ({ publicId: p.publicId, name: p.name }))
+  try {
+    const result = await getPermissions({ appId, pageSize: 200 })
+    return result.items.map((p) => ({ publicId: p.publicId, name: p.name }))
+  } catch {
+    return []
+  }
 }
 
 export async function updateUserAction(id: string, patch: Partial<User>): Promise<User> {
