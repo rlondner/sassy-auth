@@ -1,6 +1,7 @@
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
+import { generatePendingPublicId } from '../common/pending-public-id';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -37,7 +38,7 @@ async function ensureApp() {
   if (found) return found;
   return prisma.$transaction(async (tx) => {
     const created = await tx.saApp.create({
-      data: { publicId: 'placeholder', name: APP_NAME, url: APP_URL, isPlatform: false },
+      data: { publicId: generatePendingPublicId(), name: APP_NAME, url: APP_URL, isPlatform: false },
     });
     return tx.saApp.update({
       where: { id: created.id },
@@ -51,7 +52,7 @@ async function ensureOrg(appId: number, name: string) {
   if (found) return found;
   return prisma.$transaction(async (tx) => {
     const created = await tx.saOrg.create({
-      data: { publicId: 'placeholder', name, appId, isPlatform: false },
+      data: { publicId: generatePendingPublicId(), name, appId, isPlatform: false },
     });
     return tx.saOrg.update({
       where: { id: created.id },
@@ -65,7 +66,7 @@ async function ensureAppPermission(appId: number, name: string) {
   if (perm) return perm;
   perm = await prisma.$transaction(async (tx) => {
     const c = await tx.saPermission.create({
-      data: { publicId: 'placeholder', name, appId, isSystem: false },
+      data: { publicId: generatePendingPublicId(), name, appId, isSystem: false },
     });
     return tx.saPermission.update({
       where: { id: c.id },
@@ -93,7 +94,7 @@ async function ensureUser(seed: UserSeed, orgIdByName: Record<string, number>, s
     saUser = await prisma.$transaction(async (tx) => {
       const c = await tx.saUser.create({
         data: {
-          publicId: 'placeholder',
+          publicId: generatePendingPublicId(),
           betterAuthUserId: baUserId,
           orgId: orgIdByName[seed.org],
           firstName: seed.firstName,
