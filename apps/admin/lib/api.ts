@@ -1,7 +1,8 @@
 import 'server-only'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
-import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo } from './types'
+import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, MeProfile, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
 
 const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
@@ -15,7 +16,33 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Response>
       ...init.headers,
     },
   })
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`)
+  // bug-0136: an expired auth-server session previously threw the
+  // opaque "API error 401" that surfaced as a generic toast. Bouncing
+  // to /login mirrors what the admin middleware does on a hard
+  // sign-out and gives the user a clear path forward.
+  // `redirect()` throws a NEXT_REDIRECT sentinel that Next.js's
+  // route handler catches, so this works cleanly in both server
+  // actions and RSC page renders.
+  if (res.status === 401) redirect('/login')
+  if (!res.ok) {
+    // bug-0050 / bug-0200 / bug-0201: previously threw only
+    // "API error ${status}: ${path}" and discarded the response body.
+    // Callers that wanted to distinguish (e.g. self-delete
+    // "cannot delete your own account" vs generic 403; "already
+    // exists" vs generic 409) had no signal to key off. Now the
+    // Nest error message is appended when parseable, so callers can
+    // reliably `.includes(...)` on both the status code and the
+    // server-side reason.
+    let detail = ''
+    try {
+      const body = await res.clone().json() as { message?: string | string[] }
+      if (typeof body?.message === 'string') detail = ` ${body.message}`
+      else if (Array.isArray(body?.message)) detail = ` ${body.message.join(', ')}`
+    } catch {
+      // non-JSON body — leave detail empty
+    }
+    throw new Error(`API error ${res.status}: ${path}${detail}`)
+  }
   return res
 }
 
@@ -33,7 +60,11 @@ export async function getUser(id: string): Promise<User> {
 export async function createUser(payload: CreateUserPayload): Promise<CreateUserResponse> {
   const res = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(payload) })
   const result: CreateUserResponse = await res.json()
-  Sentry.addBreadcrumb({ category: 'admin.action', message: `User created: ${result.user.email}`, level: 'info' })
+  // bug-0146: log the userId, not the email. Emails are PII and
+  // Sentry breadcrumbs are retained by a third party. The publicId
+  // is the correlation key for support debugging without leaking
+  // any identifying data.
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User created: ${result.user.id}`, level: 'info' })
   return result
 }
 
@@ -79,10 +110,34 @@ export async function deleteOrg(publicId: string): Promise<void> {
   Sentry.addBreadcrumb({ category: 'admin.action', message: `Org deleted: ${publicId}`, level: 'info' });
 }
 
-export async function getRoles(appId?: string): Promise<Role[]> {
-  const params = appId ? `?appId=${appId}` : ''
-  const res = await apiFetch(`/api/roles${params}`)
+export async function getRoles(params: ListRolesParams = {}): Promise<ListRolesResponse> {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.appId) qs.set('appId', params.appId)
+  if (params.page) qs.set('page', String(params.page))
+  if (params.pageSize) qs.set('pageSize', String(params.pageSize))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const res = await apiFetch(`/api/roles${suffix}`)
   return res.json()
+}
+
+export async function getRole(publicId: string): Promise<RoleDetail> {
+  const res = await apiFetch(`/api/roles/${publicId}`)
+  return res.json()
+}
+
+export async function createRole(payload: CreateRolePayload): Promise<RoleDetail> {
+  const res = await apiFetch('/api/roles', { method: 'POST', body: JSON.stringify(payload) })
+  return res.json()
+}
+
+export async function updateRole(publicId: string, patch: UpdateRolePayload): Promise<RoleDetail> {
+  const res = await apiFetch(`/api/roles/${publicId}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  return res.json()
+}
+
+export async function deleteRole(publicId: string): Promise<void> {
+  await apiFetch(`/api/roles/${publicId}`, { method: 'DELETE' })
 }
 
 export async function getUserRoles(userId: string): Promise<Role[]> {
@@ -92,7 +147,12 @@ export async function getUserRoles(userId: string): Promise<Role[]> {
 
 export async function getEffectivePermissions(userId: string): Promise<Permission[]> {
   const res = await apiFetch(`/api/users/${userId}/effective-permissions`)
-  return res.json()
+  // Server returns { userId, permissions: string[] } (permission names only).
+  // The drawer expects Permission[] with id/name/appId, so synthesize id from
+  // the name (permission names are unique) and leave appId empty since the
+  // server doesn't surface it on this endpoint.
+  const body = (await res.json()) as { userId: string; permissions: string[] }
+  return body.permissions.map((name) => ({ id: name, name, appId: '' }))
 }
 
 export async function assignRole(userId: string, roleId: string): Promise<void> {
@@ -110,6 +170,27 @@ export async function resendInvitation(userId: string): Promise<{ inviteUrl: str
   const result = await res.json()
   Sentry.addBreadcrumb({ category: 'admin.action', message: `Invitation resent for user ${userId}`, level: 'info' })
   return result
+}
+
+export async function setUserRoles(userId: string, roleIds: string[]): Promise<void> {
+  await apiFetch(`/api/users/${userId}/roles`, {
+    method: 'PUT',
+    body: JSON.stringify({ roleIds }),
+  })
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User roles set: ${userId}`, level: 'info' })
+}
+
+export async function getUserDirectPermissions(userId: string): Promise<Permission[]> {
+  const res = await apiFetch(`/api/users/${userId}/direct-permissions`)
+  return res.json()
+}
+
+export async function setUserDirectPermissions(userId: string, permissionIds: string[]): Promise<void> {
+  await apiFetch(`/api/users/${userId}/direct-permissions`, {
+    method: 'PUT',
+    body: JSON.stringify({ permissionIds }),
+  })
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User direct permissions set: ${userId}`, level: 'info' })
 }
 
 // Public endpoints — no session cookie needed
@@ -162,4 +243,39 @@ export async function getMyPermissions(): Promise<string[]> {
   const res = await apiFetch('/api/me/permissions');
   const body: { permissions: string[] } = await res.json();
   return body.permissions;
+}
+
+export async function getMyProfile(): Promise<MeProfile> {
+  const res = await apiFetch('/api/me');
+  return res.json();
+}
+
+export async function getPermissions(params: ListPermissionsParams = {}): Promise<ListPermissionsResponse> {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.appId) qs.set('appId', params.appId)
+  if (params.page) qs.set('page', String(params.page))
+  if (params.pageSize) qs.set('pageSize', String(params.pageSize))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const res = await apiFetch(`/api/permissions${suffix}`)
+  return res.json()
+}
+
+export async function getPermission(publicId: string): Promise<PermissionDetail> {
+  const res = await apiFetch(`/api/permissions/${publicId}`)
+  return res.json()
+}
+
+export async function createPermission(payload: CreatePermissionPayload): Promise<PermissionRow> {
+  const res = await apiFetch('/api/permissions', { method: 'POST', body: JSON.stringify(payload) })
+  return res.json()
+}
+
+export async function updatePermission(publicId: string, patch: UpdatePermissionPayload): Promise<PermissionRow> {
+  const res = await apiFetch(`/api/permissions/${publicId}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  return res.json()
+}
+
+export async function deletePermission(publicId: string): Promise<void> {
+  await apiFetch(`/api/permissions/${publicId}`, { method: 'DELETE' })
 }

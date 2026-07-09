@@ -3,6 +3,7 @@
 **/server-stopped
 
 logs/
+test-results/
 .mcp.json
 
 # Build outputs
@@ -41,4 +42,10 @@ designs/apps-mgmt/apps-mgmt-preview_en.zip
 designs/apps-mgmt/apps-mgmt-preview_fr.zip
 apps/auth-server/.env
 .worktrees/
+.claude/worktrees/
 
+.gstack/
+/tmp
+.claude/scheduled_tasks.lock
+# roborev snapshots
+/.roborev/

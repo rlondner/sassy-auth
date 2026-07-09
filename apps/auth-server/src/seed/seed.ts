@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
+import { generatePendingPublicId } from '../common/pending-public-id';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -12,9 +13,10 @@ const PLATFORM_PERMISSIONS = [
   'platform.orgs.manage',
   'platform.apps.manage',
   'platform.users.manage',
+  'platform.roles.manage',
   'platform.permissions.manage',
   'org.users.manage',
-  'org.permissions.manage',
+  'org.roles.manage',
 ] as const;
 
 const ADMIN_PASSWORD = 'Pass@word1234';
@@ -32,6 +34,7 @@ const PLATFORM_ADMINS: ReadonlyArray<{
   { email: 'u@sa.io', firstName: 'Users', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.users.manage' } },
   { email: 'o@sa.io', firstName: 'Orgs',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.orgs.manage' } },
   { email: 'a@sa.io', firstName: 'Apps',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.apps.manage' } },
+  { email: 'r@sa.io', firstName: 'Roles', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.roles.manage' } },
   { email: 'p@sa.io', firstName: 'Perms', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.permissions.manage' } },
   { email: 's@sa.io', firstName: 'Super', lastName: 'Admin', grant: { kind: 'role',   role: 'Platform Super Admin' } },
 ];
@@ -47,7 +50,7 @@ async function ensurePlatformSuperAdminRole(platformAppId: number) {
     role = await prisma.$transaction(async (tx) => {
       const created = await tx.saRole.create({
         data: {
-          publicId: 'placeholder',
+          publicId: generatePendingPublicId(),
           name: SUPER_ADMIN_ROLE_NAME,
           appId: platformAppId,
         },
@@ -107,7 +110,7 @@ async function seedPlatformAdmin(
   const saUser = await prisma.$transaction(async (tx) => {
     const created = await tx.saUser.create({
       data: {
-        publicId: 'placeholder',
+        publicId: generatePendingPublicId(),
         betterAuthUserId: baUserId,
         orgId: platformOrgId,
         firstName: admin.firstName,
@@ -147,7 +150,7 @@ async function main() {
     platformApp = await prisma.$transaction(async (tx) => {
       const created = await tx.saApp.create({
         data: {
-          publicId: 'placeholder',
+          publicId: generatePendingPublicId(),
           name: 'SassyAuth',
           url: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
           isPlatform: true,
@@ -171,7 +174,7 @@ async function main() {
     platformOrg = await prisma.$transaction(async (tx) => {
       const created = await tx.saOrg.create({
         data: {
-          publicId: 'placeholder',
+          publicId: generatePendingPublicId(),
           name: 'Platform',
           appId: platformApp!.id,
           isPlatform: true,
@@ -188,18 +191,34 @@ async function main() {
     console.log(`Platform org already exists: publicId=${platformOrg.publicId}`);
   }
 
-  // 3. Platform permissions (immutable — create if absent, never update)
+  // 3. Platform permissions (immutable — create if absent, never rename)
   for (const name of PLATFORM_PERMISSIONS) {
+    const isSystem = name.startsWith('org.');
     const existing = await prisma.saPermission.findUnique({ where: { name } });
     if (!existing) {
       await prisma.$transaction(async (tx) => {
         const c = await tx.saPermission.create({
-          data: { publicId: 'placeholder', name, appId: platformApp!.id },
+          data: { publicId: generatePendingPublicId(), name, appId: platformApp!.id, isSystem },
         });
         const publicId = sqids.encode([c.id]);
         return tx.saPermission.update({ where: { id: c.id }, data: { publicId } });
       });
-      console.log(`Created permission: ${name}`);
+      console.log(`Created permission: ${name} (isSystem=${isSystem})`);
+    } else {
+      // Both fields may need repair on the same row (e.g. after a migration
+      // that inserts placeholder publicIds). Combining avoids requiring a
+      // second seed run to fix the second field.
+      const needsSystemFix = existing.isSystem !== isSystem;
+      const needsPublicIdFix = existing.publicId.startsWith('pending-');
+      if (needsSystemFix || needsPublicIdFix) {
+        const data: { isSystem?: boolean; publicId?: string } = {};
+        if (needsSystemFix) data.isSystem = isSystem;
+        if (needsPublicIdFix) data.publicId = sqids.encode([existing.id]);
+        await prisma.saPermission.update({ where: { id: existing.id }, data });
+        if (needsSystemFix) console.log(`Updated permission ${name}: isSystem=${isSystem}`);
+        if (needsPublicIdFix)
+          console.log(`Backfilled placeholder publicId for ${name}: ${data.publicId}`);
+      }
     }
   }
 
@@ -209,6 +228,16 @@ async function main() {
   // 5. Platform admin users
   for (const admin of PLATFORM_ADMINS) {
     await seedPlatformAdmin(admin, platformOrg.id, superAdminRole.id);
+  }
+
+  if (process.env.SEED_DEMO === '1') {
+    const { seedDemoResourceServer } = await import('./demo-resource-server');
+    await seedDemoResourceServer();
+  }
+
+  if (process.env.SEED_DEMO_MULTITENANT === '1') {
+    const { seedDemoMultitenant } = await import('./demo-multitenant');
+    await seedDemoMultitenant();
   }
 
   console.log('Seed complete.');
