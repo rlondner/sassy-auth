@@ -1,5 +1,6 @@
 import { getUsers, getOrgs, getMyPermissions, getMyProfile } from '@/lib/api'
 import { UsersTable } from '@/components/users-table'
+import { AccessDeniedPanel } from '@/components/access-denied-panel'
 import type { Org } from '@/lib/types'
 
 interface UsersPageProps {
@@ -8,12 +9,25 @@ interface UsersPageProps {
 
 export default async function UsersPage({ searchParams }: UsersPageProps) {
   const { orgId: orgIdParam } = await searchParams
-  const [perms, profile] = await Promise.all([
-    getMyPermissions().catch(() => [] as string[]),
-    getMyProfile().catch(() => null),
+
+  // bug-0196: switch from bare Promise.all to Promise.allSettled so a
+  // failure in one call does not crash the whole page to the generic
+  // error.tsx boundary. Also introduces the AccessDeniedPanel gate
+  // used by every other admin page (apps, orgs, permissions, roles)
+  // — previously the /users page was the odd one out, showing either
+  // a full 500 or an empty list to callers who lacked the required
+  // permissions.
+  const [permsResult, profileResult] = await Promise.allSettled([
+    getMyPermissions(),
+    getMyProfile(),
   ])
+  const perms = permsResult.status === 'fulfilled' ? permsResult.value : []
+  const profile = profileResult.status === 'fulfilled' ? profileResult.value : null
 
   const isPlatformUsers = perms.includes('platform.users.manage')
+  const isOrgUsers = perms.includes('org.users.manage')
+
+  if (!isPlatformUsers && !isOrgUsers) return <AccessDeniedPanel />
 
   // For non-platform callers, default the orgId to their own org if no
   // explicit URL param is set, and ignore any attempt to pass a different
@@ -23,7 +37,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
     ? orgIdParam
     : (orgIdParam && profile && orgIdParam === profile.org.id ? orgIdParam : profile?.org.id)
 
-  const [users, orgsRes] = await Promise.all([
+  const [usersResult, orgsResult] = await Promise.allSettled([
     getUsers(effectiveOrgId ? { orgId: effectiveOrgId } : undefined),
     isPlatformUsers
       ? getOrgs({ pageSize: 200 })
@@ -42,6 +56,16 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
           pageSize: 200,
         }),
   ])
+
+  // If the primary users query rejected, bubble to error.tsx — the page
+  // cannot render without it. A rejected orgs query is survivable
+  // (empty orgs → no dropdown → user can still see their own list).
+  if (usersResult.status === 'rejected') throw usersResult.reason
+
+  const users = usersResult.value
+  const orgsRes = orgsResult.status === 'fulfilled'
+    ? orgsResult.value
+    : { items: [], total: 0, page: 1, pageSize: 200 }
 
   const orgs: Org[] = orgsRes.items.map((o) => ({
     id: o.publicId,
