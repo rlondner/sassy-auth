@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet,
   SheetBody,
@@ -14,22 +15,24 @@ import {
   Label,
 } from '@sassy-auth/ui'
 import { updateAppAction } from '@/app/(admin)/apps/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { App } from '@/lib/types'
 
 interface Props {
   app: App
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function AppEditDrawer({ app, open, onOpenChange }: Props) {
+export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
   const [callbackUrl, setCallbackUrl] = React.useState(app.callbackUrl ?? '')
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -44,14 +47,27 @@ export function AppEditDrawer({ app, open, onOpenChange }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!dirty) return
+    // bug-0141: a submit with whitespace-only fields is a validation
+    // failure at the client layer. Server would reject with a 400
+    // and a generic errorKey, but the UX is cleaner if we flag it
+    // here — an empty trimmed name means "no name," not "clear name."
+    if (name.trim() === '' || url.trim() === '') {
+      setErrorKey('apps.errors.nameRequired')
+      return
+    }
     const patch: { name?: string; url?: string; callbackUrl?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (callbackUrl !== (app.callbackUrl ?? '')) patch.callbackUrl = callbackUrl.trim() || null
     startTransition(async () => {
       const result = await updateAppAction(app.publicId, patch)
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('apps.toast.updated'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 
@@ -109,10 +125,7 @@ export function AppEditDrawer({ app, open, onOpenChange }: Props) {
                   variant="outline"
                   aria-label={t('apps.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(app.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(app.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">

@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, Button, ButtonGroup, Badge } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { App } from '@/lib/types'
 
 interface Props {
@@ -16,14 +16,7 @@ interface Props {
 
 export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Props) {
   const t = useTranslations()
-  const [copied, setCopied] = React.useState<string | null>(null)
-
-  function copy(text: string, key: string) {
-    copyToClipboard(text, () => {
-      setCopied(key)
-      setTimeout(() => setCopied(null), 2000)
-    })
-  }
+  const { copiedKey: copied, copy } = useCopyFeedback()
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
