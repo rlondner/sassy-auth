@@ -4,11 +4,12 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteAppAction, listAppsAction } from '@/app/(admin)/apps/actions'
 import type { App, ListAppsResponse } from '@/lib/types'
 import { AppViewDrawer } from './app-view-drawer'
@@ -31,20 +32,26 @@ export function AppsTable({ initial }: Props) {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
-  const [copiedSqid, setCopiedSqid] = React.useState<string | null>(null)
+  const { copiedKey: copiedSqid, copy: copySqid } = useCopyFeedback()
   const initialRefRef = React.useRef(true)
 
   // Debounced refetch when query / page / pageSize change.
+  // bug-0137: guard the setData with a `cancelled` flag so a slow
+  // in-flight response can't overwrite state after the effect has
+  // been superseded by a newer query. clearTimeout alone only stops
+  // pending timers — it can't cancel a fetch that has already started.
   React.useEffect(() => {
     if (initialRefRef.current) {
       initialRefRef.current = false
       return
     }
+    let cancelled = false
     const timer = setTimeout(async () => {
       const result = await listAppsAction({ q: query || undefined, page, pageSize })
+      if (cancelled) return
       if (result && 'items' in result) setData(result)
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query, page, pageSize])
 
   const columns: ColumnDef<App>[] = [
@@ -83,10 +90,7 @@ export function AppsTable({ initial }: Props) {
               aria-label={t('apps.actions.copy')}
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(a.publicId, () => {
-                  setCopiedSqid(a.publicId)
-                  setTimeout(() => setCopiedSqid(null), 2000)
-                })
+                void copySqid(a.publicId, a.publicId)
               }}
               className="text-muted-foreground hover:text-primary"
             >
@@ -133,6 +137,19 @@ export function AppsTable({ initial }: Props) {
     },
   ]
 
+  const refresh = React.useCallback(async () => {
+    const refreshed = await listAppsAction({ q: query || undefined, page, pageSize })
+    if (refreshed && 'items' in refreshed) {
+      setData(refreshed)
+      // bug-0206: point `selected` at the fresh row so any open drawer
+      // reads the new data, not the pre-refresh snapshot. If the row
+      // was removed from the current page, drop the selection.
+      setSelected((prev) =>
+        prev ? refreshed.items.find((r) => r.publicId === prev.publicId) ?? null : null,
+      )
+    }
+  }, [query, page, pageSize])
+
   async function handleDelete() {
     if (!selected) return
     const result = await deleteAppAction(selected.publicId)
@@ -142,8 +159,8 @@ export function AppsTable({ initial }: Props) {
     }
     setDeleteOpen(false)
     setViewOpen(false)
-    const refreshed = await listAppsAction({ q: query || undefined, page, pageSize })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    toast.success(t('apps.toast.deleted'))
+    await refresh()
   }
 
   return (
@@ -202,9 +219,10 @@ export function AppsTable({ initial }: Props) {
           app={selected}
           open={editOpen}
           onOpenChange={setEditOpen}
+          onSuccess={refresh}
         />
       )}
-      <AppCreateDrawer open={createOpen} onOpenChange={setCreateOpen} />
+      <AppCreateDrawer open={createOpen} onOpenChange={setCreateOpen} onSuccess={refresh} />
       {selected && (
         <DeleteAlertDialog
           open={deleteOpen}
