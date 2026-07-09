@@ -87,7 +87,10 @@ export type ResourceArea = 'apps' | 'orgs' | 'roles' | 'permissions' | 'users'
 const AREA_TO_PERMS: Record<ResourceArea, readonly string[]> = {
   apps:        ['platform.apps.manage'],
   orgs:        ['platform.orgs.manage', 'org.users.manage'],
-  roles:       ['platform.permissions.manage', 'org.permissions.manage'],
+  // The admin /roles page reads with platform.roles.manage | org.roles.manage
+  // (see app/(admin)/roles/page.tsx). The perms admin (platform.permissions.manage)
+  // is correctly denied, so roles must map to the roles.manage perms.
+  roles:       ['platform.roles.manage', 'org.roles.manage'],
   permissions: ['platform.permissions.manage'],
   users:       ['platform.users.manage', 'org.users.manage'],
 }

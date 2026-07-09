@@ -30,7 +30,11 @@ describe('AppCreateDrawer', () => {
     fireEvent.change(screen.getByLabelText(en.apps.fields.url), { target: { value: 'https://x.example' } })
     fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.createTitle }))
     await waitFor(() =>
-      expect(actions.createAppAction).toHaveBeenCalledWith({ name: 'X', url: 'https://x.example' }),
+      expect(actions.createAppAction).toHaveBeenCalledWith({
+        name: 'X',
+        url: 'https://x.example',
+        callbackUrl: null,
+      }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
