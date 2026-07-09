@@ -12,7 +12,7 @@ export default defineConfig({
   // Local: cap at 2 so Next.js dev-mode route compilation doesn't get
   // overwhelmed at cold start (12 parallel first-hit compiles times out
   // the 30s test timeout). CI still serializes.
-  workers: CI_TESTS ? 1 : 2,
+  workers: CI_TESTS ? 1 : 1,
   timeout: 30_000,
   reporter: CI_TESTS ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {

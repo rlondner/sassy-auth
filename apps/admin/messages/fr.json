@@ -36,6 +36,9 @@
     "fields": {
       "name": "Nom de l’application",
       "url": "URL de l’application",
+      "callbackUrl": "URL de rappel",
+      "callbackUrlHint": "Laissez vide pour accepter tout rappel sous l’URL de l’application. Indiquez une URL complète pour exiger une correspondance exacte du redirect_uri.",
+      "callbackUrlDefault": "Par défaut (tout chemin sous l’URL de l’application)",
       "publicId": "ID Public",
       "urlHint": "URL de base principale de cette application."
     },
@@ -67,7 +70,8 @@
       "platformProtected": "Les applications plateforme ne peuvent pas être modifiées.",
       "forbidden": "Vous n’avez plus la permission d’effectuer cette action.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
-      "urlInvalid": "Veuillez saisir une URL valide commençant par https://.",
+      "urlInvalid": "Veuillez saisir une URL valide.",
+      "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
       "nameRequired": "Le nom de l’application est requis."
     },
     "badges": {
@@ -408,6 +412,8 @@
       "selfDeleteError": "Vous ne pouvez pas supprimer votre propre compte."
     },
     "errors": {
+      "required": "Obligatoire",
+      "emailInvalid": "Adresse e-mail invalide",
       "forbidden": "Vous n’avez pas la permission d’effectuer cette action.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "rolesSetFailed": "Échec de la mise à jour des rôles.",
@@ -433,7 +439,13 @@
     "confirmPassword": "Confirmer le mot de passe",
     "submit": "Activer le compte",
     "expired": "Ce lien d’invitation a expiré ou est invalide. Contactez votre administrateur pour en obtenir un nouveau.",
-    "success": "Compte activé ! Vous pouvez maintenant vous connecter."
+    "success": "Compte activé ! Vous pouvez maintenant vous connecter.",
+    "errors": {
+      "passwordMismatch": "Les mots de passe ne correspondent pas.",
+      "passwordTooShort": "Le mot de passe doit contenir au moins 12 caractères.",
+      "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
+      "genericError": "Une erreur est survenue."
+    }
   },
   "oauthError": {
     "pageTitle": "Erreur d'autorisation — SassyAuth",
