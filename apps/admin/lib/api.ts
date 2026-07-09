@@ -172,6 +172,13 @@ export async function resendInvitation(userId: string): Promise<{ inviteUrl: str
   return result
 }
 
+export async function resetPassword(userId: string): Promise<{ resetUrl: string | null }> {
+  const res = await apiFetch(`/api/users/${userId}/reset-password`, { method: 'POST' })
+  const result = await res.json()
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Password reset triggered for ${userId}`, level: 'info' })
+  return result
+}
+
 export async function setUserRoles(userId: string, roleIds: string[]): Promise<void> {
   await apiFetch(`/api/users/${userId}/roles`, {
     method: 'PUT',

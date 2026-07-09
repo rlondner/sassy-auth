@@ -358,6 +358,10 @@
       "edit": "Modifier",
       "save": "Enregistrer",
       "resetPassword": "Réinitialiser le mot de passe",
+      "resetLinkTitle": "Lien de réinitialisation",
+      "resetLinkBody": "Partagez ce lien à usage unique avec l’utilisateur ; il le recevra aussi par e-mail.",
+      "resendLinkTitle": "Lien d’invitation",
+      "resendLinkBody": "Partagez ce lien avec l’utilisateur ; il le recevra aussi par e-mail.",
       "grantAccess": "Accorder l’accès",
       "assignedRoles": "Rôles attribués",
       "effectivePermissions": "Permissions effectives",
@@ -403,7 +407,10 @@
       "created": "User created",
       "updated": "User updated",
       "deleted": "User deleted",
-      "resent": "Invitation resent"
+      "resent": "Invitation resent",
+      "resetLinkGenerated": "Lien de réinitialisation généré",
+      "activated": "Utilisateur activé",
+      "deactivated": "Utilisateur désactivé"
     },
     "confirmDelete": {
       "title": "Supprimer l’utilisateur",
@@ -411,14 +418,42 @@
       "button": "Supprimer",
       "selfDeleteError": "Vous ne pouvez pas supprimer votre propre compte."
     },
+    "confirmDeactivate": {
+      "title": "Désactiver l’utilisateur",
+      "body": "Désactiver {name} ? Cette action déconnecte l’utilisateur partout et bloque les nouvelles connexions jusqu’à réactivation.",
+      "button": "Désactiver"
+    },
     "errors": {
       "required": "Obligatoire",
       "emailInvalid": "Adresse e-mail invalide",
       "forbidden": "Vous n’avez pas la permission d’effectuer cette action.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "noPassword": "Cet utilisateur n’a pas de mot de passe à réinitialiser.",
+      "notPending": "Cet utilisateur n’est plus en attente d’invitation.",
       "rolesSetFailed": "Échec de la mise à jour des rôles.",
-      "directPermissionsSetFailed": "Échec de la mise à jour des permissions directes."
+      "directPermissionsSetFailed": "Échec de la mise à jour des permissions directes.",
+      "selfDeactivate": "Vous ne pouvez pas désactiver votre propre compte."
     }
+  },
+  "forgotPassword": {
+    "title": "Réinitialiser votre mot de passe",
+    "subtitle": "Saisissez votre adresse e-mail et nous vous enverrons un lien de réinitialisation.",
+    "email": "Adresse e-mail",
+    "submit": "Envoyer le lien",
+    "sent": "Si un compte existe pour cette adresse, un lien de réinitialisation est en route.",
+    "backToLogin": "Retour à la connexion"
+  },
+  "resetPassword": {
+    "title": "Choisissez un nouveau mot de passe",
+    "password": "Nouveau mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "submit": "Réinitialiser le mot de passe",
+    "success": "Mot de passe mis à jour. Vous pouvez maintenant vous connecter.",
+    "invalidToken": "Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.",
+    "mismatch": "Les mots de passe ne correspondent pas.",
+    "tooShort": "Le mot de passe doit comporter au moins 12 caractères.",
+    "complexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
+    "backToLogin": "Retour à la connexion"
   },
   "login": {
     "title": "Console d’administration",
@@ -426,6 +461,7 @@
     "email": "Adresse e-mail",
     "password": "Mot de passe",
     "submit": "Se connecter",
+    "forgotPassword": "Mot de passe oublié ?",
     "error": {
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
       "inactive": "Ce compte a été désactivé.",
