@@ -15,6 +15,10 @@ import { AssignRoleDto } from './dto/assign-role.dto';
 import { resolveRoleIdsForApp, resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
 import { assertCallerCanGrantSystemPerms } from '../common/permissions/assert-caller-can-grant-system-perms';
 import { LoggerService } from '../common/logger/logger.service';
+import { auth } from '../auth/auth.config';
+import { runWithResetUrlCapture } from '../auth/reset-url-context';
+import { EmailService } from '../email/email.service';
+import { invitationEmail } from '../email/templates/invitation.template';
 
 const USER_INCLUDE = {
   betterAuthUser: { select: { email: true } },
@@ -56,6 +60,7 @@ export class UsersService {
   constructor(
     private readonly sqids: SqidService,
     private readonly logger: LoggerService,
+    private readonly email: EmailService,
   ) {}
 
   async listUsers(
@@ -290,10 +295,12 @@ export class UsersService {
       roleCount: numericRoleIds.length,
       directPermissionCount: numericPermIds.length,
     });
-    return {
-      user: formatUser(saUser),
-      inviteUrl: `${baseUrl}/accept-invite?token=${invitation.token}`,
-    };
+    const inviteUrl = `${baseUrl}/accept-invite?token=${invitation.token}`;
+    await this.email.send({
+      to: dto.email,
+      ...invitationEmail({ firstName: dto.firstName, inviteUrl }),
+    });
+    return { user: formatUser(saUser), inviteUrl };
   }
   async updateUser(callerBaId: string, publicId: string, dto: UpdateUserDto) {
     const existing = await prisma.saUser.findUnique({ where: { publicId } });
@@ -316,6 +323,11 @@ export class UsersService {
       );
     }
 
+    // Deactivation is a kill-switch and must not be self-inflicted.
+    if (dto.status === 'inactive' && existing.betterAuthUserId === callerBaId) {
+      throw new ForbiddenException('You cannot deactivate your own account');
+    }
+
     const updated = await prisma.saUser.update({
       where: { publicId },
       data: {
@@ -327,6 +339,13 @@ export class UsersService {
       },
       include: USER_INCLUDE,
     });
+
+    // On deactivation, revoke every active session so the user is logged out
+    // everywhere at once (blocking new logins/tokens is enforced elsewhere).
+    if (dto.status === 'inactive') {
+      await prisma.session.deleteMany({ where: { userId: existing.betterAuthUserId } });
+    }
+
     const changedFields = Object.keys(dto).filter((k) => dto[k as keyof typeof dto] !== undefined);
     this.logger.getWinstonLogger().info('User updated', {
       context: 'UsersService',
@@ -589,8 +608,12 @@ export class UsersService {
   }
 
   async resendInvitation(callerBaId: string, userPublicId: string) {
-    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    const user = await prisma.saUser.findUnique({
+      where: { publicId: userPublicId },
+      include: { betterAuthUser: { select: { email: true } } },
+    });
     if (!user) throw new NotFoundException('User not found');
+    if (!user.betterAuthUser) throw new NotFoundException('User account not found');
     await checkPermission(
       callerBaId,
       ['platform.users.manage', 'org.users.manage'],
@@ -624,6 +647,52 @@ export class UsersService {
     });
 
     const baseUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
-    return { inviteUrl: `${baseUrl}/accept-invite?token=${invitation.token}` };
+    const inviteUrl = `${baseUrl}/accept-invite?token=${invitation.token}`;
+    await this.email.send({
+      to: user.betterAuthUser.email,
+      ...invitationEmail({ firstName: user.firstName, inviteUrl }),
+    });
+    return { inviteUrl };
+  }
+
+  async resetPassword(callerBaId: string, userPublicId: string): Promise<{ resetUrl: string | null }> {
+    const user = await prisma.saUser.findUnique({
+      where: { publicId: userPublicId },
+      include: { betterAuthUser: { select: { email: true } } },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.betterAuthUser) throw new NotFoundException('User account not found');
+
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    // Only users with an email/password (credential) account can reset a password.
+    // Pending users (not yet accepted) and social-only users have none.
+    const credential = await prisma.account.findFirst({
+      where: { userId: user.betterAuthUserId, providerId: 'credential' },
+      select: { id: true },
+    });
+    if (!credential) {
+      throw new BadRequestException('User has no password to reset');
+    }
+
+    const email = user.betterAuthUser.email;
+    const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    const { resetUrl } = await runWithResetUrlCapture(async () => {
+      await auth.api.requestPasswordReset({
+        body: { email, redirectTo: `${adminUrl}/reset-password` },
+      });
+    });
+
+    this.logger.getWinstonLogger().info('Admin triggered password reset', {
+      context: 'UsersService',
+      userId: userPublicId,
+      linkSurfaced: resetUrl !== null,
+    });
+
+    return { resetUrl };
   }
 }

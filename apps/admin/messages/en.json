@@ -358,6 +358,10 @@
       "edit": "Edit",
       "save": "Save",
       "resetPassword": "Reset Password",
+      "resetLinkTitle": "Password reset link",
+      "resetLinkBody": "Share this one-time link with the user, or they'll receive it by email.",
+      "resendLinkTitle": "Invitation link",
+      "resendLinkBody": "Share this link with the user, or they'll receive it by email.",
       "grantAccess": "Grant Access",
       "assignedRoles": "Assigned Roles",
       "effectivePermissions": "Effective Permissions",
@@ -403,7 +407,10 @@
       "created": "User created",
       "updated": "User updated",
       "deleted": "User deleted",
-      "resent": "Invitation resent"
+      "resent": "Invitation resent",
+      "resetLinkGenerated": "Password reset link generated",
+      "activated": "User activated",
+      "deactivated": "User deactivated"
     },
     "confirmDelete": {
       "title": "Delete user",
@@ -411,14 +418,42 @@
       "button": "Delete",
       "selfDeleteError": "You cannot delete your own account."
     },
+    "confirmDeactivate": {
+      "title": "Deactivate user",
+      "body": "Deactivate {name}? This signs them out everywhere and blocks new logins until reactivated.",
+      "button": "Deactivate"
+    },
     "errors": {
       "required": "Required",
       "emailInvalid": "Invalid email",
       "forbidden": "You do not have permission to perform this action.",
       "generic": "Something went wrong. Please try again.",
+      "noPassword": "This user has no password to reset.",
+      "notPending": "This user is no longer pending an invitation.",
       "rolesSetFailed": "Failed to update roles.",
-      "directPermissionsSetFailed": "Failed to update direct permissions."
+      "directPermissionsSetFailed": "Failed to update direct permissions.",
+      "selfDeactivate": "You cannot deactivate your own account."
     }
+  },
+  "forgotPassword": {
+    "title": "Reset your password",
+    "subtitle": "Enter your email and we'll send you a reset link.",
+    "email": "Email Address",
+    "submit": "Send reset link",
+    "sent": "If an account exists for that email, a reset link is on its way.",
+    "backToLogin": "Back to sign in"
+  },
+  "resetPassword": {
+    "title": "Choose a new password",
+    "password": "New Password",
+    "confirmPassword": "Confirm Password",
+    "submit": "Reset password",
+    "success": "Password updated. You can now sign in.",
+    "invalidToken": "This reset link is invalid or has expired. Request a new one.",
+    "mismatch": "Passwords do not match.",
+    "tooShort": "Password must be at least 12 characters.",
+    "complexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
+    "backToLogin": "Back to sign in"
   },
   "login": {
     "title": "Admin Console",
@@ -426,6 +461,7 @@
     "email": "Email Address",
     "password": "Password",
     "submit": "Sign In",
+    "forgotPassword": "Forgot password?",
     "error": {
       "invalidCredentials": "Invalid email or password.",
       "inactive": "This account has been deactivated.",

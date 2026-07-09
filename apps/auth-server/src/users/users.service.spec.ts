@@ -3,6 +3,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { UsersService } from './users.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
+import { EmailService } from '../email/email.service';
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -30,7 +31,8 @@ jest.mock('@sassy-auth/db', () => ({
     saPermission: { findMany: jest.fn() },
     saInvitation: { create: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn() },
     user: { create: jest.fn() },
-    account: { create: jest.fn() },
+    account: { create: jest.fn(), findFirst: jest.fn() },
+    session: { deleteMany: jest.fn() },
   },
 }));
 
@@ -40,6 +42,12 @@ jest.mock('../common/permissions/check-permission', () => ({
 
 jest.mock('../common/permissions/assert-caller-can-grant-system-perms', () => ({
   assertCallerCanGrantSystemPerms: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockSend = jest.fn().mockResolvedValue({ sent: true });
+
+jest.mock('../auth/auth.config', () => ({
+  auth: { api: { requestPasswordReset: jest.fn().mockResolvedValue({ status: true }) } },
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -72,7 +80,8 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saPermission: { findMany: jest.Mock };
   saInvitation: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
   user: { create: jest.Mock };
-  account: { create: jest.Mock };
+  account: { create: jest.Mock; findFirst: jest.Mock };
+  session: { deleteMany: jest.Mock };
 };
 
 // bug-0186: fixed timestamps so assertions on the ISO-serialized
@@ -107,10 +116,12 @@ describe('UsersService', () => {
         UsersService,
         SqidService,
         { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+        { provide: EmailService, useValue: { send: mockSend } },
       ],
     }).compile();
     service = module.get(UsersService);
     jest.clearAllMocks();
+    mockSend.mockClear();
     mockPrisma.$transaction.mockImplementation((fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma));
   });
 
@@ -321,6 +332,13 @@ describe('UsersService', () => {
       });
     });
 
+    it('sends an invitation email to the new user', async () => {
+      await service.createUser('ba-caller', dto);
+      expect(mockSend).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'jane@example.com', subject: expect.stringMatching(/invit/i) }),
+      );
+    });
+
     it('treats undefined roleIds / directPermissionIds as no-op (no createMany call)', async () => {
       mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 9, publicId: 'org1', appId: 4 });
       mockPrisma.user.create.mockResolvedValue(undefined);
@@ -441,6 +459,16 @@ describe('UsersService', () => {
         expect.objectContaining({ where: expect.objectContaining({ userId: 1, usedAt: null }) }),
       );
       expect(result.inviteUrl).toContain('newtoken123');
+    });
+
+    it('sends the invitation email on resend', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'pending', betterAuthUser: { email: 'alice@example.com' } }));
+      mockPrisma.saInvitation.updateMany.mockResolvedValue(undefined);
+      mockPrisma.saInvitation.create.mockResolvedValue({ token: 'newtoken123', expiresAt: new Date() });
+      await service.resendInvitation('ba-caller', 'usr1');
+      expect(mockSend).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'alice@example.com', subject: expect.stringMatching(/invit/i) }),
+      );
     });
 
     it('throws BadRequestException when user is already active', async () => {
@@ -922,6 +950,67 @@ describe('UsersService', () => {
 
       expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', []);
       expect(mockPrisma.saUserRole.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    const mockAuth = require('../auth/auth.config').auth.api.requestPasswordReset as jest.Mock;
+
+    beforeEach(() => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(
+        makeSaUser({ status: 'active', betterAuthUserId: 'ba-1', orgId: 1, betterAuthUser: { email: 'a@b.co' } }),
+      );
+      mockPrisma.account.findFirst.mockResolvedValue({ id: 'acc1', providerId: 'credential' });
+      mockAuth.mockResolvedValue({ status: true });
+    });
+
+    it('triggers a reset and returns the captured resetUrl', async () => {
+      // Simulate the hook writing a URL during requestPasswordReset.
+      mockAuth.mockImplementation(async () => {
+        const { captureResetUrl } = require('../auth/reset-url-context');
+        captureResetUrl('http://localhost:3001/reset-password?token=xyz');
+        return { status: true };
+      });
+      const res = await service.resetPassword('ba-caller', 'usr1');
+      expect(mockAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ body: expect.objectContaining({ email: 'a@b.co' }) }),
+      );
+      expect(res.resetUrl).toContain('token=xyz');
+    });
+
+    it('throws NotFoundException when the user does not exist', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.resetPassword('ba-caller', 'nope')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws BadRequestException when the user has no credential account', async () => {
+      mockPrisma.account.findFirst.mockResolvedValue(null);
+      await expect(service.resetPassword('ba-caller', 'usr1')).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('updateUser status kill-switch', () => {
+    beforeEach(() => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ betterAuthUserId: 'ba-target', orgId: 1 }));
+      mockPrisma.saUser.update.mockResolvedValue(makeSaUser({ status: 'inactive' }));
+      mockPrisma.session.deleteMany.mockResolvedValue({ count: 2 });
+    });
+
+    it('deletes the user sessions when status becomes inactive', async () => {
+      await service.updateUser('ba-caller', 'usr1', { status: 'inactive' });
+      expect(mockPrisma.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'ba-target' } });
+    });
+
+    it('does not delete sessions for a non-inactive update', async () => {
+      mockPrisma.saUser.update.mockResolvedValue(makeSaUser({ status: 'active' }));
+      await service.updateUser('ba-caller', 'usr1', { firstName: 'New' });
+      expect(mockPrisma.session.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('forbids deactivating your own account', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ betterAuthUserId: 'ba-self', orgId: 1 }));
+      await expect(service.updateUser('ba-self', 'usr1', { status: 'inactive' })).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mockPrisma.session.deleteMany).not.toHaveBeenCalled();
     });
   });
 

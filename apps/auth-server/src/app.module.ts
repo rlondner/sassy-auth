@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
+import { EmailModule } from './email/email.module';
 import { TokenModule } from './token/token.module';
 import { CommonModule } from './common/common.module';
 import { UsersModule } from './users/users.module';
@@ -48,6 +49,7 @@ const throttlerConfig = isTest
     PermissionsModule,
     MeModule,
     RegistrationModule,
+    EmailModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
