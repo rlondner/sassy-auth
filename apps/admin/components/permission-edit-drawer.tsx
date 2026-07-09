@@ -104,11 +104,11 @@ export function PermissionEditDrawer({ permission, open, onOpenChange, onSuccess
             )}
             <div className="flex justify-end pt-4">
               <ButtonGroup>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} loading={pending}>
                   {t('permissions.drawer.cancel')}
                 </Button>
                 <Button type="submit" disabled={!dirty || pending}>
-                  {pending ? t('permissions.drawer.saving') : t('permissions.drawer.save')}
+                  {t('permissions.drawer.save')}
                 </Button>
               </ButtonGroup>
             </div>

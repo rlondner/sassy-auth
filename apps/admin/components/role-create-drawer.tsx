@@ -133,12 +133,12 @@ export function RoleCreateDrawer({ apps, open, onOpenChange, onSuccess }: Props)
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  disabled={pending}
+                  loading={pending}
                 >
                   {t('roles.drawer.cancel')}
                 </Button>
-                <Button type="submit" disabled={pending}>
-                  {pending ? t('roles.drawer.saving') : t('roles.drawer.createTitle')}
+                <Button type="submit" loading={pending}>
+                  {t('roles.drawer.createTitle')}
                 </Button>
               </ButtonGroup>
             </div>

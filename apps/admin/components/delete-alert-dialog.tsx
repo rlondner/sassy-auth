@@ -55,10 +55,10 @@ export function DeleteAlertDialog({
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={pending}
+            loading={pending}
             className={cn(buttonVariants({ variant: 'destructive' }))}
           >
-            {pending ? '…' : confirmLabel}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
