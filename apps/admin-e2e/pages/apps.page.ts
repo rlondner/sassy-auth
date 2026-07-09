@@ -14,7 +14,7 @@ export class AppsPage {
     this.heading = page.locator('[aria-current="page"]').filter({ hasText: t('apps.title') })
     // The create button label is defined per UI convention via i18n key apps.create.
     this.createButton = page.getByRole('button', { name: t('apps.create') })
-    this.accessDenied = page.getByTestId('access-denied-panel')
+    this.accessDenied = page.getByRole('heading', { name: t('apps.accessDenied.title') })
   }
 
   async goto() {
@@ -23,6 +23,13 @@ export class AppsPage {
 
   rowByName(name: string): Locator {
     return this.page.getByRole('row', { name: new RegExp(escapeRe(name)) })
+  }
+
+  /** Filter the table via its search box so row lookups tolerate pagination. */
+  async search(query: string) {
+    const box = this.page.getByPlaceholder(t('apps.search'))
+    await box.fill('')
+    await box.fill(query)
   }
 
   async createApp({ name, url }: { name: string; url: string }) {
@@ -34,9 +41,11 @@ export class AppsPage {
     await drawer.getByLabel(t('apps.fields.url')).fill(url)
     await drawer.getByRole('button', { name: t('apps.drawer.createTitle') }).click()
     await raceSuccessOrError(this.page, t('apps.toast.created'))
+    await this.search(name)
   }
 
   async editApp(name: string, patch: { name?: string; url?: string }) {
+    await this.search(name)
     // Row actions are inside a DropdownMenu triggered by the "more actions" button.
     await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
     await this.page.getByRole('menuitem', { name: t('apps.actions.edit') }).click()
@@ -49,9 +58,11 @@ export class AppsPage {
     }
     await drawer.getByRole('button', { name: t('apps.drawer.save') }).click()
     await raceSuccessOrError(this.page, t('apps.toast.updated'))
+    if (patch.name !== undefined) await this.search(patch.name)
   }
 
   async deleteApp(name: string) {
+    await this.search(name)
     await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
     await this.page.getByRole('menuitem', { name: t('apps.actions.delete') }).click()
     await this.page

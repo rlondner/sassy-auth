@@ -34,10 +34,9 @@ import { hashPassword, verifyPassword } from 'better-auth/crypto';
 // across requests within one process, and the verify always fails.
 let dummyHashPromise: Promise<string> | null = null;
 function getDummyPasswordHash(): Promise<string> {
-  if (!dummyHashPromise) {
-    dummyHashPromise = hashPassword('bug-0209-timing-guard-dummy-input');
-  }
-  return dummyHashPromise;
+  // Returning the `??=` expression directly yields `Promise<string>`;
+  // TS does not narrow the module-level `let` across a return statement.
+  return (dummyHashPromise ??= hashPassword('bug-0209-timing-guard-dummy-input'));
 }
 import { SqidService } from '../common/sqid/sqid.service';
 import { DirectLoginDto } from './dto/direct-login.dto';
