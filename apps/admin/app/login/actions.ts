@@ -19,6 +19,11 @@ interface ParsedSessionCookie {
   expires?: Date
 }
 
+// Known limitation: the comma-splitting regex may fail when Node concatenates
+// multiple Set-Cookie headers with ", " and one contains an Expires date.
+// BetterAuth currently returns a single session cookie so this is safe.
+// Consider replacing with `set-cookie-parser` if more cookies are added.
+//
 // Parse the first Set-Cookie clause that matches `better-auth.session_token=...`.
 // Node fetch combines multiple Set-Cookie headers with ", " — split on that
 // boundary while NOT splitting on the "," inside an Expires=Wed, 21 Oct ... date.
