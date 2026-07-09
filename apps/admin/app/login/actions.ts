@@ -40,7 +40,12 @@ function parseSessionCookie(header: string): ParsedSessionCookie | null {
     // exactly once, so the signature ends up as `…%3D` (length 48 ≠ 44),
     // session lookup returns null, and every refresh bounces to /login.
     // Single-decode here so the round-trip is identity.
-    const value = decodeURIComponent(namePair.slice(eq + 1))
+    let value: string
+    try {
+      value = decodeURIComponent(namePair.slice(eq + 1))
+    } catch {
+      value = namePair.slice(eq + 1)
+    }
 
     const parsed: ParsedSessionCookie = { value, httpOnly: false }
     for (const attr of attrs) {
