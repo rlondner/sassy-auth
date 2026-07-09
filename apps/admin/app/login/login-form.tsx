@@ -57,8 +57,8 @@ export function LoginForm({ next }: { next: string }) {
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? '…' : t('submit')}
+          <Button type="submit" className="w-full" loading={isPending}>
+            {t('submit')}
           </Button>
         </form>
       </div>
