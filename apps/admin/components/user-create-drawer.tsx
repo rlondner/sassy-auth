@@ -176,7 +176,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
             </SheetFooter>
           </>
         ) : (
-          <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
+          <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="contents">
             <SheetBody className="flex flex-col gap-6">
               <section>
                 <h3 className="mb-4 text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('users.drawer.basicInfo')}</h3>
