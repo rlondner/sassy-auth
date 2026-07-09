@@ -1,9 +1,11 @@
 import {
   buildOAuthAuthorizationServerMetadata,
+  ISSUER_PLACEHOLDER,
   JWKS_ROUTE,
   OAUTH_AUTHORIZE_ROUTE,
   OAUTH_TOKEN_ROUTE,
   TOKEN_CONTROLLER_PATH,
+  resolveIssuer,
 } from './oauth-metadata';
 
 describe('buildOAuthAuthorizationServerMetadata', () => {
@@ -59,5 +61,40 @@ describe('buildOAuthAuthorizationServerMetadata', () => {
         'token_endpoint_auth_methods_supported',
       ].sort(),
     );
+  });
+});
+
+describe('resolveIssuer', () => {
+  let originalIssuer: string | undefined;
+
+  beforeEach(() => {
+    originalIssuer = process.env.BETTER_AUTH_URL;
+  });
+
+  afterEach(() => {
+    if (originalIssuer === undefined) delete process.env.BETTER_AUTH_URL;
+    else process.env.BETTER_AUTH_URL = originalIssuer;
+  });
+
+  it('returns BETTER_AUTH_URL verbatim when set without a trailing slash', () => {
+    process.env.BETTER_AUTH_URL = 'https://auth.prod.example.com';
+    expect(resolveIssuer()).toBe('https://auth.prod.example.com');
+  });
+
+  it('strips a trailing slash so the value matches what discovery advertises', () => {
+    process.env.BETTER_AUTH_URL = 'https://auth.prod.example.com/';
+    expect(resolveIssuer()).toBe('https://auth.prod.example.com');
+  });
+
+  it('falls back to ISSUER_PLACEHOLDER when BETTER_AUTH_URL is unset', () => {
+    delete process.env.BETTER_AUTH_URL;
+    expect(resolveIssuer()).toBe(ISSUER_PLACEHOLDER);
+  });
+
+  it('lets TokenService and DiscoveryController agree on the issuer string (no trailing-slash drift)', () => {
+    process.env.BETTER_AUTH_URL = 'https://auth.prod.example.com/';
+    const tokenIssuer = resolveIssuer();
+    const discoveryDoc = buildOAuthAuthorizationServerMetadata(resolveIssuer());
+    expect(tokenIssuer).toBe(discoveryDoc.issuer);
   });
 });

@@ -1,6 +1,7 @@
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
+import { generatePendingPublicId } from '../common/pending-public-id';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -58,7 +59,7 @@ async function ensureApp() {
   if (found) return found;
   return prisma.$transaction(async (tx) => {
     const created = await tx.saApp.create({
-      data: { publicId: 'placeholder', name: APP_NAME, url: APP_URL, isPlatform: false },
+      data: { publicId: generatePendingPublicId(), name: APP_NAME, url: APP_URL, isPlatform: false },
     });
     return tx.saApp.update({
       where: { id: created.id },
@@ -72,7 +73,7 @@ async function ensureOrg(appId: number) {
   if (found) return found;
   return prisma.$transaction(async (tx) => {
     const created = await tx.saOrg.create({
-      data: { publicId: 'placeholder', name: ORG_NAME, appId, isPlatform: false },
+      data: { publicId: generatePendingPublicId(), name: ORG_NAME, appId, isPlatform: false },
     });
     return tx.saOrg.update({
       where: { id: created.id },
@@ -88,7 +89,7 @@ async function ensurePermissions(appId: number) {
     if (!perm) {
       perm = await prisma.$transaction(async (tx) => {
         const c = await tx.saPermission.create({
-          data: { publicId: 'placeholder', name, appId },
+          data: { publicId: generatePendingPublicId(), name, appId },
         });
         return tx.saPermission.update({
           where: { id: c.id },
@@ -110,7 +111,7 @@ async function ensureRole(
   if (!role) {
     role = await prisma.$transaction(async (tx) => {
       const c = await tx.saRole.create({
-        data: { publicId: 'placeholder', name: roleName, appId },
+        data: { publicId: generatePendingPublicId(), name: roleName, appId },
       });
       return tx.saRole.update({
         where: { id: c.id },
@@ -152,7 +153,7 @@ async function ensureUser(
     saUser = await prisma.$transaction(async (tx) => {
       const c = await tx.saUser.create({
         data: {
-          publicId: 'placeholder',
+          publicId: generatePendingPublicId(),
           betterAuthUserId: baUserId,
           orgId,
           firstName,

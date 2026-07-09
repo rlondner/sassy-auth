@@ -20,6 +20,11 @@ export class AppsController {
     return this.apps.listApps(callerBaId(req), q);
   }
 
+  @Get(':publicId')
+  get(@Req() req: Request, @Param('publicId') publicId: string) {
+    return this.apps.getApp(callerBaId(req), publicId);
+  }
+
   @Post()
   create(@Req() req: Request, @Body() dto: CreateAppDto) {
     return this.apps.createApp(callerBaId(req), dto);
