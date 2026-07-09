@@ -14,7 +14,10 @@ concurrency:
 jobs:
   admin-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The suite runs ~170 tests serially (workers: 1 in CI) plus install,
+    # build, migrate and seed. 20 min was too tight and truncated runs; 35
+    # gives headroom without masking a genuine hang.
+    timeout-minutes: 35
 
     services:
       postgres:
@@ -46,8 +49,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -62,6 +63,13 @@ jobs:
 
       - name: Apply migrations
         run: pnpm --filter @sassy-auth/db exec prisma migrate deploy --schema=schema.prisma
+
+      # The auth-server and admin apps import the workspace libraries via
+      # their built output (`main: ./dist/index.js`). Compile them so the
+      # dev servers started by Playwright can resolve `@sassy-auth/db` and
+      # `@sassy-auth/types` at runtime.
+      - name: Build shared packages
+        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
 
       # bug-0092: auth-server compilation was previously excluded from CI
       # because of TS2742 on BetterAuth's inferred type and a shape
@@ -81,6 +89,11 @@ jobs:
           echo "RSA_PUBLIC_KEY=$(base64 -w0 ./keys/public.pem)" >> $GITHUB_ENV
 
       - name: Seed platform data
+        # SEED_DEMO_MULTITENANT provisions the app01 Acme/Globex tenants and
+        # their admins (e.g. acme-admin@app01.io) that
+        # multitenant-tenant-admin.spec.ts signs in as.
+        env:
+          SEED_DEMO_MULTITENANT: '1'
         run: pnpm --filter @sassy-auth/auth-server seed
 
       - name: Install Playwright browsers
