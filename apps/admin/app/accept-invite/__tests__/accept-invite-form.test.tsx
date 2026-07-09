@@ -28,7 +28,9 @@ describe('AcceptInviteForm', () => {
     fireEvent.change(screen.getByLabelText('acceptInvite.password'), { target: { value: 'password1' } })
     fireEvent.change(screen.getByLabelText('acceptInvite.confirmPassword'), { target: { value: 'password2' } })
     fireEvent.click(screen.getByText('acceptInvite.submit'))
-    await waitFor(() => expect(screen.getByText(/do not match/i)).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText('acceptInvite.errors.passwordMismatch')).toBeInTheDocument(),
+    )
   })
 
   it('calls acceptInvitation on valid submit', async () => {
