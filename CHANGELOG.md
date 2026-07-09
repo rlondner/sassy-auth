@@ -4,6 +4,92 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-07-08
+
+61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
+
+### Fixed (~76 bugs)
+
+#### All 9 Critical bugs — CLOSED
+
+- **bug-0001** — Cross-tenant org access via `checkPermission` (b62d543)
+- **bug-0038** — JWT `permissions`→`scope` migration (8740829)
+- **bug-0039** — In-memory OAuth code store → `SaOauthCode` DB table (296df3e)
+- **bug-0054** — `redirect_uri` not bound to authorization code (70c9589)
+- **bug-0074** — Inactive/pending users could authenticate (04ad774)
+- **bug-0094** — `checkPermissionForApp` silent grant on undefined `targetAppId` (cbfe798)
+- **bug-0147** — Username/phoneNumber non-unique login collision (98c0111)
+- **bug-0148** — PublicId 'placeholder' race on concurrent creates (6db55b7)
+- **bug-0183** — `createPermission` allows `platform.*` names (bbd4e4e)
+
+#### Auth-server hardening (33 bugs)
+
+bug-0034, 0080, 0092, 0097, 0115, 0138, 0139, 0140, 0144, 0149, 0152, 0153, 0154, 0158, 0163, 0164, 0166, 0167, 0168, 0169, 0175, 0179, 0184, 0185, 0186, 0187, 0192, 0193, 0194, 0197, 0198, 0209, 0210
+
+#### Admin UX + security (27 bugs)
+
+bug-0050, 0136, 0137, 0141, 0142, 0145, 0146, 0155, 0159, 0160, 0165, 0170, 0171, 0189, 0190, 0191, 0195, 0196, 0199, 0200, 0201, 0202, 0203, 0204, 0205, 0206, 0207
+
+#### Test infrastructure (7 bugs)
+
+bug-0173, 0178, 0181, 0208, 0211, 0212, 0213
+
+### New bugs found (15)
+
+See [BUGS_2026-07-08.md](./bugs/BUGS_2026-07-08.md) and [TODO_2026-07-08.md](./todo/TODO_2026-07-08.md).
+
+#### Critical (2) — timing side-channels undermining the bug-0209 fix
+
+- **bug-0214** — `directLogin` org/app mismatch check returns 403 before scrypt — defeats timing guard, enables user enumeration + tenant-membership oracle.
+- **bug-0215** — Social-only users (no credential row) skip scrypt in `directLogin` — leaks authentication method via timing.
+
+#### Warning (6)
+
+- **bug-0216** — Post-login OAuth redirect path missing `/api/token` prefix — always rejected by admin's `validateNextUrl`.
+- **bug-0217** — Helmet CSP blocks Swagger UI in development (comment incorrectly claims CSP is prod-only).
+- **bug-0218** — `updateUser` status guard bypass: `pending→inactive→active` circumvents invitation acceptance.
+- **bug-0219** — `updateUser` missing self-modification guard (unlike `deleteUser`, `setUserRoles`, `setUserDirectPermissions`).
+- **bug-0220** — Expired `SaOauthCode` rows accumulate unboundedly (no cleanup job).
+- **bug-0221** — `updateUserAction` lacks try/catch; swallows NEXT_REDIRECT sentinel on 401.
+
+#### Minor (7)
+
+- **bug-0222** — `user-view-drawer` initial-load effect lacks cancellation flag — stale data on rapid open/close.
+- **bug-0223** — Admin `next.config.ts` security headers missing HSTS.
+- **bug-0224** — `accept-invite-form` error message lacks `role="alert"`.
+- **bug-0225** — Five search inputs across table components lack accessible labels.
+- **bug-0226** — Pagination page-size selects lack accessible labels.
+- **bug-0227** — `use-copy-feedback` hardcoded English toast bypasses i18n.
+- **bug-0228** — E2E `afterAll` cleanup omits `SaOauthCode` table.
+
+### Added
+
+- `helmet` middleware on auth-server (bug-0154)
+- `@nestjs/throttler` rate limiting: 120 req/min default, 10 req/min on auth endpoints (bug-0080)
+- `resolveListScope` helper for list endpoints (bug-0001)
+- `generatePendingPublicId()` replaces 'placeholder' literal (bug-0148)
+- `useCopyFeedback` hook consolidates 13 clipboard copy sites (bug-0155)
+- `GET /api/apps/:id` endpoint (bug-0164)
+- Admin security headers: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, Cache-Control (bug-0191)
+- Admin `loading.tsx` for loading indicators during navigation (bug-0207)
+- `AccessDeniedPanel` component for 403 states (bug-0196)
+- `SaUser.createdAt` and `lastLoginAt` fields (bug-0186)
+- 5 new Prisma migrations (see OVERNIGHT_REPORT_2026-07-08.md §4)
+
+### Changed
+
+- `ValidationPipe` now has `forbidNonWhitelisted: true` (bug-0194)
+- Auth-server `tsconfig.json` upgraded to `strict: true` (bug-0197)
+- Swagger UI gated behind `NODE_ENV !== 'production'` (bug-0153)
+- BetterAuth session config now explicit (`expiresIn`, `updateAge`) (bug-0158)
+- 401 responses in admin redirect to `/login` via `apiFetch` (bug-0136)
+
+### Project health
+
+Estimated open bugs: **~153** (192 prior − 54 newly fixed + 15 new). All Critical-severity bugs resolved. The 2 new Critical bugs (bug-0214, 0215) are regressions in the timing guard — they need priority attention before the directLogin fix can be considered complete.
+
+---
+
 ## [Unreleased] — 2026-07-07
 
 No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), reviewed across five prior daily reviews (2026-07-02 through 2026-07-06). Today's review is a **multi-agent deep sweep** covering: server action error handling, admin security headers/caching, auth-server bootstrap/startup, i18n completeness, shared UI accessibility, admin page authorization, seed script correctness, and TypeScript configuration. 22 new bugs found (0 critical, 10 warning, 12 minor). No bugs fixed.
