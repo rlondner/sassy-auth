@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle,
   Button, ButtonGroup, Input, Label,
@@ -9,7 +10,7 @@ import {
 import {
   updateRoleAction, getRoleAction, listAppPermissionsAction,
 } from '@/app/(admin)/roles/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { RoleRow, RoleDetail } from '@/lib/types'
 import { PermissionRowsEditor, type PermOption } from './role-permission-rows-editor'
 
@@ -17,9 +18,10 @@ interface Props {
   role: RoleRow
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function RoleEditDrawer({ role, open, onOpenChange }: Props) {
+export function RoleEditDrawer({ role, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(role.name)
   const [initialPermIds, setInitialPermIds] = React.useState<string[]>([])
@@ -28,7 +30,8 @@ export function RoleEditDrawer({ role, open, onOpenChange }: Props) {
   const [loadingDetail, setLoadingDetail] = React.useState(false)
   const [loadingPerms, setLoadingPerms] = React.useState(false)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -82,8 +85,13 @@ export function RoleEditDrawer({ role, open, onOpenChange }: Props) {
     if (permsDirty) patch.permissionIds = currentIds
     startTransition(async () => {
       const result = await updateRoleAction(role.publicId, patch)
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('roles.toast.updated'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 
@@ -122,10 +130,7 @@ export function RoleEditDrawer({ role, open, onOpenChange }: Props) {
                   variant="outline"
                   aria-label={t('roles.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(role.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(role.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">
@@ -160,11 +165,11 @@ export function RoleEditDrawer({ role, open, onOpenChange }: Props) {
             )}
             <div className="flex justify-end pt-4">
               <ButtonGroup>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} loading={pending}>
                   {t('roles.drawer.cancel')}
                 </Button>
                 <Button type="submit" disabled={!dirty || pending}>
-                  {pending ? t('roles.drawer.saving') : t('roles.drawer.save')}
+                  {t('roles.drawer.save')}
                 </Button>
               </ButtonGroup>
             </div>

@@ -2,12 +2,13 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle,
   Button, ButtonGroup, Input, Label,
 } from '@sassy-auth/ui'
 import { updatePermissionAction } from '@/app/(admin)/permissions/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { PermissionRow } from '@/lib/types'
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]+)+$/
@@ -16,13 +17,15 @@ interface Props {
   permission: PermissionRow
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function PermissionEditDrawer({ permission, open, onOpenChange }: Props) {
+export function PermissionEditDrawer({ permission, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(permission.name)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -38,8 +41,13 @@ export function PermissionEditDrawer({ permission, open, onOpenChange }: Props) 
     if (!NAME_REGEX.test(name.trim())) { setErrorKey('permissions.errors.nameInvalid'); return }
     startTransition(async () => {
       const result = await updatePermissionAction(permission.publicId, { name: name.trim() })
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('permissions.toast.updated'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 
@@ -79,10 +87,7 @@ export function PermissionEditDrawer({ permission, open, onOpenChange }: Props) 
                   variant="outline"
                   aria-label={t('permissions.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(permission.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(permission.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">
@@ -99,11 +104,11 @@ export function PermissionEditDrawer({ permission, open, onOpenChange }: Props) 
             )}
             <div className="flex justify-end pt-4">
               <ButtonGroup>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} loading={pending}>
                   {t('permissions.drawer.cancel')}
                 </Button>
                 <Button type="submit" disabled={!dirty || pending}>
-                  {pending ? t('permissions.drawer.saving') : t('permissions.drawer.save')}
+                  {t('permissions.drawer.save')}
                 </Button>
               </ButtonGroup>
             </div>
