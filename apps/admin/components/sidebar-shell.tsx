@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { ShieldCheck, Boxes, Building2, Users, ShieldEllipsis, KeyRound } from 'lucide-react'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel,
@@ -27,7 +28,6 @@ interface NavGroup {
 
 interface SidebarShellProps {
   groups: NavGroup[]
-  currentPath: string
   user: { firstName: string; lastName: string; email: string }
   currentLocale: string
   availableLocales: string[]
@@ -38,9 +38,10 @@ interface SidebarShellProps {
 }
 
 export function SidebarShell({
-  groups, currentPath, user, currentLocale, availableLocales,
+  groups, user, currentLocale, availableLocales,
   signOutLabel, lightModeLabel, darkModeLabel, children,
 }: SidebarShellProps) {
+  const currentPath = usePathname() ?? ''
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon" className="border-r-0">

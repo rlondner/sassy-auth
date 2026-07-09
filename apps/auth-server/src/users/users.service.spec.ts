@@ -38,6 +38,14 @@ jest.mock('../common/permissions/check-permission', () => ({
   checkPermission: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../common/permissions/assert-caller-can-grant-system-perms', () => ({
+  assertCallerCanGrantSystemPerms: jest.fn().mockResolvedValue(undefined),
+}));
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockAssertGrant = require('../common/permissions/assert-caller-can-grant-system-perms')
+  .assertCallerCanGrantSystemPerms as jest.Mock;
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   $transaction: jest.Mock;
@@ -67,6 +75,11 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   account: { create: jest.Mock };
 };
 
+// bug-0186: fixed timestamps so assertions on the ISO-serialized
+// output stay stable. `lastLoginAt` defaults to null (never signed
+// in); tests that exercise the login-tracking path override it.
+const FIXTURE_CREATED_AT = new Date('2026-01-15T12:00:00.000Z');
+
 const makeSaUser = (overrides = {}) => ({
   id: 1,
   publicId: 'usr1',
@@ -78,6 +91,8 @@ const makeSaUser = (overrides = {}) => ({
   phoneNumber: null,
   username: null,
   status: 'active',
+  createdAt: FIXTURE_CREATED_AT,
+  lastLoginAt: null,
   org: { publicId: 'org1' },
   betterAuthUser: { email: 'alice@example.com' },
   ...overrides,
@@ -107,6 +122,30 @@ describe('UsersService', () => {
       expect(result[0].id).toBe('usr1');
       expect(result[0].email).toBe('alice@example.com');
       expect(result[0].status).toBe('active');
+    });
+
+    // bug-0186: previously the admin `User` type declared `createdAt`
+    // and `lastLoginAt` fields that the API never returned. Both are
+    // now real: `createdAt` is a NOT-NULL column with a
+    // CURRENT_TIMESTAMP default; `lastLoginAt` is nullable and
+    // populated by (a) `token.controller.ts::directLogin` on success
+    // and (b) the BetterAuth `databaseHooks.session.create.after`
+    // hook in `auth.config.ts`.
+    it('includes createdAt (ISO string) and lastLoginAt (ISO string | null) in list output', async () => {
+      const loginTime = new Date('2026-05-01T09:30:00.000Z');
+      mockPrisma.saUser.findMany.mockResolvedValue([
+        makeSaUser({ lastLoginAt: loginTime }),
+        makeSaUser({ publicId: 'usr2', lastLoginAt: null }),
+      ]);
+      const result = await service.listUsers('ba-caller', {});
+      expect(result[0]).toMatchObject({
+        createdAt: FIXTURE_CREATED_AT.toISOString(),
+        lastLoginAt: loginTime.toISOString(),
+      });
+      expect(result[1]).toMatchObject({
+        createdAt: FIXTURE_CREATED_AT.toISOString(),
+        lastLoginAt: null,
+      });
     });
 
     it('passes orgId filter to prisma when provided', async () => {
@@ -254,13 +293,15 @@ describe('UsersService', () => {
     it('atomically wires roleIds and directPermissionIds inside the create transaction', async () => {
       // Org lookup for app-scope validation
       mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 9, publicId: 'org1', appId: 4, name: 'Plat', isPlatform: false });
-      // Role + permission resolution
-      mockPrisma.saRole.findMany.mockResolvedValue([
-        { id: 20, publicId: 'rA', appId: 4 },
-      ]);
-      mockPrisma.saPermission.findMany.mockResolvedValue([
-        { id: 30, publicId: 'pA', appId: 4 },
-      ]);
+      // saPermission.findMany / saRole.findMany are each called twice:
+      // once for the escalation-guard pre-resolve and once for the app-scope
+      // resolver. Stub each call shape separately with mockResolvedValueOnce.
+      mockPrisma.saPermission.findMany
+        .mockResolvedValueOnce([{ name: 'apps.read', isSystem: false }])
+        .mockResolvedValueOnce([{ id: 30, publicId: 'pA', appId: 4, isSystem: false }]);
+      mockPrisma.saRole.findMany
+        .mockResolvedValueOnce([{ permissions: [] }])
+        .mockResolvedValueOnce([{ id: 20, publicId: 'rA', appId: 4 }]);
 
       mockPrisma.user.create.mockResolvedValue(undefined);
       const created = makeSaUser({ id: 7, publicId: 'newPub' });
@@ -346,7 +387,7 @@ describe('UsersService', () => {
   describe('assignRole', () => {
     it('creates a SaUserRole link', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
-      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1' });
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1', permissions: [] });
       mockPrisma.saUserRole.create.mockResolvedValue(undefined);
       await expect(service.assignRole('ba-caller', 'usr1', { roleId: 'role1' })).resolves.toBeUndefined();
       expect(mockPrisma.saUserRole.create).toHaveBeenCalledWith({
@@ -367,7 +408,7 @@ describe('UsersService', () => {
 
     it('is idempotent when the role is already assigned (Prisma P2002)', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
-      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1' });
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1', permissions: [] });
       mockPrisma.saUserRole.create.mockImplementationOnce(() => {
         const err = new Error('Unique constraint failed');
         (err as Error & { code?: string }).code = 'P2002';
@@ -380,7 +421,7 @@ describe('UsersService', () => {
   describe('removeRole', () => {
     it('deletes the SaUserRole link', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
-      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1' });
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1', permissions: [] });
       mockPrisma.saUserRole.delete.mockResolvedValue(undefined);
       await expect(service.removeRole('ba-caller', 'usr1', 'role1')).resolves.toBeUndefined();
       expect(mockPrisma.saUserRole.delete).toHaveBeenCalledWith({
@@ -441,7 +482,7 @@ describe('UsersService', () => {
   describe('assignRole re-throw non-P2002 error', () => {
     it('re-throws unexpected errors from prisma.saUserRole.create', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
-      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1' });
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1', permissions: [] });
       const unexpected = new Error('DB timeout');
       mockPrisma.saUserRole.create.mockImplementationOnce(() => Promise.reject(unexpected));
       await expect(service.assignRole('ba-caller', 'usr1', { roleId: 'role1' })).rejects.toThrow('DB timeout');
@@ -477,10 +518,17 @@ describe('UsersService', () => {
 
     it('deletes existing role rows and inserts the new set inside a transaction', async () => {
       primeFindUnique();
-      mockPrisma.saRole.findMany.mockResolvedValue([
-        { id: 20, publicId: 'rA', appId: orgWithApp.appId },
-        { id: 21, publicId: 'rB', appId: orgWithApp.appId },
-      ]);
+      // saRole.findMany is called twice: once by the escalation guard,
+      // once by resolveRoleIdsForApp. Use mockResolvedValueOnce twice.
+      mockPrisma.saRole.findMany
+        .mockResolvedValueOnce([
+          { permissions: [] },
+          { permissions: [] },
+        ])
+        .mockResolvedValueOnce([
+          { id: 20, publicId: 'rA', appId: orgWithApp.appId },
+          { id: 21, publicId: 'rB', appId: orgWithApp.appId },
+        ]);
 
       await service.setUserRoles(callerBaId, userPublicId, ['rA', 'rB']);
 
@@ -503,10 +551,15 @@ describe('UsersService', () => {
 
     it('rejects role publicIds belonging to a different app with BadRequestException', async () => {
       primeFindUnique();
-      mockPrisma.saRole.findMany.mockResolvedValue([
-        { id: 20, publicId: 'rA', appId: orgWithApp.appId },
-        { id: 99, publicId: 'rWrong', appId: 7 },
-      ]);
+      mockPrisma.saRole.findMany
+        .mockResolvedValueOnce([
+          { permissions: [] },
+          { permissions: [] },
+        ])
+        .mockResolvedValueOnce([
+          { id: 20, publicId: 'rA', appId: orgWithApp.appId },
+          { id: 99, publicId: 'rWrong', appId: 7 },
+        ]);
       await expect(
         service.setUserRoles(callerBaId, userPublicId, ['rA', 'rWrong']),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -610,6 +663,334 @@ describe('UsersService', () => {
       await expect(
         service.setUserDirectPermissions(callerBaId, userPublicId, []),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('setUserDirectPermissions escalation guard', () => {
+    const callerBaId = 'ba-caller';
+    const userPublicId = 'usrPub';
+    const orgWithApp = { id: 7, appId: 4 };
+
+    function primeFindUnique() {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce({
+        id: 1, publicId: userPublicId, betterAuthUserId: 'ba-target', orgId: orgWithApp.id,
+      });
+      mockPrisma.saOrg.findUnique.mockResolvedValueOnce({ id: orgWithApp.id, appId: orgWithApp.appId });
+    }
+
+    it('allows an org.users.manage holder to grant org.users.manage to a peer in their own org', async () => {
+      primeFindUnique();
+      // saPermission.findMany is called twice: once by the escalation guard
+      // pre-resolve query (selecting name+isSystem) and once by
+      // resolvePermissionIdsForApp (selecting id+publicId+appId+isSystem).
+      mockPrisma.saPermission.findMany
+        .mockResolvedValueOnce([{ name: 'org.users.manage', isSystem: true }])
+        .mockResolvedValueOnce([
+          { id: 30, publicId: 'pUM', appId: orgWithApp.appId, isSystem: true },
+        ]);
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await expect(
+        service.setUserDirectPermissions(callerBaId, userPublicId, ['pUM']),
+      ).resolves.toBeUndefined();
+
+      expect(mockAssertGrant).toHaveBeenCalledWith(callerBaId, ['org.users.manage']);
+      expect(mockPrisma.saUserPermission.createMany).toHaveBeenCalledWith({
+        data: [{ userId: 1, permissionId: 30 }],
+      });
+    });
+
+    it('rejects an org.users.manage holder trying to grant org.roles.manage', async () => {
+      primeFindUnique();
+      mockPrisma.saPermission.findMany.mockResolvedValueOnce([
+        { name: 'org.roles.manage', isSystem: true },
+      ]);
+      mockAssertGrant.mockRejectedValueOnce(
+        new ForbiddenException('Cannot grant system permission(s) you do not hold: org.roles.manage'),
+      );
+
+      await expect(
+        service.setUserDirectPermissions(callerBaId, userPublicId, ['pRM']),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockAssertGrant).toHaveBeenCalledWith(callerBaId, ['org.roles.manage']);
+      expect(mockPrisma.saUserPermission.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.saUserPermission.createMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects an org.users.manage holder trying to grant platform.users.manage', async () => {
+      primeFindUnique();
+      // Guard pre-resolve sees the perm as non-system (isSystem=false), so it
+      // does NOT add it to the guard list — the actual rejection comes from
+      // resolvePermissionIdsForApp, which sees appId mismatch on a non-system
+      // perm and throws BadRequestException.
+      mockPrisma.saPermission.findMany
+        .mockResolvedValueOnce([{ name: 'platform.users.manage', isSystem: false }])
+        .mockResolvedValueOnce([
+          { id: 99, publicId: 'pPUM', appId: 1, isSystem: false },
+        ]);
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await expect(
+        service.setUserDirectPermissions(callerBaId, userPublicId, ['pPUM']),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockPrisma.saUserPermission.createMany).not.toHaveBeenCalled();
+    });
+
+    it('allows platform.users.manage holder to grant any org.* to any tenant user', async () => {
+      primeFindUnique();
+      mockPrisma.saPermission.findMany
+        .mockResolvedValueOnce([
+          { name: 'org.users.manage', isSystem: true },
+          { name: 'org.roles.manage', isSystem: true },
+        ])
+        .mockResolvedValueOnce([
+          { id: 30, publicId: 'pUM', appId: orgWithApp.appId, isSystem: true },
+          { id: 31, publicId: 'pRM', appId: orgWithApp.appId, isSystem: true },
+        ]);
+      // Platform-tier holders pass the guard unconditionally — stub success.
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await expect(
+        service.setUserDirectPermissions(callerBaId, userPublicId, ['pUM', 'pRM']),
+      ).resolves.toBeUndefined();
+
+      expect(mockAssertGrant).toHaveBeenCalledWith(
+        callerBaId,
+        ['org.users.manage', 'org.roles.manage'],
+      );
+      expect(mockPrisma.saUserPermission.createMany).toHaveBeenCalledWith({
+        data: [
+          { userId: 1, permissionId: 30 },
+          { userId: 1, permissionId: 31 },
+        ],
+      });
+    });
+  });
+
+  describe('setUserRoles escalation guard', () => {
+    const callerBaId = 'ba-caller';
+    const userPublicId = 'usrPub';
+    const orgWithApp = { id: 7, appId: 4 };
+
+    function primeFindUnique() {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce({
+        id: 1, publicId: userPublicId, betterAuthUserId: 'ba-target', orgId: orgWithApp.id,
+      });
+      mockPrisma.saOrg.findUnique.mockResolvedValueOnce({ id: orgWithApp.id, appId: orgWithApp.appId });
+    }
+
+    it('rejects assigning a role containing org.roles.manage when caller lacks it', async () => {
+      primeFindUnique();
+      // saRole.findMany is called twice: once for the escalation guard
+      // (selecting permissions.permission.name+isSystem) and once by
+      // resolveRoleIdsForApp (selecting id+publicId+appId).
+      mockPrisma.saRole.findMany.mockResolvedValueOnce([
+        {
+          permissions: [
+            { permission: { name: 'org.roles.manage', isSystem: true } },
+          ],
+        },
+      ]);
+      mockAssertGrant.mockRejectedValueOnce(
+        new ForbiddenException('Cannot grant system permission(s) you do not hold: org.roles.manage'),
+      );
+
+      await expect(
+        service.setUserRoles(callerBaId, userPublicId, ['rRM']),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockAssertGrant).toHaveBeenCalledWith(callerBaId, ['org.roles.manage']);
+      expect(mockPrisma.saUserRole.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.saUserRole.createMany).not.toHaveBeenCalled();
+    });
+
+    it('allows assigning a role containing only non-system perms', async () => {
+      primeFindUnique();
+      mockPrisma.saRole.findMany
+        .mockResolvedValueOnce([
+          {
+            permissions: [
+              { permission: { name: 'apps.read', isSystem: false } },
+              { permission: { name: 'apps.write', isSystem: false } },
+            ],
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 20, publicId: 'rA', appId: orgWithApp.appId },
+        ]);
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await expect(
+        service.setUserRoles(callerBaId, userPublicId, ['rA']),
+      ).resolves.toBeUndefined();
+
+      // No system perms => the guard is invoked with an empty list (it
+      // short-circuits internally, but the call still happens).
+      expect(mockAssertGrant).toHaveBeenCalledWith(callerBaId, []);
+      expect(mockPrisma.saUserRole.createMany).toHaveBeenCalledWith({
+        data: [{ userId: 1, roleId: 20 }],
+      });
+    });
+  });
+
+  describe('assignRole escalation guard', () => {
+    it('rejects assigning a role whose perms include a system perm the caller lacks', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValueOnce({
+        id: 5,
+        publicId: 'role1',
+        permissions: [
+          { permission: { name: 'org.roles.manage', isSystem: true } },
+        ],
+      });
+      mockAssertGrant.mockRejectedValueOnce(
+        new ForbiddenException('Cannot grant system permission(s) you do not hold: org.roles.manage'),
+      );
+
+      await expect(
+        service.assignRole('ba-caller', 'usr1', { roleId: 'role1' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', ['org.roles.manage']);
+      expect(mockPrisma.saUserRole.create).not.toHaveBeenCalled();
+    });
+
+    it('allows assigning a role with only non-system perms', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValueOnce({
+        id: 5,
+        publicId: 'role1',
+        permissions: [
+          { permission: { name: 'apps.read', isSystem: false } },
+        ],
+      });
+      mockPrisma.saUserRole.create.mockResolvedValueOnce(undefined);
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await expect(
+        service.assignRole('ba-caller', 'usr1', { roleId: 'role1' }),
+      ).resolves.toBeUndefined();
+
+      expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', []);
+      expect(mockPrisma.saUserRole.create).toHaveBeenCalled();
+    });
+  });
+
+  // bug-0097 — the escalation guard was previously only applied to
+  // assignRole and setUserRoles. removeRole was the asymmetric outlier:
+  // a caller could strip a role from a user even if they weren't
+  // themselves authorized to grant its system perms. Revoke-then-
+  // re-grant is the same escalation surface in reverse.
+  describe('removeRole escalation guard (bug-0097)', () => {
+    it('rejects removing a role whose perms include a system perm the caller lacks', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValueOnce({
+        id: 5,
+        publicId: 'role1',
+        permissions: [
+          { permission: { name: 'org.roles.manage', isSystem: true } },
+        ],
+      });
+      mockAssertGrant.mockRejectedValueOnce(
+        new ForbiddenException('Cannot grant system permission(s) you do not hold: org.roles.manage'),
+      );
+
+      await expect(
+        service.removeRole('ba-caller', 'usr1', 'role1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', ['org.roles.manage']);
+      expect(mockPrisma.saUserRole.delete).not.toHaveBeenCalled();
+    });
+
+    it('allows removing a role with only non-system perms', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValueOnce(makeSaUser());
+      mockPrisma.saRole.findUnique.mockResolvedValueOnce({
+        id: 5,
+        publicId: 'role1',
+        permissions: [
+          { permission: { name: 'apps.read', isSystem: false } },
+        ],
+      });
+      mockPrisma.saUserRole.delete.mockResolvedValueOnce(undefined);
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await expect(
+        service.removeRole('ba-caller', 'usr1', 'role1'),
+      ).resolves.toBeUndefined();
+
+      expect(mockAssertGrant).toHaveBeenCalledWith('ba-caller', []);
+      expect(mockPrisma.saUserRole.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('createUser escalation guard', () => {
+    const dto = {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      email: 'jane@example.com',
+      orgId: 'org1',
+    };
+
+    it('aggregates system perms from initial direct perms and roles into a single guard call', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValueOnce({ id: 9, publicId: 'org1', appId: 4 });
+      // saPermission.findMany called for guard pre-resolve, then by
+      // resolvePermissionIdsForApp.
+      mockPrisma.saPermission.findMany
+        .mockResolvedValueOnce([{ name: 'org.users.manage', isSystem: true }])
+        .mockResolvedValueOnce([
+          { id: 30, publicId: 'pUM', appId: 4, isSystem: true },
+        ]);
+      // saRole.findMany called for guard pre-resolve, then by
+      // resolveRoleIdsForApp.
+      mockPrisma.saRole.findMany
+        .mockResolvedValueOnce([
+          {
+            permissions: [
+              { permission: { name: 'org.roles.manage', isSystem: true } },
+              // duplicate of the direct perm should be deduped in the guard call
+              { permission: { name: 'org.users.manage', isSystem: true } },
+              { permission: { name: 'apps.read', isSystem: false } },
+            ],
+          },
+        ])
+        .mockResolvedValueOnce([{ id: 20, publicId: 'rA', appId: 4 }]);
+      mockPrisma.user.create.mockResolvedValue(undefined);
+      mockPrisma.saUser.create.mockResolvedValue(
+        makeSaUser({ id: 7, publicId: 'newPub' }),
+      );
+      mockPrisma.saInvitation.create.mockResolvedValue({ token: 'tok-1' });
+      mockAssertGrant.mockResolvedValueOnce(undefined);
+
+      await service.createUser('ba-caller', {
+        ...dto,
+        roleIds: ['rA'],
+        directPermissionIds: ['pUM'],
+      });
+
+      // The guard receives the deduped union of system perm names.
+      expect(mockAssertGrant).toHaveBeenCalledTimes(1);
+      const [, names] = mockAssertGrant.mock.calls[0];
+      expect(new Set(names)).toEqual(new Set(['org.users.manage', 'org.roles.manage']));
+    });
+
+    it('rejects createUser when the caller cannot grant a requested system perm', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValueOnce({ id: 9, publicId: 'org1', appId: 4 });
+      mockPrisma.saPermission.findMany.mockResolvedValueOnce([
+        { name: 'org.roles.manage', isSystem: true },
+      ]);
+      mockAssertGrant.mockRejectedValueOnce(
+        new ForbiddenException('Cannot grant system permission(s) you do not hold: org.roles.manage'),
+      );
+
+      await expect(
+        service.createUser('ba-caller', {
+          ...dto,
+          directPermissionIds: ['pRM'],
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mockPrisma.saUser.create).not.toHaveBeenCalled();
     });
   });
 });

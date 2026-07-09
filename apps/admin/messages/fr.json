@@ -36,6 +36,9 @@
     "fields": {
       "name": "Nom de l’application",
       "url": "URL de l’application",
+      "callbackUrl": "URL de rappel",
+      "callbackUrlHint": "Laissez vide pour accepter tout rappel sous l’URL de l’application. Indiquez une URL complète pour exiger une correspondance exacte du redirect_uri.",
+      "callbackUrlDefault": "Par défaut (tout chemin sous l’URL de l’application)",
       "publicId": "ID Public",
       "urlHint": "URL de base principale de cette application."
     },
@@ -67,7 +70,8 @@
       "platformProtected": "Les applications plateforme ne peuvent pas être modifiées.",
       "forbidden": "Vous n’avez plus la permission d’effectuer cette action.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
-      "urlInvalid": "Veuillez saisir une URL valide commençant par https://.",
+      "urlInvalid": "Veuillez saisir une URL valide.",
+      "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
       "nameRequired": "Le nom de l’application est requis."
     },
     "badges": {
@@ -191,7 +195,7 @@
       "rolesShort": "rôles",
       "usersShort": "utilisateurs"
     },
-    "badges": { "platform": "Plateforme" },
+    "badges": { "platform": "Plateforme", "system": "Système" },
     "actions": {
       "view": "Voir",
       "edit": "Modifier",
@@ -408,6 +412,8 @@
       "selfDeleteError": "Vous ne pouvez pas supprimer votre propre compte."
     },
     "errors": {
+      "required": "Obligatoire",
+      "emailInvalid": "Adresse e-mail invalide",
       "forbidden": "Vous n’avez pas la permission d’effectuer cette action.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "rolesSetFailed": "Échec de la mise à jour des rôles.",
@@ -433,6 +439,50 @@
     "confirmPassword": "Confirmer le mot de passe",
     "submit": "Activer le compte",
     "expired": "Ce lien d’invitation a expiré ou est invalide. Contactez votre administrateur pour en obtenir un nouveau.",
-    "success": "Compte activé ! Vous pouvez maintenant vous connecter."
+    "success": "Compte activé ! Vous pouvez maintenant vous connecter.",
+    "errors": {
+      "passwordMismatch": "Les mots de passe ne correspondent pas.",
+      "passwordTooShort": "Le mot de passe doit contenir au moins 12 caractères.",
+      "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
+      "genericError": "Une erreur est survenue."
+    }
+  },
+  "oauthError": {
+    "pageTitle": "Erreur d'autorisation — SassyAuth",
+    "fallbackHeading": "Demande d'autorisation rejetée",
+    "fallbackBody": "SassyAuth n'a pas pu traiter la demande d'autorisation.",
+    "fallbackHint": "Contactez un administrateur de la plateforme en lui indiquant l'URL sur laquelle vous êtes tombé.",
+    "appLabel": "Identifiant de l'application :",
+    "actions": {
+      "returnToSignIn": "Retour à la connexion",
+      "contactAdministrator": "Contacter l'administrateur"
+    },
+    "codes": {
+      "invalid_request": {
+        "heading": "Demande d'autorisation rejetée",
+        "body": "La requête est incomplète ou utilise une méthode de challenge PKCE non prise en charge.",
+        "hint": "Le client doit envoyer code_challenge et code_challenge_method=S256."
+      },
+      "APP_NOT_FOUND": {
+        "heading": "Application introuvable",
+        "body": "L'application qui a initié la requête n'est pas enregistrée dans SassyAuth.",
+        "hint": "Vérifiez que le client_id (un Sqid) correspond à une ligne de la liste des applications."
+      },
+      "invalid_redirect_uri": {
+        "heading": "L'URL de redirection ne correspond pas",
+        "body": "L'URL de redirection envoyée par l'application ne correspond pas à celle enregistrée pour cette application.",
+        "hint": "Ouvrez Applications, trouvez cette ligne et modifiez l'URL pour que son origine corresponde au point de terminaison de redirection."
+      },
+      "USER_NOT_FOUND": {
+        "heading": "Compte non provisionné",
+        "body": "Votre connexion a réussi, mais aucun compte SassyAuth n'y est associé.",
+        "hint": "Demandez à un administrateur de créer un utilisateur SassyAuth pour votre adresse e-mail et de l'assigner à une organisation."
+      },
+      "USER_ORG_MISMATCH": {
+        "heading": "Accès non autorisé à cette application",
+        "body": "Votre compte SassyAuth existe mais n'est pas rattaché à l'application demandée.",
+        "hint": "Demandez à un administrateur de vous ajouter à une organisation associée à cette application."
+      }
+    }
   }
 }

@@ -42,7 +42,7 @@ test.describe('/orgs UI matrix', () => {
     const admin = adminFromProject(info.project.name)
     test.skip(!permittedForArea(admin, 'orgs'), 'admin lacks platform.orgs.manage')
     // Orgs need a non-platform app; super-admin only path creates one upstream.
-    test.skip(admin.key !== 'super' && admin.key !== 'orgs', 'requires super or orgs admin')
+    test.skip(admin.key !== 'super', 'CRUD needs a prerequisite app (apps.manage); only super qualifies')
     const appName = await makeTempApp(page)
     const orgs = new OrgsPage(page)
     await orgs.goto()
@@ -59,7 +59,7 @@ test.describe('/orgs UI matrix', () => {
   test('Edit row updates the name', async ({ page }, info) => {
     const admin = adminFromProject(info.project.name)
     test.skip(!permittedForArea(admin, 'orgs'), 'admin lacks platform.orgs.manage')
-    test.skip(admin.key !== 'super' && admin.key !== 'orgs', 'requires super or orgs admin')
+    test.skip(admin.key !== 'super', 'CRUD needs a prerequisite app (apps.manage); only super qualifies')
     const appName = await makeTempApp(page)
     const orgs = new OrgsPage(page)
     await orgs.goto()
@@ -77,7 +77,7 @@ test.describe('/orgs UI matrix', () => {
   test('Delete row removes it from the table', async ({ page }, info) => {
     const admin = adminFromProject(info.project.name)
     test.skip(!permittedForArea(admin, 'orgs'), 'admin lacks platform.orgs.manage')
-    test.skip(admin.key !== 'super' && admin.key !== 'orgs', 'requires super or orgs admin')
+    test.skip(admin.key !== 'super', 'CRUD needs a prerequisite app (apps.manage); only super qualifies')
     const appName = await makeTempApp(page)
     const orgs = new OrgsPage(page)
     await orgs.goto()

@@ -14,6 +14,7 @@ jest.mock('@/app/(admin)/permissions/actions', () => ({
     publicId: 'sq_p1', name: 'apps.read',
     app: { publicId: 'sq_a1', name: 'Portal' },
     roleCount: 2, userCount: 1,
+    isSystem: false,
     roles: [
       { publicId: 'sq_r1', name: 'Editor', appName: 'Portal' },
       { publicId: 'sq_r2', name: 'Viewer', appName: 'Portal' },
@@ -28,6 +29,7 @@ const permission: PermissionRow = {
   publicId: 'sq_p1', name: 'apps.read',
   app: { publicId: 'sq_a1', name: 'Portal' },
   roleCount: 2, userCount: 1,
+  isSystem: false,
 }
 
 describe('PermissionViewDrawer', () => {
@@ -45,6 +47,16 @@ describe('PermissionViewDrawer', () => {
     render(<PermissionViewDrawer permission={platformPerm} open={true} onOpenChange={() => {}} onEdit={() => {}} onDelete={() => {}} />)
     expect(screen.getByText('permissions.badges.platform')).toBeInTheDocument()
     // Edit/Delete buttons are absent for platform.*
+    expect(screen.queryByRole('button', { name: 'permissions.actions.edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'permissions.actions.delete' })).not.toBeInTheDocument()
+  })
+
+  it('shows the System badge for isSystem permissions', () => {
+    const systemPerm: PermissionRow = { ...permission, name: 'org.users.manage', isSystem: true }
+    render(<PermissionViewDrawer permission={systemPerm} open={true} onOpenChange={() => {}} onEdit={() => {}} onDelete={() => {}} />)
+    expect(screen.getByText('permissions.badges.system')).toBeInTheDocument()
+    expect(screen.queryByText('permissions.badges.platform')).not.toBeInTheDocument()
+    // Edit/Delete buttons are absent for isSystem
     expect(screen.queryByRole('button', { name: 'permissions.actions.edit' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'permissions.actions.delete' })).not.toBeInTheDocument()
   })

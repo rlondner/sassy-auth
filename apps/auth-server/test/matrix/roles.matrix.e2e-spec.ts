@@ -1,6 +1,6 @@
 import { prisma } from '@sassy-auth/db';
 import { bootApp, closeApp, as } from './harness';
-import { drainCleanup, uniqueName, createTempApp, createTempRole } from './factories';
+import { drainCleanup, registerCleanup, uniqueName, createTempApp, createTempRole, superAdmin } from './factories';
 import { SEED_ADMINS, isPermitted } from './permissions-matrix';
 
 describe('/roles matrix', () => {
@@ -98,6 +98,45 @@ describe('/roles matrix', () => {
         });
       }
     });
+
+    if (isPermitted(admin, 'roles', 'create')) {
+      describe('Role name uniqueness is scoped to the parent app', () => {
+        // Roles must be torn down before their parent app, otherwise the
+        // restricted FK SaRole_appId_fkey blocks createTempApp's cleanup.
+        function trackRole(publicId: string) {
+          const s = as(superAdmin());
+          registerCleanup(async () => { await s.del(`/api/roles/${publicId}`); });
+        }
+
+        it('returns 409 when a second role with the same name is created in the same app', async () => {
+          const app = await createTempApp();
+          const a = as(admin);
+          const name = uniqueName('e2e-dup');
+
+          const first = await a.post('/api/roles', { name, appId: app.publicId, permissionIds: [] });
+          expect(first.status).toBe(201);
+          trackRole(first.body.publicId);
+
+          const second = await a.post('/api/roles', { name, appId: app.publicId, permissionIds: [] });
+          expect(second.status).toBe(409);
+        });
+
+        it('returns 201 for the same role name in two different apps', async () => {
+          const appA = await createTempApp();
+          const appB = await createTempApp();
+          const a = as(admin);
+          const name = uniqueName('e2e-cross-app');
+
+          const inA = await a.post('/api/roles', { name, appId: appA.publicId, permissionIds: [] });
+          expect(inA.status).toBe(201);
+          trackRole(inA.body.publicId);
+
+          const inB = await a.post('/api/roles', { name, appId: appB.publicId, permissionIds: [] });
+          expect(inB.status).toBe(201);
+          trackRole(inB.body.publicId);
+        });
+      });
+    }
 
     if (isPermitted(admin, 'roles', 'create')
         && isPermitted(admin, 'roles', 'update')
