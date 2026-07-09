@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>resource-server-fastapi · result</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>Signed in</h1>
+    <script type="application/json" id="token-data">{{ access_token | tojson }}</script>
+    <p>Calling <code>GET /api/properties</code> (requires <code>rs.properties.create</code>)…</p>
+    <h2 id="result" data-pending>…</h2>
+    <details>
+      <summary>Decoded token</summary>
+      <pre id="claims"></pre>
+    </details>
+    <p>
+      <a class="btn" href="/" id="signout">Sign Out</a>
+    </p>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

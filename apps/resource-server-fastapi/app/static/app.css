@@ -1,0 +1,25 @@
+:root { color-scheme: light dark; }
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, sans-serif;
+  background: Canvas; color: CanvasText;
+  display: grid; place-items: center; min-height: 100vh;
+}
+.card {
+  max-width: 560px; padding: 2rem 2.5rem;
+  border: 1px solid color-mix(in oklab, CanvasText 20%, transparent);
+  border-radius: 12px; background: Canvas;
+}
+.btn {
+  display: inline-block; padding: .5rem 1rem;
+  border: 1px solid color-mix(in oklab, CanvasText 30%, transparent);
+  border-radius: 8px; text-decoration: none; color: inherit;
+  cursor: pointer; background: transparent;
+}
+.btn.primary {
+  background: color-mix(in oklab, AccentColor 80%, Canvas);
+  color: AccentColorText; border-color: transparent;
+}
+h2[data-status="authorized"] { color: SeaGreen; }
+h2[data-status="unauthorized"] { color: IndianRed; }
+pre { background: color-mix(in oklab, CanvasText 6%, Canvas); padding: 1rem; border-radius: 8px; overflow: auto; }
