@@ -437,7 +437,13 @@
     "confirmPassword": "Confirm Password",
     "submit": "Activate Account",
     "expired": "This invitation link has expired or is invalid. Contact your administrator for a new one.",
-    "success": "Account activated! You can now sign in."
+    "success": "Account activated! You can now sign in.",
+    "errors": {
+      "passwordMismatch": "Passwords do not match.",
+      "passwordTooShort": "Password must be at least 12 characters.",
+      "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
+      "genericError": "Something went wrong."
+    }
   },
   "oauthError": {
     "pageTitle": "Authorization error — SassyAuth",

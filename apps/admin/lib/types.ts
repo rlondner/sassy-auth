@@ -7,8 +7,12 @@ export interface User {
   username: string | null
   orgId: string
   status: 'active' | 'pending' | 'inactive'
-  lastLoginAt?: string | null
-  createdAt?: string
+  // bug-0186: both fields are now real. The API always returns them:
+  // `createdAt` is a NOT-NULL DB column; `lastLoginAt` is nullable in
+  // the DB (null means "never signed in") and preserved as such over
+  // the wire. Both are ISO strings.
+  createdAt: string
+  lastLoginAt: string | null
 }
 
 export interface Org {

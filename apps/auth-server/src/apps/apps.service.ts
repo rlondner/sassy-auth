@@ -3,6 +3,7 @@ import { prisma } from '@sassy-auth/db';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppDto } from './dto/update-app.dto';
 import { ListAppsQueryDto } from './dto/list-apps-query.dto';
@@ -34,8 +35,9 @@ export class AppsService {
     ]);
     const page = q.page ?? 1;
     const pageSize = q.pageSize ?? 25;
-    const where = q.q
-      ? { OR: [{ name: { contains: q.q, mode: 'insensitive' as const } }, { url: { contains: q.q, mode: 'insensitive' as const } }] }
+    const escaped = q.q ? q.q.replace(/%/g, '\\%').replace(/_/g, '\\_') : undefined;
+    const where = escaped
+      ? { OR: [{ name: { contains: escaped, mode: 'insensitive' as const } }, { url: { contains: escaped, mode: 'insensitive' as const } }] }
       : {};
     const [rows, total] = await Promise.all([
       prisma.saApp.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { id: 'desc' } }),
@@ -44,13 +46,31 @@ export class AppsService {
     return { items: rows.map(formatApp), total, page, pageSize };
   }
 
+  async getApp(callerBaId: string, publicId: string) {
+    // bug-0164: sibling to orgs/roles/permissions/users `get`. Apps are
+    // read from the same required-perms surface as `listApps` — the
+    // orgs / permissions / roles admin pages need to render the parent
+    // app's name when displaying a single record. Apps are not
+    // org-scoped so no `targetOrgId` is threaded (contrast with
+    // orgs.service.ts::getOrg).
+    await checkPermission(callerBaId, [
+      'platform.apps.manage',
+      'platform.orgs.manage',
+      'platform.permissions.manage',
+      'platform.roles.manage',
+    ]);
+    const app = await prisma.saApp.findUnique({ where: { publicId } });
+    if (!app) throw new NotFoundException();
+    return formatApp(app);
+  }
+
   async createApp(callerBaId: string, dto: CreateAppDto) {
     await checkPermission(callerBaId, 'platform.apps.manage');
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
-          data: { publicId: 'placeholder', name: dto.name, url: dto.url, callbackUrl: dto.callbackUrl || null, isPlatform: false },
+          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, callbackUrl: dto.callbackUrl || null, isPlatform: false },
         });
         return tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
       });

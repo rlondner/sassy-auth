@@ -48,11 +48,18 @@ export async function checkPermission(
   }
 
   // Second try: any non-platform permission grants access, but only if
-  // the caller's org matches the target org (when one was supplied).
+  // the caller's org matches the target org. bug-0001: `targetOrgId`
+  // is REQUIRED for the non-platform branch — an undefined value is a
+  // bug at the call site (previously it silently granted cross-tenant
+  // access to any caller holding an `org.*` perm). List endpoints that
+  // legitimately need to admit both platform and org-scoped callers
+  // must use `resolveListScope` instead of this helper — that helper
+  // returns a scope object the caller can turn into a Prisma `where`
+  // filter for its own org.
   for (const r of requiredList) {
     if (r.startsWith('platform.')) continue;
     if (!perms.has(r)) continue;
-    if (options.targetOrgId === undefined) return;
+    if (options.targetOrgId === undefined) continue;
     if (saUser.orgId === options.targetOrgId) return;
   }
 
