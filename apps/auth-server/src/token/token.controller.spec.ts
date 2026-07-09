@@ -17,7 +17,10 @@ jest.mock('@sentry/nestjs', () => ({
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
     saApp: { findUnique: jest.fn() },
-    saUser: { findUnique: jest.fn(), findFirst: jest.fn() },
+    // `update` covers the bug-0186 fire-and-forget lastLoginAt bump
+    // in directLogin. Default it to resolve so the tests that don't
+    // care about the write don't need to touch it.
+    saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     account: { findFirst: jest.fn() },
   },
 }));
@@ -31,11 +34,11 @@ jest.mock('better-auth/crypto', () => ({ verifyPassword: jest.fn().mockResolvedV
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';
 
-const mockGetSession = auth.api.getSession as jest.Mock;
+const mockGetSession = auth.api.getSession as unknown as jest.Mock;
 
 const mockPrisma = prisma as unknown as {
   saApp: { findUnique: jest.Mock };
-  saUser: { findUnique: jest.Mock; findFirst: jest.Mock };
+  saUser: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
   account: { findFirst: jest.Mock };
 };
 
@@ -91,6 +94,7 @@ describe('TokenController', () => {
       id: 1,
       publicId: 'sqid-1',
       betterAuthUserId: 'ba-1',
+      status: 'active',
       orgId: 5,
       org: { id: 5, publicId: 'sqid-5', appId: 10 },
     };
@@ -117,6 +121,81 @@ describe('TokenController', () => {
         controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-99' }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    // bug-0147 — username / phoneNumber identifier branches now use
+    // findUnique against the newly-@unique columns. Previously they used
+    // findFirst on a non-unique column, so two users across different
+    // orgs sharing a username silently authenticated the wrong tenant
+    // (cross-org auth bug). These tests lock in the correct Prisma call.
+    it('directLogin (username branch) uses findUnique on username, not findFirst', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findUnique.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+      mockTokenService.issueJwt.mockResolvedValue('jwt.token');
+
+      await controller.directLogin({ identifier: 'alice', password: 'pw', appId: 'sqid-10' });
+
+      expect(mockPrisma.saUser.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { username: 'alice' } }),
+      );
+      expect(mockPrisma.saUser.findFirst).not.toHaveBeenCalled();
+    });
+
+    // bug-0186: successful directLogin bumps SaUser.lastLoginAt so the
+    // admin console's "Last login" column reflects reality. The update
+    // is fire-and-forget so its rejection cannot fail the login itself.
+    it('bumps SaUser.lastLoginAt on successful directLogin', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+      mockTokenService.issueJwt.mockResolvedValue('jwt.token');
+      mockPrisma.saUser.update.mockResolvedValue({});
+
+      await controller.directLogin({
+        identifier: 'user@example.com',
+        password: 'pw',
+        appId: 'sqid-10',
+      });
+
+      expect(mockPrisma.saUser.update).toHaveBeenCalledWith({
+        where: { id: saUser.id },
+        data: { lastLoginAt: expect.any(Date) },
+      });
+    });
+
+    it('directLogin (phone branch) uses findUnique on phoneNumber, not findFirst', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findUnique.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+      mockTokenService.issueJwt.mockResolvedValue('jwt.token');
+
+      await controller.directLogin({ identifier: '+15551234567', password: 'pw', appId: 'sqid-10' });
+
+      expect(mockPrisma.saUser.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { phoneNumber: '+15551234567' } }),
+      );
+      expect(mockPrisma.saUser.findFirst).not.toHaveBeenCalled();
+    });
+
+    // bug-0074 — inactive/pending users must not receive a JWT even with the
+    // correct password. Kept opaque as INVALID_CREDENTIALS so response does not
+    // leak that the account exists.
+    it.each(['inactive', 'pending'] as const)(
+      'throws UnauthorizedException (INVALID_CREDENTIALS) when user status is %s',
+      async (status) => {
+        mockPrisma.saApp.findUnique.mockResolvedValue(app);
+        mockPrisma.saUser.findFirst.mockResolvedValue({
+          ...saUser,
+          status,
+          betterAuthUser: baUser,
+        });
+        mockPrisma.account.findFirst.mockResolvedValue(account);
+
+        await expect(
+          controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+      },
+    );
   });
 
   // ── GET /api/token/oauth/authorize ───────────────────────────────────────
@@ -128,6 +207,7 @@ describe('TokenController', () => {
       id: 1,
       publicId: 'sqid-1',
       betterAuthUserId: 'ba-user-1',
+      status: 'active',
       orgId: 5,
       org: { id: 5, publicId: 'sqid-5', appId: 10 },
     };
@@ -176,6 +256,22 @@ describe('TokenController', () => {
         controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    // bug-0074 — a still-valid BetterAuth session cannot mint an OAuth code
+    // for a user whose SaUser.status is not 'active'.
+    it.each(['inactive', 'pending'] as const)(
+      'throws ForbiddenException when user status is %s',
+      async (status) => {
+        mockPrisma.saApp.findUnique.mockResolvedValue(app);
+        mockGetSession.mockResolvedValue(fakeSession);
+        mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, status });
+
+        const fakeReq = { headers: {} } as unknown as import('express').Request;
+        await expect(
+          controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
+        ).rejects.toThrow(ForbiddenException);
+      },
+    );
   });
 
   // ── POST /api/token/oauth/token ───────────────────────────────────────────
@@ -189,6 +285,7 @@ describe('TokenController', () => {
       const saUser = {
         id: 1,
         publicId: 'sqid-1',
+        status: 'active',
         orgId: 5,
         org: { publicId: 'sqid-5', appId: 10 },
       };
@@ -208,6 +305,33 @@ describe('TokenController', () => {
         token_type: 'Bearer',
         expires_in: 3600,
       });
+    });
+
+    // bug-0074 — the OAuth code was issued at /authorize time when the user
+    // was active, but they can be deactivated between /authorize and /token.
+    // Re-check status here so a mid-flow deactivation is honored.
+    it('throws ForbiddenException when user status flipped to inactive between authorize and token', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'inactive',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+
+      await expect(
+        controller.oauthToken({
+          code: 'valid-code',
+          client_id: 'sqid-10',
+          code_verifier: 'a'.repeat(64),
+          redirect_uri: 'https://app.example.com/callback',
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });
