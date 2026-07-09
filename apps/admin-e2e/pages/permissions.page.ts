@@ -24,17 +24,27 @@ export class PermissionsPage {
     return this.page.getByRole('row', { name: new RegExp(escapeRe(name)) })
   }
 
+  /** Filter the table via its search box so row lookups tolerate pagination. */
+  async search(query: string) {
+    const box = this.page.getByPlaceholder(t('permissions.search'))
+    await box.fill('')
+    await box.fill(query)
+  }
+
   async createPermission({ name, appName }: { name: string; appName: string }) {
     await this.createButton.click()
     const drawer = this.page.getByRole('dialog')
     await drawer.getByLabel(t('permissions.fields.name')).fill(name)
-    await drawer.getByLabel(t('permissions.fields.app')).click()
-    await this.page.getByRole('option', { name: appName }).click()
+    // The app field is a native <select>; use selectOption rather than
+    // clicking options (native <option>s are not "visible" to Playwright).
+    await drawer.getByLabel(t('permissions.fields.app')).selectOption({ label: appName })
     await drawer.getByRole('button', { name: t('permissions.drawer.createTitle') }).click()
     await raceSuccessOrError(this.page, t('permissions.toast.created'))
+    await this.search(name)
   }
 
   async editPermission(name: string, patch: { name?: string }) {
+    await this.search(name)
     // Row actions are inside a DropdownMenu triggered by the "more actions" button.
     await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
     await this.page.getByRole('menuitem', { name: t('permissions.actions.edit') }).click()
@@ -44,9 +54,11 @@ export class PermissionsPage {
     }
     await drawer.getByRole('button', { name: t('permissions.drawer.save') }).click()
     await raceSuccessOrError(this.page, t('permissions.toast.updated'))
+    if (patch.name !== undefined) await this.search(patch.name)
   }
 
   async deletePermission(name: string) {
+    await this.search(name)
     await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
     await this.page.getByRole('menuitem', { name: t('permissions.actions.delete') }).click()
     await this.page

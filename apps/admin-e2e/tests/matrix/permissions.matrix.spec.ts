@@ -8,6 +8,13 @@ function uniqueName(prefix: string): string {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
 }
 
+// Permission names must be lowercase, dotted, with each segment starting with
+// a letter. crypto.randomUUID() slices can begin with a digit, so lead the
+// random segment with a letter to keep the generated name valid.
+function permName(kind: string): string {
+  return `e2e.perm.${kind}.x${crypto.randomUUID().slice(0, 8)}`
+}
+
 async function makeTempApp(page: import('@playwright/test').Page): Promise<string> {
   const apps = new AppsPage(page)
   await apps.goto()
@@ -44,7 +51,7 @@ test.describe('/permissions UI matrix', () => {
     const appName = await makeTempApp(page)
     const perms = new PermissionsPage(page)
     await perms.goto()
-    const name = `e2e.${uniqueName('perm-ui').replace(/-/g, '.')}`
+    const name = permName('ui')
     await perms.createPermission({ name, appName })
     await expect(perms.rowByName(name)).toBeVisible()
     await perms.deletePermission(name)
@@ -60,9 +67,9 @@ test.describe('/permissions UI matrix', () => {
     const appName = await makeTempApp(page)
     const perms = new PermissionsPage(page)
     await perms.goto()
-    const name = `e2e.${uniqueName('perm-ui').replace(/-/g, '.')}`
+    const name = permName('ui')
     await perms.createPermission({ name, appName })
-    const renamed = `e2e.${uniqueName('perm-ren').replace(/-/g, '.')}`
+    const renamed = permName('ren')
     await perms.editPermission(name, { name: renamed })
     await expect(perms.rowByName(renamed)).toBeVisible()
     await perms.deletePermission(renamed)
@@ -78,7 +85,7 @@ test.describe('/permissions UI matrix', () => {
     const appName = await makeTempApp(page)
     const perms = new PermissionsPage(page)
     await perms.goto()
-    const name = `e2e.${uniqueName('perm-ui').replace(/-/g, '.')}`
+    const name = permName('ui')
     await perms.createPermission({ name, appName })
     await perms.deletePermission(name)
     await expect(perms.rowByName(name)).toBeHidden()

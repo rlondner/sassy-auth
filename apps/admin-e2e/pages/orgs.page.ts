@@ -24,18 +24,27 @@ export class OrgsPage {
     return this.page.getByRole('row', { name: new RegExp(escapeRe(name)) })
   }
 
+  /** Filter the table via its search box so row lookups tolerate pagination. */
+  async search(query: string) {
+    const box = this.page.getByPlaceholder(t('orgs.search'))
+    await box.fill('')
+    await box.fill(query)
+  }
+
   async createOrg({ name, appName }: { name: string; appName: string }) {
     await this.createButton.click()
     const drawer = this.page.getByRole('dialog')
     await drawer.getByLabel(t('orgs.fields.name')).fill(name)
-    // App is selected via combobox or select — assumes the form binds to app name.
-    await drawer.getByLabel(t('orgs.fields.app')).click()
-    await this.page.getByRole('option', { name: appName }).click()
+    // The app field is a native <select>; use selectOption rather than
+    // clicking options (native <option>s are not "visible" to Playwright).
+    await drawer.getByLabel(t('orgs.fields.app')).selectOption({ label: appName })
     await drawer.getByRole('button', { name: t('orgs.drawer.createTitle') }).click()
     await raceSuccessOrError(this.page, t('orgs.toast.created'))
+    await this.search(name)
   }
 
   async editOrg(name: string, patch: { name?: string }) {
+    await this.search(name)
     // Row actions are inside a DropdownMenu triggered by the "more actions" button.
     await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
     await this.page.getByRole('menuitem', { name: t('orgs.actions.edit') }).click()
@@ -45,9 +54,13 @@ export class OrgsPage {
     }
     await drawer.getByRole('button', { name: t('orgs.drawer.save') }).click()
     await raceSuccessOrError(this.page, t('orgs.toast.updated'))
+    // The edit drawer closes and the table refreshes (clearing the filter);
+    // re-filter to the renamed row for the caller's assertion.
+    if (patch.name !== undefined) await this.search(patch.name)
   }
 
   async deleteOrg(name: string) {
+    await this.search(name)
     await this.rowByName(name).locator('[aria-haspopup="menu"]').click()
     await this.page.getByRole('menuitem', { name: t('orgs.actions.delete') }).click()
     await this.page
