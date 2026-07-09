@@ -7,7 +7,7 @@ import {
   Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle,
   Button, ButtonGroup, Badge,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { getRoleAction } from '@/app/(admin)/roles/actions'
 import type { RoleRow, RoleDetail } from '@/lib/types'
 
@@ -17,29 +17,33 @@ interface Props {
   onOpenChange: (open: boolean) => void
   onEdit: () => void
   onDelete: () => void
+  // bug-0205: previously the drawer always rendered Edit + Delete
+  // regardless of whether the caller had write access. An org-scoped
+  // admin who could only read roles saw actionable buttons that
+  // produced 403s on click. Pass `canWrite` (same shape as the
+  // table's dropdown) and gate the buttons.
+  canWrite?: boolean
 }
 
-export function RoleViewDrawer({ role, open, onOpenChange, onEdit, onDelete }: Props) {
+export function RoleViewDrawer({ role, open, onOpenChange, onEdit, onDelete, canWrite = true }: Props) {
   const t = useTranslations()
   const [detail, setDetail] = React.useState<RoleDetail | null>(null)
   const [loading, setLoading] = React.useState(false)
-  const [copied, setCopied] = React.useState<string | null>(null)
+  const { copiedKey: copied, copy } = useCopyFeedback()
 
+  // bug-0145: cancel in-flight fetch on drawer close / role change.
+  // Same story as PermissionViewDrawer — otherwise a slow response
+  // can setDetail after the drawer's context has moved on.
   React.useEffect(() => {
     if (!open) return
+    let cancelled = false
     setLoading(true)
     setDetail(null)
     getRoleAction(role.publicId)
-      .then((res) => { if ('publicId' in res) setDetail(res) })
-      .finally(() => setLoading(false))
+      .then((res) => { if (!cancelled && 'publicId' in res) setDetail(res) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [open, role.publicId])
-
-  function copy(text: string, key: string) {
-    copyToClipboard(text, () => {
-      setCopied(key)
-      setTimeout(() => setCopied(null), 2000)
-    })
-  }
 
   const permissions = detail?.permissions ?? []
   const permissionCount = detail?.permissionCount ?? role.permissionCount
@@ -56,18 +60,20 @@ export function RoleViewDrawer({ role, open, onOpenChange, onEdit, onDelete }: P
             <SheetTitle>{role.name}</SheetTitle>
           </div>
           <div className="flex items-center gap-2">
-            <ButtonGroup>
-              <Button size="sm" variant="outline" onClick={onEdit}>{t('roles.actions.edit')}</Button>
-              <Button
-                size="sm" variant="outline"
-                className="border-destructive text-destructive"
-                onClick={onDelete}
-                disabled={userCount > 0}
-                title={userCount > 0 ? t('roles.drawer.inUseTooltip', { userCount }) : undefined}
-              >
-                {t('roles.actions.delete')}
-              </Button>
-            </ButtonGroup>
+            {canWrite && (
+              <ButtonGroup>
+                <Button size="sm" variant="outline" onClick={onEdit}>{t('roles.actions.edit')}</Button>
+                <Button
+                  size="sm" variant="outline"
+                  className="border-destructive text-destructive"
+                  onClick={onDelete}
+                  disabled={userCount > 0}
+                  title={userCount > 0 ? t('roles.drawer.inUseTooltip', { userCount }) : undefined}
+                >
+                  {t('roles.actions.delete')}
+                </Button>
+              </ButtonGroup>
+            )}
             <SheetClose asChild>
               <button className="ml-2 flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
                 <span className="material-symbols-outlined text-[20px]">close</span>

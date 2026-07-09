@@ -7,9 +7,16 @@ import {
   buildOAuthAuthorizationServerMetadata,
 } from './oauth-metadata';
 
+// This spec mutates process.env.BETTER_AUTH_URL inside test bodies. Jest runs
+// tests within a single file serially by default, and beforeEach/afterEach
+// below snapshot + restore the env on every test boundary so a failing test
+// cannot leak its mutation to the next. If you ever switch this file to
+// `test.concurrent` or move BETTER_AUTH_URL reads to module-init time, this
+// isolation breaks — keep the env reads request-scoped.
 describe('DiscoveryController', () => {
   let app: INestApplication;
-  const originalIssuer = process.env.BETTER_AUTH_URL;
+  let originalIssuer: string | undefined;
+  let warnSpy: jest.SpyInstance;
 
   async function buildApp(issuer: string | undefined): Promise<INestApplication> {
     if (issuer === undefined) {
@@ -29,6 +36,13 @@ describe('DiscoveryController', () => {
     return instance;
   }
 
+  beforeEach(() => {
+    originalIssuer = process.env.BETTER_AUTH_URL;
+    // Controller logs a startup warning when BETTER_AUTH_URL is unset; mute it
+    // here so the "falls back to placeholder" test doesn't pollute output.
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
   afterEach(async () => {
     if (app) await app.close();
     if (originalIssuer === undefined) {
@@ -36,6 +50,7 @@ describe('DiscoveryController', () => {
     } else {
       process.env.BETTER_AUTH_URL = originalIssuer;
     }
+    warnSpy.mockRestore();
   });
 
   it('serves the RFC 8414 metadata at /.well-known/oauth-authorization-server (root, not /api/...)', async () => {
@@ -72,5 +87,17 @@ describe('DiscoveryController', () => {
     const res = await request(app.getHttpServer()).get('/.well-known/oauth-authorization-server');
     expect(res.status).toBe(200);
     expect(res.body.issuer).toBe('https://auth.example.com');
+  });
+
+  it('logs a startup warning when BETTER_AUTH_URL is unset so a misconfigured prod deploy is observable', async () => {
+    app = await buildApp(undefined);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('BETTER_AUTH_URL is unset'),
+    );
+  });
+
+  it('does NOT warn when BETTER_AUTH_URL is set', async () => {
+    app = await buildApp('http://localhost:3000');
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
