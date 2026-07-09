@@ -2,17 +2,24 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetContent, SheetHeader, SheetBody, SheetFooter, SheetClose, SheetTitle, SheetDescription,
-  Button, FormField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Button, ButtonGroup, FormField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sassy-auth/ui'
-import { createUserAction, getRolesAction } from '@/app/(admin)/users/actions'
+import {
+  createUserAction, getRolesAction, getAppPermissionsAction,
+} from '@/app/(admin)/users/actions'
 import type { Org, Role } from '@/lib/types'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
+import { RoleRowsEditor, type RoleOption } from './user-role-rows-editor'
+import { PermissionRowsEditor, type PermOption } from './role-permission-rows-editor'
 
 interface UserCreateDrawerProps {
   orgs: Org[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
 interface FormState {
@@ -22,51 +29,68 @@ interface FormState {
   username: string
   phoneNumber: string
   orgId: string
-  roleId: string
+  roleIds: string[]
+  directPermissionIds: string[]
 }
 
-const EMPTY: FormState = { firstName: '', lastName: '', email: '', username: '', phoneNumber: '', orgId: '', roleId: '' }
+const EMPTY: FormState = {
+  firstName: '', lastName: '', email: '', username: '', phoneNumber: '',
+  orgId: '', roleIds: [], directPermissionIds: [],
+}
 
-export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerProps) {
+export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCreateDrawerProps) {
   const t = useTranslations()
   const [form, setForm] = React.useState<FormState>(EMPTY)
-  const [roles, setRoles] = React.useState<Role[]>([])
-  const [errors, setErrors] = React.useState<Partial<FormState>>({})
+  const [roles, setRoles] = React.useState<RoleOption[]>([])
+  const [perms, setPerms] = React.useState<PermOption[]>([])
+  const [rolesLoading, setRolesLoading] = React.useState(false)
+  const [permsLoading, setPermsLoading] = React.useState(false)
+  const [errors, setErrors] = React.useState<Partial<Record<keyof FormState, string>>>({})
   const [submitting, setSubmitting] = React.useState(false)
   const [inviteUrl, setInviteUrl] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [serverError, setServerError] = React.useState<string | null>(null)
 
-  // Reset on open
   React.useEffect(() => {
     if (open) {
       setForm(EMPTY)
       setErrors({})
       setInviteUrl(null)
       setServerError(null)
-      setCopied(false)
     }
   }, [open])
 
-  // Load roles when org changes
+  // Load roles + app permissions in parallel whenever org changes.
   React.useEffect(() => {
-    if (!form.orgId) { setRoles([]); return }
+    if (!form.orgId) { setRoles([]); setPerms([]); return }
     const selectedOrg = orgs.find((o) => o.id === form.orgId)
     if (!selectedOrg) return
-    getRolesAction(selectedOrg.appId).then(setRoles)
+    let cancelled = false
+    setRolesLoading(true)
+    setPermsLoading(true)
+    getRolesAction(selectedOrg.appId).then((r) => {
+      if (cancelled) return
+      setRoles(r.map((x) => ({ publicId: x.publicId, name: x.name })))
+    }).finally(() => { if (!cancelled) setRolesLoading(false) })
+    getAppPermissionsAction(selectedOrg.appId).then((p) => {
+      if (cancelled) return
+      setPerms(p)
+    }).finally(() => { if (!cancelled) setPermsLoading(false) })
+    return () => { cancelled = true }
   }, [form.orgId, orgs])
 
-  function set(field: keyof FormState) {
-    return (value: string) => setForm((f) => ({ ...f, [field]: value }))
+  function set<K extends keyof FormState>(field: K) {
+    return (value: FormState[K]) => setForm((f) => ({ ...f, [field]: value }))
   }
 
   function validate(): boolean {
-    const e: Partial<FormState> = {}
-    if (!form.firstName.trim()) e.firstName = 'Required'
-    if (!form.lastName.trim()) e.lastName = 'Required'
-    if (!form.email.trim()) e.email = 'Required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Invalid email'
-    if (!form.orgId) e.orgId = 'Required'
+    const e: Partial<Record<keyof FormState, string>> = {}
+    if (!form.firstName.trim()) e.firstName = t('users.errors.required')
+    if (!form.lastName.trim()) e.lastName = t('users.errors.required')
+    if (!form.email.trim()) e.email = t('users.errors.required')
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = t('users.errors.emailInvalid')
+    if (!form.orgId) e.orgId = t('users.errors.required')
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -83,12 +107,19 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
         orgId: form.orgId,
         ...(form.username && { username: form.username }),
         ...(form.phoneNumber && { phoneNumber: form.phoneNumber }),
-        ...(form.roleId && { roleId: form.roleId }),
+        ...(form.roleIds.filter((id) => id !== '').length > 0 && {
+          roleIds: Array.from(new Set(form.roleIds.filter((id) => id !== ''))),
+        }),
+        ...(form.directPermissionIds.filter((id) => id !== '').length > 0 && {
+          directPermissionIds: Array.from(new Set(form.directPermissionIds.filter((id) => id !== ''))),
+        }),
       })
       if ('error' in result) {
         setServerError(result.error)
       } else {
+        toast.success(t('users.toast.created'))
         setInviteUrl(result.inviteUrl)
+        onSuccess?.()
       }
     } finally {
       setSubmitting(false)
@@ -97,10 +128,10 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
 
   async function handleCopy() {
     if (!inviteUrl) return
-    await navigator.clipboard.writeText(inviteUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    await copy(inviteUrl, 'invite-url')
   }
+
+  const selectedOrg = orgs.find((o) => o.id === form.orgId)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -111,18 +142,17 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
             <SheetDescription>{t('users.drawer.createSubtitle')}</SheetDescription>
           </div>
           <SheetClose asChild>
-            <button className="flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--muted)]">
+            <button className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
           </SheetClose>
         </SheetHeader>
 
         {inviteUrl ? (
-          /* Success state */
           <>
             <SheetBody className="flex flex-col items-center gap-6 pt-12 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--secondary)]">
-                <span className="material-symbols-outlined text-[32px] text-[var(--primary)]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
+                <span className="material-symbols-outlined text-[32px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
               </div>
               <div>
                 <h2 className="text-headline-sm">{t('users.drawer.inviteCreated')}</h2>
@@ -132,7 +162,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
                   <input
                     readOnly
                     value={inviteUrl}
-                    className="flex-1 rounded border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-body-sm font-mono"
+                    className="flex-1 rounded border border-border bg-muted px-3 py-2 text-body-sm font-mono"
                   />
                   <Button variant="outline" size="sm" onClick={handleCopy}>
                     <span className="material-symbols-outlined text-[18px]">{copied ? 'check' : 'content_copy'}</span>
@@ -146,93 +176,71 @@ export function UserCreateDrawer({ orgs, open, onOpenChange }: UserCreateDrawerP
             </SheetFooter>
           </>
         ) : (
-          /* Form */
           <>
             <SheetBody className="flex flex-col gap-6">
-              {/* Basic Info */}
               <section>
-                <h3 className="mb-4 text-label-sm font-bold uppercase tracking-wider text-[var(--muted-foreground)]">{t('users.drawer.basicInfo')}</h3>
+                <h3 className="mb-4 text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('users.drawer.basicInfo')}</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    label={t('users.fields.firstName')}
-                    value={form.firstName}
-                    onChange={(e) => set('firstName')(e.target.value)}
-                    error={errors.firstName}
-                    required
-                  />
-                  <FormField
-                    label={t('users.fields.lastName')}
-                    value={form.lastName}
-                    onChange={(e) => set('lastName')(e.target.value)}
-                    error={errors.lastName}
-                    required
-                  />
-                  <FormField
-                    label={t('users.fields.email')}
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => set('email')(e.target.value)}
-                    error={errors.email}
-                    required
-                    className="col-span-2"
-                  />
-                  <FormField
-                    label={`${t('users.fields.username')} ${t('users.fields.optional')}`}
-                    value={form.username}
-                    onChange={(e) => set('username')(e.target.value)}
-                  />
-                  <FormField
-                    label={`${t('users.fields.phone')} ${t('users.fields.optional')}`}
-                    type="tel"
-                    value={form.phoneNumber}
-                    onChange={(e) => set('phoneNumber')(e.target.value)}
-                  />
+                  <FormField label={t('users.fields.firstName')} value={form.firstName} onChange={(e) => set('firstName')(e.target.value)} error={errors.firstName} required />
+                  <FormField label={t('users.fields.lastName')} value={form.lastName} onChange={(e) => set('lastName')(e.target.value)} error={errors.lastName} required />
+                  <FormField label={t('users.fields.email')} type="email" value={form.email} onChange={(e) => set('email')(e.target.value)} error={errors.email} required className="col-span-2" />
+                  <FormField label={`${t('users.fields.username')} ${t('users.fields.optional')}`} value={form.username} onChange={(e) => set('username')(e.target.value)} />
+                  <FormField label={`${t('users.fields.phone')} ${t('users.fields.optional')}`} type="tel" value={form.phoneNumber} onChange={(e) => set('phoneNumber')(e.target.value)} />
                 </div>
               </section>
 
-              {/* Access */}
               <section>
-                <h3 className="mb-4 text-label-sm font-bold uppercase tracking-wider text-[var(--muted-foreground)]">{t('users.drawer.accessPerms')}</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-label-md font-semibold">{t('users.fields.org')}<span className="ml-0.5 text-[var(--destructive)]">*</span></label>
-                    <Select value={form.orgId} onValueChange={set('orgId')}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select org" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {errors.orgId && <p className="text-label-md text-[var(--destructive)]">{errors.orgId}</p>}
-                  </div>
+                <h3 className="mb-4 text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('users.drawer.accessPerms')}</h3>
+                <div className="flex flex-col gap-1.5 mb-4">
+                  <label className="text-label-md font-semibold">{t('users.fields.org')}<span className="ml-0.5 text-destructive">*</span></label>
+                  <Select value={form.orgId} onValueChange={set('orgId')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select org" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {errors.orgId && <p className="text-label-md text-destructive">{errors.orgId}</p>}
+                </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-label-md font-semibold">{t('users.fields.role')}</label>
-                    <Select value={form.roleId} onValueChange={set('roleId')} disabled={!form.orgId || roles.length === 0}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={form.orgId ? 'Select role' : 'Select org first'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="mb-4">
+                  <h4 className="mb-2 text-label-md font-semibold">{t('users.drawer.assignedRoles')}</h4>
+                  <RoleRowsEditor
+                    appId={selectedOrg?.appId ?? ''}
+                    roles={roles}
+                    rows={form.roleIds}
+                    onRowsChange={(next) => set('roleIds')(next)}
+                    loading={rolesLoading}
+                  />
+                </div>
+
+                <div>
+                  <h4 className="mb-2 text-label-md font-semibold">{t('users.drawer.assignedDirectPermissions')}</h4>
+                  <PermissionRowsEditor
+                    appId={selectedOrg?.appId ?? ''}
+                    perms={perms}
+                    rows={form.directPermissionIds}
+                    onRowsChange={(next) => set('directPermissionIds')(next)}
+                    loading={permsLoading}
+                  />
                 </div>
               </section>
 
               {serverError && (
-                <p className="rounded border border-[var(--destructive)]/20 bg-[#ffdad6]/30 px-3 py-2 text-body-sm text-[var(--destructive)]">
+                <p role="alert" className="rounded border border-destructive/20 bg-destructive/10 px-3 py-2 text-body-sm text-destructive">
                   {serverError}
                 </p>
               )}
             </SheetBody>
 
             <SheetFooter>
-              <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={submitting}>{t('users.drawer.cancel')}</Button>
-              <Button onClick={handleSubmit} disabled={submitting}>
-                {submitting ? '…' : t('users.drawer.create')}
-              </Button>
+              <ButtonGroup>
+                <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={submitting}>{t('users.drawer.cancel')}</Button>
+                <Button onClick={handleSubmit} disabled={submitting}>
+                  {submitting ? '…' : t('users.drawer.create')}
+                </Button>
+              </ButtonGroup>
             </SheetFooter>
           </>
         )}
