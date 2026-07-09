@@ -4,11 +4,12 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, Badge,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteOrgAction, listOrgsAction } from '@/app/(admin)/orgs/actions'
 import type { App, OrgRow, ListOrgsResponse } from '@/lib/types'
 import { OrgViewDrawer } from './org-view-drawer'
@@ -32,7 +33,7 @@ export function OrgsTable({ initial, apps }: Props) {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
-  const [copiedSqid, setCopiedSqid] = React.useState<string | null>(null)
+  const { copiedKey: copiedSqid, copy: copySqid } = useCopyFeedback()
   const initialRefRef = React.useRef(true)
 
   React.useEffect(() => {
@@ -40,6 +41,7 @@ export function OrgsTable({ initial, apps }: Props) {
       initialRefRef.current = false
       return
     }
+    let cancelled = false
     const timer = setTimeout(async () => {
       const params = {
         q: query || undefined,
@@ -48,9 +50,12 @@ export function OrgsTable({ initial, apps }: Props) {
         pageSize,
       }
       const result = await listOrgsAction(params)
+      // bug-0137: guard against stale in-flight response overwriting
+      // state after a newer query has superseded this effect.
+      if (cancelled) return
       if (result && 'items' in result) setData(result)
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query, appFilter, page, pageSize])
 
   const columns: ColumnDef<OrgRow>[] = [
@@ -94,10 +99,7 @@ export function OrgsTable({ initial, apps }: Props) {
               aria-label={t('orgs.actions.copy')}
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(o.publicId, () => {
-                  setCopiedSqid(o.publicId)
-                  setTimeout(() => setCopiedSqid(null), 2000)
-                })
+                void copySqid(o.publicId, o.publicId)
               }}
               className="text-muted-foreground hover:text-primary"
             >
@@ -151,6 +153,20 @@ export function OrgsTable({ initial, apps }: Props) {
     },
   ]
 
+  const refresh = React.useCallback(async () => {
+    const refreshed = await listOrgsAction({
+      q: query || undefined, appId: appFilter || undefined, page, pageSize,
+    })
+    if (refreshed && 'items' in refreshed) {
+      setData(refreshed)
+      // bug-0206: rebase `selected` on the refreshed rows so drawers
+      // reflect current data, or clear if the row is gone.
+      setSelected((prev) =>
+        prev ? refreshed.items.find((r) => r.publicId === prev.publicId) ?? null : null,
+      )
+    }
+  }, [query, appFilter, page, pageSize])
+
   async function handleDelete() {
     if (!selected) return
     const result = await deleteOrgAction(selected.publicId)
@@ -160,10 +176,8 @@ export function OrgsTable({ initial, apps }: Props) {
     }
     setDeleteOpen(false)
     setViewOpen(false)
-    const refreshed = await listOrgsAction({
-      q: query || undefined, appId: appFilter || undefined, page, pageSize,
-    })
-    if (refreshed && 'items' in refreshed) setData(refreshed)
+    toast.success(t('orgs.toast.deleted'))
+    await refresh()
   }
 
   return (
@@ -236,9 +250,10 @@ export function OrgsTable({ initial, apps }: Props) {
           org={selected}
           open={editOpen}
           onOpenChange={setEditOpen}
+          onSuccess={refresh}
         />
       )}
-      <OrgCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} />
+      <OrgCreateDrawer apps={apps} open={createOpen} onOpenChange={setCreateOpen} onSuccess={refresh} />
       {selected && (
         <DeleteAlertDialog
           open={deleteOpen}

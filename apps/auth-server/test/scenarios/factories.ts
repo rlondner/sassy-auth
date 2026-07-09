@@ -5,6 +5,7 @@
  */
 import 'dotenv/config';
 import * as crypto from 'crypto';
+import * as path from 'path';
 import express from 'express';
 import request, { Response as SuperResponse } from 'supertest';
 import { Test } from '@nestjs/testing';
@@ -47,12 +48,17 @@ export async function bootScenarioApp() {
   ensureTestEnv();
 
   // Migrations + platform seed + demo seed (idempotent).
+  // bug-0181: use absolute paths built from __dirname rather than
+  // `npx prisma` with a relative schema. `npx` invokes a shell resolve
+  // that can pick up a project-local prisma or a global one, and the
+  // relative schema path only works when jest runs from the auth-server
+  // cwd. Matches the pattern already used in `matrix/harness.ts`.
   if (!process.env.SCENARIO_DB_READY) {
     const { execSync } = await import('child_process');
-    execSync(
-      'npx prisma migrate deploy --schema=../../packages/db/schema.prisma',
-      { stdio: 'inherit' },
-    );
+    const dbRoot = path.resolve(__dirname, '../../../../packages/db');
+    const prismaBin = path.join(dbRoot, 'node_modules/.bin/prisma');
+    const schemaPath = path.join(dbRoot, 'schema.prisma');
+    execSync(`${prismaBin} migrate deploy --schema=${schemaPath}`, { stdio: 'inherit' });
     execSync('pnpm seed', {
       stdio: 'inherit',
       cwd: process.cwd(),
