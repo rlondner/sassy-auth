@@ -1,5 +1,6 @@
 import 'server-only'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, MeProfile, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
 
@@ -15,7 +16,33 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Response>
       ...init.headers,
     },
   })
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`)
+  // bug-0136: an expired auth-server session previously threw the
+  // opaque "API error 401" that surfaced as a generic toast. Bouncing
+  // to /login mirrors what the admin middleware does on a hard
+  // sign-out and gives the user a clear path forward.
+  // `redirect()` throws a NEXT_REDIRECT sentinel that Next.js's
+  // route handler catches, so this works cleanly in both server
+  // actions and RSC page renders.
+  if (res.status === 401) redirect('/login')
+  if (!res.ok) {
+    // bug-0050 / bug-0200 / bug-0201: previously threw only
+    // "API error ${status}: ${path}" and discarded the response body.
+    // Callers that wanted to distinguish (e.g. self-delete
+    // "cannot delete your own account" vs generic 403; "already
+    // exists" vs generic 409) had no signal to key off. Now the
+    // Nest error message is appended when parseable, so callers can
+    // reliably `.includes(...)` on both the status code and the
+    // server-side reason.
+    let detail = ''
+    try {
+      const body = await res.clone().json() as { message?: string | string[] }
+      if (typeof body?.message === 'string') detail = ` ${body.message}`
+      else if (Array.isArray(body?.message)) detail = ` ${body.message.join(', ')}`
+    } catch {
+      // non-JSON body — leave detail empty
+    }
+    throw new Error(`API error ${res.status}: ${path}${detail}`)
+  }
   return res
 }
 
@@ -33,7 +60,11 @@ export async function getUser(id: string): Promise<User> {
 export async function createUser(payload: CreateUserPayload): Promise<CreateUserResponse> {
   const res = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(payload) })
   const result: CreateUserResponse = await res.json()
-  Sentry.addBreadcrumb({ category: 'admin.action', message: `User created: ${result.user.email}`, level: 'info' })
+  // bug-0146: log the userId, not the email. Emails are PII and
+  // Sentry breadcrumbs are retained by a third party. The publicId
+  // is the correlation key for support debugging without leaking
+  // any identifying data.
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `User created: ${result.user.id}`, level: 'info' })
   return result
 }
 
