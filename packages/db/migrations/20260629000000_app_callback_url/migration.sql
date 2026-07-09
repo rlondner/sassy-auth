@@ -1,0 +1,1 @@
+ALTER TABLE "SaApp" ADD COLUMN "callbackUrl" TEXT;
