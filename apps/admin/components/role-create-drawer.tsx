@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle,
   Button, ButtonGroup, Input, Label,
@@ -14,9 +15,10 @@ interface Props {
   apps: App[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function RoleCreateDrawer({ apps, open, onOpenChange }: Props) {
+export function RoleCreateDrawer({ apps, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState('')
   const [appId, setAppId] = React.useState('')
@@ -59,8 +61,13 @@ export function RoleCreateDrawer({ apps, open, onOpenChange }: Props) {
     const uniqIds = Array.from(new Set(permissionIds))
     startTransition(async () => {
       const result = await createRoleAction({ name: name.trim(), appId, permissionIds: uniqIds })
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('roles.toast.created'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 
