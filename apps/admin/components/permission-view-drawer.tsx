@@ -7,7 +7,7 @@ import {
   Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle,
   Button, ButtonGroup, Badge, UserAvatar,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { getPermissionAction } from '@/app/(admin)/permissions/actions'
 import type { PermissionRow, PermissionDetail } from '@/lib/types'
 
@@ -23,27 +23,28 @@ export function PermissionViewDrawer({ permission, open, onOpenChange, onEdit, o
   const t = useTranslations()
   const [detail, setDetail] = React.useState<PermissionDetail | null>(null)
   const [loading, setLoading] = React.useState(false)
-  const [copied, setCopied] = React.useState<string | null>(null)
+  const { copiedKey: copied, copy } = useCopyFeedback()
 
   const isPlatform = permission.name.startsWith('platform.')
   const isSystem = !isPlatform && (permission.isSystem ?? false)
   const isImmutable = isPlatform || isSystem
 
+  // bug-0145: cancel the in-flight fetch on drawer close / permission
+  // change. Previously a slow response could resolve after the drawer
+  // was closed and setDetail(res) with data the user is no longer
+  // looking at, or worse — after the user re-opened the drawer with
+  // a different permission, overwriting the newer permission's data
+  // with the old one.
   React.useEffect(() => {
     if (!open) return
+    let cancelled = false
     setLoading(true)
     setDetail(null)
     getPermissionAction(permission.publicId)
-      .then((res) => { if ('publicId' in res) setDetail(res) })
-      .finally(() => setLoading(false))
+      .then((res) => { if (!cancelled && 'publicId' in res) setDetail(res) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [open, permission.publicId])
-
-  function copy(text: string, key: string) {
-    copyToClipboard(text, () => {
-      setCopied(key)
-      setTimeout(() => setCopied(null), 2000)
-    })
-  }
 
   const roles = detail?.roles ?? []
   const users = detail?.users ?? []
