@@ -1,6 +1,14 @@
-import { IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 
 export class CreateAppDto {
-  @IsString() @MinLength(1) @MaxLength(120) name: string;
-  @IsUrl({ require_protocol: true, protocols: ['https', 'http'] }) @MaxLength(2048) url: string;
+  @IsString() @MinLength(1) @MaxLength(120) name!: string;
+  @IsAppUrl() @MaxLength(2048) url!: string;
+
+  // Optional exact-match callback URL. Omitted / null / '' all mean "default"
+  // (origin match against `url`) and skip validation.
+  @ValidateIf((o) => o.callbackUrl !== undefined && o.callbackUrl !== null && o.callbackUrl !== '')
+  @IsAppUrl()
+  @MaxLength(2048)
+  callbackUrl?: string | null;
 }
