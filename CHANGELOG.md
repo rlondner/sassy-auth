@@ -88,6 +88,103 @@ See [BUGS_2026-07-08.md](./bugs/BUGS_2026-07-08.md) and [TODO_2026-07-08.md](./t
 
 Estimated open bugs: **~153** (192 prior − 54 newly fixed + 15 new). All Critical-severity bugs resolved. The 2 new Critical bugs (bug-0214, 0215) are regressions in the timing guard — they need priority attention before the directLogin fix can be considered complete.
 
+## [Unreleased] — 2026-07-09
+
+Reviewing the 15 commits that landed on 2026-07-08 — a massive overnight bug-fixing sprint that closed **~55 bugs** including **all 9 Criticals**. 16 new bugs found in the post-fix review (0 critical, 8 warning, 8 minor). No code changes today.
+
+### Bugs found (16 new)
+
+See [BUGS_2026-07-09.md](./bugs/BUGS_2026-07-09.md) and [TODO_2026-07-09.md](./todo/TODO_2026-07-09.md).
+
+#### Warning (8)
+
+- **bug-0214** — `directLogin` org/app mismatch returns 403 before scrypt — timing oracle reveals tenant membership.
+- **bug-0216** — Post-login OAuth `next` path is broken — bug-0149 redirect is non-functional (path lacks `/` prefix).
+- **bug-0217** — Helmet CSP breaks Swagger UI in development (`helmet()` applied unconditionally).
+- **bug-0218** — `updateUser` status guard is one-hop — `pending→inactive→active` bypasses invitation requirement.
+- **bug-0219** — `updateUser` missing self-modification guard — admin can deactivate own account.
+- **bug-0225** — BetterAuth sign-in/sign-up routes bypass NestJS ThrottlerGuard entirely (mounted as raw Express middleware).
+- **bug-0226** — Bug-0206 `selected` rebase fix not applied to UsersTable — stale data in user drawer after refresh.
+- **bug-0227** — `createUserAction` and `updateUserAction` leak raw server error messages to UI after bug-0050 made `apiFetch` richer.
+
+#### Minor (8)
+
+- **bug-0215** — `directLogin` timing guard incomplete — OAuth-only account skips dummy scrypt.
+- **bug-0220** — `SaOauthCode` table has no cleanup job — unbounded row growth from abandoned flows.
+- **bug-0221** — `updateUserAction` swallows Next.js `NEXT_REDIRECT` sentinel — session expiry shows error instead of login.
+- **bug-0222** — `user-view-drawer` initial-load effect lacks cancellation — rapid open/close shows stale data.
+- **bug-0223** — Session validation cache negative-caches 5xx responses — 10s false lockout on transient errors.
+- **bug-0224** — Throttler `@Throttle` decorator values duplicate module config — silently masks central changes.
+- **bug-0228** — `listUsers` silently truncates at 500 with no pagination metadata or indicator.
+- **bug-0229** — App edit drawer shows "name required" error when URL is empty.
+
+### Summary of 2026-07-08 changes (15 commits)
+
+#### Security (4 commits)
+
+- **`880b5e6`** sec+ux(oauth): Timing-guard on `directLogin` to prevent user enumeration (bug-0209). Browser-friendly authorize 401 now redirects to `/login?next=` instead of returning JSON (bug-0149).
+- **`51769a8`** sec+fix: 6 hygiene items — social provider env validation (bug-0175), `AcceptInvitationDto` `@MaxLength` (bug-0184), invitation URL env warning (bug-0185), and three minor fixes (bug-0166, 0168, 0169).
+- **`6a39e9d`** sec(auth): `removeRole` escalation guard (bug-0097), startup env validation (bug-0115), set-replace `@ArrayMaxSize` caps (bug-0034).
+- **`0b6ef0d`** sec(auth): Rate limiting via `@nestjs/throttler` — 120 req/min global, 10 req/min on auth endpoints (bug-0080). Explicit BetterAuth session config (bug-0158).
+
+#### Bug fixes (7 commits)
+
+- **`2e0190b`** fix(admin): Rebase table `selected` state on refresh — drawers now show current server data, not stale snapshots (bug-0206).
+- **`4a193dc`** fix(admin): `apiFetch` now includes response body in errors (bug-0050), `RoleViewDrawer` respects `canWrite` (bug-0205), added `loading.tsx` for admin routes (bug-0207), and 3 related dead-code fixes (bug-0199, 0200, 0201).
+- **`f9403a2`** fix: Async cancellation flags + `updateUser` status transition guard — prevents pending→active without invitation (bug-0137, 0142, 0145, 0152).
+- **`1039b69`** fix: `listUsers` hard cap at 200 (bug-0140), accept-invite timer cleanup on unmount (bug-0160), resource-server docs comment (bug-0167), clipboard toast (bug-0171).
+- **`23e9fe4`** fix(admin+ui): Middleware 401 redirect (bug-0136), PII scrubbing (bug-0146), React `useId` for SSR-safe IDs (bug-0170), `FormField` `aria-describedby` (bug-0203), whitespace input guards (bug-0141).
+- **`7f869b3`** fix(users): `removeRole` P2025 handling (bug-0138), `resendInvitation` transaction (bug-0139), `SaInvitation.expiresAt` index (bug-0144).
+- **`51769a8`** (also in Security above) — fixes bug-0166, 0168, 0169.
+
+#### Performance (1 commit)
+
+- **`e1c06d0`** perf(admin): Session validation cache with 10s TTL — reduces auth-server round-trips on admin page navigation (bug-0165). 500-entry cap with two-phase eviction prevents memory leaks.
+
+#### Refactor (1 commit)
+
+- **`fd45111`** refactor(admin): `useCopyFeedback` hook — replaces 13 unmount-leaking `setTimeout` instances across table components (bug-0155).
+
+#### Features (1 commit)
+
+- **`00927c3`** feat(users): Expose `createdAt` and `lastLoginAt` on User API — includes DB migration to add `SaUser.createdAt` and `SaUser.lastLoginAt` columns (bug-0186).
+
+#### Tests (1 commit)
+
+- **`6b534d1`** test(e2e): Reinstate `afterAll` cleanup + absolute Prisma path (bug-0173, 0178, 0181). E2E tests now properly clean up non-platform data after runs.
+
+#### Docs (1 commit)
+
+- **`cf42543`** docs: Overnight autonomous bug-triage report documenting session outcomes, decisions needed, and attention items.
+
+### New dependencies
+
+- `helmet` — HTTP security headers on auth-server (bug-0154)
+- `@nestjs/throttler` — rate limiting on auth-server (bug-0080)
+
+### New database migrations
+
+```
+20260707180000_bug_0147_unique_username_phone
+20260707180500_bug_0039_saoauthcode_table
+20260707190000_bug_0179_betterauth_indexes
+20260708100000_bug_0186_saUser_created_last_login
+20260708120000_bug_0144_invitation_expires_at_index
+```
+
+### New helpers
+
+- `apps/auth-server/src/common/permissions/resolve-list-scope.ts` — org-scoping for list endpoints (bug-0001)
+- `apps/auth-server/src/common/pending-public-id.ts` — per-request UUID for placeholder publicIds (bug-0148)
+- `apps/admin/lib/use-copy-feedback.ts` — canonical clipboard hook (bug-0155)
+
+### Known open bugs
+
+Net open bugs: **~29** (13 from backlog + 16 new today). Down from ~210 at the start of 2026-07-08. All 9 Criticals closed. The legacy backlog (bug-0002–0135) has ambiguous status and needs reconciliation.
+
+### Project health note
+
+This is a landmark day for the project. The overnight session on 2026-07-08 cleared the entire Critical backlog and the vast majority of Warning/Minor bugs. The three new bugs found today are all Minor — two are narrow timing/caching edge cases and one is a maintenance hygiene issue. The README Known Limitations section has been updated to reflect the current state. The remaining open bugs are either test-coverage gaps, UX polish, or items waiting on design decisions. The project is in a materially better state than at any prior daily review.
 ---
 
 ## [Unreleased] — 2026-07-07

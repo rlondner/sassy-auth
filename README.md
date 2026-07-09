@@ -106,7 +106,7 @@ sassy-auth/
 | Owner       | Tables                                                                                      |
 |-------------|---------------------------------------------------------------------------------------------|
 | BetterAuth  | `user`, `session`, `account`, `verification`                                                |
-| SassyAuth   | `sa_app`, `sa_org`, `sa_user`, `sa_invitation`, `sa_permission`, `sa_role`, `sa_role_permission`, `sa_user_role`, `sa_user_permission` |
+| SassyAuth   | `sa_app`, `sa_org`, `sa_user`, `sa_invitation`, `sa_permission`, `sa_role`, `sa_role_permission`, `sa_user_role`, `sa_user_permission`, `sa_oauth_code` |
 
 `sa_user` links to BetterAuth's `user` table via the `betterAuthUserId` foreign key.
 
@@ -347,7 +347,7 @@ Response:
 ```
 
 > **Note:** The `redirect_uri` sent here must match the one validated at the authorize step — by origin against the app's `url`, or exactly against the app's `callbackUrl` when one is configured.
-Authorization codes are single-use and stored in-process (see [Known Limitations](#known-limitations)). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
+Authorization codes are single-use and stored in the database (`SaOauthCode` table). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
 
 ### Flow B: Direct Login
 
@@ -749,3 +749,12 @@ A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright test
 
 **`deleteUser` does not remove BetterAuth identity.**
 Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
+
+**JWT `scope` claim returns all user permissions, not app-scoped.**
+The JWT includes all of the user's permissions (including `platform.*` ones), not just those relevant to the requesting app. Resource servers receive scope entries they cannot act on. Tracked as **bug-0157**.
+
+**Rate limiting uses in-memory store.**
+Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/min/IP on auth endpoints, 10 requests/hour/IP on registration). In a horizontally-scaled deployment, each instance maintains its own counter. For consistent enforcement across pods, replace with a shared Redis backend.
+
+**LIKE wildcard characters not escaped in search.**
+The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.
