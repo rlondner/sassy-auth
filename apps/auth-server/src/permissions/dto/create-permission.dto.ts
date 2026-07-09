@@ -7,8 +7,8 @@ const NAME_REGEX = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]+)+$/;
 
 export class CreatePermissionDto {
   @IsString() @MinLength(3) @MaxLength(120) @Matches(NAME_REGEX, { message: 'name must be lowercase dotted segments (e.g. apps.read)' })
-  name: string;
+  name!: string;
 
   @IsString() @MinLength(1) @MaxLength(40)
-  appId: string;
+  appId!: string;
 }
