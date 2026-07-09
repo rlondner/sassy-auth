@@ -5,7 +5,9 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "test": "turbo test",
-    "lint": "turbo lint"
+    "lint": "turbo lint",
+    "setup:resource-server-fastapi": "uv sync --directory apps/resource-server-fastapi",
+    "dev:resource-server-fastapi": "uv run --directory apps/resource-server-fastapi uvicorn app.main:app --port 8010 --reload"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

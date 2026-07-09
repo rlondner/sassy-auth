@@ -12,6 +12,11 @@ function callerBaId(req: Request): string {
 export class MeController {
   constructor(private readonly me: MeService) {}
 
+  @Get()
+  profile(@Req() req: Request) {
+    return this.me.getMyProfile(callerBaId(req));
+  }
+
   @Get('permissions')
   permissions(@Req() req: Request) {
     return this.me.getMyPermissions(callerBaId(req));

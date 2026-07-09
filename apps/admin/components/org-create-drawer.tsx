@@ -3,6 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle,
   Button, ButtonGroup, Input, Label,
@@ -14,9 +15,10 @@ interface Props {
   apps: App[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function OrgCreateDrawer({ apps, open, onOpenChange }: Props) {
+export function OrgCreateDrawer({ apps, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState('')
   const [appId, setAppId] = React.useState('')
@@ -48,8 +50,13 @@ export function OrgCreateDrawer({ apps, open, onOpenChange }: Props) {
     setErrorKey(null)
     startTransition(async () => {
       const result = await createOrgAction({ name: name.trim(), appId })
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('orgs.toast.created'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 
