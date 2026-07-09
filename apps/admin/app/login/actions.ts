@@ -5,8 +5,7 @@ import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
-
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+import { AUTH_SERVER_URL } from '@/lib/config'
 
 interface ParsedSessionCookie {
   value: string
@@ -19,6 +18,11 @@ interface ParsedSessionCookie {
   expires?: Date
 }
 
+// Known limitation: the comma-splitting regex may fail when Node concatenates
+// multiple Set-Cookie headers with ", " and one contains an Expires date.
+// BetterAuth currently returns a single session cookie so this is safe.
+// Consider replacing with `set-cookie-parser` if more cookies are added.
+//
 // Parse the first Set-Cookie clause that matches `better-auth.session_token=...`.
 // Node fetch combines multiple Set-Cookie headers with ", " — split on that
 // boundary while NOT splitting on the "," inside an Expires=Wed, 21 Oct ... date.
@@ -40,7 +44,12 @@ function parseSessionCookie(header: string): ParsedSessionCookie | null {
     // exactly once, so the signature ends up as `…%3D` (length 48 ≠ 44),
     // session lookup returns null, and every refresh bounces to /login.
     // Single-decode here so the round-trip is identity.
-    const value = decodeURIComponent(namePair.slice(eq + 1))
+    let value: string
+    try {
+      value = decodeURIComponent(namePair.slice(eq + 1))
+    } catch {
+      value = namePair.slice(eq + 1)
+    }
 
     const parsed: ParsedSessionCookie = { value, httpOnly: false }
     for (const attr of attrs) {
@@ -100,7 +109,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
 
   let res: Response
   try {
-    res = await fetch(`${AUTH_SERVER}/api/auth/sign-in/email`, {
+    res = await fetch(`${AUTH_SERVER_URL}/api/auth/sign-in/email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -133,20 +142,24 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
   // the lifetime upstream issued is honored on the client.
   const cookieStore = await cookies()
   const setCookieHeader = res.headers.get('set-cookie')
-  if (setCookieHeader) {
-    const parsed = parseSessionCookie(setCookieHeader)
-    if (parsed) {
-      cookieStore.set('better-auth.session_token', parsed.value, {
-        httpOnly: parsed.httpOnly,
-        secure: parsed.secure ?? process.env.NODE_ENV === 'production',
-        sameSite: parsed.sameSite ?? 'lax',
-        path: parsed.path ?? '/',
-        ...(parsed.maxAge !== undefined && { maxAge: parsed.maxAge }),
-        ...(parsed.expires !== undefined && { expires: parsed.expires }),
-        ...(parsed.domain !== undefined && { domain: parsed.domain }),
-      })
-    }
+  if (!setCookieHeader) {
+    Sentry.captureMessage('Auth server returned 200 but no Set-Cookie header', { level: 'error' })
+    return { error: 'invalidCredentials' }
   }
+  const parsed = parseSessionCookie(setCookieHeader)
+  if (!parsed) {
+    Sentry.captureMessage('Failed to parse session cookie from auth server response', { level: 'error' })
+    return { error: 'invalidCredentials' }
+  }
+  cookieStore.set('better-auth.session_token', parsed.value, {
+    httpOnly: parsed.httpOnly,
+    secure: parsed.secure ?? process.env.NODE_ENV === 'production',
+    sameSite: parsed.sameSite ?? 'lax',
+    path: parsed.path ?? '/',
+    ...(parsed.maxAge !== undefined && { maxAge: parsed.maxAge }),
+    ...(parsed.expires !== undefined && { expires: parsed.expires }),
+    ...(parsed.domain !== undefined && { domain: parsed.domain }),
+  })
 
   // Do not pass plaintext email to Sentry; the admin layout will identify
   // the user by id after the next page render reads the session.

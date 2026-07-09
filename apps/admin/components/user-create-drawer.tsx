@@ -237,8 +237,8 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
             <SheetFooter>
               <ButtonGroup>
                 <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={submitting}>{t('users.drawer.cancel')}</Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? '…' : t('users.drawer.create')}
+                <Button type="submit" loading={submitting}>
+                  {t('users.drawer.create')}
                 </Button>
               </ButtonGroup>
             </SheetFooter>

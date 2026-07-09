@@ -199,6 +199,8 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
             }
             toast.success(t('users.toast.deleted'))
             setDeleteOpen(false)
+            // bug-0116: also close the view drawer if the deleted user was open in it.
+            setViewOpen(false)
             refresh()
           }}
         />
