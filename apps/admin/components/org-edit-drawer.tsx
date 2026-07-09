@@ -8,7 +8,7 @@ import {
   Button, ButtonGroup, Input, Label,
 } from '@sassy-auth/ui'
 import { updateOrgAction } from '@/app/(admin)/orgs/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { OrgRow } from '@/lib/types'
 
 interface Props {
@@ -22,7 +22,8 @@ export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(org.name)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -35,6 +36,12 @@ export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!dirty) return
+    // bug-0141: whitespace-only submissions fail server-side. Catch
+    // at the client for a clearer error.
+    if (name.trim() === '') {
+      setErrorKey('orgs.errors.nameRequired')
+      return
+    }
     startTransition(async () => {
       const result = await updateOrgAction(org.publicId, { name: name.trim() })
       if ('errorKey' in result) {
@@ -86,10 +93,7 @@ export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
                   variant="outline"
                   aria-label={t('orgs.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(org.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(org.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">
@@ -114,12 +118,12 @@ export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  disabled={pending}
+                  loading={pending}
                 >
                   {t('orgs.drawer.cancel')}
                 </Button>
                 <Button type="submit" disabled={!dirty || pending}>
-                  {pending ? t('orgs.drawer.saving') : t('orgs.drawer.save')}
+                  {t('orgs.drawer.save')}
                 </Button>
               </ButtonGroup>
             </div>

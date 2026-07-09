@@ -9,6 +9,22 @@ type DiagnosticBuckets = {
 export const test = base.extend<{ diagnostics: DiagnosticBuckets }>({
   diagnostics: [
     async ({ page }, use, testInfo) => {
+      // Disable CSS animations/transitions so Radix menus, drawers and sonner
+      // toasts settle instantly. Without this, an animating toast can keep a
+      // freshly-opened dropdown from ever becoming "stable" for Playwright.
+      await page.addInitScript(() => {
+        const css =
+          '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important;scroll-behavior:auto!important}'
+        const inject = () => {
+          const style = document.createElement('style')
+          style.setAttribute('data-e2e-no-animations', '')
+          style.textContent = css
+          document.head?.appendChild(style)
+        }
+        if (document.head) inject()
+        else document.addEventListener('DOMContentLoaded', inject)
+      })
+
       const buckets: DiagnosticBuckets = {
         consoleMessages: [],
         pageErrors: [],

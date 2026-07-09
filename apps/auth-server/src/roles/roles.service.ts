@@ -6,6 +6,7 @@ import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
 import { checkPermissionForApp } from '../common/permissions/check-permission-for-app';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -67,7 +68,10 @@ export class RolesService {
       // q.appId was already validated above; reuse targetAppId to avoid a second lookup.
       where.appId = targetAppId;
     }
-    if (q.q) where.name = { contains: q.q, mode: 'insensitive' };
+    if (q.q) {
+      const escaped = q.q.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      where.name = { contains: escaped, mode: 'insensitive' };
+    }
 
     const [rows, total] = (await Promise.all([
       prisma.saRole.findMany({
@@ -139,7 +143,7 @@ export class RolesService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saRole.create({
-          data: { publicId: 'placeholder', name: dto.name, appId: app.id },
+          data: { publicId: generatePendingPublicId(), name: dto.name, appId: app.id },
         });
         if (permissionIds.length > 0) {
           await tx.saRolePermission.createMany({

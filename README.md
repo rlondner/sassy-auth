@@ -106,7 +106,7 @@ sassy-auth/
 | Owner       | Tables                                                                                      |
 |-------------|---------------------------------------------------------------------------------------------|
 | BetterAuth  | `user`, `session`, `account`, `verification`                                                |
-| SassyAuth   | `sa_app`, `sa_org`, `sa_user`, `sa_invitation`, `sa_permission`, `sa_role`, `sa_role_permission`, `sa_user_role`, `sa_user_permission` |
+| SassyAuth   | `sa_app`, `sa_org`, `sa_user`, `sa_invitation`, `sa_permission`, `sa_role`, `sa_role_permission`, `sa_user_role`, `sa_user_permission`, `sa_oauth_code` |
 
 `sa_user` links to BetterAuth's `user` table via the `betterAuthUserId` foreign key.
 
@@ -222,6 +222,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `BETTER_AUTH_SECRET`  | Random string, 32+ characters                                  |
 | `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`. Also used as the JWT `iss` claim. |
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
+| `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
 
 ### Admin console
 
@@ -308,13 +309,18 @@ The user authenticates using any method BetterAuth supports: email/password, mag
 
 **Step 3 — Receive the authorization code**
 
-After successful authentication, SassyAuth validates that the user's org is associated with the requested app, that the `redirect_uri` origin matches the app's registered URL, then redirects to:
+After successful authentication, SassyAuth validates that the user's org is associated with the requested app and that the `redirect_uri` is allowed for that app, then redirects to:
 
 ```
 <redirect_uri>?code=<code>&state=<state>
 ```
 
-The `redirect_uri` must share an origin (scheme + host + port) with the `url` registered on the `sa_app` row. If it doesn't, the authorize call returns `400 invalid_redirect_uri`. `localhost` URIs are allowed for development.
+How the `redirect_uri` is validated depends on the app's `sa_app` row:
+
+- **Default (no `callbackUrl` set):** the `redirect_uri` must share an origin (scheme + host + port) with the app's registered `url`. Any path under that origin is accepted.
+- **With `callbackUrl` set:** the `redirect_uri` must equal the configured `callbackUrl` exactly. A trailing-slash difference is tolerated; scheme, host, port, path, and query string must otherwise match.
+
+A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_redirect_uri`. Note that registering an app whose `url` or `callbackUrl` uses `http` or a `localhost`/loopback host requires the auth server to run with `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true`; by default both must be `https` with a public host (see [Environment Variables](#environment-variables)).
 
 
 **Step 4 — Exchange the code + verifier for a JWT**
@@ -340,8 +346,8 @@ Response:
 }
 ```
 
-> **Note:** The `redirect_uri` must use the same origin (scheme + host + port) as the app's registered URL. `localhost` URIs are allowed for development.
-Authorization codes are single-use and stored in-process (see [Known Limitations](#known-limitations)). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
+> **Note:** The `redirect_uri` sent here must match the one validated at the authorize step — by origin against the app's `url`, or exactly against the app's `callbackUrl` when one is configured.
+Authorization codes are single-use and stored in the database (`SaOauthCode` table). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
 
 ### Flow B: Direct Login
 
@@ -488,6 +494,7 @@ Cache the JWKS document locally and refresh it only when you encounter a `kid` y
 | POST   | `/api/token/direct/login`                     | Direct credential login — returns JWT            |
 | GET    | `/api/me`                                     | Caller's profile: org, app context, effective permissions |
 | ALL    | `/api/auth/*`                                 | BetterAuth: sign-up, sign-in, magic link, OTP, social login |
+| POST   | `/api/register`                               | **Self-serve signup** — atomically create org + user + org↔app association (see below) |
 | GET    | `/api/users`                                  | List users (filter by `orgId`, `appId`)          |
 | GET    | `/api/users/:id`                              | Get user                                         |
 | POST   | `/api/users`                                  | Create user + invitation                         |
@@ -527,6 +534,54 @@ Cache the JWKS document locally and refresh it only when you encounter a `kid` y
 BetterAuth mounts on Express before NestJS and intercepts all `/api/auth/*` routes directly. NestJS handles all other routes.
 
 Full OpenAPI spec is in `docs/`.
+
+---
+
+## Self-serve Registration (`POST /api/register`)
+
+A public endpoint for resource-server-driven customer signup. It atomically creates an org, a BetterAuth user, and the org↔app association in a single transaction.
+
+### Request
+
+```json
+POST /api/register
+Content-Type: application/json
+
+{
+  "email":       "user@example.com",
+  "password":    "s3cr3tP@ss",
+  "companyName": "Acme Corp",
+  "appPublicId": "<sa_app.publicId>"
+}
+```
+
+| Field         | Type   | Rules                    |
+|---------------|--------|--------------------------|
+| `email`       | string | valid email              |
+| `password`    | string | min 8 characters         |
+| `companyName` | string | min 1 character          |
+| `appPublicId` | string | must match an existing app |
+
+### Responses
+
+| Status | Meaning                                     |
+|--------|---------------------------------------------|
+| `201`  | `{ "ok": true }` — org + user created       |
+| `400`  | Validation error (missing/invalid fields)   |
+| `404`  | Unknown `appPublicId`                       |
+| `409`  | Email already registered                    |
+| `429`  | Rate limit exceeded (see below)             |
+
+### Rate limiting
+
+The endpoint is guarded by an in-memory per-IP fixed-window rate limiter. Configure it via env vars:
+
+| Variable                 | Description                                                              | Default      |
+|--------------------------|--------------------------------------------------------------------------|--------------|
+| `REGISTER_RATE_LIMIT`    | Max requests per IP per window. `0` or unset = unlimited (dev/trusted)  | `10`         |
+| `REGISTER_RATE_WINDOW_MS`| Window length in milliseconds                                            | `3600000` (1 h) |
+
+> **Multi-instance note:** the rate-limit store is in-process. In a horizontally-scaled deployment (multiple pods / workers), each instance maintains its own counter. For consistent enforcement across pods, replace the in-memory store with a shared backend such as Redis.
 
 ---
 
@@ -683,62 +738,23 @@ Tests are in `apps/admin-e2e/tests/`. In CI, the Playwright config automatically
 
 The following items are deferred to later sub-projects and are not yet production-ready. See `todo/TODO_*.md` for daily follow-up lists and `bugs/BUGS_*.md` for the full bug catalog.
 
-**In-memory OAuth code store.**
-Authorization codes from Flow A are stored in memory. They are lost on server restart and the server cannot run as multiple instances behind a load balancer. Replace with Redis or a database table before deploying to production. Tracked as **bug-0039**.
-
-**`redirect_uri` origin-only validation.**
-`redirect_uri` is validated against the app's registered URL origin (scheme + host + port). Any path under that origin is accepted. A per-app allowlist of specific redirect paths (stored in `SaApp`) should be added for tighter control. Tracked as **bug-0047**.
+**`redirect_uri` validation granularity.**
+By default `redirect_uri` is validated against the app's registered `url` origin (scheme + host + port), and any path under that origin is accepted. Apps that need tighter control can now set an optional `callbackUrl` on the `SaApp` row, which forces an exact `redirect_uri` match (trailing-slash tolerant). A full allowlist of multiple distinct redirect paths per app is still not supported. Partially addresses **bug-0047**.
 
 **PKCE `code_verifier` format not validated.**
 The `code_verifier` field is checked for presence but not for RFC 7636 format (43-128 chars of unreserved characters). Tracked as **bug-0041**.
 
-**JWT payload breaking change (`scope` replaces `permissions`).**
-The JWT `permissions` claim (string array) was replaced with `scope` (space-separated string) on the `docs/pkce-resource-server-design` branch. No migration path or version marker exists. Tracked as **bug-0038**.
-
-**RBAC not org-scoped.**
-`checkPermission` only verifies that the caller holds the named permission — it does not constrain by `orgId`. A user with `org.users.manage` in org A can currently act on users in org B. Tracked as **bug-0001**.
-
-**Inactive users can still authenticate.**
-Neither the OAuth authorize flow nor the direct login flow checks `saUser.status` before issuing a JWT. Setting a user to `inactive` via the API has no effect on their ability to log in and receive tokens. Tracked as **bug-0074**.
-
-**No rate limiting on authentication endpoints.**
-The `/api/token/direct/login` and `/api/invitations/:token` endpoints accept unlimited requests. Brute-force password attacks are unthrottled. Tracked as **bug-0080**.
-
-**Escalation guard coverage is incomplete.**
-The `assertCallerCanGrantSystemPerms` guard is applied to `assignRole` and `setUserRoles` but not to `removeRole`. `checkPermissionForApp` has a silent bypass when `targetAppId` is undefined. Tracked as **bug-0094** and **bug-0097**.
-
-**CI — E2E only, no typecheck/lint.**
-A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. Typecheck and lint are not yet wired into CI. Note: the e2e workflow excludes `@sassy-auth/auth-server` from `turbo build` due to pre-existing build errors (tracked as **bug-0092**).
-
-**Set-replace DTOs lack array size limits.**
-The `PUT /users/:id/roles` and `PUT /users/:id/direct-permissions` endpoints accept arrays of any size (including empty). No `@ArrayMaxSize` is enforced. Tracked as **bug-0034**.
-
-**`BETTER_AUTH_URL` not validated at startup.**
-`resolveIssuer()` accepts any string — empty, whitespace, or non-URL values produce a malformed `issuer` in the OAuth AS discovery document and in every JWT's `iss` claim. A warning is logged when the variable is unset, but not when it is set to an invalid value. Tracked as **bug-0115**.
-
-**Username/phone direct-login collision across tenants.**
-`username` and `phoneNumber` on `SaUser` have no uniqueness constraint (not even per-org). The `directLogin` endpoint uses `findFirst` — if two users in different orgs share a username, the wrong user may be authenticated or a valid login may be rejected. Tracked as **bug-0147**.
-
-**Concurrent entity creation races on `publicId: 'placeholder'`.**
-All create flows (apps, orgs, roles, permissions) insert a shared literal `'placeholder'` as `publicId` before updating it to the real Sqid. Two concurrent creates hit the unique constraint, producing a misleading "name already exists" error. Tracked as **bug-0148**.
+**CI — no lint, single-package typecheck.**
+A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
 
 **`deleteUser` does not remove BetterAuth identity.**
 Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
 
-**Swagger/OpenAPI docs exposed in all environments.**
-`/api/docs` and `/api/docs-json` are mounted unconditionally — no `NODE_ENV` gate. The full API surface is publicly discoverable in production. Tracked as **bug-0153**.
+**JWT `scope` claim returns all user permissions, not app-scoped.**
+The JWT includes all of the user's permissions (including `platform.*` ones), not just those relevant to the requesting app. Resource servers receive scope entries they cannot act on. Tracked as **bug-0157**.
 
-**No security headers (Helmet).**
-The auth-server sets no `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, or `Content-Security-Policy` headers. Tracked as **bug-0154**.
+**Rate limiting uses in-memory store.**
+Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/min/IP on auth endpoints, 10 requests/hour/IP on registration). In a horizontally-scaled deployment, each instance maintains its own counter. For consistent enforcement across pods, replace with a shared Redis backend.
 
-**`GET /api/apps/:id` endpoint missing.**
-The API Reference table documents `GET /api/apps/:id` but no such route exists in `AppsController`. All other entity controllers (orgs, roles, permissions, users) have a get-by-id handler. Tracked as **bug-0164**.
-
-**Admin middleware session validation not cached.**
-The Next.js Edge middleware calls the auth-server's `get-session` endpoint on every authenticated request with `cache: 'no-store'`. No session caching is applied, so each page load incurs a full round-trip to the auth-server. Tracked as **bug-0165**.
-
-**`createPermission` allows `platform.*` names (privilege escalation).**
-The `createPermission` endpoint does not block names starting with `platform.`. An admin with `platform.permissions.manage` can create a permission named `platform.anything.new` and assign it to themselves, effectively minting arbitrary platform privileges. Tracked as **bug-0183**.
-
-**Missing database indexes on BetterAuth tables.**
-The `Session`, `Account`, and `Verification` tables lack indexes on their most-queried foreign key and lookup columns (`Session.userId`, `Account.userId`, `Verification.identifier`). Authentication performance degrades linearly with table size. Tracked as **bug-0179**.
+**LIKE wildcard characters not escaped in search.**
+The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.

@@ -11,6 +11,7 @@ import {
   createUserAction, getRolesAction, getAppPermissionsAction,
 } from '@/app/(admin)/users/actions'
 import type { Org, Role } from '@/lib/types'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { RoleRowsEditor, type RoleOption } from './user-role-rows-editor'
 import { PermissionRowsEditor, type PermOption } from './role-permission-rows-editor'
 
@@ -47,7 +48,8 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
   const [errors, setErrors] = React.useState<Partial<Record<keyof FormState, string>>>({})
   const [submitting, setSubmitting] = React.useState(false)
   const [inviteUrl, setInviteUrl] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [serverError, setServerError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -56,7 +58,6 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
       setErrors({})
       setInviteUrl(null)
       setServerError(null)
-      setCopied(false)
     }
   }, [open])
 
@@ -85,11 +86,11 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
 
   function validate(): boolean {
     const e: Partial<Record<keyof FormState, string>> = {}
-    if (!form.firstName.trim()) e.firstName = 'Required'
-    if (!form.lastName.trim()) e.lastName = 'Required'
-    if (!form.email.trim()) e.email = 'Required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Invalid email'
-    if (!form.orgId) e.orgId = 'Required'
+    if (!form.firstName.trim()) e.firstName = t('users.errors.required')
+    if (!form.lastName.trim()) e.lastName = t('users.errors.required')
+    if (!form.email.trim()) e.email = t('users.errors.required')
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = t('users.errors.emailInvalid')
+    if (!form.orgId) e.orgId = t('users.errors.required')
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -127,9 +128,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
 
   async function handleCopy() {
     if (!inviteUrl) return
-    await navigator.clipboard.writeText(inviteUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    await copy(inviteUrl, 'invite-url')
   }
 
   const selectedOrg = orgs.find((o) => o.id === form.orgId)
@@ -238,8 +237,8 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
             <SheetFooter>
               <ButtonGroup>
                 <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={submitting}>{t('users.drawer.cancel')}</Button>
-                <Button onClick={handleSubmit} disabled={submitting}>
-                  {submitting ? '…' : t('users.drawer.create')}
+                <Button onClick={handleSubmit} loading={submitting}>
+                  {t('users.drawer.create')}
                 </Button>
               </ButtonGroup>
             </SheetFooter>

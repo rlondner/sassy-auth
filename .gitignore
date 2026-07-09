@@ -49,4 +49,3 @@ apps/auth-server/.env
 .claude/scheduled_tasks.lock
 # roborev snapshots
 /.roborev/
-pnpm-lock.yaml

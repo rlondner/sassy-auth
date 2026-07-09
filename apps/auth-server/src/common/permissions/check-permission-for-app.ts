@@ -44,11 +44,16 @@ export async function checkPermissionForApp(
     if (r.startsWith('platform.') && perms.has(r)) return;
   }
 
-  // non-platform permissions allowed only when the caller's app matches the target app.
+  // Non-platform permissions require an explicit app scope. `targetAppId`
+  // must be supplied by the caller — an undefined value is a bug at the call
+  // site (previously it silently granted access, bug-0094). The check is
+  // strict equality against `callerAppId`; if either side is undefined the
+  // caller falls through to the ForbiddenException below.
   for (const r of requiredList) {
     if (r.startsWith('platform.')) continue;
     if (!perms.has(r)) continue;
-    if (options.targetAppId === undefined) return;
+    if (options.targetAppId === undefined) continue;
+    if (options.callerAppId === undefined) continue;
     if (options.callerAppId === options.targetAppId) return;
   }
 

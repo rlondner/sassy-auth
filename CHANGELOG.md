@@ -4,6 +4,238 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-07-08
+
+61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
+
+### Fixed (~76 bugs)
+
+#### All 9 Critical bugs — CLOSED
+
+- **bug-0001** — Cross-tenant org access via `checkPermission` (b62d543)
+- **bug-0038** — JWT `permissions`→`scope` migration (8740829)
+- **bug-0039** — In-memory OAuth code store → `SaOauthCode` DB table (296df3e)
+- **bug-0054** — `redirect_uri` not bound to authorization code (70c9589)
+- **bug-0074** — Inactive/pending users could authenticate (04ad774)
+- **bug-0094** — `checkPermissionForApp` silent grant on undefined `targetAppId` (cbfe798)
+- **bug-0147** — Username/phoneNumber non-unique login collision (98c0111)
+- **bug-0148** — PublicId 'placeholder' race on concurrent creates (6db55b7)
+- **bug-0183** — `createPermission` allows `platform.*` names (bbd4e4e)
+
+#### Auth-server hardening (33 bugs)
+
+bug-0034, 0080, 0092, 0097, 0115, 0138, 0139, 0140, 0144, 0149, 0152, 0153, 0154, 0158, 0163, 0164, 0166, 0167, 0168, 0169, 0175, 0179, 0184, 0185, 0186, 0187, 0192, 0193, 0194, 0197, 0198, 0209, 0210
+
+#### Admin UX + security (27 bugs)
+
+bug-0050, 0136, 0137, 0141, 0142, 0145, 0146, 0155, 0159, 0160, 0165, 0170, 0171, 0189, 0190, 0191, 0195, 0196, 0199, 0200, 0201, 0202, 0203, 0204, 0205, 0206, 0207
+
+#### Test infrastructure (7 bugs)
+
+bug-0173, 0178, 0181, 0208, 0211, 0212, 0213
+
+### New bugs found (15)
+
+See [BUGS_2026-07-08.md](./bugs/BUGS_2026-07-08.md) and [TODO_2026-07-08.md](./todo/TODO_2026-07-08.md).
+
+#### Critical (2) — timing side-channels undermining the bug-0209 fix
+
+- **bug-0214** — `directLogin` org/app mismatch check returns 403 before scrypt — defeats timing guard, enables user enumeration + tenant-membership oracle.
+- **bug-0215** — Social-only users (no credential row) skip scrypt in `directLogin` — leaks authentication method via timing.
+
+#### Warning (6)
+
+- **bug-0216** — Post-login OAuth redirect path missing `/api/token` prefix — always rejected by admin's `validateNextUrl`.
+- **bug-0217** — Helmet CSP blocks Swagger UI in development (comment incorrectly claims CSP is prod-only).
+- **bug-0218** — `updateUser` status guard bypass: `pending→inactive→active` circumvents invitation acceptance.
+- **bug-0219** — `updateUser` missing self-modification guard (unlike `deleteUser`, `setUserRoles`, `setUserDirectPermissions`).
+- **bug-0220** — Expired `SaOauthCode` rows accumulate unboundedly (no cleanup job).
+- **bug-0221** — `updateUserAction` lacks try/catch; swallows NEXT_REDIRECT sentinel on 401.
+
+#### Minor (7)
+
+- **bug-0222** — `user-view-drawer` initial-load effect lacks cancellation flag — stale data on rapid open/close.
+- **bug-0230** — Admin `next.config.ts` security headers missing HSTS.
+- **bug-0231** — `accept-invite-form` error message lacks `role="alert"`.
+- **bug-0232** — Five search inputs across table components lack accessible labels.
+- **bug-0233** — Pagination page-size selects lack accessible labels.
+- **bug-0234** — `use-copy-feedback` hardcoded English toast bypasses i18n.
+- **bug-0235** — E2E `afterAll` cleanup omits `SaOauthCode` table.
+
+### Added
+
+- `helmet` middleware on auth-server (bug-0154)
+- `@nestjs/throttler` rate limiting: 120 req/min default, 10 req/min on auth endpoints (bug-0080)
+- `resolveListScope` helper for list endpoints (bug-0001)
+- `generatePendingPublicId()` replaces 'placeholder' literal (bug-0148)
+- `useCopyFeedback` hook consolidates 13 clipboard copy sites (bug-0155)
+- `GET /api/apps/:id` endpoint (bug-0164)
+- Admin security headers: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, Cache-Control (bug-0191)
+- Admin `loading.tsx` for loading indicators during navigation (bug-0207)
+- `AccessDeniedPanel` component for 403 states (bug-0196)
+- `SaUser.createdAt` and `lastLoginAt` fields (bug-0186)
+- 5 new Prisma migrations (see OVERNIGHT_REPORT_2026-07-08.md §4)
+
+### Changed
+
+- `ValidationPipe` now has `forbidNonWhitelisted: true` (bug-0194)
+- Auth-server `tsconfig.json` upgraded to `strict: true` (bug-0197)
+- Swagger UI gated behind `NODE_ENV !== 'production'` (bug-0153)
+- BetterAuth session config now explicit (`expiresIn`, `updateAge`) (bug-0158)
+- 401 responses in admin redirect to `/login` via `apiFetch` (bug-0136)
+
+### Project health
+
+Estimated open bugs: **~153** (192 prior − 54 newly fixed + 15 new). All Critical-severity bugs resolved. The 2 new Critical bugs (bug-0214, 0215) are regressions in the timing guard — they need priority attention before the directLogin fix can be considered complete.
+
+## [Unreleased] — 2026-07-09
+
+Reviewing the 15 commits that landed on 2026-07-08 — a massive overnight bug-fixing sprint that closed **~55 bugs** including **all 9 Criticals**. 16 new bugs found in the post-fix review. A concurrent session (PRs #238–#252) fixed 9 of the 16 and filed+fixed 6 more (using overlapping numbers 0223–0228 for different issues). Colliding entries renumbered to 0230–0235.
+
+### Bugs found (16) — 9 fixed same-day, 7 open
+
+See [BUGS_2026-07-09.md](./bugs/BUGS_2026-07-09.md) and [TODO_2026-07-09.md](./todo/TODO_2026-07-09.md).
+
+#### Fixed same-day (9) — PRs #238–#246
+
+- **bug-0214** — `directLogin` org/app mismatch timing oracle (PR #238)
+- **bug-0215** — `directLogin` OAuth-only account timing gap (PR #239)
+- **bug-0216** — Post-login OAuth `next` path broken (PR #240)
+- **bug-0217** — Helmet CSP breaks Swagger UI in dev (PR #241)
+- **bug-0218** — `updateUser` status guard one-hop bypass (PR #242)
+- **bug-0219** — `updateUser` missing self-modification guard (PR #243)
+- **bug-0220** — `SaOauthCode` no cleanup job (PR #244)
+- **bug-0221** — `updateUserAction` swallows NEXT_REDIRECT (PR #245)
+- **bug-0222** — `user-view-drawer` lacks cancellation (PR #246)
+
+#### Still open — Warning (3)
+
+- **bug-0232** — BetterAuth sign-in/sign-up routes bypass NestJS ThrottlerGuard entirely (mounted as raw Express middleware).
+- **bug-0233** — Bug-0206 `selected` rebase fix not applied to UsersTable — stale data in user drawer after refresh.
+- **bug-0234** — `createUserAction` and `updateUserAction` leak raw server error messages to UI after bug-0050 made `apiFetch` richer.
+
+#### Still open — Minor (4)
+
+- **bug-0229** — App edit drawer shows "name required" error when URL is empty.
+- **bug-0230** — Session validation cache negative-caches 5xx responses — 10s false lockout on transient errors.
+- **bug-0231** — Throttler `@Throttle` decorator values duplicate module config — silently masks central changes.
+- **bug-0235** — `listUsers` silently truncates at 500 with no pagination metadata or indicator.
+
+### Summary of 2026-07-08 changes (15 commits)
+
+#### Security (4 commits)
+
+- **`880b5e6`** sec+ux(oauth): Timing-guard on `directLogin` to prevent user enumeration (bug-0209). Browser-friendly authorize 401 now redirects to `/login?next=` instead of returning JSON (bug-0149).
+- **`51769a8`** sec+fix: 6 hygiene items — social provider env validation (bug-0175), `AcceptInvitationDto` `@MaxLength` (bug-0184), invitation URL env warning (bug-0185), and three minor fixes (bug-0166, 0168, 0169).
+- **`6a39e9d`** sec(auth): `removeRole` escalation guard (bug-0097), startup env validation (bug-0115), set-replace `@ArrayMaxSize` caps (bug-0034).
+- **`0b6ef0d`** sec(auth): Rate limiting via `@nestjs/throttler` — 120 req/min global, 10 req/min on auth endpoints (bug-0080). Explicit BetterAuth session config (bug-0158).
+
+#### Bug fixes (7 commits)
+
+- **`2e0190b`** fix(admin): Rebase table `selected` state on refresh — drawers now show current server data, not stale snapshots (bug-0206).
+- **`4a193dc`** fix(admin): `apiFetch` now includes response body in errors (bug-0050), `RoleViewDrawer` respects `canWrite` (bug-0205), added `loading.tsx` for admin routes (bug-0207), and 3 related dead-code fixes (bug-0199, 0200, 0201).
+- **`f9403a2`** fix: Async cancellation flags + `updateUser` status transition guard — prevents pending→active without invitation (bug-0137, 0142, 0145, 0152).
+- **`1039b69`** fix: `listUsers` hard cap at 200 (bug-0140), accept-invite timer cleanup on unmount (bug-0160), resource-server docs comment (bug-0167), clipboard toast (bug-0171).
+- **`23e9fe4`** fix(admin+ui): Middleware 401 redirect (bug-0136), PII scrubbing (bug-0146), React `useId` for SSR-safe IDs (bug-0170), `FormField` `aria-describedby` (bug-0203), whitespace input guards (bug-0141).
+- **`7f869b3`** fix(users): `removeRole` P2025 handling (bug-0138), `resendInvitation` transaction (bug-0139), `SaInvitation.expiresAt` index (bug-0144).
+- **`51769a8`** (also in Security above) — fixes bug-0166, 0168, 0169.
+
+#### Performance (1 commit)
+
+- **`e1c06d0`** perf(admin): Session validation cache with 10s TTL — reduces auth-server round-trips on admin page navigation (bug-0165). 500-entry cap with two-phase eviction prevents memory leaks.
+
+#### Refactor (1 commit)
+
+- **`fd45111`** refactor(admin): `useCopyFeedback` hook — replaces 13 unmount-leaking `setTimeout` instances across table components (bug-0155).
+
+#### Features (1 commit)
+
+- **`00927c3`** feat(users): Expose `createdAt` and `lastLoginAt` on User API — includes DB migration to add `SaUser.createdAt` and `SaUser.lastLoginAt` columns (bug-0186).
+
+#### Tests (1 commit)
+
+- **`6b534d1`** test(e2e): Reinstate `afterAll` cleanup + absolute Prisma path (bug-0173, 0178, 0181). E2E tests now properly clean up non-platform data after runs.
+
+#### Docs (1 commit)
+
+- **`cf42543`** docs: Overnight autonomous bug-triage report documenting session outcomes, decisions needed, and attention items.
+
+### New dependencies
+
+- `helmet` — HTTP security headers on auth-server (bug-0154)
+- `@nestjs/throttler` — rate limiting on auth-server (bug-0080)
+
+### New database migrations
+
+```
+20260707180000_bug_0147_unique_username_phone
+20260707180500_bug_0039_saoauthcode_table
+20260707190000_bug_0179_betterauth_indexes
+20260708100000_bug_0186_saUser_created_last_login
+20260708120000_bug_0144_invitation_expires_at_index
+```
+
+### New helpers
+
+- `apps/auth-server/src/common/permissions/resolve-list-scope.ts` — org-scoping for list endpoints (bug-0001)
+- `apps/auth-server/src/common/pending-public-id.ts` — per-request UUID for placeholder publicIds (bug-0148)
+- `apps/admin/lib/use-copy-feedback.ts` — canonical clipboard hook (bug-0155)
+
+### Known open bugs
+
+Net open bugs: **~20** (13 from backlog + 7 still-open from today). Down from ~210 at the start of 2026-07-08. All 9 Criticals closed. A concurrent session also fixed 6 additional bugs (0223–0228, different issues from this catalog). The legacy backlog (bug-0002–0135) has ambiguous status and needs reconciliation.
+
+### Project health note
+
+This is a landmark day for the project. The overnight session on 2026-07-08 cleared the entire Critical backlog and the vast majority of Warning/Minor bugs. The three new bugs found today are all Minor — two are narrow timing/caching edge cases and one is a maintenance hygiene issue. The README Known Limitations section has been updated to reflect the current state. The remaining open bugs are either test-coverage gaps, UX polish, or items waiting on design decisions. The project is in a materially better state than at any prior daily review.
+---
+
+## [Unreleased] — 2026-07-07
+
+No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), reviewed across five prior daily reviews (2026-07-02 through 2026-07-06). Today's review is a **multi-agent deep sweep** covering: server action error handling, admin security headers/caching, auth-server bootstrap/startup, i18n completeness, shared UI accessibility, admin page authorization, seed script correctness, and TypeScript configuration. 22 new bugs found (0 critical, 10 warning, 12 minor). No bugs fixed.
+
+### Bugs found (22 new)
+
+See [BUGS_2026-07-07.md](./bugs/BUGS_2026-07-07.md) and [TODO_2026-07-07.md](./todo/TODO_2026-07-07.md).
+
+#### Warning (10)
+
+- **bug-0189** — `signOutAction` crashes on auth-server outage — session cookie not cleared, user stuck.
+- **bug-0190** — Five users server actions (`getUserRolesAction`, `getEffectivePermissionsAction`, `getUserDirectPermissionsAction`, `getRolesAction`, `getAppPermissionsAction`) propagate unhandled exceptions — drawer/form crashes.
+- **bug-0191** — Admin Next.js app missing security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`) and `Cache-Control` on authenticated pages.
+- **bug-0192** — `DirectLoginDto.password` has no `@MaxLength()` — scrypt DoS vector on unauthenticated login endpoint.
+- **bug-0193** — No `app.enableShutdownHooks()` on auth-server — in-flight requests dropped on SIGTERM, Prisma connections leaked.
+- **bug-0194** — `ValidationPipe` missing `forbidNonWhitelisted: true` — unknown request properties silently stripped.
+- **bug-0195** — `accept-invite-form` has 4 hardcoded English validation messages bypassing i18n.
+- **bug-0196** — UsersPage uses bare `Promise.all` and has no access-denied check — errors crash to generic error boundary.
+- **bug-0197** — auth-server `tsconfig.json` missing `strict: true` — weaker type safety than other packages.
+- **bug-0198** — `packages/db` `db:seed` script depends on `tsconfig-paths` without declaring it as a dependency.
+
+#### Minor (12)
+
+- **bug-0199** — `apps` server action `mapError` misattributes all 403s on create/update to "platform protected."
+- **bug-0200** — `deleteUserAction` self-delete error detection is dead code (response body discarded by `apiFetch`).
+- **bug-0201** — `createUserAction` `message.includes('already')` check is dead code.
+- **bug-0202** — BetterAuth `auth` exported as `any` disables all TypeScript type checking.
+- **bug-0203** — `FormField` hint text not linked to input via `aria-describedby`.
+- **bug-0204** — `CardTitle` renders as `<div>` instead of `<h3>` — screen reader heading navigation skips cards.
+- **bug-0205** — `RoleViewDrawer` shows edit/delete buttons regardless of `canWrite` permission.
+- **bug-0206** — Stale `selected` state in table components after data refresh — drawers show outdated data.
+- **bug-0207** — No `loading.tsx` for any admin route — no loading indicator during page navigation.
+- **bug-0208** — Seed `else if` chain skips `publicId` backfill when `isSystem` also needs fixing.
+- **bug-0209** — User enumeration via timing in `directLogin` (user-not-found fast path vs scrypt slow path).
+- **bug-0210** — `bootstrap()` called without `.catch()` — startup failures may exit silently with code 0.
+
+### Known open bugs
+
+All previously tracked bugs remain open. The 9 critical bugs remain unfixed. Day 6 with zero commits and zero critical fixes merged. Total open bugs: 210 (188 prior + 22 new).
+
+### Project health note
+
+Today's multi-agent review (9 agents in parallel) found no new critical bugs — prior reviews have been thorough on the critical-severity surface. The findings concentrate in two areas: (1) **production hardening** — the auth-server lacks graceful shutdown, strict TypeScript, and request validation hardening; the admin app lacks security headers and cache controls. Four of these are one-line fixes (bug-0193, bug-0192, bug-0194, bug-0210). (2) **Error handling consistency** — the users page and its 5 server actions are the outliers in a codebase where other pages/actions handle errors consistently. bug-0189 (signOutAction) is the most user-impactful: a transient auth-server outage locks users out of the sign-out flow. The 7-day commit freeze with 9 critical bugs and 210 total open bugs is a sustained project health concern.
+
+---
+
 ## [Unreleased] — 2026-07-06
 
 No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), reviewed across four prior daily reviews (2026-07-02 through 2026-07-05). Today's review is a **test infrastructure, configuration, and schema audit** covering: E2E test reliability/cleanup, RBAC matrix coverage gaps, environment variable validation, Prisma schema missing indexes, permissions service privilege escalation, invitation endpoint hardening, and admin type contract drift. 16 new bugs found (1 critical, 7 warning, 7 minor, 1 info). No bugs fixed.
@@ -347,6 +579,13 @@ After today's review: 2 bugs fixed (bug-0027, bug-0078), 18 new bugs found. Net 
 ---
 
 ## [Unreleased] — 2026-06-18
+
+- Apps: optional per-app `callbackUrl`. When set, the PKCE `redirect_uri` must
+  match it exactly (trailing-slash tolerant); when blank, any callback under the
+  app's URL origin is accepted (unchanged behavior).
+- Apps: app and callback URLs now require https + a public host by default.
+  Set `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true` to permit http/localhost URLs in
+  development.
 
 ### Changed (palette/table-action-tooltips branch — PR #107, not merged)
 

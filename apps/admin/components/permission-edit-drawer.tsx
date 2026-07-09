@@ -8,7 +8,7 @@ import {
   Button, ButtonGroup, Input, Label,
 } from '@sassy-auth/ui'
 import { updatePermissionAction } from '@/app/(admin)/permissions/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { PermissionRow } from '@/lib/types'
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]+)+$/
@@ -24,7 +24,8 @@ export function PermissionEditDrawer({ permission, open, onOpenChange, onSuccess
   const t = useTranslations()
   const [name, setName] = React.useState(permission.name)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -86,10 +87,7 @@ export function PermissionEditDrawer({ permission, open, onOpenChange, onSuccess
                   variant="outline"
                   aria-label={t('permissions.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(permission.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(permission.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">
@@ -106,11 +104,11 @@ export function PermissionEditDrawer({ permission, open, onOpenChange, onSuccess
             )}
             <div className="flex justify-end pt-4">
               <ButtonGroup>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} loading={pending}>
                   {t('permissions.drawer.cancel')}
                 </Button>
                 <Button type="submit" disabled={!dirty || pending}>
-                  {pending ? t('permissions.drawer.saving') : t('permissions.drawer.save')}
+                  {t('permissions.drawer.save')}
                 </Button>
               </ButtonGroup>
             </div>

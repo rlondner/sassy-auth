@@ -118,7 +118,14 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
       })
       .finally(() => { if (!cancelled) setOptionsLoading(false) })
     return () => { cancelled = true }
-  }, [editing, user?.id, appId])
+    // bug-0142: `roles` and `directPermissions` are referenced above
+    // (setRoleRows(rIds), setPermRows(pIds)) but were previously not
+    // in the dep array. When either changed under the drawer (e.g., a
+    // partial save re-fetched roles), the snapshot went stale — the
+    // dirty check compared new state against the pre-save baseline.
+    // Including them makes the snapshot reset every time the baseline
+    // legitimately shifts.
+  }, [editing, user?.id, appId, roles, directPermissions])
 
   function setsEqual(a: string[], b: string[]): boolean {
     const A = new Set(a.filter((x) => x !== ''))
@@ -246,7 +253,7 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
             {editing ? (
               <ButtonGroup>
                 <Button variant="secondary" size="sm" onClick={handleCancel} disabled={saving}>{t('users.drawer.cancel')}</Button>
-                <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? '…' : t('users.drawer.save')}</Button>
+                <Button size="sm" onClick={handleSave} loading={saving}>{t('users.drawer.save')}</Button>
               </ButtonGroup>
             ) : (
               <ButtonGroup>
