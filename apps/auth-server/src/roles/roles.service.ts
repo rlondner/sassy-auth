@@ -6,6 +6,7 @@ import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { checkPermission } from '../common/permissions/check-permission';
 import { checkPermissionForApp } from '../common/permissions/check-permission-for-app';
+import { generatePendingPublicId } from '../common/pending-public-id';
 import { resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -50,9 +51,12 @@ export class RolesService {
       targetAppId = -1; // force cross-app to require platform.roles.manage
     }
 
+    // platform.users.manage included so the /users admin page can populate
+    // the role picker in the user-access drawer without a cross-page
+    // permission grant. Mirrors the orgs/permissions read pattern.
     await checkPermissionForApp(
       callerBaId,
-      ['platform.roles.manage', 'org.roles.manage'],
+      ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
       { targetAppId, callerAppId: caller.org.appId },
     );
 
@@ -115,7 +119,7 @@ export class RolesService {
 
     await checkPermissionForApp(
       callerBaId,
-      ['platform.roles.manage', 'org.roles.manage'],
+      ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
       { targetAppId: row.appId, callerAppId: caller.org.appId },
     );
 
@@ -139,7 +143,7 @@ export class RolesService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saRole.create({
-          data: { publicId: 'placeholder', name: dto.name, appId: app.id },
+          data: { publicId: generatePendingPublicId(), name: dto.name, appId: app.id },
         });
         if (permissionIds.length > 0) {
           await tx.saRolePermission.createMany({

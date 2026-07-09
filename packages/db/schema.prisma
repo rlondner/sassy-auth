@@ -32,6 +32,14 @@ model Session {
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // bug-0179: BetterAuth's session middleware runs
+  // `Session.findFirst({ where: { userId } })` on every authenticated
+  // request. Without this index the DB falls back to a sequential
+  // scan whose cost grows with total session-row count across all
+  // users. The unique index on `token` above supports the sign-in
+  // path, but the userId lookup is the hot per-request query.
+  @@index([userId])
 }
 
 model Account {
@@ -49,6 +57,10 @@ model Account {
   password              String?
   createdAt             DateTime
   updatedAt             DateTime
+
+  // bug-0179: BetterAuth loads the credential account by userId at
+  // password-verification time (`Account.findFirst({ where: { userId } })`).
+  @@index([userId])
 }
 
 model Verification {
@@ -58,6 +70,10 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime?
   updatedAt  DateTime?
+
+  // bug-0179: BetterAuth's magic-link and email-OTP flows lookup by
+  // identifier (`Verification.findFirst({ where: { identifier } })`).
+  @@index([identifier])
 }
 
 // ── SassyAuth tables ──────────────────────────────────────────────────────────
@@ -101,16 +117,36 @@ model SaUser {
   org              SaOrg              @relation(fields: [orgId], references: [id])
   firstName        String
   lastName         String
-  phoneNumber      String?
-  username         String?
+  // bug-0147: partial-unique semantics. Both fields are nullable so
+  // multiple NULL rows coexist (Postgres treats NULLs as distinct in a
+  // standard unique index — CREATE UNIQUE INDEX on a nullable column
+  // enforces uniqueness across NON-NULL values only), and non-NULL
+  // values are enforced unique across the whole table. This lets
+  // `directLogin` do `findUnique({ where: { username } })` /
+  // `findUnique({ where: { phoneNumber } })` without collisions across
+  // orgs (was `findFirst` → returned an arbitrary matching row → cross-
+  // tenant auth bug).
+  phoneNumber      String?            @unique
+  username         String?            @unique
   status           UserStatus         @default(pending)
+  // bug-0186: `createdAt` records when the admin provisioned the user
+  // (or when they self-registered), NOT when the BetterAuth `User`
+  // row was created — those diverge for platform admins seeded before
+  // this column existed (backfilled with the migration's default) and
+  // for BetterAuth users that lose their SaUser via bug-0151. This is
+  // the field the /users admin table's "Created" column reads.
+  createdAt        DateTime           @default(now())
+  // `lastLoginAt` is denormalized and updated on every login-shaped
+  // event: BetterAuth `sign-in/*` (via a databaseHooks.session.create
+  // hook in auth.config.ts) and `POST /api/token/direct/login` (in
+  // token.controller.ts, on successful JWT issuance). Null means the
+  // user has never signed in — most commonly a pending invitee.
+  lastLoginAt      DateTime?
   roles            SaUserRole[]
   directPermissions SaUserPermission[]
   invitations       SaInvitation[]
 
   @@index([orgId])
-  @@index([username])
-  @@index([phoneNumber])
 }
 
 model SaInvitation {
@@ -123,8 +159,15 @@ model SaInvitation {
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
-  @@index([token])
+  // bug-0187: `@@index([token])` dropped — `token String @unique`
+  // above already provisions a btree unique index, so a second
+  // non-unique index on the same column was pure overhead.
   @@index([userId])
+  // bug-0144: invitations are queried by `expiresAt` in two spots —
+  // `validateToken` compares against now(), and any cleanup job
+  // scanning for expired unused tokens would filter on the same
+  // column. A supporting index keeps both cheap as the table grows.
+  @@index([expiresAt])
 }
 
 model SaPermission {
@@ -178,4 +221,26 @@ model SaUserPermission {
   permission   SaPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([userId, permissionId])
+}
+
+// bug-0039: OAuth authorization codes moved from an in-memory Map on a
+// single OauthService instance to a shared DB table so the auth-server
+// can run multiple replicas behind a load balancer. Codes are one-shot:
+// generated at /api/token/oauth/authorize and deleted on /api/token/oauth/token
+// (or on any validation failure — see OauthService.exchangeCode). The
+// row also carries the fields bound at issuance for PKCE + redirect_uri
+// verification per RFC 6749 §4.1.3 (bug-0054). Rows accumulate past
+// `expiresAt` but the exchange path rejects them, so a periodic cleanup
+// job is optional (not shipped in v1).
+model SaOauthCode {
+  code                String   @id
+  userId              String
+  appPublicId         String
+  redirectUri         String
+  codeChallenge       String
+  codeChallengeMethod String
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+
+  @@index([expiresAt])
 }
