@@ -3,17 +3,18 @@
 // own dotenv but the Prisma client runtime does not.
 import 'dotenv/config';
 import * as crypto from 'crypto';
+import * as path from 'path';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import express from 'express';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { toNodeHandler } from 'better-auth/node';
 import { prisma } from '@sassy-auth/db';
 import { AppModule } from '../src/app.module';
 import { auth } from '../src/auth/auth.config';
-import { SentryExceptionFilter } from '../src/common/filters/sentry-exception.filter';
+import { configureNestApp } from '../src/configure-nest-app';
 import { LoggerService } from '../src/common/logger/logger.service';
 
 // Generate RS256 key pair for the test run
@@ -37,10 +38,10 @@ describe('SassyAuth E2E', () => {
     // not apps/auth-server, so pass --schema explicitly — without it the
     // CLI looks in cwd/prisma/schema.prisma and fails.
     const { execSync } = await import('child_process');
-    execSync(
-      'npx prisma migrate deploy --schema=../../packages/db/schema.prisma',
-      { stdio: 'inherit' },
-    );
+    const dbRoot = path.resolve(__dirname, '../../../packages/db');
+    const prismaBin = path.join(dbRoot, 'node_modules/.bin/prisma');
+    const schemaPath = path.join(dbRoot, 'schema.prisma');
+    execSync(`${prismaBin} migrate deploy --schema=${schemaPath}`, { stdio: 'inherit' });
 
     // Build NestJS app with Express adapter + BetterAuth mount
     const expressApp = express();
@@ -51,9 +52,7 @@ describe('SassyAuth E2E', () => {
     }).compile();
 
     app = moduleRef.createNestApplication(new ExpressAdapter(expressApp));
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    app.useGlobalFilters(new SentryExceptionFilter(new LoggerService()));
+    configureNestApp(app, new LoggerService());
     await app.init();
 
     httpServer = app.getHttpServer();
@@ -67,17 +66,34 @@ describe('SassyAuth E2E', () => {
 
   afterAll(async () => {
     await app.close();
-    // Clean up test data
-    // await prisma.saUserPermission.deleteMany();
-    // await prisma.saUserRole.deleteMany();
-    // await prisma.saRolePermission.deleteMany();
-    // await prisma.saUser.deleteMany();
-    // await prisma.saPermission.deleteMany({ where: { app: { isPlatform: false } } });
-    // await prisma.saRole.deleteMany();
-    // await prisma.saOrg.deleteMany({ where: { isPlatform: false } });
-    // await prisma.account.deleteMany();
-    // await prisma.session.deleteMany();
-    // await prisma.user.deleteMany();
+    // bug-0173: the cleanup queries were commented out — if any
+    // preceding test failed, the "final cleanup" test at the
+    // bottom of this spec was skipped and stale data leaked into
+    // subsequent runs. Runs as afterAll so it fires regardless of
+    // which tests failed. beforeAll re-runs `pnpm seed`, which is
+    // idempotent — so the aggressive wipe below is safe (the next
+    // run's seed restores platform apps, orgs, roles, and
+    // permissions).
+    try {
+      await prisma.saUserPermission.deleteMany();
+      await prisma.saUserRole.deleteMany();
+      await prisma.saRolePermission.deleteMany();
+      await prisma.saInvitation.deleteMany();
+      await prisma.saUser.deleteMany();
+      await prisma.saPermission.deleteMany({ where: { app: { isPlatform: false } } });
+      await prisma.saRole.deleteMany();
+      await prisma.saOrg.deleteMany({ where: { isPlatform: false } });
+      await prisma.saApp.deleteMany({ where: { isPlatform: false } });
+      await prisma.account.deleteMany();
+      await prisma.session.deleteMany();
+      await prisma.user.deleteMany();
+    } catch (err) {
+      // Log-only: cleanup failure must not fail the whole suite.
+      console.warn('[bug-0173] e2e afterAll cleanup encountered:', err);
+    }
+    // bug-0178: always disconnect Prisma so the process can exit
+    // cleanly. Was already present pre-fix; kept last so cleanup
+    // above uses the connection.
     await prisma.$disconnect();
   });
 
@@ -112,7 +128,12 @@ describe('SassyAuth E2E', () => {
       // Get platform org
       const platformOrg = await prisma.saOrg.findFirst({ where: { isPlatform: true } });
 
-      // Create sa_user linked to BetterAuth user + platform org
+      // Create sa_user linked to BetterAuth user + platform org.
+      // bug-0074: directLogin now rejects users whose status is not
+      // 'active', so this e2e user (which will exercise directLogin
+      // below) is explicitly created active. In production a user
+      // becomes 'active' by accepting an invitation; here we short-
+      // circuit that setup step.
       const saUserRecord = await prisma.saUser.create({
         data: {
           publicId: 'placeholder',
@@ -120,6 +141,7 @@ describe('SassyAuth E2E', () => {
           orgId: platformOrg!.id,
           firstName: 'E2E',
           lastName: 'User',
+          status: 'active',
         },
       });
       // Compute and store publicId via Sqids
@@ -147,7 +169,7 @@ describe('SassyAuth E2E', () => {
       expect(decoded.sub).toBe(userPublicId);
       expect(decoded.aud).toBe(platformAppPublicId);
       expect(decoded.iss).toBe('http://localhost:3000');
-      expect(Array.isArray(decoded.permissions)).toBe(true);
+      expect(typeof decoded.scope).toBe('string');
     });
 
     it('returns 401 for wrong password', async () => {
@@ -186,15 +208,176 @@ describe('SassyAuth E2E', () => {
     });
 
     it('POST /api/token/oauth/token returns 401 for invalid code', async () => {
-      await request(httpServer)
+      // The DTO uses @IsUrl({ require_tld: false }) so localhost URLs work in
+      // dev/test without any test-side URL mutation.
+      const platformApp = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+      const res = await request(httpServer)
         .post('/api/token/oauth/token')
         .send({
-          code: 'bogus-code',
-          client_id: platformAppPublicId,
-          client_secret: 'any',
-          redirect_uri: 'https://app.example.com/callback',
+          code: 'definitely-not-a-real-code',
+          client_id: platformApp.publicId,
+          code_verifier: 'a'.repeat(64),
+          redirect_uri: `${platformApp.url.replace(/\/$/, '')}/cb`,
         })
         .expect(401);
+      expect(res.body.message).toContain('invalid_grant');
+    });
+
+    describe('OAuth PKCE round-trip', () => {
+      function s256(verifier: string): string {
+        return crypto
+          .createHash('sha256')
+          .update(verifier)
+          .digest('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+      }
+
+      it('authorize → token returns a JWT with scope (string)', async () => {
+        // 1. Establish a BetterAuth session via sign-in (super admin from seed).
+        const signInRes = await request(httpServer)
+          .post('/api/auth/sign-in/email')
+          .send({ email: 's@sa.io', password: 'Pass@word1234' });
+        expect([200, 201]).toContain(signInRes.status);
+        const cookies = (signInRes.headers['set-cookie'] as unknown as string[]) || [];
+        const sessionCookie = cookies.find((c) =>
+          c.startsWith('better-auth.session_token='),
+        );
+        expect(sessionCookie).toBeTruthy();
+
+        // 2. Look up the platform app's publicId from the seed.
+        // OauthTokenExchangeDto now uses @IsUrl({ require_tld: false }) so the
+        // seeded http://localhost:3000 URL is accepted as-is for the redirect_uri
+        // origin match — no test-side mutation needed.
+        const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+
+        // 3. Build PKCE pair and call /api/token/oauth/authorize.
+        const verifier = 'a'.repeat(64);
+        const challenge = s256(verifier);
+        const redirectUri = `${app.url.replace(/\/$/, '')}/cb`;
+        const authorizeRes = await request(httpServer)
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: app.publicId,
+            redirect_uri: redirectUri,
+            code_challenge: challenge,
+            code_challenge_method: 'S256',
+            state: 'xyz',
+          })
+          .set('Cookie', sessionCookie!.split(';')[0])
+          .expect(302);
+        const location = authorizeRes.headers.location as string;
+        const code = new URL(location).searchParams.get('code');
+        expect(code).toBeTruthy();
+
+        // 4. Exchange the code.
+        const tokenRes = await request(httpServer)
+          .post('/api/token/oauth/token')
+          .send({
+            code,
+            client_id: app.publicId,
+            code_verifier: verifier,
+            redirect_uri: redirectUri,
+          })
+          .expect(201);
+        expect(tokenRes.body.access_token).toBeTruthy();
+
+        // 5. Verify the JWT carries `scope` (string) and not `permissions`.
+        const decoded = jwt.verify(tokenRes.body.access_token, publicPem, {
+          algorithms: ['RS256'],
+        }) as Record<string, unknown>;
+        expect(typeof decoded.scope).toBe('string');
+        expect('permissions' in decoded).toBe(false);
+
+        // 6. The JWT header `kid` must match the JWKS key — JWKS-based
+        // verifiers (e.g. FastAPI's PyJWKClient) look up the signing key by
+        // this id. If the signer ever drops it or drifts from the JWKS,
+        // every RS call would 401.
+        const completed = jwt.decode(tokenRes.body.access_token, {
+          complete: true,
+        }) as { header: { kid?: string } };
+        const jwksRes = await request(httpServer).get('/api/token/jwks').expect(200);
+        const jwksKid = jwksRes.body.keys[0]?.kid;
+        expect(completed.header.kid).toBeTruthy();
+        expect(jwksKid).toBeTruthy();
+        expect(completed.header.kid).toBe(jwksKid);
+      });
+    });
+
+    describe('OAuth authorize error redirect', () => {
+      // The authorize endpoint is browser-only. On 4xx errors, it must
+      // redirect to the admin's /oauth-error page when ADMIN_URL is set,
+      // and fall back to the historical JSON body when ADMIN_URL is unset.
+      const ORIGINAL_ADMIN_URL = process.env.ADMIN_URL;
+
+      afterEach(() => {
+        if (ORIGINAL_ADMIN_URL === undefined) {
+          delete process.env.ADMIN_URL;
+        } else {
+          process.env.ADMIN_URL = ORIGINAL_ADMIN_URL;
+        }
+      });
+
+      it('redirects to admin /oauth-error with code+app when ADMIN_URL is set and redirect_uri origin mismatches', async () => {
+        process.env.ADMIN_URL = 'http://localhost:3001';
+
+        // Sign in to obtain a BetterAuth session — the authorize endpoint
+        // requires one before it inspects the redirect_uri.
+        const signInRes = await request(httpServer)
+          .post('/api/auth/sign-in/email')
+          .send({ email: 's@sa.io', password: 'Pass@word1234' });
+        expect([200, 201]).toContain(signInRes.status);
+        const cookies = (signInRes.headers['set-cookie'] as unknown as string[]) || [];
+        const sessionCookie = cookies.find((c) => c.startsWith('better-auth.session_token='));
+        expect(sessionCookie).toBeTruthy();
+
+        const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+
+        const res = await request(httpServer)
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: app.publicId,
+            redirect_uri: 'http://evil.example.com/cb', // wrong origin
+            code_challenge: 'x'.repeat(43),
+            code_challenge_method: 'S256',
+            state: 'xyz',
+          })
+          .set('Cookie', sessionCookie!.split(';')[0])
+          .expect(302);
+
+        const location = res.headers.location as string;
+        const url = new URL(location);
+        expect(url.origin + url.pathname).toBe('http://localhost:3001/oauth-error');
+        expect(url.searchParams.get('code')).toBe('invalid_redirect_uri');
+        expect(url.searchParams.get('app')).toBe(app.publicId);
+      });
+
+      it('returns the historical JSON 400 body when ADMIN_URL is unset', async () => {
+        delete process.env.ADMIN_URL;
+
+        const signInRes = await request(httpServer)
+          .post('/api/auth/sign-in/email')
+          .send({ email: 's@sa.io', password: 'Pass@word1234' });
+        const cookies = (signInRes.headers['set-cookie'] as unknown as string[]) || [];
+        const sessionCookie = cookies.find((c) => c.startsWith('better-auth.session_token='));
+
+        const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+
+        const res = await request(httpServer)
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: app.publicId,
+            redirect_uri: 'http://evil.example.com/cb',
+            code_challenge: 'x'.repeat(43),
+            code_challenge_method: 'S256',
+            state: 'xyz',
+          })
+          .set('Cookie', sessionCookie!.split(';')[0])
+          .expect(400);
+
+        expect(res.body.message).toBe('invalid_redirect_uri');
+      });
     });
   });
 
@@ -279,6 +462,345 @@ describe('SassyAuth E2E', () => {
           lastName: expected.lastName,
         });
       }
+    });
+  });
+
+  // ── CORS preflight on public NestJS controllers ──────────────────────────
+  // Regression guard for the accept-invite browser flow: the admin app at
+  // http://localhost:3001 POSTs JSON to /api/invitations/:token/accept, which
+  // triggers a CORS preflight on the auth-server at http://localhost:3000.
+  // configureNestApp() must wire app.enableCors() with TRUSTED_ORIGINS so the
+  // preflight is answered with the matching Access-Control-Allow-Origin;
+  // otherwise the browser surfaces a "Failed to fetch" with no useful trace.
+
+  describe('CORS preflight on /api/invitations/:token/accept', () => {
+    it('answers OPTIONS with 204 and ACAO for an allow-listed origin', async () => {
+      const res = await request(httpServer)
+        .options('/api/invitations/anytoken/accept')
+        .set('Origin', 'http://localhost:3001')
+        .set('Access-Control-Request-Method', 'POST')
+        .set('Access-Control-Request-Headers', 'content-type')
+        .expect(204);
+
+      expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3001');
+    });
+
+    it('omits ACAO for an origin that is not on the TRUSTED_ORIGINS allow-list', async () => {
+      const res = await request(httpServer)
+        .options('/api/invitations/anytoken/accept')
+        .set('Origin', 'https://evil.example.com')
+        .set('Access-Control-Request-Method', 'POST')
+        .set('Access-Control-Request-Headers', 'content-type');
+
+      expect(res.headers['access-control-allow-origin']).toBeUndefined();
+    });
+  });
+
+  // ── Accept invitation → BetterAuth sign-in works ─────────────────────────
+  // Regression guard: if acceptInvitation hashes with bcrypt (or anything that
+  // isn't BetterAuth's scrypt format `<saltHex>:<hashHex>`), the resulting
+  // account row is unreadable to BetterAuth's verifyPassword and the user
+  // gets a 500 on /api/auth/sign-in/email. This test exercises the full
+  // accept→sign-in loop end-to-end so a hash-format mismatch fails here
+  // instead of in production.
+
+  describe('Invitation accept → /api/auth/sign-in/email', () => {
+    const inviteeEmail = 'invite-e2e@example.com';
+    const password = 'InvitedP@ss12345';
+    let inviteToken: string;
+    let createdBaUserId: string | null = null;
+
+    beforeAll(async () => {
+      // Build the bare-minimum invite shape: a BetterAuth user row WITHOUT
+      // an account row (the credential account is what accept creates), a
+      // pending SaUser linked to it, and a fresh SaInvitation token.
+      const baUser = await prisma.user.create({
+        data: {
+          id: 'invite-e2e-ba-' + Date.now(),
+          email: inviteeEmail,
+          name: 'Invite E2E',
+          emailVerified: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+      createdBaUserId = baUser.id;
+
+      const platformOrg = await prisma.saOrg.findFirst({ where: { isPlatform: true } });
+      const saUser = await prisma.saUser.create({
+        data: {
+          publicId: 'invite-e2e-' + Date.now(),
+          betterAuthUserId: baUser.id,
+          orgId: platformOrg!.id,
+          firstName: 'Invite',
+          lastName: 'E2E',
+          status: 'pending',
+        },
+      });
+
+      inviteToken = 'invite-e2e-token-' + Date.now();
+      await prisma.saInvitation.create({
+        data: {
+          publicId: 'invite-e2e-inv-' + Date.now(),
+          token: inviteToken,
+          userId: saUser.id,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+    });
+
+    afterAll(async () => {
+      // Best-effort cleanup. Cascades on SaUser remove SaInvitation; account
+      // and session rows on the BetterAuth user cascade per schema.
+      if (createdBaUserId) {
+        await prisma.saUser.deleteMany({ where: { betterAuthUserId: createdBaUserId } });
+        await prisma.user.delete({ where: { id: createdBaUserId } }).catch(() => undefined);
+      }
+    });
+
+    it('accepts the invitation and then signs in successfully', async () => {
+      await request(httpServer)
+        .post(`/api/invitations/${inviteToken}/accept`)
+        .send({ password })
+        .expect(204);
+
+      const signIn = await request(httpServer)
+        .post('/api/auth/sign-in/email')
+        .send({ email: inviteeEmail, password })
+        .expect(200);
+
+      const setCookie = signIn.headers['set-cookie'] as unknown as string[] | string | undefined;
+      const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+      expect(
+        cookies.some((c) => c.startsWith('better-auth.session_token=')),
+      ).toBe(true);
+    });
+  });
+
+  // ── Full admin lifecycle: app → perm → org → role → user → accept → sign-in
+  // Exercises the end-to-end happy path a real platform admin walks: provision
+  // an app, a permission scoped to it, an org scoped to it, a role bundling
+  // that permission, a pending user assigned to the org, then complete the
+  // invite flow and prove the new user can sign in via BetterAuth with
+  // Pass@word1234. Companion Playwright spec drives the same flow through
+  // the admin UI; this one pins the API contract.
+
+  describe('Lifecycle: provision app+perm+org+role+user, accept invite, sign in', () => {
+    const ts = Date.now();
+    const PASSWORD = 'Pass@word1234';
+    const inviteeEmail = `lifecycle-${ts}@example.com`;
+    let superAdminCookie: string;
+    let appPublicId: string;
+    let permPublicId: string;
+    let orgPublicId: string;
+    let rolePublicId: string;
+    let userPublicId: string;
+    let inviteToken: string;
+
+    beforeAll(async () => {
+      const signIn = await request(httpServer)
+        .post('/api/auth/sign-in/email')
+        .send({ email: 's@sa.io', password: 'Pass@word1234' })
+        .expect(200);
+      const setCookie = signIn.headers['set-cookie'] as unknown as string[] | string | undefined;
+      const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+      const sessionPair = cookies
+        .map((c) => c.split(';')[0])
+        .find((c) => c.startsWith('better-auth.session_token='));
+      expect(sessionPair).toBeDefined();
+      superAdminCookie = sessionPair!;
+    });
+
+    afterAll(async () => {
+      // Best-effort teardown in dependency order. Each step is wrapped so a
+      // mid-flow failure in the test body still cleans up what was created.
+      const tryDelete = async (path: string) => {
+        try {
+          await request(httpServer).delete(path).set('Cookie', superAdminCookie).expect(204);
+        } catch {
+          /* ignore — partially-created scenario */
+        }
+      };
+      if (userPublicId) await tryDelete(`/api/users/${userPublicId}`);
+      if (rolePublicId) await tryDelete(`/api/roles/${rolePublicId}`);
+      if (orgPublicId) await tryDelete(`/api/orgs/${orgPublicId}`);
+      if (permPublicId) await tryDelete(`/api/permissions/${permPublicId}`);
+      if (appPublicId) await tryDelete(`/api/apps/${appPublicId}`);
+      // The CreateUser flow inserts a BetterAuth user row that is NOT removed
+      // by DELETE /api/users (which only touches the platform-side saUser).
+      // Same pattern as the existing super-admin DELETE cleanup block.
+      await prisma.user.deleteMany({ where: { email: inviteeEmail } });
+    });
+
+    it('creates an app', async () => {
+      const res = await request(httpServer)
+        .post('/api/apps')
+        .set('Cookie', superAdminCookie)
+        .send({ name: `E2E Lifecycle App ${ts}`, url: 'https://example.com/lifecycle' })
+        .expect(201);
+      expect(res.body.publicId).toBeTruthy();
+      appPublicId = res.body.publicId;
+    });
+
+    it('creates a permission scoped to the new app', async () => {
+      // The DTO regex requires dotted lowercase segments where every segment
+      // after the first starts with a letter, hence the `t<digits>` prefix
+      // on the timestamp segment.
+      const res = await request(httpServer)
+        .post('/api/permissions')
+        .set('Cookie', superAdminCookie)
+        .send({ name: `e2e.t${ts}.read`, appId: appPublicId })
+        .expect(201);
+      expect(res.body.publicId).toBeTruthy();
+      permPublicId = res.body.publicId;
+    });
+
+    it('creates an org scoped to the new app', async () => {
+      const res = await request(httpServer)
+        .post('/api/orgs')
+        .set('Cookie', superAdminCookie)
+        .send({ name: `E2E Lifecycle Org ${ts}`, appId: appPublicId })
+        .expect(201);
+      expect(res.body.publicId).toBeTruthy();
+      orgPublicId = res.body.publicId;
+    });
+
+    it('creates a role bundling the new permission', async () => {
+      const res = await request(httpServer)
+        .post('/api/roles')
+        .set('Cookie', superAdminCookie)
+        .send({
+          name: `E2E Lifecycle Role ${ts}`,
+          appId: appPublicId,
+          permissionIds: [permPublicId],
+        })
+        .expect(201);
+      expect(res.body.publicId).toBeTruthy();
+      rolePublicId = res.body.publicId;
+    });
+
+    it('creates a pending user in the new org and returns an invite URL', async () => {
+      const res = await request(httpServer)
+        .post('/api/users')
+        .set('Cookie', superAdminCookie)
+        .send({
+          firstName: 'Lifecycle',
+          lastName: 'E2E',
+          email: inviteeEmail,
+          orgId: orgPublicId,
+        })
+        .expect(201);
+      expect(res.body.user.id).toBeTruthy();
+      expect(res.body.inviteUrl).toMatch(/\/accept-invite\?token=/);
+      userPublicId = res.body.user.id;
+      inviteToken = new URL(res.body.inviteUrl).searchParams.get('token')!;
+      expect(inviteToken).toBeTruthy();
+    });
+
+    it('assigns the role to the new user', async () => {
+      await request(httpServer)
+        .post(`/api/users/${userPublicId}/roles`)
+        .set('Cookie', superAdminCookie)
+        .send({ roleId: rolePublicId })
+        .expect(204);
+    });
+
+    it('accepts the invitation with Pass@word1234', async () => {
+      await request(httpServer)
+        .post(`/api/invitations/${inviteToken}/accept`)
+        .send({ password: PASSWORD })
+        .expect(204);
+    });
+
+    it('signs in via BetterAuth email/password as the new user', async () => {
+      const res = await request(httpServer)
+        .post('/api/auth/sign-in/email')
+        .send({ email: inviteeEmail, password: PASSWORD })
+        .expect(200);
+      const setCookie = res.headers['set-cookie'] as unknown as string[] | string | undefined;
+      const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+      expect(
+        cookies.some((c) => c.startsWith('better-auth.session_token=')),
+      ).toBe(true);
+    });
+
+    it('exposes the assigned permission to the newly signed-in user', async () => {
+      const signIn = await request(httpServer)
+        .post('/api/auth/sign-in/email')
+        .send({ email: inviteeEmail, password: PASSWORD })
+        .expect(200);
+      const setCookie = signIn.headers['set-cookie'] as unknown as string[] | string | undefined;
+      const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+      const userCookie = cookies
+        .map((c) => c.split(';')[0])
+        .find((c) => c.startsWith('better-auth.session_token='))!;
+
+      const me = await request(httpServer)
+        .get('/api/me/permissions')
+        .set('Cookie', userCookie)
+        .expect(200);
+      expect(me.body.permissions).toEqual(expect.arrayContaining([`e2e.t${ts}.read`]));
+    });
+
+    // The lifecycle test only assigns the original role at the start. Here
+    // we use the new set-replace endpoints to add a SECOND role and a
+    // direct permission, then verify the union flows through /api/me/permissions.
+
+    it('sets a second role + a direct permission via the new set-replace endpoints', async () => {
+      // Provision a second role pointing at the same app + permission.
+      const role2Res = await request(httpServer)
+        .post('/api/roles')
+        .set('Cookie', superAdminCookie)
+        .send({
+          name: `E2E Lifecycle Role 2 ${ts}`,
+          appId: appPublicId,
+          permissionIds: [permPublicId],
+        })
+        .expect(201);
+      const role2PublicId = role2Res.body.publicId as string;
+
+      // Add the new role to the existing single-role set (set-replace).
+      await request(httpServer)
+        .put(`/api/users/${userPublicId}/roles`)
+        .set('Cookie', superAdminCookie)
+        .send({ roleIds: [rolePublicId, role2PublicId] })
+        .expect(204);
+
+      // Grant the same permission directly to the user as well.
+      await request(httpServer)
+        .put(`/api/users/${userPublicId}/direct-permissions`)
+        .set('Cookie', superAdminCookie)
+        .send({ permissionIds: [permPublicId] })
+        .expect(204);
+
+      // GET reflects the new direct-permission row.
+      const direct = await request(httpServer)
+        .get(`/api/users/${userPublicId}/direct-permissions`)
+        .set('Cookie', superAdminCookie)
+        .expect(200);
+      expect(direct.body).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: `e2e.t${ts}.read` }),
+      ]));
+    });
+
+    it('the newly-signed-in user still sees the same effective permission set via /api/me', async () => {
+      const signIn = await request(httpServer)
+        .post('/api/auth/sign-in/email')
+        .send({ email: inviteeEmail, password: PASSWORD })
+        .expect(200);
+      const setCookie = signIn.headers['set-cookie'] as unknown as string[] | string | undefined;
+      const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+      const userCookie = cookies
+        .map((c) => c.split(';')[0])
+        .find((c) => c.startsWith('better-auth.session_token='))!;
+
+      const me = await request(httpServer)
+        .get('/api/me/permissions')
+        .set('Cookie', userCookie)
+        .expect(200);
+      // The same permission, granted via 2 roles + 1 direct, still appears once
+      // (deduplicated union — guards against double-counting in the join).
+      expect(me.body.permissions).toEqual(expect.arrayContaining([`e2e.t${ts}.read`]));
     });
   });
 

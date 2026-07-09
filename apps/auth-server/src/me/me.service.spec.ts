@@ -44,3 +44,33 @@ describe('MeService', () => {
     await expect(service.getMyPermissions('ba-caller')).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
+
+describe('MeService.getMyProfile', () => {
+  let service: MeService;
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({ providers: [MeService] }).compile();
+    service = module.get(MeService);
+    jest.clearAllMocks();
+  });
+
+  it('returns userId, org, and app metadata', async () => {
+    mockPrisma.saUser.findUnique.mockResolvedValue({
+      publicId: 'sq_u1',
+      org: {
+        publicId: 'sq_o1', name: 'Acme', isPlatform: false,
+        app: { publicId: 'sq_a1', name: 'app01', isPlatform: false },
+      },
+    });
+    const result = await service.getMyProfile('ba-caller');
+    expect(result).toEqual({
+      userId: 'sq_u1',
+      org: { id: 'sq_o1', name: 'Acme', isPlatform: false },
+      app: { id: 'sq_a1', name: 'app01', isPlatform: false },
+    });
+  });
+
+  it('throws ForbiddenException when caller has no SaUser', async () => {
+    mockPrisma.saUser.findUnique.mockResolvedValue(null);
+    await expect(service.getMyProfile('ba-caller')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});

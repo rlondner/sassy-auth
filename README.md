@@ -26,11 +26,12 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
     - [Observability (optional)](#observability-optional)
     - [Social providers (optional)](#social-providers-optional)
   - [Auth Flows](#auth-flows)
-    - [Flow A: OAuth2 Authorization Code](#flow-a-oauth2-authorization-code)
+    - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
     - [Flow B: Direct Login](#flow-b-direct-login)
     - [Flow C: Invite + Accept](#flow-c-invite--accept)
   - [JWKS and Token Verification](#jwks-and-token-verification)
   - [API Reference](#api-reference)
+  - [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
   - [Admin Console](#admin-console-1)
   - [Observability](#observability)
   - [Running Tests](#running-tests)
@@ -46,6 +47,8 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
 - pnpm >= 9
 - PostgreSQL 14+
 
+**Alternative: Flox (zero-config).** If you have [Flox](https://flox.dev) installed, run `flox activate` in the project root. It provisions Node.js, pnpm, PostgreSQL, Python, and uv automatically, generates `.env.local` with RSA keys and all required variables, runs database migrations, and seeds platform data. Skip to [step 6](#6-start-the-development-servers) after activation.
+
 ---
 
 ## Project Structure
@@ -59,8 +62,8 @@ sassy-auth/
         token/               # JWT issuance: OAuth2 and direct login flows
         users/               # Users CRUD + role assignment
         invitations/         # Invitation issue / validate / accept
-        orgs/                # Org list (read-only)
-        roles/               # Role list (read-only)
+        orgs/                # Org CRUD
+        roles/               # Role CRUD + permission assignment
         common/
           permissions/       # checkPermission helper
           middleware/        # RequestIdMiddleware
@@ -82,6 +85,14 @@ sassy-auth/
       sentry.{client,server,edge}.config.ts
       instrumentation.ts
       middleware.ts          # Edge auth gate
+    resource-server-fastapi/  # Python/FastAPI reference resource server (port 8010)
+      app/
+        oauth/               # PKCE login flow + JWKS token verification
+        api/                 # Protected API routes (/api/properties)
+        web/                 # Public web routes
+        templates/           # Jinja2 HTML templates
+        static/              # CSS + JS
+      tests/                 # pytest test suite
   packages/
     db/                      # Prisma schema, PrismaClient singleton, migrations
     types/                   # Shared TypeScript types (JWT payload, error codes, identifier detection)
@@ -95,7 +106,7 @@ sassy-auth/
 | Owner       | Tables                                                                                      |
 |-------------|---------------------------------------------------------------------------------------------|
 | BetterAuth  | `user`, `session`, `account`, `verification`                                                |
-| SassyAuth   | `sa_app`, `sa_org`, `sa_user`, `sa_invitation`, `sa_permission`, `sa_role`, `sa_role_permission`, `sa_user_role`, `sa_user_permission` |
+| SassyAuth   | `sa_app`, `sa_org`, `sa_user`, `sa_invitation`, `sa_permission`, `sa_role`, `sa_role_permission`, `sa_user_role`, `sa_user_permission`, `sa_oauth_code` |
 
 `sa_user` links to BetterAuth's `user` table via the `betterAuthUserId` foreign key.
 
@@ -152,11 +163,20 @@ The seed script is idempotent — safe to run multiple times. It creates:
 
 - The platform app (`isPlatform: true`, name "SassyAuth")
 - The platform org (`isPlatform: true`, name "Platform")
-- Platform permissions: `platform.orgs.manage`, `platform.apps.manage`, `platform.users.manage`, `platform.permissions.manage`, `org.users.manage`, `org.permissions.manage`
+- Platform permissions: `platform.orgs.manage`, `platform.apps.manage`, `platform.users.manage`, `platform.permissions.manage`, `platform.roles.manage`, `org.users.manage`, `org.roles.manage`
+- System permissions (`isSystem: true`): `org.users.manage`, `org.roles.manage` — these bypass app-scope checks
 
 ```bash
 pnpm --filter @sassy-auth/db db:seed
 ```
+
+The seed also creates 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `p@sa.io`, `s@sa.io`), each with password `Pass@word1234`. `s@sa.io` is the super admin and is the recommended account for first sign-in.
+
+**Optional — demo resource server data.** Set `SEED_DEMO=1` to additionally create a sample app (`resourceserver01`), an org (`Citadel`), 8 `rs.*` permissions, 2 roles, and 2 demo users (`m@cpm.io`, `i@cpm.io`) used by the [FastAPI sample resource server](apps/resource-server-fastapi/README.md).
+
+**Optional — multi-tenant demo data.** Set `SEED_DEMO_MULTITENANT=1` to create a second sample app (`app01`) with two orgs (Acme, Globex), 3 users each, and org-scoped permissions (`contracts.read`, `contracts.create`, `org.users.manage`, `org.roles.manage`). Useful for testing the org-scoped admin experience.
+
+
 
 ### 6. Start the development servers
 
@@ -198,8 +218,11 @@ Copy the two output lines directly into your `.env.local` file.
 | `DATABASE_URL`        | PostgreSQL connection string                                   |
 | `RSA_PRIVATE_KEY`     | Base64-encoded PKCS8 PEM private key (for signing JWTs)        |
 | `RSA_PUBLIC_KEY`      | Base64-encoded SPKI PEM public key (served via JWKS endpoint)  |
+| `JWT_KEY_ID`          | `kid` written into every issued JWT header and the JWKS document. Resource servers use it to pick the right key from the JWKS. Rotate together with the RSA key pair. Default: `sassy-auth-1` |
 | `BETTER_AUTH_SECRET`  | Random string, 32+ characters                                  |
-| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`      |
+| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`. Also used as the JWT `iss` claim. |
+| `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
+| `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
 
 ### Admin console
 
@@ -207,6 +230,10 @@ Copy the two output lines directly into your `.env.local` file.
 |-----------------------|--------------------------------------------------------------------------------------------|
 | `ADMIN_URL`           | Public URL of the admin console, used by the API to build invitation links. Default: `http://localhost:3001` |
 | `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `http://localhost:3000`      |
+| `LOGIN_NEXT_ALLOWED_ORIGINS` | Comma-separated origins allowed by `/login?next=` redirect validation (in addition to `AUTH_SERVER_URL`). Default: empty |
+| `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
+| `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
+| `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
 
 ### Observability (optional)
 
@@ -242,27 +269,61 @@ Omit the client ID and secret for any provider you do not want to enable.
 
 ## Auth Flows
 
-### Flow A: OAuth2 Authorization Code
+### Flow A: OAuth2 Authorization Code with PKCE (S256)
 
-Use this flow for third-party or external resource servers that redirect users to SassyAuth for login.
+Use this flow for third-party or external resource servers that redirect users to SassyAuth for login. PKCE is **required** — only the `S256` method is accepted and the server rejects authorize requests without a code chal
 
-**Step 1 — Redirect the user to the authorization endpoint**
+**Step 0 — Generate a PKCE pair (client-side)**
+
+```javascript
+const crypto = require('crypto');
+const code_verifier = crypto.randomBytes(64).toString('base64url');
+const code_challenge = crypto
+  .createHash('sha256').update(code_verifier).digest('base64')
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// Keep `code_verifier` server-side. Send `code_challenge` on the authorize call.
+```
+
+**Step 1 — Generate PKCE verifier and challenge**
+
+```javascript
+const verifier = crypto.randomBytes(64).toString('base64url'); // 43-128 chars
+const challenge = crypto
+  .createHash('sha256')
+  .update(verifier)
+  .digest('base64url');
+```
+
+**Step 2 — Redirect the user to the authorization endpoint**
 
 ```
-GET /api/token/oauth/authorize?client_id=<appPublicId>&redirect_uri=<uri>&state=<state>
+GET /api/token/oauth/authorize
+  ?client_id=<appPublicId>
+  &redirect_uri=<uri>
+  &code_challenge=<S256 challenge>
+  &code_challenge_method=S256
+  &state=<state>
 ```
 
 The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple, GitHub).
 
-**Step 2 — Receive the authorization code**
+**Step 3 — Receive the authorization code**
 
-After successful authentication, SassyAuth validates that the user's org is associated with the requested app, then redirects to:
+After successful authentication, SassyAuth validates that the user's org is associated with the requested app and that the `redirect_uri` is allowed for that app, then redirects to:
 
 ```
 <redirect_uri>?code=<code>&state=<state>
 ```
 
-**Step 3 — Exchange the code for a JWT**
+How the `redirect_uri` is validated depends on the app's `sa_app` row:
+
+- **Default (no `callbackUrl` set):** the `redirect_uri` must share an origin (scheme + host + port) with the app's registered `url`. Any path under that origin is accepted.
+- **With `callbackUrl` set:** the `redirect_uri` must equal the configured `callbackUrl` exactly. A trailing-slash difference is tolerated; scheme, host, port, path, and query string must otherwise match.
+
+A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_redirect_uri`. Note that registering an app whose `url` or `callbackUrl` uses `http` or a `localhost`/loopback host requires the auth server to run with `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true`; by default both must be `https` with a public host (see [Environment Variables](#environment-variables)).
+
+
+**Step 4 — Exchange the code + verifier for a JWT**
 
 ```bash
 curl -X POST http://localhost:3000/api/token/oauth/token \
@@ -270,7 +331,7 @@ curl -X POST http://localhost:3000/api/token/oauth/token \
   -d '{
     "code": "<authorization-code>",
     "client_id": "<appPublicId>",
-    "client_secret": "<clientSecret>",
+    "code_verifier": "<verifier>",
     "redirect_uri": "<redirect_uri>"
   }'
 ```
@@ -284,6 +345,9 @@ Response:
   "expires_in": 3600
 }
 ```
+
+> **Note:** The `redirect_uri` sent here must match the one validated at the authorize step — by origin against the app's `url`, or exactly against the app's `callbackUrl` when one is configured.
+Authorization codes are single-use and stored in the database (`SaOauthCode` table). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
 
 ### Flow B: Direct Login
 
@@ -305,7 +369,7 @@ The `identifier` field is auto-detected and accepts:
 - Phone number — `+15551234567`
 - Username — `johndoe`
 
-The password is validated against the bcrypt hash stored by BetterAuth. No BetterAuth session is created; only a JWT is returned.
+The password is validated against the scrypt hash stored by BetterAuth (format `<saltHex>:<hashHex>`). No BetterAuth session is created; only a JWT is returned.
 
 Response:
 
@@ -357,16 +421,25 @@ curl http://localhost:3000/api/token/jwks
 }
 ```
 
+**JWT header:**
+
+| Field          | Description                                        |
+|----------------|----------------------------------------------------|
+| `alg`          | `RS256`                                            |
+| `typ`          | `JWT`                                              |
+| `kid`          | Matches the `kid` of the key in the JWKS document. Controlled by `JWT_KEY_ID`. |
+
 **JWT payload structure:**
 
-| Claim          | Description                                        |
-|----------------|----------------------------------------------------|
-| `sub`          | User public ID (Sqid)                              |
-| `aud`          | App public ID (Sqid)                               |
-| `org`          | Org public ID (Sqid)                               |
-| `permissions`  | Flat array of effective permission names           |
-| `iat`          | Issued at (Unix timestamp)                         |
-| `exp`          | Expiry — 1 hour after issuance                     |
+| Claim          | Description                                                                   |
+|----------------|-------------------------------------------------------------------------------|
+| `sub`          | User public ID (Sqid)                                                         |
+| `aud`          | App public ID (Sqid)                                                          |
+| `org`          | Org public ID (Sqid)                                                          |
+| `iss`          | Value of `BETTER_AUTH_URL` at issuance time                                   |
+| `scope`        | Space-separated list of effective permission names (OAuth 2.0 `scope` claim)  |
+| `iat`          | Issued at (Unix timestamp)                                                    |
+| `exp`          | Expiry — 1 hour after issuance                                                |
 
 **Example verification in Node.js:**
 
@@ -384,16 +457,29 @@ function getKey(header, callback) {
   });
 }
 
-jwt.verify(token, getKey, { algorithms: ['RS256'] }, (err, decoded) => {
-  if (err) throw err;
-  // decoded.sub        — user public ID
-  // decoded.aud        — app public ID
-  // decoded.org        — org public ID
-  // decoded.permissions — string[]
-});
+jwt.verify(
+  token,
+  getKey,
+  {
+    algorithms: ['RS256'],
+    issuer: process.env.BETTER_AUTH_URL,
+    audience: '<your-app-publicId>',
+  },
+  (err, decoded) => {
+    if (err) throw err;
+    // decoded.sub   — user public ID
+    // decoded.aud   — app public ID
+    // decoded.org   — org public ID
+    // decoded.scope — space-separated permission names, e.g. "rs.properties.read rs.inspections.read"
+    const scopes = new Set(String(decoded.scope ?? '').split(' '));
+    if (!scopes.has('rs.properties.read')) throw new Error('insufficient_scope');
+  },
+);
 ```
 
-Cache the JWKS document locally and refresh it only when you encounter a key ID you do not recognise. Do not fetch it on every request.
+A Python/FastAPI example using `pyjwt[crypto]` and `PyJWKClient` is in [`apps/resource-server-fastapi/`](apps/resource-server-fastapi/README.md).
+
+Cache the JWKS document locally and refresh it only when you encounter a `kid` you do not recognise. Do not fetch it on every request.
 
 ---
 
@@ -401,29 +487,109 @@ Cache the JWKS document locally and refresh it only when you encounter a key ID 
 
 | Method | Path                                          | Description                                      |
 |--------|-----------------------------------------------|--------------------------------------------------|
+| GET    | `/.well-known/oauth-authorization-server`     | RFC 8414 OAuth AS metadata (issuer, endpoints, supported methods) |
 | GET    | `/api/token/jwks`                             | JWKS document with RS256 public key              |
 | GET    | `/api/token/oauth/authorize`                  | OAuth2 authorization — initiates login flow      |
 | POST   | `/api/token/oauth/token`                      | Exchange authorization code for JWT              |
 | POST   | `/api/token/direct/login`                     | Direct credential login — returns JWT            |
+| GET    | `/api/me`                                     | Caller's profile: org, app context, effective permissions |
 | ALL    | `/api/auth/*`                                 | BetterAuth: sign-up, sign-in, magic link, OTP, social login |
+| POST   | `/api/register`                               | **Self-serve signup** — atomically create org + user + org↔app association (see below) |
 | GET    | `/api/users`                                  | List users (filter by `orgId`, `appId`)          |
 | GET    | `/api/users/:id`                              | Get user                                         |
 | POST   | `/api/users`                                  | Create user + invitation                         |
 | PATCH  | `/api/users/:id`                              | Update user                                      |
 | DELETE | `/api/users/:id`                              | Delete user                                      |
 | GET    | `/api/users/:id/roles`                        | List user's roles                                |
+| PUT    | `/api/users/:id/roles`                        | Set-replace all roles (atomic swap)              |
 | POST   | `/api/users/:id/roles`                        | Assign role                                      |
 | DELETE | `/api/users/:id/roles/:roleId`                | Remove role                                      |
+| GET    | `/api/users/:id/direct-permissions`           | List user's direct permission assignments        |
+| PUT    | `/api/users/:id/direct-permissions`           | Set-replace all direct permissions (atomic swap) |
 | GET    | `/api/users/:id/effective-permissions`        | Computed permissions (roles ∪ direct)            |
 | POST   | `/api/users/:id/resend-invitation`            | Re-issue invitation for a pending user           |
 | GET    | `/api/invitations/:token`                     | Validate an invitation (returns user info + `expired`) |
 | POST   | `/api/invitations/:token`                     | Accept invitation (sets password, creates Account, activates user) |
-| GET    | `/api/orgs`                                   | List orgs (read-only)                            |
-| GET    | `/api/roles`                                  | List roles (read-only)                           |
+| GET    | `/api/orgs`                                   | List orgs (filter by `appId`)                    |
+| GET    | `/api/orgs/:id`                               | Get org                                          |
+| POST   | `/api/orgs`                                   | Create org                                       |
+| PATCH  | `/api/orgs/:id`                               | Update org                                       |
+| DELETE | `/api/orgs/:id`                               | Delete org                                       |
+| GET    | `/api/apps`                                   | List apps (filter by `orgId`)                    |
+| GET    | `/api/apps/:id`                               | Get app                                          |
+| POST   | `/api/apps`                                   | Create app                                       |
+| PATCH  | `/api/apps/:id`                               | Update app                                       |
+| DELETE | `/api/apps/:id`                               | Delete app                                       |
+| GET    | `/api/roles`                                  | List roles (filter by `appId`)                   |
+| GET    | `/api/roles/:id`                              | Get role (includes permissions, user count)       |
+| POST   | `/api/roles`                                  | Create role with permission IDs                  |
+| PATCH  | `/api/roles/:id`                              | Update role name/description/permissions         |
+| DELETE | `/api/roles/:id`                              | Delete role (blocked if users assigned)          |
+| GET    | `/api/permissions`                            | List permissions (filter by `appId`, search `q`) |
+| GET    | `/api/permissions/:id`                        | Get permission (includes role/user detail)       |
+| POST   | `/api/permissions`                            | Create permission                                |
+| PATCH  | `/api/permissions/:id`                        | Update permission name/description               |
+| DELETE | `/api/permissions/:id`                        | Delete permission (blocked if roles/users assigned) |
 
 BetterAuth mounts on Express before NestJS and intercepts all `/api/auth/*` routes directly. NestJS handles all other routes.
 
 Full OpenAPI spec is in `docs/`.
+
+---
+
+## Self-serve Registration (`POST /api/register`)
+
+A public endpoint for resource-server-driven customer signup. It atomically creates an org, a BetterAuth user, and the org↔app association in a single transaction.
+
+### Request
+
+```json
+POST /api/register
+Content-Type: application/json
+
+{
+  "email":       "user@example.com",
+  "password":    "s3cr3tP@ss",
+  "companyName": "Acme Corp",
+  "appPublicId": "<sa_app.publicId>"
+}
+```
+
+| Field         | Type   | Rules                    |
+|---------------|--------|--------------------------|
+| `email`       | string | valid email              |
+| `password`    | string | min 8 characters         |
+| `companyName` | string | min 1 character          |
+| `appPublicId` | string | must match an existing app |
+
+### Responses
+
+| Status | Meaning                                     |
+|--------|---------------------------------------------|
+| `201`  | `{ "ok": true }` — org + user created       |
+| `400`  | Validation error (missing/invalid fields)   |
+| `404`  | Unknown `appPublicId`                       |
+| `409`  | Email already registered                    |
+| `429`  | Rate limit exceeded (see below)             |
+
+### Rate limiting
+
+The endpoint is guarded by an in-memory per-IP fixed-window rate limiter. Configure it via env vars:
+
+| Variable                 | Description                                                              | Default      |
+|--------------------------|--------------------------------------------------------------------------|--------------|
+| `REGISTER_RATE_LIMIT`    | Max requests per IP per window. `0` or unset = unlimited (dev/trusted)  | `10`         |
+| `REGISTER_RATE_WINDOW_MS`| Window length in milliseconds                                            | `3600000` (1 h) |
+
+> **Multi-instance note:** the rate-limit store is in-process. In a horizontally-scaled deployment (multiple pods / workers), each instance maintains its own counter. For consistent enforcement across pods, replace the in-memory store with a shared backend such as Redis.
+
+---
+
+## Sample Resource Server (FastAPI)
+
+A runnable Python/FastAPI sample lives at [`apps/resource-server-fastapi/`](apps/resource-server-fastapi/README.md). It demonstrates the full Flow A (PKCE) round-trip from a non-Node consumer: starting the authorize redirect, exchanging the code, verifying the JWT against the JWKS endpoint, and scope-gating a protected endpoint.
+
+The sample relies on the `SEED_DEMO=1` data (`resourceserver01` app, `Citadel` org, demo users `m@cpm.io` / `i@cpm.io`). The RS app's own README walks through both the seed-driven setup and a manual admin-UI alternative for users who want to provision everything from scratch.
 
 ---
 
@@ -438,11 +604,67 @@ pnpm --filter @sassy-auth/admin dev
 Routes:
 - `/login` — credential login (proxies BetterAuth via Server Action)
 - `/accept-invite?token=...` — invitation landing
-- `/users` — users management (TanStack Table, view/edit drawer, create drawer)
+- `/oauth-error` — OAuth error page (shown when the authorize flow fails; optionally links to `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`)
+- `/users` — users management (TanStack Table, view/edit/create drawers)
+- `/orgs` — org management
+- `/apps` — app management
+- `/roles` — role management with inline permission assignment
+- `/permissions` — permission management with role/user detail view
+
+All CRUD operations (create, update, delete) show success toast notifications via [Sonner](https://sonner.emilkowal.dev/). The `<Toaster />` is mounted in the root layout and respects the user's light/dark theme preference.
 
 i18n is wired with `next-intl` (locales: `en`, `fr`). Strings live in `apps/admin/messages/`. The active locale is detected from the `Accept-Language` header and can be overridden via the `LocaleSwitcher` in the shell.
 
 The admin console talks to `auth-server` via `AUTH_SERVER_URL` (default `http://localhost:3000`). All API calls forward the BetterAuth session cookie via the helpers in `apps/admin/lib/api.ts`.
+
+The login page supports a `next=<url>` query parameter for post-login redirect (e.g., from a resource server's OAuth flow). URLs are validated against an allowlist (`AUTH_SERVER_URL` + `LOGIN_NEXT_ALLOWED_ORIGINS` env var) to prevent open redirects.
+
+---
+
+## Resource Server (FastAPI)
+
+A reference resource server is at `apps/resource-server-fastapi/`. It demonstrates how a third-party application integrates with SassyAuth using OAuth2 PKCE.
+
+**Prerequisites:** Python 3.11+, pip or uv.
+
+```bash
+cd apps/resource-server-fastapi
+python -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+pip install -e ".[dev]"
+```
+
+**Configure:**
+
+```bash
+cp .env.example .env
+# Edit .env — set SASSY_CLIENT_ID to the app's publicId from the seed
+```
+
+| Variable              | Description                                                   |
+|-----------------------|---------------------------------------------------------------|
+| `AUTH_SERVER_URL`     | SassyAuth base URL (default `http://localhost:3000`)          |
+| `ADMIN_URL`           | Admin console URL for login redirect (default `http://localhost:3001`) |
+| `SASSY_CLIENT_ID`    | `sa_app.publicId` for this resource server (from seed output) |
+| `RS_BASE_URL`        | Public URL of this server (e.g. `http://localhost:8010`)      |
+| `REDIRECT_URI`       | OAuth callback URL (e.g. `http://localhost:8010/auth/callback`) |
+
+**Run:**
+
+```bash
+uvicorn app.main:app --port 8010 --reload
+```
+
+**Test:**
+
+```bash
+pytest
+```
+
+Routes:
+- `/` — landing page with login button
+- `/auth/login` — initiates PKCE flow → redirects to SassyAuth
+- `/auth/callback` — receives authorization code, exchanges for JWT
+- `/api/properties` — protected endpoint; requires Bearer token with `rs.properties.read` scope
 
 ---
 
@@ -487,32 +709,52 @@ Unit test files live alongside source files as `*.spec.ts` / `*.test.tsx` and ru
 
 ### E2E tests
 
+**Auth-server E2E (Jest + Supertest):**
+
 ```bash
 pnpm --filter @sassy-auth/auth-server test:e2e
 ```
 
-E2E tests are in `apps/auth-server/test/` and use the Jest config at `test/jest-e2e.json`. They require a running database.
+Tests are in `apps/auth-server/test/` using the Jest config at `test/jest-e2e.json`. They require a running database.
+
+**Admin E2E (Playwright):**
+
+```bash
+# Requires both servers running (pnpm dev in another terminal)
+pnpm --filter @sassy-auth/admin-e2e test:e2e
+
+# Headed mode (see the browser)
+pnpm --filter @sassy-auth/admin-e2e test:e2e:headed
+
+# Interactive UI mode
+pnpm --filter @sassy-auth/admin-e2e test:e2e:ui
+```
+
+Tests are in `apps/admin-e2e/tests/`. In CI, the Playwright config automatically starts both servers. Locally, start `pnpm dev` first. See `apps/admin-e2e/README.md` for details.
 
 ---
 
 ## Known Limitations
 
-The following items are deferred to later sub-projects and are not yet production-ready. See `TODO.md` for the full follow-up list and `BUGs.md` for catalogued bugs.
+The following items are deferred to later sub-projects and are not yet production-ready. See `todo/TODO_*.md` for daily follow-up lists and `bugs/BUGS_*.md` for the full bug catalog.
 
-**In-memory OAuth code store.**
-Authorization codes from Flow A are stored in memory. They are lost on server restart and the server cannot run as multiple instances behind a load balancer. Replace with Redis or a database table before deploying to production.
+**`redirect_uri` validation granularity.**
+By default `redirect_uri` is validated against the app's registered `url` origin (scheme + host + port), and any path under that origin is accepted. Apps that need tighter control can now set an optional `callbackUrl` on the `SaApp` row, which forces an exact `redirect_uri` match (trailing-slash tolerant). A full allowlist of multiple distinct redirect paths per app is still not supported. Partially addresses **bug-0047**.
 
-**`redirect_uri` allowlist not enforced.**
-Any `redirect_uri` is currently accepted during the code exchange. A per-app allowlist (stored in `SaApp`) needs to be added to prevent open redirect attacks.
+**PKCE `code_verifier` format not validated.**
+The `code_verifier` field is checked for presence but not for RFC 7636 format (43-128 chars of unreserved characters). Tracked as **bug-0041**.
 
-**`client_secret` not validated.**
-The `client_secret` field is accepted in `POST /api/token/oauth/token` but not checked against any stored value. Per-app secrets need to be generated, hashed, and stored in `SaApp`.
+**CI — no lint, single-package typecheck.**
+A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
 
-**RBAC not org-scoped.**
-`checkPermission` only verifies that the caller holds the named permission — it does not constrain by `orgId`. A user with `org.users.manage` in org A can currently act on users in org B. Tracked as **bug-0001**.
+**`deleteUser` does not remove BetterAuth identity.**
+Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
 
-**No CI.**
-No GitHub Actions workflow yet — typecheck/test/lint must be run locally.
+**JWT `scope` claim returns all user permissions, not app-scoped.**
+The JWT includes all of the user's permissions (including `platform.*` ones), not just those relevant to the requesting app. Resource servers receive scope entries they cannot act on. Tracked as **bug-0157**.
 
-**Admin / orgs / apps / roles CRUD UI.**
-Only users management is implemented in the admin console. Orgs / apps / roles / permissions CRUD is planned for a later sub-project.
+**Rate limiting uses in-memory store.**
+Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/min/IP on auth endpoints, 10 requests/hour/IP on registration). In a horizontally-scaled deployment, each instance maintains its own counter. For consistent enforcement across pods, replace with a shared Redis backend.
+
+**LIKE wildcard characters not escaped in search.**
+The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.

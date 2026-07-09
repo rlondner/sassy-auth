@@ -20,18 +20,27 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
+  // bug-0160: track the redirect timer in a ref so unmount can
+  // cancel it. Previously the setTimeout could fire after the user
+  // navigated away, triggering a router.push into a stale route.
+  const redirectTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(
+    () => () => {
+      if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current)
+    },
+    [],
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (password !== confirm) { setError('Passwords do not match.'); return }
+    if (password !== confirm) { setError(t('acceptInvite.errors.passwordMismatch')); return }
     if (password.length < 12) {
-      setError('Password must be at least 12 characters.')
+      setError(t('acceptInvite.errors.passwordTooShort'))
       return
     }
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(password)) {
-      setError(
-        'Password must contain an uppercase letter, a lowercase letter, and a digit.',
-      )
+      setError(t('acceptInvite.errors.passwordComplexity'))
       return
     }
     setError(null)
@@ -39,9 +48,9 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
     try {
       await acceptInvitation(token, password)
       setSuccess(true)
-      setTimeout(() => router.push('/login'), 2000)
+      redirectTimerRef.current = setTimeout(() => router.push('/login'), 2000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      setError(err instanceof Error ? err.message : t('acceptInvite.errors.genericError'))
     } finally {
       setSubmitting(false)
     }
@@ -84,8 +93,8 @@ export function AcceptInviteForm({ token, firstName, email }: AcceptInviteFormPr
         />
       </div>
       {error && <p className="text-label-md text-[var(--destructive)]">{error}</p>}
-      <Button type="submit" className="w-full" disabled={submitting}>
-        {submitting ? '…' : t('acceptInvite.submit')}
+      <Button type="submit" className="w-full" loading={submitting}>
+        {t('acceptInvite.submit')}
       </Button>
     </form>
   )

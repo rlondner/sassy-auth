@@ -1,0 +1,2316 @@
+<html lang="en" vid="0" style="background-color: rgb(46, 46, 46);">
+
+<head vid="1">
+  <meta charset="UTF-8" vid="2">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" vid="3">
+  <title vid="4">User Management Dashboard - Night Theme</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" vid="6">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" vid="7">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"
+    vid="8">
+
+  <style vid="10">
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+
+  <style type="text/css">
+    *,
+    ::before,
+    ::after {
+      --tw-border-spacing-x: 0;
+      --tw-border-spacing-y: 0;
+      --tw-translate-x: 0;
+      --tw-translate-y: 0;
+      --tw-rotate: 0;
+      --tw-skew-x: 0;
+      --tw-skew-y: 0;
+      --tw-scale-x: 1;
+      --tw-scale-y: 1;
+      --tw-pan-x: ;
+      --tw-pan-y: ;
+      --tw-pinch-zoom: ;
+      --tw-scroll-snap-strictness: proximity;
+      --tw-gradient-from-position: ;
+      --tw-gradient-via-position: ;
+      --tw-gradient-to-position: ;
+      --tw-ordinal: ;
+      --tw-slashed-zero: ;
+      --tw-numeric-figure: ;
+      --tw-numeric-spacing: ;
+      --tw-numeric-fraction: ;
+      --tw-ring-inset: ;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-color: rgb(59 130 246 / 0.5);
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-colored: 0 0 #0000;
+      --tw-blur: ;
+      --tw-brightness: ;
+      --tw-contrast: ;
+      --tw-grayscale: ;
+      --tw-hue-rotate: ;
+      --tw-invert: ;
+      --tw-saturate: ;
+      --tw-sepia: ;
+      --tw-drop-shadow: ;
+      --tw-backdrop-blur: ;
+      --tw-backdrop-brightness: ;
+      --tw-backdrop-contrast: ;
+      --tw-backdrop-grayscale: ;
+      --tw-backdrop-hue-rotate: ;
+      --tw-backdrop-invert: ;
+      --tw-backdrop-opacity: ;
+      --tw-backdrop-saturate: ;
+      --tw-backdrop-sepia: ;
+      --tw-contain-size: ;
+      --tw-contain-layout: ;
+      --tw-contain-paint: ;
+      --tw-contain-style: ;
+    }
+
+    ::backdrop {
+      --tw-border-spacing-x: 0;
+      --tw-border-spacing-y: 0;
+      --tw-translate-x: 0;
+      --tw-translate-y: 0;
+      --tw-rotate: 0;
+      --tw-skew-x: 0;
+      --tw-skew-y: 0;
+      --tw-scale-x: 1;
+      --tw-scale-y: 1;
+      --tw-pan-x: ;
+      --tw-pan-y: ;
+      --tw-pinch-zoom: ;
+      --tw-scroll-snap-strictness: proximity;
+      --tw-gradient-from-position: ;
+      --tw-gradient-via-position: ;
+      --tw-gradient-to-position: ;
+      --tw-ordinal: ;
+      --tw-slashed-zero: ;
+      --tw-numeric-figure: ;
+      --tw-numeric-spacing: ;
+      --tw-numeric-fraction: ;
+      --tw-ring-inset: ;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-color: rgb(59 130 246 / 0.5);
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-colored: 0 0 #0000;
+      --tw-blur: ;
+      --tw-brightness: ;
+      --tw-contrast: ;
+      --tw-grayscale: ;
+      --tw-hue-rotate: ;
+      --tw-invert: ;
+      --tw-saturate: ;
+      --tw-sepia: ;
+      --tw-drop-shadow: ;
+      --tw-backdrop-blur: ;
+      --tw-backdrop-brightness: ;
+      --tw-backdrop-contrast: ;
+      --tw-backdrop-grayscale: ;
+      --tw-backdrop-hue-rotate: ;
+      --tw-backdrop-invert: ;
+      --tw-backdrop-opacity: ;
+      --tw-backdrop-saturate: ;
+      --tw-backdrop-sepia: ;
+      --tw-contain-size: ;
+      --tw-contain-layout: ;
+      --tw-contain-paint: ;
+      --tw-contain-style: ;
+    }
+
+    /*
+! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com
+*/
+    /*
+1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)
+2. Allow adding a border to an element by just adding a border-width. (https://github.com/tailwindcss/tailwindcss/pull/116)
+*/
+
+    *,
+    ::before,
+    ::after {
+      box-sizing: border-box;
+      /* 1 */
+      border-width: 0;
+      /* 2 */
+      border-style: solid;
+      /* 2 */
+      border-color: #e5e7eb;
+      /* 2 */
+    }
+
+    ::before,
+    ::after {
+      --tw-content: '';
+    }
+
+    /*
+1. Use a consistent sensible line-height in all browsers.
+2. Prevent adjustments of font size after orientation changes in iOS.
+3. Use a more readable tab size.
+4. Use the user's configured `sans` font-family by default.
+5. Use the user's configured `sans` font-feature-settings by default.
+6. Use the user's configured `sans` font-variation-settings by default.
+7. Disable tap highlights on iOS
+*/
+
+    html,
+    :host {
+      line-height: 1.5;
+      /* 1 */
+      -webkit-text-size-adjust: 100%;
+      /* 2 */
+      -moz-tab-size: 4;
+      /* 3 */
+      tab-size: 4;
+      /* 3 */
+      font-family: Inter, sans-serif;
+      /* 4 */
+      font-feature-settings: normal;
+      /* 5 */
+      font-variation-settings: normal;
+      /* 6 */
+      -webkit-tap-highlight-color: transparent;
+      /* 7 */
+    }
+
+    /*
+1. Remove the margin in all browsers.
+2. Inherit line-height from `html` so users can set them as a class directly on the `html` element.
+*/
+
+    body {
+      margin: 0;
+      /* 1 */
+      line-height: inherit;
+      /* 2 */
+    }
+
+    /*
+1. Add the correct height in Firefox.
+2. Correct the inheritance of border color in Firefox. (https://bugzilla.mozilla.org/show_bug.cgi?id=190655)
+3. Ensure horizontal rules are visible by default.
+*/
+
+    hr {
+      height: 0;
+      /* 1 */
+      color: inherit;
+      /* 2 */
+      border-top-width: 1px;
+      /* 3 */
+    }
+
+    /*
+Add the correct text decoration in Chrome, Edge, and Safari.
+*/
+
+    abbr:where([title]) {
+      text-decoration: underline dotted;
+    }
+
+    /*
+Remove the default font size and weight for headings.
+*/
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-size: inherit;
+      font-weight: inherit;
+    }
+
+    /*
+Reset links to optimize for opt-in styling instead of opt-out.
+*/
+
+    a {
+      color: inherit;
+      text-decoration: inherit;
+    }
+
+    /*
+Add the correct font weight in Edge and Safari.
+*/
+
+    b,
+    strong {
+      font-weight: bolder;
+    }
+
+    /*
+1. Use the user's configured `mono` font-family by default.
+2. Use the user's configured `mono` font-feature-settings by default.
+3. Use the user's configured `mono` font-variation-settings by default.
+4. Correct the odd `em` font sizing in all browsers.
+*/
+
+    code,
+    kbd,
+    samp,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      /* 1 */
+      font-feature-settings: normal;
+      /* 2 */
+      font-variation-settings: normal;
+      /* 3 */
+      font-size: 1em;
+      /* 4 */
+    }
+
+    /*
+Add the correct font size in all browsers.
+*/
+
+    small {
+      font-size: 80%;
+    }
+
+    /*
+Prevent `sub` and `sup` elements from affecting the line height in all browsers.
+*/
+
+    sub,
+    sup {
+      font-size: 75%;
+      line-height: 0;
+      position: relative;
+      vertical-align: baseline;
+    }
+
+    sub {
+      bottom: -0.25em;
+    }
+
+    sup {
+      top: -0.5em;
+    }
+
+    /*
+1. Remove text indentation from table contents in Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=999088, https://bugs.webkit.org/show_bug.cgi?id=201297)
+2. Correct table border color inheritance in all Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=935729, https://bugs.webkit.org/show_bug.cgi?id=195016)
+3. Remove gaps between table borders by default.
+*/
+
+    table {
+      text-indent: 0;
+      /* 1 */
+      border-color: inherit;
+      /* 2 */
+      border-collapse: collapse;
+      /* 3 */
+    }
+
+    /*
+1. Change the font styles in all browsers.
+2. Remove the margin in Firefox and Safari.
+3. Remove default padding in all browsers.
+*/
+
+    button,
+    input,
+    optgroup,
+    select,
+    textarea {
+      font-family: inherit;
+      /* 1 */
+      font-feature-settings: inherit;
+      /* 1 */
+      font-variation-settings: inherit;
+      /* 1 */
+      font-size: 100%;
+      /* 1 */
+      font-weight: inherit;
+      /* 1 */
+      line-height: inherit;
+      /* 1 */
+      letter-spacing: inherit;
+      /* 1 */
+      color: inherit;
+      /* 1 */
+      margin: 0;
+      /* 2 */
+      padding: 0;
+      /* 3 */
+    }
+
+    /*
+Remove the inheritance of text transform in Edge and Firefox.
+*/
+
+    button,
+    select {
+      text-transform: none;
+    }
+
+    /*
+1. Correct the inability to style clickable types in iOS and Safari.
+2. Remove default button styles.
+*/
+
+    button,
+    input:where([type='button']),
+    input:where([type='reset']),
+    input:where([type='submit']) {
+      -webkit-appearance: button;
+      /* 1 */
+      background-color: transparent;
+      /* 2 */
+      background-image: none;
+      /* 2 */
+    }
+
+    /*
+Use the modern Firefox focus style for all focusable elements.
+*/
+
+    :-moz-focusring {
+      outline: auto;
+    }
+
+    /*
+Remove the additional `:invalid` styles in Firefox. (https://github.com/mozilla/gecko-dev/blob/2f9eacd9d3d995c937b4251a5557d95d494c9be1/layout/style/res/forms.css#L728-L737)
+*/
+
+    :-moz-ui-invalid {
+      box-shadow: none;
+    }
+
+    /*
+Add the correct vertical alignment in Chrome and Firefox.
+*/
+
+    progress {
+      vertical-align: baseline;
+    }
+
+    /*
+Correct the cursor style of increment and decrement buttons in Safari.
+*/
+
+    ::-webkit-inner-spin-button,
+    ::-webkit-outer-spin-button {
+      height: auto;
+    }
+
+    /*
+1. Correct the odd appearance in Chrome and Safari.
+2. Correct the outline style in Safari.
+*/
+
+    [type='search'] {
+      -webkit-appearance: textfield;
+      /* 1 */
+      outline-offset: -2px;
+      /* 2 */
+    }
+
+    /*
+Remove the inner padding in Chrome and Safari on macOS.
+*/
+
+    ::-webkit-search-decoration {
+      -webkit-appearance: none;
+    }
+
+    /*
+1. Correct the inability to style clickable types in iOS and Safari.
+2. Change font properties to `inherit` in Safari.
+*/
+
+    ::-webkit-file-upload-button {
+      -webkit-appearance: button;
+      /* 1 */
+      font: inherit;
+      /* 2 */
+    }
+
+    /*
+Add the correct display in Chrome and Safari.
+*/
+
+    summary {
+      display: list-item;
+    }
+
+    /*
+Removes the default spacing and border for appropriate elements.
+*/
+
+    blockquote,
+    dl,
+    dd,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    hr,
+    figure,
+    p,
+    pre {
+      margin: 0;
+    }
+
+    fieldset {
+      margin: 0;
+      padding: 0;
+    }
+
+    legend {
+      padding: 0;
+    }
+
+    ol,
+    ul,
+    menu {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    /*
+Reset default styling for dialogs.
+*/
+    dialog {
+      padding: 0;
+    }
+
+    /*
+Prevent resizing textareas horizontally by default.
+*/
+
+    textarea {
+      resize: vertical;
+    }
+
+    /*
+1. Reset the default placeholder opacity in Firefox. (https://github.com/tailwindlabs/tailwindcss/issues/3300)
+2. Set the default placeholder color to the user's configured gray 400 color.
+*/
+
+    input::placeholder,
+    textarea::placeholder {
+      opacity: 1;
+      /* 1 */
+      color: #9ca3af;
+      /* 2 */
+    }
+
+    /*
+Set the default cursor for buttons.
+*/
+
+    button,
+    [role="button"] {
+      cursor: pointer;
+    }
+
+    /*
+Make sure disabled buttons don't get the pointer cursor.
+*/
+    :disabled {
+      cursor: default;
+    }
+
+    /*
+1. Make replaced elements `display: block` by default. (https://github.com/mozdevs/cssremedy/issues/14)
+2. Add `vertical-align: middle` to align replaced elements more sensibly by default. (https://github.com/jensimmons/cssremedy/issues/14#issuecomment-634934210)
+   This can trigger a poorly considered lint error in some tools but is included by design.
+*/
+
+    img,
+    svg,
+    video,
+    canvas,
+    audio,
+    iframe,
+    embed,
+    object {
+      display: block;
+      /* 1 */
+      vertical-align: middle;
+      /* 2 */
+    }
+
+    /*
+Constrain images and videos to the parent width and preserve their intrinsic aspect ratio. (https://github.com/mozdevs/cssremedy/issues/14)
+*/
+
+    img,
+    video {
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* Make elements with the HTML hidden attribute stay hidden by default */
+    [hidden]:where(:not([hidden="until-found"])) {
+      display: none;
+    }
+
+    .pointer-events-none {
+      pointer-events: none;
+    }
+
+    .absolute {
+      position: absolute;
+    }
+
+    .relative {
+      position: relative;
+    }
+
+    .inset-y-0 {
+      top: 0px;
+      bottom: 0px;
+    }
+
+    .bottom-0 {
+      bottom: 0px;
+    }
+
+    .left-0 {
+      left: 0px;
+    }
+
+    .right-0 {
+      right: 0px;
+    }
+
+    .top-1\/2 {
+      top: 50%;
+    }
+
+    .z-10 {
+      z-index: 10;
+    }
+
+    .z-20 {
+      z-index: 20;
+    }
+
+    .col-span-full {
+      grid-column: 1 / -1;
+    }
+
+    .mx-2 {
+      margin-left: 0.5rem;
+      margin-right: 0.5rem;
+    }
+
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .-mt-12 {
+      margin-top: -3rem;
+    }
+
+    .mb-0\.5 {
+      margin-bottom: 0.125rem;
+    }
+
+    .mb-1 {
+      margin-bottom: 0.25rem;
+    }
+
+    .mb-2 {
+      margin-bottom: 0.5rem;
+    }
+
+    .mb-3 {
+      margin-bottom: 0.75rem;
+    }
+
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+
+    .mb-6 {
+      margin-bottom: 1.5rem;
+    }
+
+    .ml-1 {
+      margin-left: 0.25rem;
+    }
+
+    .mr-1\.5 {
+      margin-right: 0.375rem;
+    }
+
+    .mr-2 {
+      margin-right: 0.5rem;
+    }
+
+    .mt-0\.5 {
+      margin-top: 0.125rem;
+    }
+
+    .mt-1 {
+      margin-top: 0.25rem;
+    }
+
+    .mt-6 {
+      margin-top: 1.5rem;
+    }
+
+    .block {
+      display: block;
+    }
+
+    .flex {
+      display: flex;
+    }
+
+    .inline-flex {
+      display: inline-flex;
+    }
+
+    .grid {
+      display: grid;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .h-1\.5 {
+      height: 0.375rem;
+    }
+
+    .h-10 {
+      height: 2.5rem;
+    }
+
+    .h-16 {
+      height: 4rem;
+    }
+
+    .h-2\.5 {
+      height: 0.625rem;
+    }
+
+    .h-24 {
+      height: 6rem;
+    }
+
+    .h-3 {
+      height: 0.75rem;
+    }
+
+    .h-4 {
+      height: 1rem;
+    }
+
+    .h-5 {
+      height: 1.25rem;
+    }
+
+    .h-6 {
+      height: 1.5rem;
+    }
+
+    .h-8 {
+      height: 2rem;
+    }
+
+    .h-full {
+      height: 100%;
+    }
+
+    .h-screen {
+      height: 100vh;
+    }
+
+    .w-1 {
+      width: 0.25rem;
+    }
+
+    .w-1\.5 {
+      width: 0.375rem;
+    }
+
+    .w-10 {
+      width: 2.5rem;
+    }
+
+    .w-2\.5 {
+      width: 0.625rem;
+    }
+
+    .w-24 {
+      width: 6rem;
+    }
+
+    .w-3 {
+      width: 0.75rem;
+    }
+
+    .w-4 {
+      width: 1rem;
+    }
+
+    .w-5 {
+      width: 1.25rem;
+    }
+
+    .w-6 {
+      width: 1.5rem;
+    }
+
+    .w-8 {
+      width: 2rem;
+    }
+
+    .w-\[240px\] {
+      width: 240px;
+    }
+
+    .w-\[340px\] {
+      width: 340px;
+    }
+
+    .w-full {
+      width: 100%;
+    }
+
+    .w-px {
+      width: 1px;
+    }
+
+    .w-screen {
+      width: 100vw;
+    }
+
+    .min-w-0 {
+      min-width: 0px;
+    }
+
+    .max-w-4xl {
+      max-width: 56rem;
+    }
+
+    .flex-1 {
+      flex: 1 1 0%;
+    }
+
+    .flex-shrink-0 {
+      flex-shrink: 0;
+    }
+
+    .-translate-y-1\/2 {
+      --tw-translate-y: -50%;
+      transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+    }
+
+    .grid-cols-1 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .flex-col {
+      flex-direction: column;
+    }
+
+    .flex-wrap {
+      flex-wrap: wrap;
+    }
+
+    .items-end {
+      align-items: flex-end;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .justify-center {
+      justify-content: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-1 {
+      gap: 0.25rem;
+    }
+
+    .gap-1\.5 {
+      gap: 0.375rem;
+    }
+
+    .gap-2 {
+      gap: 0.5rem;
+    }
+
+    .gap-3 {
+      gap: 0.75rem;
+    }
+
+    .gap-4 {
+      gap: 1rem;
+    }
+
+    .gap-6 {
+      gap: 1.5rem;
+    }
+
+    .gap-8 {
+      gap: 2rem;
+    }
+
+    .space-y-1> :not([hidden])~ :not([hidden]) {
+      --tw-space-y-reverse: 0;
+      margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));
+      margin-bottom: calc(0.25rem * var(--tw-space-y-reverse));
+    }
+
+    .space-y-2> :not([hidden])~ :not([hidden]) {
+      --tw-space-y-reverse: 0;
+      margin-top: calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));
+      margin-bottom: calc(0.5rem * var(--tw-space-y-reverse));
+    }
+
+    .space-y-4> :not([hidden])~ :not([hidden]) {
+      --tw-space-y-reverse: 0;
+      margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse)));
+      margin-bottom: calc(1rem * var(--tw-space-y-reverse));
+    }
+
+    .space-y-6> :not([hidden])~ :not([hidden]) {
+      --tw-space-y-reverse: 0;
+      margin-top: calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));
+      margin-bottom: calc(1.5rem * var(--tw-space-y-reverse));
+    }
+
+    .space-y-8> :not([hidden])~ :not([hidden]) {
+      --tw-space-y-reverse: 0;
+      margin-top: calc(2rem * calc(1 - var(--tw-space-y-reverse)));
+      margin-bottom: calc(2rem * var(--tw-space-y-reverse));
+    }
+
+    .overflow-hidden {
+      overflow: hidden;
+    }
+
+    .overflow-y-auto {
+      overflow-y: auto;
+    }
+
+    .scroll-smooth {
+      scroll-behavior: smooth;
+    }
+
+    .truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .rounded {
+      border-radius: 0.25rem;
+    }
+
+    .rounded-full {
+      border-radius: 9999px;
+    }
+
+    .rounded-lg {
+      border-radius: 0.5rem;
+    }
+
+    .rounded-md {
+      border-radius: 0.375rem;
+    }
+
+    .rounded-xl {
+      border-radius: 0.75rem;
+    }
+
+    .rounded-r-full {
+      border-top-right-radius: 9999px;
+      border-bottom-right-radius: 9999px;
+    }
+
+    .border {
+      border-width: 1px;
+    }
+
+    .border-b {
+      border-bottom-width: 1px;
+    }
+
+    .border-r {
+      border-right-width: 1px;
+    }
+
+    .border-t {
+      border-top-width: 1px;
+    }
+
+    .border-brand-500\/20 {
+      border-color: rgb(96 165 250 / 0.2);
+    }
+
+    .border-brand-500\/40 {
+      border-color: rgb(96 165 250 / 0.4);
+    }
+
+    .border-emerald-500\/20 {
+      border-color: rgb(16 185 129 / 0.2);
+    }
+
+    .border-night-border {
+      --tw-border-opacity: 1;
+      border-color: rgb(31 41 55 / var(--tw-border-opacity, 1));
+    }
+
+    .border-orange-500\/20 {
+      border-color: rgb(249 115 22 / 0.2);
+    }
+
+    .border-pink-500\/20 {
+      border-color: rgb(236 72 153 / 0.2);
+    }
+
+    .border-purple-500\/20 {
+      border-color: rgb(168 85 247 / 0.2);
+    }
+
+    .border-transparent {
+      border-color: transparent;
+    }
+
+    .bg-amber-500 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-brand-500 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(96 165 250 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-brand-500\/10 {
+      background-color: rgb(96 165 250 / 0.1);
+    }
+
+    .bg-emerald-500 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(16 185 129 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-emerald-900\/20 {
+      background-color: rgb(6 78 59 / 0.2);
+    }
+
+    .bg-emerald-900\/30 {
+      background-color: rgb(6 78 59 / 0.3);
+    }
+
+    .bg-emerald-900\/40 {
+      background-color: rgb(6 78 59 / 0.4);
+    }
+
+    .bg-night-base {
+      --tw-bg-opacity: 1;
+      background-color: rgb(10 15 30 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-night-base\/40 {
+      background-color: rgb(10 15 30 / 0.4);
+    }
+
+    .bg-night-base\/50 {
+      background-color: rgb(10 15 30 / 0.5);
+    }
+
+    .bg-night-base\/80 {
+      background-color: rgb(10 15 30 / 0.8);
+    }
+
+    .bg-night-border {
+      --tw-bg-opacity: 1;
+      background-color: rgb(31 41 55 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-night-card {
+      --tw-bg-opacity: 1;
+      background-color: rgb(17 24 39 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-night-sidebar {
+      --tw-bg-opacity: 1;
+      background-color: rgb(7 11 20 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-night-sidebar\/50 {
+      background-color: rgb(7 11 20 / 0.5);
+    }
+
+    .bg-orange-900\/20 {
+      background-color: rgb(124 45 18 / 0.2);
+    }
+
+    .bg-orange-900\/40 {
+      background-color: rgb(124 45 18 / 0.4);
+    }
+
+    .bg-pink-900\/40 {
+      background-color: rgb(131 24 67 / 0.4);
+    }
+
+    .bg-purple-500 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(168 85 247 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-purple-900\/20 {
+      background-color: rgb(88 28 135 / 0.2);
+    }
+
+    .bg-purple-900\/40 {
+      background-color: rgb(88 28 135 / 0.4);
+    }
+
+    .bg-slate-600 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(71 85 105 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-slate-800 {
+      --tw-bg-opacity: 1;
+      background-color: rgb(30 41 59 / var(--tw-bg-opacity, 1));
+    }
+
+    .bg-gradient-to-r {
+      background-image: linear-gradient(to right, var(--tw-gradient-stops));
+    }
+
+    .from-brand-700\/80 {
+      --tw-gradient-from: rgb(37 99 235 / 0.8) var(--tw-gradient-from-position);
+      --tw-gradient-to: rgb(37 99 235 / 0) var(--tw-gradient-to-position);
+      --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+    }
+
+    .to-night-sidebar {
+      --tw-gradient-to: #070b14 var(--tw-gradient-to-position);
+    }
+
+    .p-1 {
+      padding: 0.25rem;
+    }
+
+    .p-1\.5 {
+      padding: 0.375rem;
+    }
+
+    .p-2 {
+      padding: 0.5rem;
+    }
+
+    .p-2\.5 {
+      padding: 0.625rem;
+    }
+
+    .p-4 {
+      padding: 1rem;
+    }
+
+    .p-6 {
+      padding: 1.5rem;
+    }
+
+    .p-8 {
+      padding: 2rem;
+    }
+
+    .px-1 {
+      padding-left: 0.25rem;
+      padding-right: 0.25rem;
+    }
+
+    .px-2 {
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+
+    .px-3 {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+
+    .px-3\.5 {
+      padding-left: 0.875rem;
+      padding-right: 0.875rem;
+    }
+
+    .px-6 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    .px-8 {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+
+    .py-0\.5 {
+      padding-top: 0.125rem;
+      padding-bottom: 0.125rem;
+    }
+
+    .py-1 {
+      padding-top: 0.25rem;
+      padding-bottom: 0.25rem;
+    }
+
+    .py-1\.5 {
+      padding-top: 0.375rem;
+      padding-bottom: 0.375rem;
+    }
+
+    .py-2 {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+
+    .py-4 {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    .py-6 {
+      padding-top: 1.5rem;
+      padding-bottom: 1.5rem;
+    }
+
+    .pb-12 {
+      padding-bottom: 3rem;
+    }
+
+    .pb-8 {
+      padding-bottom: 2rem;
+    }
+
+    .pl-3 {
+      padding-left: 0.75rem;
+    }
+
+    .pl-9 {
+      padding-left: 2.25rem;
+    }
+
+    .pr-3 {
+      padding-right: 0.75rem;
+    }
+
+    .pt-6 {
+      padding-top: 1.5rem;
+    }
+
+    .text-left {
+      text-align: left;
+    }
+
+    .font-mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .font-sans {
+      font-family: Inter, sans-serif;
+    }
+
+    .text-2xl {
+      font-size: 1.5rem;
+      line-height: 2rem;
+    }
+
+    .text-3xl {
+      font-size: 1.875rem;
+      line-height: 2.25rem;
+    }
+
+    .text-\[10px\] {
+      font-size: 10px;
+    }
+
+    .text-base {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+
+    .text-lg {
+      font-size: 1.125rem;
+      line-height: 1.75rem;
+    }
+
+    .text-sm {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+
+    .text-xs {
+      font-size: 0.75rem;
+      line-height: 1rem;
+    }
+
+    .font-bold {
+      font-weight: 700;
+    }
+
+    .font-medium {
+      font-weight: 500;
+    }
+
+    .font-normal {
+      font-weight: 400;
+    }
+
+    .font-semibold {
+      font-weight: 600;
+    }
+
+    .uppercase {
+      text-transform: uppercase;
+    }
+
+    .leading-5 {
+      line-height: 1.25rem;
+    }
+
+    .tracking-wide {
+      letter-spacing: 0.025em;
+    }
+
+    .tracking-wider {
+      letter-spacing: 0.05em;
+    }
+
+    .text-brand-500 {
+      --tw-text-opacity: 1;
+      color: rgb(96 165 250 / var(--tw-text-opacity, 1));
+    }
+
+    .text-brand-500\/80 {
+      color: rgb(96 165 250 / 0.8);
+    }
+
+    .text-emerald-400 {
+      --tw-text-opacity: 1;
+      color: rgb(52 211 153 / var(--tw-text-opacity, 1));
+    }
+
+    .text-emerald-500 {
+      --tw-text-opacity: 1;
+      color: rgb(16 185 129 / var(--tw-text-opacity, 1));
+    }
+
+    .text-night-base {
+      --tw-text-opacity: 1;
+      color: rgb(10 15 30 / var(--tw-text-opacity, 1));
+    }
+
+    .text-orange-400 {
+      --tw-text-opacity: 1;
+      color: rgb(251 146 60 / var(--tw-text-opacity, 1));
+    }
+
+    .text-pink-400 {
+      --tw-text-opacity: 1;
+      color: rgb(244 114 182 / var(--tw-text-opacity, 1));
+    }
+
+    .text-purple-400 {
+      --tw-text-opacity: 1;
+      color: rgb(192 132 252 / var(--tw-text-opacity, 1));
+    }
+
+    .text-slate-100 {
+      --tw-text-opacity: 1;
+      color: rgb(241 245 249 / var(--tw-text-opacity, 1));
+    }
+
+    .text-slate-200 {
+      --tw-text-opacity: 1;
+      color: rgb(226 232 240 / var(--tw-text-opacity, 1));
+    }
+
+    .text-slate-300 {
+      --tw-text-opacity: 1;
+      color: rgb(203 213 225 / var(--tw-text-opacity, 1));
+    }
+
+    .text-slate-400 {
+      --tw-text-opacity: 1;
+      color: rgb(148 163 184 / var(--tw-text-opacity, 1));
+    }
+
+    .text-slate-500 {
+      --tw-text-opacity: 1;
+      color: rgb(100 116 139 / var(--tw-text-opacity, 1));
+    }
+
+    .text-slate-600 {
+      --tw-text-opacity: 1;
+      color: rgb(71 85 105 / var(--tw-text-opacity, 1));
+    }
+
+    .text-slate-700 {
+      --tw-text-opacity: 1;
+      color: rgb(51 65 85 / var(--tw-text-opacity, 1));
+    }
+
+    .text-white {
+      --tw-text-opacity: 1;
+      color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+    }
+
+    .antialiased {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .placeholder-slate-600::placeholder {
+      --tw-placeholder-opacity: 1;
+      color: rgb(71 85 105 / var(--tw-placeholder-opacity, 1));
+    }
+
+    .shadow-2xl {
+      --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+      --tw-shadow-colored: 0 25px 50px -12px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-\[0_0_15px_rgba\(96\2c 165\2c 250\2c 0\.2\)\] {
+      --tw-shadow: 0 0 15px rgba(96, 165, 250, 0.2);
+      --tw-shadow-colored: 0 0 15px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-\[0_0_15px_rgba\(96\2c 165\2c 250\2c 0\.3\)\] {
+      --tw-shadow: 0 0 15px rgba(96, 165, 250, 0.3);
+      --tw-shadow-colored: 0 0 15px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-\[0_0_8px_rgba\(16\2c 185\2c 129\2c 0\.5\)\] {
+      --tw-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+      --tw-shadow-colored: 0 0 8px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-\[0_0_8px_rgba\(168\2c 85\2c 247\2c 0\.5\)\] {
+      --tw-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+      --tw-shadow-colored: 0 0 8px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-inner {
+      --tw-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+      --tw-shadow-colored: inset 0 2px 4px 0 var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-lg {
+      --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-sm {
+      --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-xl {
+      --tw-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      --tw-shadow-colored: 0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    }
+
+    .shadow-brand-500\/20 {
+      --tw-shadow-color: rgb(96 165 250 / 0.2);
+      --tw-shadow: var(--tw-shadow-colored);
+    }
+
+    .shadow-brand-500\/5 {
+      --tw-shadow-color: rgb(96 165 250 / 0.05);
+      --tw-shadow: var(--tw-shadow-colored);
+    }
+
+    .ring-2 {
+      --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+      --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+      box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+    }
+
+    .ring-night-base {
+      --tw-ring-opacity: 1;
+      --tw-ring-color: rgb(10 15 30 / var(--tw-ring-opacity, 1));
+    }
+
+    .ring-night-border {
+      --tw-ring-opacity: 1;
+      --tw-ring-color: rgb(31 41 55 / var(--tw-ring-opacity, 1));
+    }
+
+    .transition-all {
+      transition-property: all;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 150ms;
+    }
+
+    .transition-colors {
+      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 150ms;
+    }
+
+    .selection\:bg-brand-500\/20 *::selection {
+      background-color: rgb(96 165 250 / 0.2);
+    }
+
+    .selection\:text-brand-500 *::selection {
+      --tw-text-opacity: 1;
+      color: rgb(96 165 250 / var(--tw-text-opacity, 1));
+    }
+
+    .selection\:bg-brand-500\/20::selection {
+      background-color: rgb(96 165 250 / 0.2);
+    }
+
+    .selection\:text-brand-500::selection {
+      --tw-text-opacity: 1;
+      color: rgb(96 165 250 / var(--tw-text-opacity, 1));
+    }
+
+    .hover\:border-brand-500\/30:hover {
+      border-color: rgb(96 165 250 / 0.3);
+    }
+
+    .hover\:bg-brand-500\/10:hover {
+      background-color: rgb(96 165 250 / 0.1);
+    }
+
+    .hover\:bg-brand-600:hover {
+      --tw-bg-opacity: 1;
+      background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1));
+    }
+
+    .hover\:bg-night-card:hover {
+      --tw-bg-opacity: 1;
+      background-color: rgb(17 24 39 / var(--tw-bg-opacity, 1));
+    }
+
+    .hover\:bg-slate-800:hover {
+      --tw-bg-opacity: 1;
+      background-color: rgb(30 41 59 / var(--tw-bg-opacity, 1));
+    }
+
+    .hover\:bg-slate-800\/50:hover {
+      background-color: rgb(30 41 59 / 0.5);
+    }
+
+    .hover\:text-brand-500:hover {
+      --tw-text-opacity: 1;
+      color: rgb(96 165 250 / var(--tw-text-opacity, 1));
+    }
+
+    .hover\:text-white:hover {
+      --tw-text-opacity: 1;
+      color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+    }
+
+    .focus\:border-brand-500:focus {
+      --tw-border-opacity: 1;
+      border-color: rgb(96 165 250 / var(--tw-border-opacity, 1));
+    }
+
+    .focus\:outline-none:focus {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+
+    .focus\:ring-2:focus {
+      --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+      --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+      box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+    }
+
+    .focus\:ring-brand-500:focus {
+      --tw-ring-opacity: 1;
+      --tw-ring-color: rgb(96 165 250 / var(--tw-ring-opacity, 1));
+    }
+
+    .group:hover .group-hover\:text-brand-500 {
+      --tw-text-opacity: 1;
+      color: rgb(96 165 250 / var(--tw-text-opacity, 1));
+    }
+
+    .group:hover .group-hover\:text-white {
+      --tw-text-opacity: 1;
+      color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+    }
+
+    @media (min-width: 640px) {
+
+      .sm\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .sm\:text-sm {
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+      }
+    }
+
+    @media (min-width: 768px) {
+
+      .md\:col-span-2 {
+        grid-column: span 2 / span 2;
+      }
+
+      .md\:block {
+        display: block;
+      }
+
+      .md\:w-1\/3 {
+        width: 33.333333%;
+      }
+
+      .md\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .md\:flex-row {
+        flex-direction: row;
+      }
+
+      .md\:gap-8 {
+        gap: 2rem;
+      }
+    }
+
+    @media (min-width: 1024px) {
+
+      .lg\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    * {
+      -ms-overflow-style: none !important;
+      scrollbar-width: none !important;
+    }
+
+    *::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
+  </style>
+  <link type="text/css" rel="stylesheet" id="dark-mode-custom-link">
+  <link type="text/css" rel="stylesheet" id="dark-mode-general-link">
+  <style lang="en" type="text/css" id="dark-mode-custom-style"></style>
+  <style lang="en" type="text/css" id="dark-mode-native-style"></style>
+  <style lang="en" type="text/css" id="dark-mode-native-sheet"></style>
+</head>
+
+<body
+  class="bg-night-base text-slate-300 font-sans h-screen w-screen overflow-hidden flex antialiased selection:bg-brand-500/20 selection:text-brand-500"
+  vid="11">
+
+
+  <nav
+    class="w-[240px] flex-shrink-0 bg-night-sidebar text-slate-400 flex flex-col h-full border-r border-night-border relative z-20"
+    vid="12">
+
+    <div class="h-16 flex items-center px-6 border-b border-night-border bg-night-sidebar" vid="13">
+      <div class="flex items-center gap-2 text-white" vid="14">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-brand-500" viewBox="0 0 24 24" fill="currentColor"
+          vid="15">
+          <path fill-rule="evenodd"
+            d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z"
+            clip-rule="evenodd" vid="16"></path>
+        </svg>
+        <span class="font-semibold text-lg tracking-wide text-white" vid="17">Sassy Auth</span>
+      </div>
+    </div>
+
+
+    <div class="flex-1 py-6 px-3 space-y-1 overflow-y-auto" vid="18">
+      <div class="px-3 mb-2 text-xs font-semibold text-slate-600 uppercase tracking-wider" vid="19">Directory</div>
+
+      <a href="#"
+        class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-800/50 transition-colors group"
+        vid="20">
+        <svg xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5 text-slate-500 group-hover:text-brand-500 transition-colors" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" stroke-width="2" vid="21">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+            vid="22"></path>
+        </svg>
+        Apps
+      </a>
+
+      <a href="#"
+        class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-800/50 transition-colors group"
+        vid="23">
+        <svg xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5 text-slate-500 group-hover:text-brand-500 transition-colors" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" stroke-width="2" vid="24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+            vid="25"></path>
+        </svg>
+        Organizations
+      </a>
+
+      <a href="#"
+        class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium bg-brand-500 text-night-base shadow-lg shadow-brand-500/20"
+        vid="26">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          stroke-width="2" vid="27">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+            vid="28"></path>
+        </svg>
+        Users
+      </a>
+
+      <div class="px-3 mt-6 mb-2 text-xs font-semibold text-slate-600 uppercase tracking-wider" vid="29">Access Control
+      </div>
+
+      <a href="#"
+        class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-800/50 transition-colors group"
+        vid="30">
+        <svg xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5 text-slate-500 group-hover:text-brand-500 transition-colors" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" stroke-width="2" vid="31">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+            vid="32"></path>
+        </svg>
+        Roles
+      </a>
+
+      <a href="#"
+        class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-slate-800/50 transition-colors group"
+        vid="33">
+        <svg xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5 text-slate-500 group-hover:text-brand-500 transition-colors" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" stroke-width="2" vid="34">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+            vid="35"></path>
+        </svg>
+        Permissions
+      </a>
+    </div>
+
+
+    <div class="p-4 border-t border-night-border bg-night-sidebar/50" vid="36">
+      <div class="flex items-center gap-3" vid="37">
+        <div
+          class="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-medium text-white ring-2 ring-night-border"
+          vid="38">
+          SA
+        </div>
+        <div class="flex-1 min-w-0" vid="39">
+          <p class="text-sm font-medium text-slate-200 truncate" vid="40">System Admin</p>
+          <p class="text-xs text-slate-500 truncate" vid="41">admin@authcore.io</p>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+
+  <aside class="w-[340px] flex-shrink-0 bg-night-base border-r border-night-border flex flex-col h-full z-10" vid="42">
+
+    <div class="p-4 border-b border-night-border bg-night-base z-10" vid="43">
+      <div class="flex justify-between items-center mb-4" vid="44">
+        <h1 class="text-lg font-semibold text-slate-100" vid="45">Users <span
+            class="text-slate-500 text-sm font-normal ml-1" vid="46">2,481</span></h1>
+        <button
+          class="bg-night-card hover:bg-brand-500/10 text-brand-500 p-1.5 rounded-md transition-colors border border-brand-500/20 shadow-sm"
+          title="Add User" vid="47">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" vid="48">
+            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 011-1z"
+              clip-rule="evenodd" vid="49"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="relative" vid="50">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" vid="51">
+          <svg class="h-4 w-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+            aria-hidden="true" vid="52">
+            <path fill-rule="evenodd"
+              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+              clip-rule="evenodd" vid="53"></path>
+          </svg>
+        </div>
+        <input type="text" placeholder="Search by name or email..."
+          class="block w-full pl-9 pr-3 py-2 border border-night-border rounded-md leading-5 bg-night-card text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 sm:text-sm transition-colors"
+          vid="54">
+      </div>
+    </div>
+
+
+    <div class="flex-1 overflow-y-auto p-2 space-y-1" vid="55">
+
+      <button
+        class="w-full flex items-center gap-3 p-2.5 text-left rounded-lg hover:bg-night-card transition-colors border border-transparent group"
+        vid="56">
+        <div class="relative flex-shrink-0" vid="57">
+          <div
+            class="h-10 w-10 rounded-full bg-orange-900/40 text-orange-400 flex items-center justify-center font-medium text-sm border border-orange-500/20"
+            vid="58">
+            AS
+          </div>
+          <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-night-base bg-emerald-500"
+            vid="59"></span>
+        </div>
+        <div class="flex-1 min-w-0" vid="60">
+          <p class="text-sm font-medium text-slate-300 truncate group-hover:text-white" vid="61">Alice Springfield</p>
+          <p class="text-xs text-slate-500 truncate" vid="62">alice.springfield@acme.corp</p>
+        </div>
+      </button>
+
+
+      <button
+        class="w-full flex items-center gap-3 p-2.5 text-left rounded-lg bg-brand-500/10 border border-brand-500/40 shadow-lg shadow-brand-500/5 transition-colors relative group"
+        vid="63">
+        <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-brand-500 rounded-r-full" vid="64"></div>
+        <div class="relative flex-shrink-0 ml-1" vid="65">
+          <div
+            class="h-10 w-10 rounded-full bg-brand-500 text-night-base flex items-center justify-center font-bold text-sm shadow-[0_0_15px_rgba(96,165,250,0.3)]"
+            vid="66">
+            JS
+          </div>
+          <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-night-base bg-emerald-500"
+            vid="67"></span>
+        </div>
+        <div class="flex-1 min-w-0" vid="68">
+          <p class="text-sm font-bold text-brand-500 truncate" vid="69">Johnathan Smith</p>
+          <p class="text-xs text-brand-500/80 truncate" vid="70">john.smith@techflow.io</p>
+        </div>
+      </button>
+
+
+      <button
+        class="w-full flex items-center gap-3 p-2.5 text-left rounded-lg hover:bg-night-card transition-colors border border-transparent group"
+        vid="71">
+        <div class="relative flex-shrink-0" vid="72">
+          <div
+            class="h-10 w-10 rounded-full bg-emerald-900/40 text-emerald-400 flex items-center justify-center font-medium text-sm border border-emerald-500/20"
+            vid="73">
+            MC
+          </div>
+          <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-night-base bg-slate-600"
+            vid="74"></span>
+        </div>
+        <div class="flex-1 min-w-0" vid="75">
+          <p class="text-sm font-medium text-slate-300 truncate" vid="76">Michael Chen</p>
+          <p class="text-xs text-slate-500 truncate" vid="77">m.chen@global-logistics.com</p>
+        </div>
+      </button>
+
+
+      <button
+        class="w-full flex items-center gap-3 p-2.5 text-left rounded-lg hover:bg-night-card transition-colors border border-transparent group"
+        vid="78">
+        <div class="relative flex-shrink-0" vid="79">
+          <div
+            class="h-10 w-10 rounded-full bg-purple-900/40 text-purple-400 flex items-center justify-center font-medium text-sm border border-purple-500/20"
+            vid="80">
+            SJ
+          </div>
+          <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-night-base bg-emerald-500"
+            vid="81"></span>
+        </div>
+        <div class="flex-1 min-w-0" vid="82">
+          <p class="text-sm font-medium text-slate-300 truncate" vid="83">Sarah Jenkins</p>
+          <p class="text-xs text-slate-500 truncate" vid="84">sjenkins@innovate.co</p>
+        </div>
+      </button>
+
+
+      <button
+        class="w-full flex items-center gap-3 p-2.5 text-left rounded-lg hover:bg-night-card transition-colors border border-transparent group"
+        vid="85">
+        <div class="relative flex-shrink-0" vid="86">
+          <div
+            class="h-10 w-10 rounded-full bg-pink-900/40 text-pink-400 flex items-center justify-center font-medium text-sm border border-pink-500/20"
+            vid="87">
+            DR
+          </div>
+          <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-night-base bg-amber-500"
+            vid="88"></span>
+        </div>
+        <div class="flex-1 min-w-0" vid="89">
+          <p class="text-sm font-medium text-slate-300 truncate" vid="90">David Rodriguez</p>
+          <p class="text-xs text-slate-500 truncate" vid="91">david.r@finance-plus.net</p>
+        </div>
+      </button>
+    </div>
+  </aside>
+
+
+  <main class="flex-1 flex flex-col h-full bg-night-base overflow-hidden" vid="92">
+
+    <header class="h-16 flex-shrink-0 flex items-center justify-between px-8 border-b border-night-border bg-night-card"
+      vid="93">
+      <div class="flex items-center text-sm text-slate-500" vid="94">
+        <span vid="95">Directory</span>
+        <svg class="h-4 w-4 mx-2 text-slate-700" fill="currentColor" viewBox="0 0 20 20" vid="96">
+          <path fill-rule="evenodd"
+            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+            clip-rule="evenodd" vid="97"></path>
+        </svg>
+        <span vid="98">Users</span>
+        <svg class="h-4 w-4 mx-2 text-slate-700" fill="currentColor" viewBox="0 0 20 20" vid="99">
+          <path fill-rule="evenodd"
+            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+            clip-rule="evenodd" vid="100"></path>
+        </svg>
+        <span class="font-medium text-slate-200" vid="101">Johnathan Smith</span>
+      </div>
+      <div class="flex gap-3" vid="102">
+        <button
+          class="px-3.5 py-2 text-sm font-medium text-slate-300 bg-night-base border border-night-border rounded-md shadow-sm hover:bg-slate-800 transition-colors flex items-center gap-2"
+          vid="103">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" stroke-width="2" vid="104">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              vid="105"></path>
+          </svg>
+          Reset Password
+        </button>
+        <button
+          class="px-3.5 py-2 text-sm font-medium text-night-base bg-brand-500 border border-transparent rounded-md shadow-[0_0_15px_rgba(96,165,250,0.2)] hover:bg-brand-600 focus:outline-none transition-colors flex items-center gap-2"
+          vid="106">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            stroke-width="2" vid="107">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              vid="108"></path>
+          </svg>
+          Edit User
+        </button>
+      </div>
+    </header>
+
+
+    <div class="flex-1 overflow-y-auto p-8 relative scroll-smooth" vid="109">
+      <div class="max-w-4xl mx-auto space-y-8 pb-12" vid="110">
+
+        <div class="bg-night-card rounded-xl shadow-xl border border-night-border overflow-hidden" vid="111">
+          <div class="h-24 bg-gradient-to-r from-brand-700/80 to-night-sidebar" vid="112"></div>
+          <div class="px-8 pb-8" vid="113">
+            <div class="relative flex justify-between items-end -mt-12 mb-6" vid="114">
+              <div class="h-24 w-24 rounded-xl bg-night-card p-1.5 shadow-2xl border border-night-border" vid="115">
+                <div
+                  class="h-full w-full rounded-lg bg-brand-500/10 text-brand-500 flex items-center justify-center font-bold text-3xl border border-brand-500/20"
+                  vid="116">
+                  JS
+                </div>
+              </div>
+              <span
+                class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-900/30 text-emerald-400 border border-emerald-500/20 shadow-sm mb-2"
+                vid="117">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                  vid="118"></span>
+                Active
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8" vid="119">
+              <div class="md:col-span-2" vid="120">
+                <h2 class="text-2xl font-bold text-white mb-1" vid="121">Johnathan Smith</h2>
+                <p class="text-slate-500 flex items-center gap-2 mb-4" vid="122">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-brand-500" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" vid="123">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      vid="124"></path>
+                  </svg>
+                  john.smith@techflow.io
+                </p>
+
+                <div class="flex gap-6 mt-6 pt-6 border-t border-night-border" vid="125">
+                  <div vid="126">
+                    <p class="text-xs font-medium text-slate-600 uppercase tracking-wider mb-1" vid="127">First Name</p>
+                    <p class="text-sm font-medium text-slate-300" vid="128">Johnathan</p>
+                  </div>
+                  <div vid="129">
+                    <p class="text-xs font-medium text-slate-600 uppercase tracking-wider mb-1" vid="130">Last Name</p>
+                    <p class="text-sm font-medium text-slate-300" vid="131">Smith</p>
+                  </div>
+                  <div vid="132">
+                    <p class="text-xs font-medium text-slate-600 uppercase tracking-wider mb-1" vid="133">User ID</p>
+                    <p class="text-sm font-mono text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded border border-brand-500/20"
+                      vid="134">usr_8f92a1b4</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-night-base/50 rounded-lg p-4 border border-night-border" vid="135">
+                <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-4" vid="136">Account Status
+                </h3>
+                <div class="space-y-4" vid="137">
+                  <div vid="138">
+                    <p class="text-xs text-slate-600 mb-0.5" vid="139">Last Login</p>
+                    <p class="text-sm font-medium text-slate-200" vid="140">Today at 09:42 AM</p>
+                    <p class="text-xs text-slate-600 mt-0.5" vid="141">192.168.1.1 (San Francisco)</p>
+                  </div>
+                  <div vid="142">
+                    <p class="text-xs text-slate-600 mb-0.5" vid="143">Created</p>
+                    <p class="text-sm font-medium text-slate-200" vid="144">Oct 12, 2022</p>
+                  </div>
+                  <div vid="145">
+                    <p class="text-xs text-slate-600 mb-0.5" vid="146">MFA Status</p>
+                    <div class="flex items-center gap-1.5 mt-1" vid="147">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20"
+                        fill="currentColor" vid="148">
+                        <path fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clip-rule="evenodd" vid="149"></path>
+                      </svg>
+                      <span class="text-sm font-medium text-slate-200" vid="150">Enrolled (App)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <div vid="151">
+          <div class="flex items-center justify-between mb-4 px-1" vid="152">
+            <h3 class="text-lg font-bold text-white" vid="153">Organizations &amp; Access</h3>
+            <button
+              class="text-sm font-medium text-brand-500 hover:text-brand-400 flex items-center gap-1 transition-colors"
+              vid="154">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor" stroke-width="2" vid="155">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" vid="156"></path>
+              </svg>
+              Grant Access
+            </button>
+          </div>
+
+          <div class="space-y-6" vid="157">
+
+            <div
+              class="bg-night-card rounded-xl shadow-lg border border-night-border overflow-hidden transition-all hover:border-brand-500/30"
+              vid="158">
+              <div
+                class="bg-night-base/80 px-6 py-4 border-b border-night-border flex flex-wrap justify-between items-center gap-4"
+                vid="159">
+                <div class="flex items-center gap-3" vid="160">
+                  <div
+                    class="w-10 h-10 rounded-lg bg-brand-500/10 text-brand-500 flex items-center justify-center border border-brand-500/20"
+                    vid="161">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                      stroke="currentColor" stroke-width="2" vid="162">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                        vid="163"></path>
+                    </svg>
+                  </div>
+                  <div vid="164">
+                    <div class="flex items-center gap-2" vid="165">
+                      <h4 class="text-base font-bold text-white" vid="166">TechFlow HQ</h4>
+                      <span
+                        class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-400 border border-night-border"
+                        vid="167">Primary</span>
+                    </div>
+                    <p class="text-xs font-mono text-slate-600 mt-0.5" vid="168">org_p9q2r3s4</p>
+                  </div>
+                </div>
+                <button class="text-slate-600 hover:text-brand-500 p-1 rounded-md transition-colors" vid="169">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"
+                    vid="170">
+                    <path
+                      d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
+                      vid="171"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <div class="p-6" vid="172">
+                <div class="flex flex-col md:flex-row gap-6 md:gap-8" vid="173">
+                  <div class="md:w-1/3 flex-shrink-0" vid="174">
+                    <h5
+                      class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-3 flex items-center gap-1.5"
+                      vid="175">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2" vid="176">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                          vid="177"></path>
+                      </svg>
+                      Assigned Roles
+                    </h5>
+                    <div class="space-y-2" vid="178">
+                      <div
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-900/20 text-purple-400 border border-purple-500/20 w-full shadow-inner"
+                        vid="179">
+                        <div class="w-1.5 h-1.5 rounded-full bg-purple-500 mr-2 shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                          vid="180"></div>
+                        Organization Admin
+                      </div>
+                      <div
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 border border-night-border w-full"
+                        vid="181">
+                        <div class="w-1.5 h-1.5 rounded-full bg-slate-600 mr-2" vid="182"></div>
+                        Billing Manager
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="hidden md:block w-px bg-night-border" vid="183"></div>
+
+                  <div class="flex-1" vid="184">
+                    <div class="flex justify-between items-center mb-3" vid="185">
+                      <h5
+                        class="text-xs font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1.5"
+                        vid="186">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                          stroke="currentColor" stroke-width="2" vid="187">
+                          <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                            vid="188"></path>
+                        </svg>
+                        Effective Permissions
+                      </h5>
+                      <span
+                        class="text-xs font-medium bg-night-base text-slate-500 px-2 py-0.5 rounded-full border border-night-border"
+                        vid="189">12 Total</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" vid="190">
+                      <div
+                        class="flex items-center gap-2 text-sm text-slate-300 bg-night-base/40 px-3 py-2 rounded-md border border-night-border shadow-sm group/perm"
+                        vid="191">
+                        <svg class="text-brand-500 w-4 h-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20" fill="currentColor" vid="192">
+                          <path fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd" vid="193"></path>
+                        </svg>
+                        <span class="font-mono text-xs" vid="194">users:read</span>
+                      </div>
+                      <div
+                        class="flex items-center gap-2 text-sm text-slate-300 bg-night-base/40 px-3 py-2 rounded-md border border-night-border shadow-sm"
+                        vid="195">
+                        <svg class="text-brand-500 w-4 h-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20" fill="currentColor" vid="196">
+                          <path fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd" vid="197"></path>
+                        </svg>
+                        <span class="font-mono text-xs" vid="198">users:write</span>
+                      </div>
+                      <div
+                        class="flex items-center gap-2 text-sm text-slate-300 bg-night-base/40 px-3 py-2 rounded-md border border-night-border shadow-sm"
+                        vid="199">
+                        <svg class="text-brand-500 w-4 h-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20" fill="currentColor" vid="200">
+                          <path fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd" vid="201"></path>
+                        </svg>
+                        <span class="font-mono text-xs" vid="202">billing:manage</span>
+                      </div>
+                      <div class="col-span-full mt-1" vid="203">
+                        <button
+                          class="text-xs font-medium text-slate-600 hover:text-brand-500 flex items-center gap-1 transition-colors"
+                          vid="204">
+                          + 9 more permissions
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" vid="205">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"
+                              vid="206"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <div
+              class="bg-night-card rounded-xl shadow-lg border border-night-border overflow-hidden transition-all hover:border-brand-500/30"
+              vid="207">
+              <div
+                class="bg-night-base/80 px-6 py-4 border-b border-night-border flex flex-wrap justify-between items-center gap-4"
+                vid="208">
+                <div class="flex items-center gap-3" vid="209">
+                  <div
+                    class="w-10 h-10 rounded-lg bg-orange-900/20 text-orange-400 flex items-center justify-center border border-orange-500/20"
+                    vid="210">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                      stroke="currentColor" stroke-width="2" vid="211">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        vid="212"></path>
+                    </svg>
+                  </div>
+                  <div vid="213">
+                    <h4 class="text-base font-bold text-white" vid="214">TechFlow Europe</h4>
+                    <p class="text-xs font-mono text-slate-600 mt-0.5" vid="215">org_eu82x7y1</p>
+                  </div>
+                </div>
+                <button class="text-slate-600 hover:text-brand-500 p-1 rounded-md transition-colors" vid="216">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"
+                    vid="217">
+                    <path
+                      d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
+                      vid="218"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <div class="p-6" vid="219">
+                <div class="flex flex-col md:flex-row gap-6 md:gap-8" vid="220">
+                  <div class="md:w-1/3 flex-shrink-0" vid="221">
+                    <h5
+                      class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-3 flex items-center gap-1.5"
+                      vid="222">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2" vid="223">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                          vid="224"></path>
+                      </svg>
+                      Assigned Roles
+                    </h5>
+                    <div class="space-y-2" vid="225">
+                      <div
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-900/20 text-emerald-400 border border-emerald-500/20 w-full"
+                        vid="226">
+                        <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                          vid="227"></div>
+                        Auditor
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="hidden md:block w-px bg-night-border" vid="228"></div>
+
+                  <div class="flex-1" vid="229">
+                    <div class="flex justify-between items-center mb-3" vid="230">
+                      <h5
+                        class="text-xs font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1.5"
+                        vid="231">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                          stroke="currentColor" stroke-width="2" vid="232">
+                          <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                            vid="233"></path>
+                        </svg>
+                        Effective Permissions
+                      </h5>
+                      <span
+                        class="text-xs font-medium bg-night-base text-slate-500 px-2 py-0.5 rounded-full border border-night-border"
+                        vid="234">3 Total</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" vid="235">
+                      <div
+                        class="flex items-center gap-2 text-sm text-slate-300 bg-night-base/40 px-3 py-2 rounded-md border border-night-border"
+                        vid="236">
+                        <svg class="text-brand-500 w-4 h-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20" fill="currentColor" vid="237">
+                          <path fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd" vid="238"></path>
+                        </svg>
+                        <span class="font-mono text-xs" vid="239">reports:view</span>
+                      </div>
+                      <div
+                        class="flex items-center gap-2 text-sm text-slate-300 bg-night-base/40 px-3 py-2 rounded-md border border-night-border"
+                        vid="240">
+                        <svg class="text-brand-500 w-4 h-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20" fill="currentColor" vid="241">
+                          <path fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd" vid="242"></path>
+                        </svg>
+                        <span class="font-mono text-xs" vid="243">users:read</span>
+                      </div>
+                      <div
+                        class="flex items-center gap-2 text-sm text-slate-300 bg-night-base/40 px-3 py-2 rounded-md border border-night-border"
+                        vid="244">
+                        <svg class="text-brand-500 w-4 h-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20" fill="currentColor" vid="245">
+                          <path fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd" vid="246"></path>
+                        </svg>
+                        <span class="font-mono text-xs" vid="247">audit:read</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+
+</body>
+
+</html>
