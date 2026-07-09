@@ -86,11 +86,11 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
 
   function validate(): boolean {
     const e: Partial<Record<keyof FormState, string>> = {}
-    if (!form.firstName.trim()) e.firstName = 'Required'
-    if (!form.lastName.trim()) e.lastName = 'Required'
-    if (!form.email.trim()) e.email = 'Required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Invalid email'
-    if (!form.orgId) e.orgId = 'Required'
+    if (!form.firstName.trim()) e.firstName = t('users.errors.required')
+    if (!form.lastName.trim()) e.lastName = t('users.errors.required')
+    if (!form.email.trim()) e.email = t('users.errors.required')
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = t('users.errors.emailInvalid')
+    if (!form.orgId) e.orgId = t('users.errors.required')
     setErrors(e)
     return Object.keys(e).length === 0
   }
