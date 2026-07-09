@@ -70,6 +70,20 @@ describe('InvitationsService', () => {
       expect(result.expired).toBe(true);
     });
 
+    // Regression: a used-but-not-yet-expired invitation must report
+    // expired:true so the accept-invite page renders the "expired or invalid"
+    // ErrorState instead of the password form. Pre-fix, validateToken only
+    // checked expiresAt and revisiting a consumed link still showed the form.
+    it('returns expired:true for an already-used token whose expiresAt is still in the future', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue({
+        ...validInvitation,
+        usedAt: new Date(),
+        expiresAt: futureDate,
+      });
+      const result = await service.validateToken('abc123');
+      expect(result.expired).toBe(true);
+    });
+
     it('throws NotFoundException for unknown token', async () => {
       mockPrisma.saInvitation.findUnique.mockResolvedValue(null);
       await expect(service.validateToken('unknown')).rejects.toBeInstanceOf(NotFoundException);
@@ -124,6 +138,27 @@ describe('InvitationsService', () => {
     it('throws BadRequestException for already-used token', async () => {
       mockPrisma.saInvitation.findUnique.mockResolvedValue({ ...validInvitation, usedAt: new Date() });
       await expect(service.acceptInvitation('abc123', 'NewP@ss1')).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws NotFoundException for unknown token in acceptInvitation', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(null);
+      await expect(service.acceptInvitation('unknown', 'NewP@ss1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('acceptInvitation publicId nullish branch', () => {
+    it('logs with user.id when publicId is null', async () => {
+      const invWithoutPublicId = {
+        ...validInvitation,
+        user: { ...validInvitation.user, publicId: null },
+      };
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(invWithoutPublicId);
+      mockPrisma.saInvitation.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.account.create.mockResolvedValue(undefined);
+      mockPrisma.saUser.update.mockResolvedValue(undefined);
+      mockPrisma.user.update.mockResolvedValue(undefined);
+
+      await expect(service.acceptInvitation('abc123', 'NewP@ss1')).resolves.toBeUndefined();
     });
   });
 });

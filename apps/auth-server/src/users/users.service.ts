@@ -12,6 +12,8 @@ import { checkPermission } from '../common/permissions/check-permission';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { resolveRoleIdsForApp, resolvePermissionIdsForApp } from '../common/permissions/resolve-app-scoped-ids';
+import { assertCallerCanGrantSystemPerms } from '../common/permissions/assert-caller-can-grant-system-perms';
 import { LoggerService } from '../common/logger/logger.service';
 
 const USER_INCLUDE = {
@@ -26,6 +28,8 @@ function formatUser(u: {
   phoneNumber: string | null;
   username: string | null;
   status: string;
+  createdAt: Date;
+  lastLoginAt: Date | null;
   org: { publicId: string };
   betterAuthUser: { email: string };
 }) {
@@ -38,6 +42,12 @@ function formatUser(u: {
     username: u.username,
     orgId: u.org.publicId,
     status: u.status,
+    // bug-0186: serialize as ISO strings so the JSON payload is
+    // stable across environments (Date instances would be converted
+    // via toJSON anyway, but being explicit avoids client-side
+    // dependence on that implicit behavior).
+    createdAt: u.createdAt.toISOString(),
+    lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
   };
 }
 
@@ -74,7 +84,19 @@ export class UsersService {
     const where: Record<string, unknown> = {};
     if (filters.orgPublicId) where['org'] = { publicId: filters.orgPublicId };
 
-    const users = await prisma.saUser.findMany({ where, include: USER_INCLUDE });
+    // bug-0140: hard cap the response so a single request can't return
+    // an arbitrarily large payload. Full paginated response with
+    // {items, total, page, pageSize} is a follow-up — a breaking
+    // change on the admin API contract; this cap is the immediate
+    // DoS mitigation. 500 is comfortably above any real org's active
+    // user list and well below the point where the JSON payload
+    // starts to matter for memory / latency.
+    const users = await prisma.saUser.findMany({
+      where,
+      include: USER_INCLUDE,
+      take: 500,
+      orderBy: { id: 'desc' },
+    });
     return users.map(formatUser);
   }
 
@@ -111,11 +133,11 @@ export class UsersService {
     );
 
     return user.roles.map((ur) => ({
-      id: ur.role.publicId,
+      publicId: ur.role.publicId,
       name: ur.role.name,
       appId: ur.role.app.publicId,
       permissions: ur.role.permissions.map((rp) => ({
-        id: rp.permission.publicId,
+        publicId: rp.permission.publicId,
         name: rp.permission.name,
         appId: ur.role.app.publicId,
       })),
@@ -153,6 +175,45 @@ export class UsersService {
       { targetOrgId: org.id },
     );
 
+    // Escalation guard for initial direct perms.
+    const initialPerms = (dto.directPermissionIds ?? []).length === 0
+      ? []
+      : await prisma.saPermission.findMany({
+          where: { publicId: { in: dto.directPermissionIds ?? [] } },
+          select: { name: true, isSystem: true },
+        });
+    const directSystemPermNames = initialPerms
+      .filter((p) => p.isSystem)
+      .map((p) => p.name);
+
+    // Escalation guard for initial roles.
+    const initialRoles = (dto.roleIds ?? []).length === 0
+      ? []
+      : await prisma.saRole.findMany({
+          where: { publicId: { in: dto.roleIds ?? [] } },
+          select: {
+            permissions: {
+              select: { permission: { select: { name: true, isSystem: true } } },
+            },
+          },
+        });
+    const roleSystemPermNames = Array.from(new Set(
+      initialRoles.flatMap((r) =>
+        r.permissions.filter((rp) => rp.permission.isSystem).map((rp) => rp.permission.name),
+      ),
+    ));
+
+    await assertCallerCanGrantSystemPerms(
+      callerBaId,
+      Array.from(new Set([...directSystemPermNames, ...roleSystemPermNames])),
+    );
+
+    // Resolve + app-scope-validate role/permission ids BEFORE entering the
+    // create transaction so a bad publicId throws cleanly without leaving
+    // an orphan user behind.
+    const numericRoleIds = await resolveRoleIdsForApp(org.appId, dto.roleIds ?? []);
+    const numericPermIds = await resolvePermissionIdsForApp(org.appId, dto.directPermissionIds ?? []);
+
     const baUserId = crypto.randomUUID();
     const now = new Date();
     const token = crypto.randomBytes(32).toString('hex');
@@ -187,6 +248,17 @@ export class UsersService {
           include: USER_INCLUDE,
         });
 
+        if (numericRoleIds.length > 0) {
+          await tx.saUserRole.createMany({
+            data: numericRoleIds.map((roleId) => ({ userId: createdSaUser.id, roleId })),
+          });
+        }
+        if (numericPermIds.length > 0) {
+          await tx.saUserPermission.createMany({
+            data: numericPermIds.map((permissionId) => ({ userId: createdSaUser.id, permissionId })),
+          });
+        }
+
         const createdInvitation = await tx.saInvitation.create({
           data: {
             publicId: baUserId.slice(12, 24),
@@ -215,6 +287,8 @@ export class UsersService {
       context: 'UsersService',
       userId: saUser.publicId,
       orgId: dto.orgId,
+      roleCount: numericRoleIds.length,
+      directPermissionCount: numericPermIds.length,
     });
     return {
       user: formatUser(saUser),
@@ -229,6 +303,18 @@ export class UsersService {
       ['platform.users.manage', 'org.users.manage'],
       { targetOrgId: existing.orgId },
     );
+
+    // bug-0152: a `pending` user only becomes `active` by accepting
+    // their invitation (which also sets their password). Allowing the
+    // admin PATCH to flip the status directly bypasses that gate and
+    // produces an "active" user with no credential — they can never
+    // log in, but they show up as active in every count. The correct
+    // way to promote a pending user is `resendInvitation` + accept.
+    if (dto.status === 'active' && existing.status === 'pending') {
+      throw new BadRequestException(
+        'A pending user becomes active only by accepting their invitation. Use /resend-invitation instead.',
+      );
+    }
 
     const updated = await prisma.saUser.update({
       where: { publicId },
@@ -277,8 +363,18 @@ export class UsersService {
       { targetOrgId: user.orgId },
     );
 
-    const role = await prisma.saRole.findUnique({ where: { publicId: dto.roleId } });
+    const role = await prisma.saRole.findUnique({
+      where: { publicId: dto.roleId },
+      include: {
+        permissions: { include: { permission: { select: { name: true, isSystem: true } } } },
+      },
+    });
     if (!role) throw new NotFoundException('Role not found');
+
+    const systemPermNames = role.permissions
+      .filter((rp) => rp.permission.isSystem)
+      .map((rp) => rp.permission.name);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
 
     try {
       await prisma.saUserRole.create({ data: { userId: user.id, roleId: role.id } });
@@ -311,16 +407,187 @@ export class UsersService {
       { targetOrgId: user.orgId },
     );
 
-    const role = await prisma.saRole.findUnique({ where: { publicId: rolePublicId } });
+    // bug-0097: mirror the escalation guard from assignRole /
+    // setUserRoles. Otherwise a caller who can revoke roles could
+    // strip an admin of a system perm they themselves are not
+    // authorized to grant — practically the same escalation surface
+    // in reverse, since revoking then re-granting a role can leave
+    // the caller with more effective privilege than they had before.
+    // Fetching the role with its permissions is cheap and matches the
+    // shape of assignRole above.
+    const role = await prisma.saRole.findUnique({
+      where: { publicId: rolePublicId },
+      include: {
+        permissions: { include: { permission: { select: { name: true, isSystem: true } } } },
+      },
+    });
     if (!role) throw new NotFoundException('Role not found');
 
-    await prisma.saUserRole.delete({ where: { userId_roleId: { userId: user.id, roleId: role.id } } });
+    const systemPermNames = role.permissions
+      .filter((rp) => rp.permission.isSystem)
+      .map((rp) => rp.permission.name);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
+
+    // bug-0138: catch Prisma P2025 ("record not found") so a caller
+    // who tries to remove a role that isn't currently assigned gets
+    // a 200 (idempotent) rather than a 500 with a raw Prisma stack.
+    // Symmetric with assignRole's P2002 idempotency swallow above.
+    try {
+      await prisma.saUserRole.delete({ where: { userId_roleId: { userId: user.id, roleId: role.id } } });
+    } catch (e: unknown) {
+      if (
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        (e as { code?: string }).code === 'P2025'
+      ) {
+        return;
+      }
+      throw e;
+    }
     this.logger.getWinstonLogger().info('Role removed from user', {
       context: 'UsersService',
       userId: userPublicId,
       roleId: rolePublicId,
     });
   }
+
+  async setUserRoles(
+    callerBaId: string,
+    userPublicId: string,
+    roleIds: string[],
+  ): Promise<void> {
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.betterAuthUserId === callerBaId) {
+      throw new ForbiddenException('You cannot edit your own access');
+    }
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    const org = await prisma.saOrg.findUnique({ where: { id: user.orgId } });
+    if (!org) throw new NotFoundException('User org not found');
+
+    // Apply escalation guard: collect every isSystem perm in every role
+    // about to be assigned, then assert the caller can grant them.
+    const rolesWithPerms = roleIds.length === 0
+      ? []
+      : await prisma.saRole.findMany({
+          where: { publicId: { in: roleIds } },
+          select: {
+            permissions: {
+              select: { permission: { select: { name: true, isSystem: true } } },
+            },
+          },
+        });
+    const systemPermNames = Array.from(new Set(
+      rolesWithPerms.flatMap((r) =>
+        r.permissions.filter((rp) => rp.permission.isSystem).map((rp) => rp.permission.name),
+      ),
+    ));
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
+
+    const numericIds = await resolveRoleIdsForApp(org.appId, roleIds);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.saUserRole.deleteMany({ where: { userId: user.id } });
+      if (numericIds.length > 0) {
+        await tx.saUserRole.createMany({
+          data: numericIds.map((roleId) => ({ userId: user.id, roleId })),
+        });
+      }
+    });
+
+    this.logger.getWinstonLogger().info('User roles set', {
+      context: 'UsersService',
+      userId: userPublicId,
+      roleCount: numericIds.length,
+    });
+  }
+
+  async getUserDirectPermissions(
+    callerBaId: string,
+    userPublicId: string,
+  ): Promise<Array<{ id: string; name: string; appId: string }>> {
+    const user = await prisma.saUser.findUnique({
+      where: { publicId: userPublicId },
+      include: {
+        directPermissions: { include: { permission: { select: { publicId: true, name: true, appId: true } } } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    // The admin Permission shape uses appId as a publicId string; the
+    // /api/users/:id/effective-permissions endpoint already publishes
+    // appId: '' for the same reason — direct-permission rows don't carry
+    // the app publicId via this query path. Match that convention.
+    return (user as unknown as {
+      directPermissions: Array<{ permission: { publicId: string; name: string; appId: number } }>;
+    }).directPermissions.map((up) => ({
+      id: up.permission.publicId,
+      name: up.permission.name,
+      appId: '',
+    }));
+  }
+
+  async setUserDirectPermissions(
+    callerBaId: string,
+    userPublicId: string,
+    permissionIds: string[],
+  ): Promise<void> {
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.betterAuthUserId === callerBaId) {
+      throw new ForbiddenException('You cannot edit your own access');
+    }
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    const org = await prisma.saOrg.findUnique({ where: { id: user.orgId } });
+    if (!org) throw new NotFoundException('User org not found');
+
+    // Load the permissions about to be granted so we can filter the
+    // system ones and apply the escalation guard before resolution.
+    const requestedPerms = permissionIds.length === 0
+      ? []
+      : await prisma.saPermission.findMany({
+          where: { publicId: { in: permissionIds } },
+          select: { name: true, isSystem: true },
+        });
+    const systemPermNames = requestedPerms
+      .filter((p) => p.isSystem)
+      .map((p) => p.name);
+    await assertCallerCanGrantSystemPerms(callerBaId, systemPermNames);
+
+    const numericIds = await resolvePermissionIdsForApp(org.appId, permissionIds);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.saUserPermission.deleteMany({ where: { userId: user.id } });
+      if (numericIds.length > 0) {
+        await tx.saUserPermission.createMany({
+          data: numericIds.map((permissionId) => ({ userId: user.id, permissionId })),
+        });
+      }
+    });
+
+    this.logger.getWinstonLogger().info('User direct permissions set', {
+      context: 'UsersService',
+      userId: userPublicId,
+      permissionCount: numericIds.length,
+    });
+  }
+
   async resendInvitation(callerBaId: string, userPublicId: string) {
     const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
     if (!user) throw new NotFoundException('User not found');
@@ -331,18 +598,24 @@ export class UsersService {
     );
     if (user.status !== 'pending') throw new BadRequestException('User is not pending — invitation cannot be resent');
 
-    // Expire all existing unused tokens for this user
-    await prisma.saInvitation.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { expiresAt: new Date(0) },
-    });
-
     const token = crypto.randomBytes(32).toString('hex');
     const publicId = crypto.randomUUID().slice(0, 12);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const invitation = await prisma.saInvitation.create({
-      data: { publicId, token, userId: user.id, expiresAt },
+    // bug-0139: expire-then-create must be transactional. Previously
+    // the two writes were separate — a crash / connection drop
+    // between them left the user with ZERO valid invitation tokens
+    // AND ALL prior tokens force-expired. They'd need admin
+    // intervention to recover. Wrapping in $transaction gives us
+    // all-or-nothing semantics.
+    const invitation = await prisma.$transaction(async (tx) => {
+      await tx.saInvitation.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { expiresAt: new Date(0) },
+      });
+      return tx.saInvitation.create({
+        data: { publicId, token, userId: user.id, expiresAt },
+      });
     });
 
     this.logger.getWinstonLogger().info('Invitation resent', {
