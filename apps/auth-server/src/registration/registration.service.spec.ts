@@ -94,7 +94,7 @@ describe('RegistrationService', () => {
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
       expect(mockPrisma.saOrg.create).toHaveBeenCalledWith({
-        data: { publicId: 'placeholder', name: baseDto.companyName, appId: appRow.id, isPlatform: false },
+        data: { publicId: expect.stringMatching(/^pending-/), name: baseDto.companyName, appId: appRow.id, isPlatform: false },
       });
       expect(mockPrisma.saOrg.update).toHaveBeenCalledWith({
         where: { id: draftOrgRow.id },

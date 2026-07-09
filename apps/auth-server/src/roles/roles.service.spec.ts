@@ -108,7 +108,7 @@ describe('RolesService', () => {
 
       expect(checkPermissionForApp).toHaveBeenCalledWith(
         'ba-caller',
-        ['platform.roles.manage', 'org.roles.manage'],
+        ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
         { targetAppId: 5, callerAppId: 7 },
       );
       expect(mocks.saRole.findMany).toHaveBeenCalledWith(
@@ -130,7 +130,7 @@ describe('RolesService', () => {
 
       expect(checkPermissionForApp).toHaveBeenCalledWith(
         'ba-caller',
-        ['platform.roles.manage', 'org.roles.manage'],
+        ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
         { targetAppId: -1, callerAppId: 7 },
       );
     });
@@ -145,7 +145,7 @@ describe('RolesService', () => {
 
       expect(checkPermissionForApp).toHaveBeenCalledWith(
         'ba-caller',
-        ['platform.roles.manage', 'org.roles.manage'],
+        ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
         { targetAppId: 11, callerAppId: 7 },
       );
     });
@@ -174,7 +174,7 @@ describe('RolesService', () => {
 
       expect(checkPermissionForApp).toHaveBeenCalledWith(
         'ba-caller',
-        ['platform.roles.manage', 'org.roles.manage'],
+        ['platform.roles.manage', 'platform.users.manage', 'org.roles.manage'],
         { targetAppId: 5, callerAppId: 5 },
       );
       expect(result.publicId).toBe('sq_r7');
