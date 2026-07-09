@@ -11,11 +11,29 @@ export const OAUTH_AUTHORIZE_ROUTE = 'oauth/authorize';
 export const OAUTH_TOKEN_ROUTE = 'oauth/token';
 export const JWKS_ROUTE = 'jwks';
 
-// Must match setGlobalPrefix() in configure-nest-app.ts.
-const NEST_GLOBAL_PREFIX = 'api';
+// Single source of truth for the Nest global prefix; consumed by both
+// configure-nest-app.ts (which mounts it) and this module (which derives
+// discovery URLs from it) so the two cannot drift.
+export const NEST_GLOBAL_PREFIX = 'api';
 
 // RFC 8414 well-known URI. Must be served at the host root, not under /api.
 export const OAUTH_AS_METADATA_PATH = '.well-known/oauth-authorization-server';
+
+// Documented placeholder advertised when BETTER_AUTH_URL is unset. Kept here
+// so DiscoveryController and TokenService share the same fallback, preventing
+// the discovery `issuer` and the JWT `iss` claim from diverging.
+export const ISSUER_PLACEHOLDER = 'https://auth.example.com';
+
+/**
+ * Resolves the issuer used in both the discovery doc and JWT `iss` claim.
+ * Strips a trailing slash from BETTER_AUTH_URL so RFC 8414 issuer matching
+ * (which is string-exact) doesn't break on `auth.example.com/` vs
+ * `auth.example.com`. Falls back to ISSUER_PLACEHOLDER when unset.
+ */
+export function resolveIssuer(): string {
+  const raw = process.env.BETTER_AUTH_URL ?? ISSUER_PLACEHOLDER;
+  return stripTrailingSlash(raw);
+}
 
 const RESPONSE_TYPES_SUPPORTED = ['code'] as const;
 const GRANT_TYPES_SUPPORTED = ['authorization_code'] as const;
