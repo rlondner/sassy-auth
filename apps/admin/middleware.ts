@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { AUTH_SERVER_URL } from '@/lib/config'
 
 const PUBLIC_PATHS = ['/login', '/accept-invite', '/oauth-error']
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
 // bug-0165: cache session validation results for a short TTL so we
 // don't round-trip to the auth-server on every authenticated request.
@@ -78,7 +78,7 @@ async function validateSession(request: NextRequest): Promise<boolean> {
   // AbortSignal.timeout is Edge-runtime-safe.
   const abortSignal = AbortSignal.timeout(3_000)
   try {
-    const res = await fetch(`${AUTH_SERVER}/api/auth/get-session`, {
+    const res = await fetch(`${AUTH_SERVER_URL}/api/auth/get-session`, {
       headers: { Cookie: cookieHeader },
       // Edge runtime — must not cache or be revalidated.
       cache: 'no-store',
