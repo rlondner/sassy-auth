@@ -2,25 +2,28 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle,
-  Button, Input, Label,
+  Button, ButtonGroup, Input, Label,
 } from '@sassy-auth/ui'
 import { updateOrgAction } from '@/app/(admin)/orgs/actions'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { OrgRow } from '@/lib/types'
 
 interface Props {
   org: OrgRow
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
-export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
+export function OrgEditDrawer({ org, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(org.name)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
   React.useEffect(() => {
@@ -33,10 +36,21 @@ export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!dirty) return
+    // bug-0141: whitespace-only submissions fail server-side. Catch
+    // at the client for a clearer error.
+    if (name.trim() === '') {
+      setErrorKey('orgs.errors.nameRequired')
+      return
+    }
     startTransition(async () => {
       const result = await updateOrgAction(org.publicId, { name: name.trim() })
-      if ('errorKey' in result) setErrorKey(result.errorKey)
-      else onOpenChange(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      toast.success(t('orgs.toast.updated'))
+      onSuccess?.()
+      onOpenChange(false)
     })
   }
 
@@ -59,11 +73,11 @@ export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
             </div>
             <div>
               <Label>{t('orgs.fields.app')}</Label>
-              <div className="mt-1 flex items-center justify-between rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+              <div className="mt-1 flex items-center justify-between rounded border border-border bg-card px-3 py-2">
                 <span className="text-body-sm">{org.app.name}</span>
-                <code className="font-mono text-label-md text-[var(--muted-foreground)]">{org.app.publicId}</code>
+                <code className="font-mono text-label-md text-muted-foreground">{org.app.publicId}</code>
               </div>
-              <p className="mt-1 text-label-sm text-[var(--muted-foreground)]">{t('orgs.fields.appReadOnlyHint')}</p>
+              <p className="mt-1 text-label-sm text-muted-foreground">{t('orgs.fields.appReadOnlyHint')}</p>
             </div>
             <div>
               <Label htmlFor="orgPublicId">{t('orgs.fields.publicId')}</Label>
@@ -79,10 +93,7 @@ export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
                   variant="outline"
                   aria-label={t('orgs.actions.copy')}
                   onClick={() =>
-                    copyToClipboard(org.publicId, () => {
-                      setCopied(true)
-                      setTimeout(() => setCopied(false), 2000)
-                    })
+                    void copy(org.publicId, 'publicId')
                   }
                 >
                   <span className="material-symbols-outlined text-[16px]">
@@ -91,28 +102,30 @@ export function OrgEditDrawer({ org, open, onOpenChange }: Props) {
                 </Button>
               </div>
               {copied && (
-                <p className="mt-1 text-label-sm text-[var(--primary)]">
+                <p className="mt-1 text-label-sm text-primary">
                   {t('orgs.actions.copied')}
                 </p>
               )}
             </div>
             {errorKey && (
-              <p role="alert" className="text-body-sm text-[var(--destructive)]">
+              <p role="alert" className="text-body-sm text-destructive">
                 {t(errorKey)}
               </p>
             )}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={pending}
-              >
-                {t('orgs.drawer.cancel')}
-              </Button>
-              <Button type="submit" disabled={!dirty || pending}>
-                {pending ? t('orgs.drawer.saving') : t('orgs.drawer.save')}
-              </Button>
+            <div className="flex justify-end pt-4">
+              <ButtonGroup>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={pending}
+                >
+                  {t('orgs.drawer.cancel')}
+                </Button>
+                <Button type="submit" disabled={!dirty || pending}>
+                  {pending ? t('orgs.drawer.saving') : t('orgs.drawer.save')}
+                </Button>
+              </ButtonGroup>
             </div>
           </form>
         </SheetBody>
