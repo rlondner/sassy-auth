@@ -12,16 +12,9 @@ for (const admin of SEED_ADMINS) {
     // page is whatever their nav allows first; /users redirect happens
     // because the admin landing layout picks /users as a default).
     // If a future change makes per-admin landing differ, replace the regex.
-    //
-    // On a cold dev server the first /login hit compiles + hydrates late and
-    // the initial submit can be dropped, leaving us on /login with no error.
-    // Re-submit until we navigate to an admin page.
-    await expect(async () => {
-      if (new URL(page.url()).pathname.endsWith('/login')) {
-        await login.submitButton.click().catch(() => {})
-      }
-      await expect(page).toHaveURL(/\/(users|apps|orgs|permissions|roles)$/, { timeout: 5_000 })
-    }).toPass({ timeout: 30_000 })
+    // Allow extra time for the cold-start /login compile+hydrate on the first
+    // admin; do NOT re-submit (rapid re-submits trip the auth rate limiter).
+    await expect(page).toHaveURL(/\/(users|apps|orgs|permissions|roles)$/, { timeout: 20_000 })
     const out = path.join(__dirname, admin.storageStatePath)
     await context.storageState({ path: out })
   })
