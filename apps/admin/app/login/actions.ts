@@ -143,20 +143,24 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
   // the lifetime upstream issued is honored on the client.
   const cookieStore = await cookies()
   const setCookieHeader = res.headers.get('set-cookie')
-  if (setCookieHeader) {
-    const parsed = parseSessionCookie(setCookieHeader)
-    if (parsed) {
-      cookieStore.set('better-auth.session_token', parsed.value, {
-        httpOnly: parsed.httpOnly,
-        secure: parsed.secure ?? process.env.NODE_ENV === 'production',
-        sameSite: parsed.sameSite ?? 'lax',
-        path: parsed.path ?? '/',
-        ...(parsed.maxAge !== undefined && { maxAge: parsed.maxAge }),
-        ...(parsed.expires !== undefined && { expires: parsed.expires }),
-        ...(parsed.domain !== undefined && { domain: parsed.domain }),
-      })
-    }
+  if (!setCookieHeader) {
+    Sentry.captureMessage('Auth server returned 200 but no Set-Cookie header', { level: 'error' })
+    return { error: 'invalidCredentials' }
   }
+  const parsed = parseSessionCookie(setCookieHeader)
+  if (!parsed) {
+    Sentry.captureMessage('Failed to parse session cookie from auth server response', { level: 'error' })
+    return { error: 'invalidCredentials' }
+  }
+  cookieStore.set('better-auth.session_token', parsed.value, {
+    httpOnly: parsed.httpOnly,
+    secure: parsed.secure ?? process.env.NODE_ENV === 'production',
+    sameSite: parsed.sameSite ?? 'lax',
+    path: parsed.path ?? '/',
+    ...(parsed.maxAge !== undefined && { maxAge: parsed.maxAge }),
+    ...(parsed.expires !== undefined && { expires: parsed.expires }),
+    ...(parsed.domain !== undefined && { domain: parsed.domain }),
+  })
 
   // Do not pass plaintext email to Sentry; the admin layout will identify
   // the user by id after the next page render reads the session.
