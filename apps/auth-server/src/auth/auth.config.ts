@@ -8,6 +8,8 @@ import { captureResetUrl } from './reset-url-context';
 import { APIError } from 'better-auth/api';
 import { evaluateSessionGate } from './session-gate';
 import { createAppLogger } from '../common/logger/winston.config';
+import { sendSignInOtp } from './otp-sender';
+import { otpTestStore } from './otp-test-store';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -184,12 +186,22 @@ export const auth = betterAuth({
       },
     }),
     emailOTP({
-      sendVerificationOTP: async ({ email, otp }: { email: string; otp: string }) => {
-        // bug-0163: same story as the magic-link handler — the OTP is
-        // a bearer credential, no logs in prod.
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`[email-otp] ${email} → ${otp}`);
-        }
+      otpLength: 6,
+      expiresIn: 300,
+      allowedAttempts: 3,
+      disableSignUp: true,
+      rateLimit: { window: 60, max: 5 },
+      sendVerificationOTP: async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
+        await sendSignInOtp(
+          {
+            db: prisma,
+            emailer: getEmailer(),
+            store: otpTestStore,
+            logger: authLogger,
+            isTest: process.env.NODE_ENV === 'test',
+          },
+          { email, otp, type },
+        );
       },
     }),
     openAPI({ disableDefaultReference: true }),
