@@ -14,6 +14,7 @@ import { AppsModule } from './apps/apps.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { MeModule } from './me/me.module';
 import { RegistrationModule } from './registration/registration.module';
+import { TestSupportModule } from './test-support/test-support.module';
 
 // bug-0080: Two throttler buckets — a generous `default` for the
 // general API surface and a tight `auth` bucket for endpoints where
@@ -50,6 +51,7 @@ const throttlerConfig = isTest
     MeModule,
     RegistrationModule,
     EmailModule,
+    ...(isTest ? [TestSupportModule] : []),
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
