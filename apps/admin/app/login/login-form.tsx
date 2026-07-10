@@ -61,6 +61,12 @@ export function LoginForm({ next }: { next: string }) {
           <Link href="/forgot-password" className="text-label-md text-[var(--primary)] hover:underline self-end">
             {t('forgotPassword')}
           </Link>
+          <Link
+            href={next ? `/login/code?next=${encodeURIComponent(next)}` : '/login/code'}
+            className="text-label-md text-[var(--primary)] hover:underline self-end"
+          >
+            {t('useCode')}
+          </Link>
 
           <Button type="submit" className="w-full" loading={isPending}>
             {t('submit')}

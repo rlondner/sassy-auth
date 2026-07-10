@@ -462,10 +462,23 @@
     "password": "Password",
     "submit": "Sign In",
     "forgotPassword": "Forgot password?",
+    "useCode": "Sign in with a code instead",
+    "otp": {
+      "title": "Sign in with a code",
+      "subtitle": "We'll email you a one-time code",
+      "sendCode": "Send code",
+      "codeLabel": "Verification code",
+      "verify": "Verify",
+      "resend": "Resend code",
+      "changeEmail": "Use a different email",
+      "sent": "If an account exists for that email, a code is on its way.",
+      "usePassword": "Sign in with a password instead"
+    },
     "error": {
       "invalidCredentials": "Invalid email or password.",
       "inactive": "This account has been deactivated.",
-      "serverUnavailable": "Sign-in service is unavailable. Please try again in a moment."
+      "serverUnavailable": "Sign-in service is unavailable. Please try again in a moment.",
+      "invalidCode": "Invalid or expired code."
     }
   },
   "acceptInvite": {
