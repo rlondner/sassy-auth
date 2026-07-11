@@ -5,6 +5,11 @@ import { prisma } from '@sassy-auth/db';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { getEmailer } from '../email/email.singleton';
 import { captureResetUrl } from './reset-url-context';
+import { APIError } from 'better-auth/api';
+import { evaluateSessionGate } from './session-gate';
+import { createAppLogger } from '../common/logger/winston.config';
+import { sendSignInOtp } from './otp-sender';
+import { otpTestStore } from './otp-test-store';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -36,6 +41,11 @@ export const TRUSTED_ORIGINS = (process.env.TRUSTED_ORIGINS
 // stable across upgrades.
 const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;      // 7 days
 const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;          // extend if used within 24h
+
+// The session-create gate runs outside a Nest request context, so it uses a
+// standalone Winston logger rather than the injected LoggerService (same
+// rationale as the bug-0186 after-hook).
+const authLogger = createAppLogger();
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -77,6 +87,22 @@ export const auth = betterAuth({
   databaseHooks: {
     session: {
       create: {
+        before: async (session: { userId: string }) => {
+          const gate = await evaluateSessionGate(prisma, session.userId);
+          if (!gate.allowed) {
+            // bug-0163-adjacent: no credential here, safe to log. This is the
+            // security event — a non-active user attempted to create a session
+            // (any method: password, OTP, social).
+            authLogger.warn('Session creation blocked', {
+              context: 'session-gate',
+              betterAuthUserId: session.userId,
+              status: gate.status,
+            });
+            throw new APIError('FORBIDDEN', {
+              message: 'This account is not active.',
+            });
+          }
+        },
         after: async (session: { userId: string }) => {
           try {
             await prisma.saUser.updateMany({
@@ -160,12 +186,22 @@ export const auth = betterAuth({
       },
     }),
     emailOTP({
-      sendVerificationOTP: async ({ email, otp }: { email: string; otp: string }) => {
-        // bug-0163: same story as the magic-link handler — the OTP is
-        // a bearer credential, no logs in prod.
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`[email-otp] ${email} → ${otp}`);
-        }
+      otpLength: 6,
+      expiresIn: 300,
+      allowedAttempts: 3,
+      disableSignUp: true,
+      rateLimit: { window: 60, max: 5 },
+      sendVerificationOTP: async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
+        await sendSignInOtp(
+          {
+            db: prisma,
+            emailer: getEmailer(),
+            store: otpTestStore,
+            logger: authLogger,
+            isTest: process.env.NODE_ENV === 'test',
+          },
+          { email, otp, type },
+        );
       },
     }),
     openAPI({ disableDefaultReference: true }),

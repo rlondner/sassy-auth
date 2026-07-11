@@ -462,10 +462,23 @@
     "password": "Mot de passe",
     "submit": "Se connecter",
     "forgotPassword": "Mot de passe oublié ?",
+    "useCode": "Se connecter avec un code",
+    "otp": {
+      "title": "Connexion par code",
+      "subtitle": "Nous vous enverrons un code à usage unique par e-mail",
+      "sendCode": "Envoyer le code",
+      "codeLabel": "Code de vérification",
+      "verify": "Vérifier",
+      "resend": "Renvoyer le code",
+      "changeEmail": "Utiliser une autre adresse",
+      "sent": "Si un compte existe pour cette adresse, un code est en route.",
+      "usePassword": "Se connecter avec un mot de passe"
+    },
     "error": {
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
       "inactive": "Ce compte a été désactivé.",
-      "serverUnavailable": "Le service de connexion est indisponible. Veuillez réessayer dans un instant."
+      "serverUnavailable": "Le service de connexion est indisponible. Veuillez réessayer dans un instant.",
+      "invalidCode": "Code invalide ou expiré."
     }
   },
   "acceptInvite": {
