@@ -12,6 +12,8 @@ import {
   getPermissions,
   updateUser,
   deleteUser,
+  resetPassword,
+  resendInvitation,
 } from '@/lib/api'
 import type { CreateUserPayload, Permission, Role, User } from '@/lib/types'
 
@@ -142,6 +144,47 @@ export async function updateUserAction(id: string, patch: Partial<User>): Promis
   const result = await updateUser(id, patch)
   revalidatePath('/users')
   return result
+}
+
+function mapActionError(err: unknown, map: { on400?: string; on403Own?: string; on403?: string }): string {
+  const m = err instanceof Error ? err.message : ''
+  if (map.on403Own && m.includes('403') && m.toLowerCase().includes('own')) return map.on403Own
+  if (map.on400 && m.includes('400')) return map.on400
+  if (map.on403 && m.includes('403')) return map.on403
+  return 'users.errors.generic'
+}
+
+export async function resetPasswordAction(
+  userId: string,
+): Promise<{ resetUrl: string | null } | { errorKey: string }> {
+  try {
+    return await resetPassword(userId)
+  } catch (err) {
+    return { errorKey: mapActionError(err, { on400: 'users.errors.noPassword', on403: 'users.errors.forbidden' }) }
+  }
+}
+
+export async function resendInvitationAction(
+  userId: string,
+): Promise<{ inviteUrl: string } | { errorKey: string }> {
+  try {
+    return await resendInvitation(userId)
+  } catch (err) {
+    return { errorKey: mapActionError(err, { on400: 'users.errors.notPending', on403: 'users.errors.forbidden' }) }
+  }
+}
+
+export async function setUserStatusAction(
+  userId: string,
+  status: 'active' | 'inactive',
+): Promise<{ ok: true } | { errorKey: string }> {
+  try {
+    await updateUser(userId, { status } as Partial<User>)
+    revalidatePath('/users')
+    return { ok: true }
+  } catch (err) {
+    return { errorKey: mapActionError(err, { on403Own: 'users.errors.selfDeactivate', on403: 'users.errors.forbidden' }) }
+  }
 }
 
 export async function deleteUserAction(

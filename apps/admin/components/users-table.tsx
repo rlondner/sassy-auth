@@ -15,16 +15,18 @@ import { UserViewDrawer } from './user-view-drawer'
 import { UserCreateDrawer } from './user-create-drawer'
 import { DeleteAlertDialog } from './delete-alert-dialog'
 import { PageHeader } from './page-header'
-import { deleteUserAction } from '@/app/(admin)/users/actions'
+import { deleteUserAction, resetPasswordAction, resendInvitationAction, setUserStatusAction } from '@/app/(admin)/users/actions'
+import { ShareLinkDialog } from './share-link-dialog'
 
 interface UsersTableProps {
   users: User[]
   orgs: Org[]
   initialOrgId?: string
   canPickOrg?: boolean
+  currentUserId?: string
 }
 
-export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: UsersTableProps) {
+export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, currentUserId }: UsersTableProps) {
   const t = useTranslations()
   const router = useRouter()
   void initialOrgId
@@ -35,6 +37,10 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
   const [createOpen, setCreateOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
+  const [statusTarget, setStatusTarget] = React.useState<User | null>(null)
+  const [statusError, setStatusError] = React.useState<string | null>(null)
+  const [resetLink, setResetLink] = React.useState<string | null>(null)
+  const [inviteLink, setInviteLink] = React.useState<string | null>(null)
 
   // No client-side list action for users — the page is a Server Component
   // that re-fetches on router.refresh() (paired with revalidatePath in the
@@ -105,16 +111,50 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
                 {t('users.actions.edit')}
               </DropdownMenuItem>
               {u.status === 'active' && (
-                <DropdownMenuItem>{t('users.actions.resetPassword')}</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    const res = await resetPasswordAction(u.id)
+                    if ('errorKey' in res) { toast.error(t(res.errorKey)); return }
+                    toast.success(t('users.toast.resetLinkGenerated'))
+                    if (res.resetUrl) setResetLink(res.resetUrl)
+                  }}
+                >
+                  {t('users.actions.resetPassword')}
+                </DropdownMenuItem>
               )}
               {u.status === 'pending' && (
-                <DropdownMenuItem>{t('users.actions.resendInvitation')}</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    const res = await resendInvitationAction(u.id)
+                    if ('errorKey' in res) { toast.error(t(res.errorKey)); return }
+                    toast.success(t('users.toast.resent'))
+                    setInviteLink(res.inviteUrl)
+                  }}
+                >
+                  {t('users.actions.resendInvitation')}
+                </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              {u.status === 'active' ? (
-                <DropdownMenuItem className="text-destructive">{t('users.actions.deactivate')}</DropdownMenuItem>
+              {u.status === 'active' && u.id !== currentUserId ? (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={(e) => { e.stopPropagation(); setStatusError(null); setStatusTarget(u) }}
+                >
+                  {t('users.actions.deactivate')}
+                </DropdownMenuItem>
               ) : u.status === 'inactive' ? (
-                <DropdownMenuItem>{t('users.actions.activate')}</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    const res = await setUserStatusAction(u.id, 'active')
+                    if ('errorKey' in res) { toast.error(t(res.errorKey)); return }
+                    toast.success(t('users.toast.activated'))
+                  }}
+                >
+                  {t('users.actions.activate')}
+                </DropdownMenuItem>
               ) : null}
               <DropdownMenuItem
                 className="text-destructive"
@@ -199,10 +239,43 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true }: Use
             }
             toast.success(t('users.toast.deleted'))
             setDeleteOpen(false)
+            // bug-0116: also close the view drawer if the deleted user was open in it.
+            setViewOpen(false)
             refresh()
           }}
         />
       )}
+      {statusTarget && (
+        <DeleteAlertDialog
+          open
+          onOpenChange={(o) => { if (!o) setStatusTarget(null) }}
+          title={t('users.confirmDeactivate.title')}
+          description={t('users.confirmDeactivate.body', { name: `${statusTarget.firstName} ${statusTarget.lastName}` })}
+          confirmLabel={t('users.confirmDeactivate.button')}
+          cancelLabel={t('users.drawer.cancel')}
+          error={statusError}
+          onConfirm={async () => {
+            const res = await setUserStatusAction(statusTarget.id, 'inactive')
+            if ('errorKey' in res) { setStatusError(t(res.errorKey)); return }
+            toast.success(t('users.toast.deactivated'))
+            setStatusTarget(null)
+          }}
+        />
+      )}
+      <ShareLinkDialog
+        open={resetLink !== null}
+        onOpenChange={(o) => { if (!o) setResetLink(null) }}
+        title={t('users.drawer.resetLinkTitle')}
+        description={t('users.drawer.resetLinkBody')}
+        url={resetLink ?? ''}
+      />
+      <ShareLinkDialog
+        open={inviteLink !== null}
+        onOpenChange={(o) => { if (!o) setInviteLink(null) }}
+        title={t('users.drawer.resendLinkTitle')}
+        description={t('users.drawer.resendLinkBody')}
+        url={inviteLink ?? ''}
+      />
     </>
   )
 }

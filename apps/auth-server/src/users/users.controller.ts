@@ -76,6 +76,11 @@ export class UsersController {
     return this.users.resendInvitation(callerBaId(req), id);
   }
 
+  @Post(':id/reset-password')
+  resetPassword(@Req() req: Request, @Param('id') id: string) {
+    return this.users.resetPassword(callerBaId(req), id);
+  }
+
   @Put(':id/roles')
   @HttpCode(204)
   setRoles(

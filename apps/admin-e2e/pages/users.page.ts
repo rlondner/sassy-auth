@@ -114,10 +114,9 @@ export class UsersPage {
   async resendInvitation(email: string) {
     await this.search(email)
     await this.rowByEmail(email).locator('[aria-haspopup="menu"]').click()
-    await this.page
-      .getByRole('menuitem', { name: t('users.actions.resendInvitation') })
-      .click()
-    await raceSuccessOrError(this.page, t('users.toast.resent'))
+    await this.page.getByRole('menuitem', { name: t('users.actions.resendInvitation') }).click()
+    // A copy-link dialog appears with the regenerated invite URL; dismiss it.
+    await this.page.getByRole('button', { name: t('users.drawer.done') }).click()
   }
 }
 

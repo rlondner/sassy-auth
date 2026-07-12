@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useActionState } from 'react'
 import { Button } from '@sassy-auth/ui'
@@ -57,8 +58,18 @@ export function LoginForm({ next }: { next: string }) {
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? '…' : t('submit')}
+          <Link href="/forgot-password" className="text-label-md text-[var(--primary)] hover:underline self-end">
+            {t('forgotPassword')}
+          </Link>
+          <Link
+            href={next ? `/login/code?next=${encodeURIComponent(next)}` : '/login/code'}
+            className="text-label-md text-[var(--primary)] hover:underline self-end"
+          >
+            {t('useCode')}
+          </Link>
+
+          <Button type="submit" className="w-full" loading={isPending}>
+            {t('submit')}
           </Button>
         </form>
       </div>

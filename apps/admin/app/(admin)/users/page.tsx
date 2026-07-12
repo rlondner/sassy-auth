@@ -79,6 +79,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       orgs={orgs}
       initialOrgId={effectiveOrgId}
       canPickOrg={isPlatformUsers}
+      currentUserId={profile?.userId}
     />
   )
 }

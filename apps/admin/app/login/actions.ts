@@ -5,8 +5,7 @@ import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
-
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+import { AUTH_SERVER_URL } from '@/lib/config'
 
 interface ParsedSessionCookie {
   value: string
@@ -19,6 +18,11 @@ interface ParsedSessionCookie {
   expires?: Date
 }
 
+// Known limitation: the comma-splitting regex may fail when Node concatenates
+// multiple Set-Cookie headers with ", " and one contains an Expires date.
+// BetterAuth currently returns a single session cookie so this is safe.
+// Consider replacing with `set-cookie-parser` if more cookies are added.
+//
 // Parse the first Set-Cookie clause that matches `better-auth.session_token=...`.
 // Node fetch combines multiple Set-Cookie headers with ", " — split on that
 // boundary while NOT splitting on the "," inside an Expires=Wed, 21 Oct ... date.
@@ -40,7 +44,12 @@ function parseSessionCookie(header: string): ParsedSessionCookie | null {
     // exactly once, so the signature ends up as `…%3D` (length 48 ≠ 44),
     // session lookup returns null, and every refresh bounces to /login.
     // Single-decode here so the round-trip is identity.
-    const value = decodeURIComponent(namePair.slice(eq + 1))
+    let value: string
+    try {
+      value = decodeURIComponent(namePair.slice(eq + 1))
+    } catch {
+      value = namePair.slice(eq + 1)
+    }
 
     const parsed: ParsedSessionCookie = { value, httpOnly: false }
     for (const attr of attrs) {
@@ -83,6 +92,30 @@ function parseSessionCookie(header: string): ParsedSessionCookie | null {
   return null
 }
 
+async function forwardSessionCookie(res: Response): Promise<boolean> {
+  const cookieStore = await cookies()
+  const setCookieHeader = res.headers.get('set-cookie')
+  if (!setCookieHeader) {
+    Sentry.captureMessage('Auth server returned 200 but no Set-Cookie header', { level: 'error' })
+    return false
+  }
+  const parsed = parseSessionCookie(setCookieHeader)
+  if (!parsed) {
+    Sentry.captureMessage('Failed to parse session cookie from auth server response', { level: 'error' })
+    return false
+  }
+  cookieStore.set('better-auth.session_token', parsed.value, {
+    httpOnly: parsed.httpOnly,
+    secure: parsed.secure ?? process.env.NODE_ENV === 'production',
+    sameSite: parsed.sameSite ?? 'lax',
+    path: parsed.path ?? '/',
+    ...(parsed.maxAge !== undefined && { maxAge: parsed.maxAge }),
+    ...(parsed.expires !== undefined && { expires: parsed.expires }),
+    ...(parsed.domain !== undefined && { domain: parsed.domain }),
+  })
+  return true
+}
+
 export async function signIn(formData: FormData): Promise<{ error?: string }> {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
@@ -100,7 +133,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
 
   let res: Response
   try {
-    res = await fetch(`${AUTH_SERVER}/api/auth/sign-in/email`, {
+    res = await fetch(`${AUTH_SERVER_URL}/api/auth/sign-in/email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -127,26 +160,8 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
     return { error: 'invalidCredentials' }
   }
 
-  // Forward session cookie from auth server to the browser, preserving
-  // the upstream Set-Cookie attributes (Max-Age, Expires, Path, Domain,
-  // SameSite, HttpOnly, Secure). Hand-parse rather than regex-extract so
-  // the lifetime upstream issued is honored on the client.
-  const cookieStore = await cookies()
-  const setCookieHeader = res.headers.get('set-cookie')
-  if (setCookieHeader) {
-    const parsed = parseSessionCookie(setCookieHeader)
-    if (parsed) {
-      cookieStore.set('better-auth.session_token', parsed.value, {
-        httpOnly: parsed.httpOnly,
-        secure: parsed.secure ?? process.env.NODE_ENV === 'production',
-        sameSite: parsed.sameSite ?? 'lax',
-        path: parsed.path ?? '/',
-        ...(parsed.maxAge !== undefined && { maxAge: parsed.maxAge }),
-        ...(parsed.expires !== undefined && { expires: parsed.expires }),
-        ...(parsed.domain !== undefined && { domain: parsed.domain }),
-      })
-    }
-  }
+  const ok = await forwardSessionCookie(res)
+  if (!ok) return { error: 'invalidCredentials' }
 
   // Do not pass plaintext email to Sentry; the admin layout will identify
   // the user by id after the next page render reads the session.
@@ -155,6 +170,62 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
     message: 'Admin login successful',
     level: 'info',
   })
+  const nextRaw = formData.get('next')
+  const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
+  redirect(nextSafe ?? '/users')
+}
+
+export async function requestOtp(formData: FormData): Promise<{ sent: true } | { error: string }> {
+  const email = formData.get('email') as string
+  if (!email) return { error: 'invalidCredentials' }
+
+  const origin = await getForwardedOrigin()
+  try {
+    // Fire the request; the response status is intentionally ignored for the
+    // client result. Whether the account exists/is active or not, the caller
+    // gets a neutral { sent: true } (no user enumeration). Only a transport
+    // failure is surfaced, so the operator knows to retry.
+    await fetch(`${AUTH_SERVER_URL}/api/auth/email-otp/send-verification-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(origin && { Origin: origin }) },
+      body: JSON.stringify({ email, type: 'sign-in' }),
+    })
+  } catch (err) {
+    Sentry.captureException(err, { tags: { area: 'auth', action: 'otp-request' } })
+    return { error: 'serverUnavailable' }
+  }
+  return { sent: true }
+}
+
+export async function verifyOtp(formData: FormData): Promise<{ error?: string }> {
+  const email = formData.get('email') as string
+  const otp = formData.get('otp') as string
+  if (!email || !otp) return { error: 'invalidCode' }
+
+  const origin = await getForwardedOrigin()
+  let res: Response
+  try {
+    res = await fetch(`${AUTH_SERVER_URL}/api/auth/sign-in/email-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(origin && { Origin: origin }) },
+      body: JSON.stringify({ email, otp }),
+    })
+  } catch (err) {
+    Sentry.captureException(err, { tags: { area: 'auth', action: 'otp-verify' } })
+    return { error: 'serverUnavailable' }
+  }
+
+  if (!res.ok) {
+    Sentry.addBreadcrumb({ category: 'auth', message: 'Admin OTP login failed', level: 'warning' })
+    // The session-creation gate rejects non-active users with 403 → inactive.
+    if (res.status === 403) return { error: 'inactive' }
+    return { error: 'invalidCode' }
+  }
+
+  const ok = await forwardSessionCookie(res)
+  if (!ok) return { error: 'invalidCode' }
+
+  Sentry.addBreadcrumb({ category: 'auth', message: 'Admin OTP login successful', level: 'info' })
   const nextRaw = formData.get('next')
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
   redirect(nextSafe ?? '/users')

@@ -127,12 +127,12 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  disabled={pending}
+                  loading={pending}
                 >
                   {t('apps.drawer.cancel')}
                 </Button>
-                <Button type="submit" disabled={pending}>
-                  {pending ? t('apps.drawer.saving') : t('apps.drawer.createTitle')}
+                <Button type="submit" loading={pending}>
+                  {t('apps.drawer.createTitle')}
                 </Button>
               </ButtonGroup>
             </div>

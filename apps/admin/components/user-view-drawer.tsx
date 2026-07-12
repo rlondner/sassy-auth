@@ -8,6 +8,7 @@ import {
   Button, ButtonGroup, UserAvatar, StatusChip, Badge,
 } from '@sassy-auth/ui'
 import { DeleteAlertDialog } from './delete-alert-dialog'
+import { ShareLinkDialog } from './share-link-dialog'
 import {
   getUserRolesAction,
   getEffectivePermissionsAction,
@@ -18,6 +19,7 @@ import {
   getAppPermissionsAction,
   updateUserAction,
   deleteUserAction,
+  resetPasswordAction,
 } from '@/app/(admin)/users/actions'
 import { RoleRowsEditor, type RoleOption } from './user-role-rows-editor'
 import { PermissionRowsEditor, type PermOption } from './role-permission-rows-editor'
@@ -52,6 +54,7 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
   const [showAllPerms, setShowAllPerms] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
+  const [resetLink, setResetLink] = React.useState<string | null>(null)
 
   // Edit-mode form state
   const [editProfile, setEditProfile] = React.useState<ProfileSnapshot>({ firstName: '', lastName: '', phoneNumber: '', username: '' })
@@ -253,7 +256,7 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
             {editing ? (
               <ButtonGroup>
                 <Button variant="secondary" size="sm" onClick={handleCancel} disabled={saving}>{t('users.drawer.cancel')}</Button>
-                <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? '…' : t('users.drawer.save')}</Button>
+                <Button size="sm" onClick={handleSave} loading={saving}>{t('users.drawer.save')}</Button>
               </ButtonGroup>
             ) : (
               <ButtonGroup>
@@ -265,7 +268,20 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
                 >
                   {t('users.actions.delete')}
                 </Button>
-                <Button variant="outline" size="sm">{t('users.drawer.resetPassword')}</Button>
+                {user.status === 'active' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      const res = await resetPasswordAction(user.id)
+                      if ('errorKey' in res) { toast.error(t(res.errorKey)); return }
+                      toast.success(t('users.toast.resetLinkGenerated'))
+                      if (res.resetUrl) setResetLink(res.resetUrl)
+                    }}
+                  >
+                    {t('users.drawer.resetPassword')}
+                  </Button>
+                )}
                 <Button size="sm" onClick={() => setEditing(true)}>{t('users.drawer.edit')}</Button>
               </ButtonGroup>
             )}
@@ -417,6 +433,13 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
           onSuccess?.()
           onOpenChange(false)
         }}
+      />
+      <ShareLinkDialog
+        open={resetLink !== null}
+        onOpenChange={(o) => { if (!o) setResetLink(null) }}
+        title={t('users.drawer.resetLinkTitle')}
+        description={t('users.drawer.resetLinkBody')}
+        url={resetLink ?? ''}
       />
     </Sheet>
   )

@@ -734,6 +734,23 @@ Tests are in `apps/admin-e2e/tests/`. In CI, the Playwright config automatically
 
 ---
 
+## Local email testing (Mailpit)
+
+By default the auth-server uses a **console** email transport (logs the message, sends nothing) — no setup needed for dev or CI.
+
+To view real emails locally, run [Mailpit](https://mailpit.axllent.org/):
+
+    docker compose -f docker-compose.dev.yml up -d
+
+Then in `.env.local` set:
+
+    EMAIL_SMTP_HOST=localhost
+    EMAIL_SMTP_PORT=1025
+
+Sent emails appear at http://localhost:8025. For production, set `RESEND_API_KEY` instead (takes precedence over SMTP).
+
+---
+
 ## Known Limitations
 
 The following items are deferred to later sub-projects and are not yet production-ready. See `todo/TODO_*.md` for daily follow-up lists and `bugs/BUGS_*.md` for the full bug catalog.

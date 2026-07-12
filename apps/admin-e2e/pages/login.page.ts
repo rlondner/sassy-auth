@@ -1,5 +1,8 @@
-import type { Page, Locator } from '@playwright/test'
+import { expect, type Page, type Locator } from '@playwright/test'
 import { t } from '../lib/i18n'
+
+// Auth-server base URL for the test-only OTP retrieval endpoint.
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
 export class LoginPage {
   readonly page: Page
@@ -26,5 +29,29 @@ export class LoginPage {
     await this.emailInput.fill(email)
     await this.passwordInput.fill(password)
     await this.submitButton.click()
+  }
+
+  async gotoOtp(next = '') {
+    await this.page.goto(next ? `/login/code?next=${encodeURIComponent(next)}` : '/login/code')
+  }
+
+  async requestCode(email: string) {
+    await this.page.getByLabel(t('login.email')).fill(email)
+    await this.page.getByRole('button', { name: t('login.otp.sendCode') }).click()
+    // Step 2 renders once the neutral response returns.
+    await expect(this.page.getByTestId('otp-sent')).toBeVisible()
+  }
+
+  async fetchOtp(email: string): Promise<string> {
+    const res = await this.page.request.get(
+      `${AUTH_SERVER}/test/last-otp?email=${encodeURIComponent(email)}`,
+    )
+    expect(res.ok(), 'test-only OTP endpoint should return the stored code').toBeTruthy()
+    return ((await res.json()) as { otp: string }).otp
+  }
+
+  async submitCode(otp: string) {
+    await this.page.getByLabel(t('login.otp.codeLabel')).fill(otp)
+    await this.page.getByRole('button', { name: t('login.otp.verify') }).click()
   }
 }

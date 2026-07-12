@@ -4,7 +4,9 @@
  * Keep the two files in sync by convention when seed grants change.
  */
 
-export const ADMIN_PASSWORD = 'Pass@word1234'
+// bug-0016: allow overriding the seeded admin password via env for CI/secret
+// injection, falling back to the well-known local seed value.
+export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 
 export type AdminKey = 'apps' | 'orgs' | 'users' | 'roles' | 'perms' | 'super'
 

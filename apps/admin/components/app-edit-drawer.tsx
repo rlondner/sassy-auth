@@ -150,12 +150,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
-                  disabled={pending}
+                  loading={pending}
                 >
                   {t('apps.drawer.cancel')}
                 </Button>
                 <Button type="submit" disabled={!dirty || pending}>
-                  {pending ? t('apps.drawer.saving') : t('apps.drawer.save')}
+                  {t('apps.drawer.save')}
                 </Button>
               </ButtonGroup>
             </div>

@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
+import { EmailModule } from './email/email.module';
 import { TokenModule } from './token/token.module';
 import { CommonModule } from './common/common.module';
 import { UsersModule } from './users/users.module';
@@ -13,6 +14,7 @@ import { AppsModule } from './apps/apps.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { MeModule } from './me/me.module';
 import { RegistrationModule } from './registration/registration.module';
+import { TestSupportModule } from './test-support/test-support.module';
 
 // bug-0080: Two throttler buckets — a generous `default` for the
 // general API surface and a tight `auth` bucket for endpoints where
@@ -48,6 +50,8 @@ const throttlerConfig = isTest
     PermissionsModule,
     MeModule,
     RegistrationModule,
+    EmailModule,
+    ...(isTest ? [TestSupportModule] : []),
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
