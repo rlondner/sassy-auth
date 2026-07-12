@@ -295,6 +295,51 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string }>
   redirect(nextSafe ?? '/users')
 }
 
+/**
+ * Resolve the effective per-app trust-device duration from the `next` form
+ * field (which may carry a client_id query param for per-app overrides) and
+ * re-set the better-auth.trust_device cookie Max-Age accordingly.
+ *
+ * BetterAuth sets the trust-device cookie using its plugin-level default
+ * duration (no trustDeviceMaxAge option is configured in auth.config.ts — the
+ * plugin's built-in default applies). We override the browser cookie's Max-Age
+ * here to honour per-app twoFactorTrustDays.
+ *
+ * NOTE on server-side cap: BetterAuth's Verification record for the trust
+ * device has its own expiresAt fixed at the plugin default. The cookie Max-Age
+ * controls browser eviction only. Shorter per-app values are fully enforced
+ * (cookie evicts early); values longer than the server default are capped
+ * server-side — the cookie outlives the Verification record, so the user is
+ * re-challenged at the server default regardless of the cookie surviving
+ * (acceptable risk for v1, documented in the UI field hint).
+ */
+async function applyPerAppTrustCookie(
+  res: Response,
+  nextStr: string | null,
+): Promise<void> {
+  let resolvedDays = getSystemTrustDaysClient()
+  if (nextStr) {
+    try {
+      const nextUrl = new URL(nextStr, AUTH_SERVER_URL)
+      const clientId = nextUrl.searchParams.get('client_id')
+      if (clientId) {
+        const trustRes = await fetch(
+          `${AUTH_SERVER_URL}/api/token/app-trust-days?client_id=${encodeURIComponent(clientId)}`,
+          { cache: 'no-store' },
+        )
+        if (trustRes.ok) {
+          const data = (await trustRes.json()) as { effectiveTrustDays: number }
+          if (typeof data.effectiveTrustDays === 'number' && data.effectiveTrustDays > 0) {
+            resolvedDays = data.effectiveTrustDays
+          }
+        }
+      }
+    } catch { /* use system default */ }
+  }
+  const resolvedMaxAgeSecs = resolvedDays * 24 * 60 * 60
+  await forwardNamedCookieWithMaxAge(res, 'better-auth.trust_device', resolvedMaxAgeSecs)
+}
+
 export async function verifyTotp(formData: FormData): Promise<{ error?: string }> {
   const code = formData.get('code') as string
   const trustDevice = formData.get('trustDevice') === 'true'
@@ -335,37 +380,9 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
   // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
   await forwardNamedCookie(res, 'better-auth.two_factor')
 
-  // Re-set the better-auth.trust_device cookie Max-Age to the resolved per-app
-  // interval. BetterAuth sets it with the static trustDeviceMaxAge option.
-  // We override here to honour per-app twoFactorTrustDays.
-  // NOTE: BetterAuth's Verification record for the trust device has its own
-  // expiresAt set by the plugin (static trustDeviceMaxAge). The cookie Max-Age
-  // controls browser eviction; the Verification expiresAt is the server-side
-  // guard. Shorter per-app values are enforced by the cookie; the Verification
-  // record may outlive the cookie for shorter intervals (acceptable risk for v1).
   if (trustDevice) {
-    let resolvedDays = getSystemTrustDaysClient()
-    const nextStrForTrust = typeof formData.get('next') === 'string' ? formData.get('next') as string : null
-    if (nextStrForTrust) {
-      try {
-        const nextUrl = new URL(nextStrForTrust, AUTH_SERVER_URL)
-        const clientId = nextUrl.searchParams.get('client_id')
-        if (clientId) {
-          const trustRes = await fetch(
-            `${AUTH_SERVER_URL}/api/token/app-trust-days?client_id=${encodeURIComponent(clientId)}`,
-            { cache: 'no-store' },
-          )
-          if (trustRes.ok) {
-            const data = (await trustRes.json()) as { effectiveTrustDays: number }
-            if (typeof data.effectiveTrustDays === 'number' && data.effectiveTrustDays > 0) {
-              resolvedDays = data.effectiveTrustDays
-            }
-          }
-        }
-      } catch { /* use system default */ }
-    }
-    const resolvedMaxAgeSecs = resolvedDays * 24 * 60 * 60
-    await forwardNamedCookieWithMaxAge(res, 'better-auth.trust_device', resolvedMaxAgeSecs)
+    const nextStr = typeof nextRaw === 'string' ? nextRaw : null
+    await applyPerAppTrustCookie(res, nextStr)
   }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'TOTP verify success', level: 'info' })
@@ -411,37 +428,9 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
   // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
   await forwardNamedCookie(res, 'better-auth.two_factor')
 
-  // Re-set the better-auth.trust_device cookie Max-Age to the resolved per-app
-  // interval. BetterAuth sets it with the static trustDeviceMaxAge option.
-  // We override here to honour per-app twoFactorTrustDays.
-  // NOTE: BetterAuth's Verification record for the trust device has its own
-  // expiresAt set by the plugin (static trustDeviceMaxAge). The cookie Max-Age
-  // controls browser eviction; the Verification expiresAt is the server-side
-  // guard. Shorter per-app values are enforced by the cookie; the Verification
-  // record may outlive the cookie for shorter intervals (acceptable risk for v1).
   if (trustDevice) {
-    let resolvedDays = getSystemTrustDaysClient()
-    const nextStrForTrust = typeof formData.get('next') === 'string' ? formData.get('next') as string : null
-    if (nextStrForTrust) {
-      try {
-        const nextUrl = new URL(nextStrForTrust, AUTH_SERVER_URL)
-        const clientId = nextUrl.searchParams.get('client_id')
-        if (clientId) {
-          const trustRes = await fetch(
-            `${AUTH_SERVER_URL}/api/token/app-trust-days?client_id=${encodeURIComponent(clientId)}`,
-            { cache: 'no-store' },
-          )
-          if (trustRes.ok) {
-            const data = (await trustRes.json()) as { effectiveTrustDays: number }
-            if (typeof data.effectiveTrustDays === 'number' && data.effectiveTrustDays > 0) {
-              resolvedDays = data.effectiveTrustDays
-            }
-          }
-        }
-      } catch { /* use system default */ }
-    }
-    const resolvedMaxAgeSecs = resolvedDays * 24 * 60 * 60
-    await forwardNamedCookieWithMaxAge(res, 'better-auth.trust_device', resolvedMaxAgeSecs)
+    const nextStr = typeof nextRaw === 'string' ? nextRaw : null
+    await applyPerAppTrustCookie(res, nextStr)
   }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Backup code verify success', level: 'info' })
