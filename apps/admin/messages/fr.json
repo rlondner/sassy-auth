@@ -496,6 +496,56 @@
       "genericError": "Une erreur est survenue."
     }
   },
+  "security": {
+    "title": "Authentification à deux facteurs",
+    "subtitle": "Protégez votre compte avec une application d'authentification.",
+    "status": {
+      "enabled": "La 2FA est activée",
+      "disabled": "La 2FA n'est pas activée"
+    },
+    "enable": {
+      "heading": "Configurer la 2FA",
+      "passwordLabel": "Confirmez votre mot de passe",
+      "passwordPlaceholder": "Votre mot de passe actuel",
+      "submitButton": "Générer le QR code",
+      "submitting": "Génération…",
+      "scanHeading": "Scannez avec votre application d'authentification",
+      "manualEntry": "Ou saisissez ce secret manuellement :",
+      "confirmHeading": "Confirmez votre configuration",
+      "codeLabel": "Saisissez le code à 6 chiffres de votre application",
+      "confirmButton": "Confirmer et activer",
+      "confirming": "Vérification…"
+    },
+    "backupCodes": {
+      "heading": "Enregistrez vos codes de secours",
+      "body": "Chacun de ces codes peut être utilisé une fois si vous perdez l'accès à votre application d'authentification. Conservez-les en lieu sûr — ils ne seront plus affichés.",
+      "copyButton": "Tout copier",
+      "copied": "Copié !",
+      "downloadButton": "Télécharger"
+    },
+    "disable": {
+      "heading": "Désactiver la 2FA",
+      "body": "Vous ne serez plus invité à fournir un second facteur lors de la connexion.",
+      "passwordLabel": "Confirmez votre mot de passe",
+      "passwordPlaceholder": "Votre mot de passe actuel",
+      "submitButton": "Désactiver la 2FA",
+      "submitting": "Désactivation…"
+    },
+    "regenerate": {
+      "heading": "Regénérer les codes de secours",
+      "body": "Vos codes de secours existants seront invalidés. Les nouveaux codes ne seront affichés qu'une seule fois.",
+      "passwordLabel": "Confirmez votre mot de passe",
+      "passwordPlaceholder": "Votre mot de passe actuel",
+      "submitButton": "Regénérer les codes",
+      "submitting": "Regénération…"
+    },
+    "errors": {
+      "invalidPassword": "Mot de passe invalide.",
+      "invalidCode": "Code invalide ou expiré.",
+      "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."
+    }
+  },
   "oauthError": {
     "pageTitle": "Erreur d'autorisation — SassyAuth",
     "fallbackHeading": "Demande d'autorisation rejetée",

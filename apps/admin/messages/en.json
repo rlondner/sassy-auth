@@ -496,6 +496,56 @@
       "genericError": "Something went wrong."
     }
   },
+  "security": {
+    "title": "Two-Factor Authentication",
+    "subtitle": "Protect your account with an authenticator app.",
+    "status": {
+      "enabled": "2FA is enabled",
+      "disabled": "2FA is not enabled"
+    },
+    "enable": {
+      "heading": "Set up 2FA",
+      "passwordLabel": "Confirm your password",
+      "passwordPlaceholder": "Your current password",
+      "submitButton": "Generate QR code",
+      "submitting": "Generating…",
+      "scanHeading": "Scan with your authenticator app",
+      "manualEntry": "Or enter this secret manually:",
+      "confirmHeading": "Confirm your setup",
+      "codeLabel": "Enter the 6-digit code from your app",
+      "confirmButton": "Confirm & enable",
+      "confirming": "Verifying…"
+    },
+    "backupCodes": {
+      "heading": "Save your backup codes",
+      "body": "These codes can each be used once if you lose access to your authenticator. Store them somewhere safe — they will not be shown again.",
+      "copyButton": "Copy all",
+      "copied": "Copied!",
+      "downloadButton": "Download"
+    },
+    "disable": {
+      "heading": "Disable 2FA",
+      "body": "You will no longer be prompted for a second factor when signing in.",
+      "passwordLabel": "Confirm your password",
+      "passwordPlaceholder": "Your current password",
+      "submitButton": "Disable 2FA",
+      "submitting": "Disabling…"
+    },
+    "regenerate": {
+      "heading": "Regenerate backup codes",
+      "body": "Your existing backup codes will be invalidated. New codes will be shown once.",
+      "passwordLabel": "Confirm your password",
+      "passwordPlaceholder": "Your current password",
+      "submitButton": "Regenerate codes",
+      "submitting": "Regenerating…"
+    },
+    "errors": {
+      "invalidPassword": "Invalid password.",
+      "invalidCode": "Invalid or expired code.",
+      "generic": "Something went wrong. Please try again.",
+      "serverUnavailable": "Service is unavailable. Please try again in a moment."
+    }
+  },
   "oauthError": {
     "pageTitle": "Authorization error — SassyAuth",
     "fallbackHeading": "Authorization request rejected",
