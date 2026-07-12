@@ -10,16 +10,18 @@ datasource db {
 // ── BetterAuth tables (managed by BetterAuth Prisma adapter) ──────────────────
 
 model User {
-  id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean
-  image         String?
-  createdAt     DateTime
-  updatedAt     DateTime
-  sessions      Session[]
-  accounts      Account[]
-  saUser        SaUser?
+  id               String      @id
+  name             String
+  email            String      @unique
+  emailVerified    Boolean
+  image            String?
+  createdAt        DateTime
+  updatedAt        DateTime
+  twoFactorEnabled Boolean     @default(false)
+  sessions         Session[]
+  accounts         Account[]
+  saUser           SaUser?
+  twoFactor        TwoFactor?
 }
 
 model Session {
@@ -76,6 +78,15 @@ model Verification {
   @@index([identifier])
 }
 
+model TwoFactor {
+  id          String  @id
+  secret      String
+  backupCodes String
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified    Boolean @default(true)
+}
+
 // ── SassyAuth tables ──────────────────────────────────────────────────────────
 
 enum UserStatus {
@@ -89,8 +100,9 @@ model SaApp {
   publicId    String         @unique
   name        String         @unique
   url         String
-  callbackUrl String?
-  isPlatform  Boolean        @default(false)
+  callbackUrl        String?
+  twoFactorTrustDays Int?
+  isPlatform         Boolean        @default(false)
   orgs        SaOrg[]
   permissions SaPermission[]
   roles       SaRole[]
@@ -141,7 +153,8 @@ model SaUser {
   // hook in auth.config.ts) and `POST /api/token/direct/login` (in
   // token.controller.ts, on successful JWT issuance). Null means the
   // user has never signed in — most commonly a pending invitee.
-  lastLoginAt      DateTime?
+  lastLoginAt           DateTime?
+  twoFactorPromptedAt   DateTime?
   roles            SaUserRole[]
   directPermissions SaUserPermission[]
   invitations       SaInvitation[]
