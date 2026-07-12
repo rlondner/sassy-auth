@@ -34,8 +34,8 @@ const loggerFake: Partial<LoggerService> = {
   getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() } as never),
 };
 
-const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false };
-const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', callbackUrl: null, isPlatform: true };
+const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null };
+const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', callbackUrl: null, isPlatform: true, twoFactorTrustDays: null };
 
 describe('AppsService', () => {
   let service: AppsService;
@@ -58,7 +58,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -81,7 +81,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
     expect(result).toEqual({
       publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
-      callbackUrl: null, isPlatform: false,
+      callbackUrl: null, isPlatform: false, twoFactorTrustDays: null,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -118,10 +118,11 @@ describe('AppsService', () => {
         url: 'https://portal.example.com',
         callbackUrl: null,
         isPlatform: false,
+        twoFactorTrustDays: null,
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null });
   });
 
   it('createApp stores a provided callbackUrl', async () => {
