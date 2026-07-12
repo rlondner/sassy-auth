@@ -96,12 +96,49 @@ jobs:
           SEED_DEMO_MULTITENANT: '1'
         run: pnpm --filter @sassy-auth/auth-server seed
 
+      - name: Set up Python for FastAPI RS
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install FastAPI RS dependencies
+        working-directory: apps/resource-server-fastapi
+        run: |
+          pip install fastapi "uvicorn[standard]" httpx "pyjwt[crypto]" pydantic-settings jinja2
+
+      - name: Seed RS app and write publicId
+        env:
+          RS_APP_URL: 'http://localhost:8010'
+          SEED_DEMO: '1'
+        run: |
+          pnpm --filter @sassy-auth/auth-server seed
+          node -e "
+            const { PrismaClient } = require('./packages/db/node_modules/@prisma/client');
+            const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+            prisma.saApp.findFirst({ where: { name: 'resourceserver01' } })
+              .then(app => {
+                if (app) {
+                  require('fs').writeFileSync('/tmp/sassy-e2e-rs-client-id.txt', app.publicId, 'utf8');
+                  process.stdout.write('RS publicId written: ' + app.publicId + '\n');
+                } else {
+                  process.stdout.write('WARNING: resourceserver01 not found\n');
+                }
+              })
+              .catch(err => { process.stderr.write(err.message + '\n'); process.exit(1); })
+              .finally(() => prisma.\$disconnect());
+          "
+
       - name: Install Playwright browsers
         run: pnpm --filter @sassy-auth/admin-e2e exec playwright install --with-deps chromium
 
       - name: Run e2e
         id: run-e2e
-        run: pnpm --filter @sassy-auth/admin-e2e test:e2e
+        env:
+          RS_BASE_URL: 'http://localhost:8010'
+        run: |
+          RS_CLIENT_ID=$(cat /tmp/sassy-e2e-rs-client-id.txt 2>/dev/null || echo '')
+          export RS_CLIENT_ID
+          pnpm --filter @sassy-auth/admin-e2e test:e2e
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

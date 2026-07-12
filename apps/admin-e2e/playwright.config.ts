@@ -1,8 +1,21 @@
 import { defineConfig, devices } from '@playwright/test'
+import { readFileSync } from 'fs'
 
 const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
+
+let RS_CLIENT_ID = process.env.RS_CLIENT_ID ?? ''
+if (!RS_CLIENT_ID) {
+  try {
+    RS_CLIENT_ID = readFileSync('/tmp/sassy-e2e-rs-client-id.txt', 'utf8').trim()
+  } catch { /* file not written; RS specs skip */ }
+}
+// Expose for spec files that read process.env.RS_CLIENT_ID
+if (RS_CLIENT_ID) {
+  process.env.RS_CLIENT_ID = RS_CLIENT_ID
+}
 
 export default defineConfig({
   testDir: './tests',
@@ -81,6 +94,22 @@ export default defineConfig({
           url: ADMIN_URL,
           reuseExistingServer: false,
           timeout: 120_000,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+        {
+          command: [
+            `SASSY_CLIENT_ID=${RS_CLIENT_ID}`,
+            `REDIRECT_URI=${RS_BASE_URL}/auth/callback`,
+            `RS_BASE_URL=${RS_BASE_URL}`,
+            `AUTH_SERVER_URL=${AUTH_SERVER_URL}`,
+            `ADMIN_URL=${ADMIN_URL}`,
+            'uvicorn app.main:app --port 8010',
+          ].join(' '),
+          cwd: 'apps/resource-server-fastapi',
+          url: `${RS_BASE_URL}/`,
+          reuseExistingServer: false,
+          timeout: 60_000,
           stdout: 'pipe',
           stderr: 'pipe',
         },

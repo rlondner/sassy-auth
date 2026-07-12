@@ -9,7 +9,7 @@ const sqids = new Sqids({
 });
 
 const APP_NAME = 'resourceserver01';
-const APP_URL = 'https://cheryl-crescentlike-monte.ngrok-free.dev/';
+const APP_URL = process.env['RS_APP_URL'] ?? 'https://cheryl-crescentlike-monte.ngrok-free.dev/';
 const ORG_NAME = 'Citadel';
 
 const PERMISSIONS = [
