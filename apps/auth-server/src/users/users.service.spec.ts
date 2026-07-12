@@ -57,6 +57,10 @@ jest.mock('../auth/auth.config', () => ({
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockCheckPermission = require('../common/permissions/check-permission')
+  .checkPermission as jest.Mock;
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockAssertGrant = require('../common/permissions/assert-caller-can-grant-system-perms')
   .assertCallerCanGrantSystemPerms as jest.Mock;
 
@@ -129,7 +133,11 @@ describe('UsersService', () => {
     service = module.get(UsersService);
     jest.clearAllMocks();
     mockSend.mockClear();
-    mockPrisma.$transaction.mockImplementation((fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma));
+    mockPrisma.$transaction.mockImplementation((fnOrOps: ((tx: typeof mockPrisma) => Promise<unknown>) | Promise<unknown>[]) => {
+      // Support both callback-style (interactive) and array-of-operations (batch) forms.
+      if (typeof fnOrOps === 'function') return (fnOrOps as (tx: typeof mockPrisma) => Promise<unknown>)(mockPrisma);
+      return Promise.all(fnOrOps);
+    });
   });
 
   describe('listUsers', () => {
@@ -1118,6 +1126,32 @@ describe('UsersService', () => {
       const allPayloads = JSON.stringify(allLogArgs);
       expect(allPayloads).not.toContain('"secret"');
       expect(allPayloads).not.toContain('"backupCodes"');
+    });
+
+    it('propagates a permission error and performs no writes when checkPermission rejects', async () => {
+      const permError = new Error('Forbidden');
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeUserWith2fa());
+      mockCheckPermission.mockRejectedValueOnce(permError);
+
+      await expect(service.reset2fa('ba-caller', 'usr1')).rejects.toThrow(permError);
+
+      // Neither the twoFactor deletion nor the user flag update should run.
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('calls checkPermission with the target user orgId', async () => {
+      const user = makeUserWith2fa({ orgId: 42 });
+      mockPrisma.saUser.findUnique.mockResolvedValue(user);
+      mockPrisma.twoFactor.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.user.update.mockResolvedValue({});
+
+      await service.reset2fa('ba-caller', 'usr1');
+
+      expect(mockCheckPermission).toHaveBeenCalledWith(
+        'ba-caller',
+        expect.arrayContaining(['platform.users.manage', 'org.users.manage']),
+        expect.objectContaining({ targetOrgId: 42 }),
+      );
     });
   });
 

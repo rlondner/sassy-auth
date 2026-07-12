@@ -78,13 +78,19 @@ export const auth = betterAuth({
     },
   },
   rateLimit: {
-    // Additional rate-limit on the 2FA verify endpoints. The twoFactor plugin
-    // also registers its own internal limits; this adds an outer cap so a
-    // burst of verify attempts is caught at the framework level before the
-    // plugin's per-attempt counter increments.
+    // Explicit rate-limit for the 2FA verify endpoints. In better-auth 1.6.11
+    // customRules *override* the twoFactor plugin's built-in per-path limit
+    // (window: 10, max: 3 in dist/plugins/two-factor/index.mjs:269) for exact
+    // path matches — they do NOT stack on top of it. These rules are therefore
+    // set at the same value as the plugin default so the intent (at most 3
+    // attempts per 10 s) is preserved explicitly in config and visible to
+    // reviewers. If stricter limits are needed, lower max here rather than
+    // relying on the plugin's implicit default.
+    // Note: storage defaults to in-memory; limits are per-process, not global
+    // across replicas. Wire secondaryStorage (Redis) for a cross-replica cap.
     customRules: {
-      '/two-factor/verify-totp': { window: 60, max: 10 },
-      '/two-factor/verify-backup-code': { window: 60, max: 10 },
+      '/two-factor/verify-totp': { window: 10, max: 3 },
+      '/two-factor/verify-backup-code': { window: 10, max: 3 },
     },
   },
   // bug-0186: BetterAuth creates a Session row on every successful

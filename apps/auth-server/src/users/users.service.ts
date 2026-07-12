@@ -665,16 +665,21 @@ export class UsersService {
       { targetOrgId: user.orgId },
     );
 
-    // Delete the TwoFactor row (one-to-one; deleteMany so a missing row is a
-    // no-op rather than a throw — idempotent).
-    await prisma.twoFactor.deleteMany({ where: { userId: user.betterAuthUserId } });
-
-    // Clear the flag on the BetterAuth User row so the plugin treats them as
-    // not enrolled.
-    await prisma.user.update({
-      where: { id: user.betterAuthUserId },
-      data: { twoFactorEnabled: false },
-    });
+    // Both writes are wrapped in a transaction so they succeed or fail
+    // together. Without atomicity, a partial failure (e.g. TwoFactor deleted
+    // but flag still true) would lock the user out until another admin re-runs
+    // the reset.
+    await prisma.$transaction([
+      // Delete the TwoFactor row (one-to-one; deleteMany so a missing row is a
+      // no-op rather than a throw — idempotent).
+      prisma.twoFactor.deleteMany({ where: { userId: user.betterAuthUserId } }),
+      // Clear the flag on the BetterAuth User row so the plugin treats them as
+      // not enrolled.
+      prisma.user.update({
+        where: { id: user.betterAuthUserId },
+        data: { twoFactorEnabled: false },
+      }),
+    ]);
 
     // Audit log — NEVER include secret or backupCodes.
     this.logger.getWinstonLogger().warn('2FA reset by admin', {

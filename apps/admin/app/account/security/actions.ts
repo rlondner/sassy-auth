@@ -118,11 +118,18 @@ export async function enable2fa(formData: FormData): Promise<Enable2faResult> {
   }
 
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) return { error: 'invalidPassword' }
+    // better-auth 1.6.11 returns 400 for an invalid password on the enable
+    // endpoint (BAD_REQUEST / INVALID_PASSWORD in index.mjs).
+    if (res.status === 400 || res.status === 401 || res.status === 403) return { error: 'invalidPassword' }
     return { error: 'generic' }
   }
 
-  const body = (await res.json()) as { totpURI: string; backupCodes: string[] }
+  let body: { totpURI: string; backupCodes: string[] }
+  try {
+    body = (await res.json()) as { totpURI: string; backupCodes: string[] }
+  } catch {
+    return { error: 'generic' }
+  }
   // Security: do not log body — it contains the TOTP URI and backup codes.
   return { totpURI: body.totpURI, backupCodes: body.backupCodes }
 }
@@ -156,8 +163,43 @@ export async function confirmEnable(formData: FormData): Promise<ConfirmEnableRe
   }
 
   if (!res.ok) {
-    if (res.status === 400) return { error: 'invalidCode' }
+    // better-auth 1.6.11 returns 401 for an invalid TOTP code
+    // (INVALID_CODE → UNAUTHORIZED in verify-two-factor.mjs).
+    if (res.status === 400 || res.status === 401) return { error: 'invalidCode' }
     return { error: 'generic' }
+  }
+
+  // better-auth rotates the session when confirm flips twoFactorEnabled on —
+  // it creates a new session and deletes the old one. Forward the new session
+  // token so the browser's cookie stays valid after enable completes.
+  const setCookieHeader = res.headers.get('set-cookie')
+  if (setCookieHeader?.includes('better-auth.session_token')) {
+    const cookieStore = await cookies()
+    const parts = setCookieHeader.split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/)
+    for (const part of parts) {
+      const segments = part.split(';').map((s) => s.trim())
+      const [namePair, ...attrs] = segments
+      const eq = namePair.indexOf('=')
+      if (eq < 0) continue
+      const name = namePair.slice(0, eq)
+      if (name !== 'better-auth.session_token') continue
+      let value: string
+      try { value = decodeURIComponent(namePair.slice(eq + 1)) } catch { value = namePair.slice(eq + 1) }
+      const opts: Parameters<typeof cookieStore.set>[2] = { path: '/' }
+      for (const attr of attrs) {
+        const [k, v] = attr.split('=', 2)
+        switch (k.toLowerCase()) {
+          case 'httponly': opts.httpOnly = true; break
+          case 'secure': opts.secure = true; break
+          case 'samesite': { const l = (v ?? '').toLowerCase(); if (l === 'lax' || l === 'strict' || l === 'none') opts.sameSite = l; break }
+          case 'path': if (v) opts.path = v; break
+          case 'max-age': { const n = Number(v); if (Number.isFinite(n)) opts.maxAge = n; break }
+          case 'expires': if (v) { const d = new Date(v); if (!Number.isNaN(d.getTime())) opts.expires = d } break
+        }
+      }
+      cookieStore.set('better-auth.session_token', value, opts)
+      break
+    }
   }
 
   return { ok: true }
@@ -192,7 +234,9 @@ export async function disable2fa(formData: FormData): Promise<Disable2faResult> 
   }
 
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) return { error: 'invalidPassword' }
+    // better-auth 1.6.11 returns 400 for an invalid password on the disable
+    // endpoint (BAD_REQUEST / INVALID_PASSWORD in index.mjs).
+    if (res.status === 400 || res.status === 401 || res.status === 403) return { error: 'invalidPassword' }
     return { error: 'generic' }
   }
 
@@ -233,11 +277,18 @@ export async function regenerateBackupCodes(
   }
 
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) return { error: 'invalidPassword' }
+    // better-auth 1.6.11 returns 400 for an invalid password on the
+    // generate-backup-codes endpoint (BAD_REQUEST / INVALID_PASSWORD).
+    if (res.status === 400 || res.status === 401 || res.status === 403) return { error: 'invalidPassword' }
     return { error: 'generic' }
   }
 
-  const body = (await res.json()) as { backupCodes: string[] }
+  let body: { backupCodes: string[] }
+  try {
+    body = (await res.json()) as { backupCodes: string[] }
+  } catch {
+    return { error: 'generic' }
+  }
   // Security: do not log body.
   return { backupCodes: body.backupCodes }
 }

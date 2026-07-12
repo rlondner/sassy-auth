@@ -46,4 +46,22 @@ describe('auth.config — twoFactor plugin', () => {
     const bco = tfPlugin?.options?.['backupCodeOptions'] as Record<string, unknown> | undefined;
     expect(bco?.['amount']).toBe(10);
   });
+
+  it('rateLimit.customRules sets verify-totp to { window: 10, max: 3 }', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const customRules = (options['rateLimit'] as Record<string, unknown> | undefined)?.['customRules'] as
+      | Record<string, { window: number; max: number }>
+      | undefined;
+    expect(customRules?.['/two-factor/verify-totp']).toEqual({ window: 10, max: 3 });
+  });
+
+  it('rateLimit.customRules sets verify-backup-code to { window: 10, max: 3 }', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const customRules = (options['rateLimit'] as Record<string, unknown> | undefined)?.['customRules'] as
+      | Record<string, { window: number; max: number }>
+      | undefined;
+    expect(customRules?.['/two-factor/verify-backup-code']).toEqual({ window: 10, max: 3 });
+  });
 });

@@ -24,7 +24,23 @@ describe('getSystemTrustDays', () => {
 
   it('falls back to 14 when TWO_FACTOR_TRUST_DAYS is the empty string', () => {
     process.env['TWO_FACTOR_TRUST_DAYS'] = '';
-    // Number('') === 0 which is falsy but not NaN — treat 0 as invalid.
+    // Empty string is falsy, caught by the !raw early-return guard.
+    expect(getSystemTrustDays()).toBe(14);
+  });
+
+  it('falls back to 14 when TWO_FACTOR_TRUST_DAYS is a negative number string', () => {
+    process.env['TWO_FACTOR_TRUST_DAYS'] = '-5';
+    expect(getSystemTrustDays()).toBe(14);
+  });
+
+  it('falls back to 14 when TWO_FACTOR_TRUST_DAYS is "Infinity"', () => {
+    process.env['TWO_FACTOR_TRUST_DAYS'] = 'Infinity';
+    // Number('Infinity') is not an integer.
+    expect(getSystemTrustDays()).toBe(14);
+  });
+
+  it('falls back to 14 when TWO_FACTOR_TRUST_DAYS is a fractional number string', () => {
+    process.env['TWO_FACTOR_TRUST_DAYS'] = '7.5';
     expect(getSystemTrustDays()).toBe(14);
   });
 });

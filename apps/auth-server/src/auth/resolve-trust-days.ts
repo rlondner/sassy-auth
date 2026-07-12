@@ -15,13 +15,14 @@ const FALLBACK_DAYS = 14;
 
 /**
  * Read the system-wide default from the environment. Returns 14 if the env
- * var is absent, empty, zero, or not a finite positive number.
+ * var is absent, empty, zero, negative, fractional, or not a finite positive
+ * integer.
  */
 export function getSystemTrustDays(): number {
   const raw = process.env['TWO_FACTOR_TRUST_DAYS'];
   if (!raw) return FALLBACK_DAYS;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return FALLBACK_DAYS;
+  if (!Number.isInteger(n) || n <= 0) return FALLBACK_DAYS;
   return n;
 }
 
