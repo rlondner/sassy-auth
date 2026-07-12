@@ -52,6 +52,7 @@ import {
   OAUTH_TOKEN_ROUTE,
   TOKEN_CONTROLLER_PATH,
 } from './oauth-metadata';
+import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
 
 @ApiTags('Token')
 @Controller(TOKEN_CONTROLLER_PATH)
@@ -84,12 +85,13 @@ export class TokenController {
    */
   @Get('app-trust-days')
   async appTrustDays(@Query('client_id') clientId: string) {
-    if (!clientId) return { twoFactorTrustDays: null };
+    if (!clientId) return { effectiveTrustDays: getSystemTrustDays() };
     const app = await prisma.saApp.findUnique({
       where: { publicId: clientId },
       select: { twoFactorTrustDays: true },
     });
-    return { twoFactorTrustDays: app?.twoFactorTrustDays ?? null };
+    if (!app) return { effectiveTrustDays: getSystemTrustDays() };
+    return { effectiveTrustDays: resolveTrustDays(app, getSystemTrustDays()) };
   }
 
   /**

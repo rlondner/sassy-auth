@@ -219,10 +219,8 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
           { cache: 'no-store' },
         )
         if (trustRes.ok) {
-          const data = (await trustRes.json()) as { twoFactorTrustDays: number | null }
-          if (typeof data.twoFactorTrustDays === 'number' && data.twoFactorTrustDays > 0) {
-            intervalDays = data.twoFactorTrustDays
-          }
+          const data = (await trustRes.json()) as { effectiveTrustDays: number }
+          intervalDays = data.effectiveTrustDays
         }
       }
     } catch { /* use system default */ }

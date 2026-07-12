@@ -24,5 +24,5 @@ export function getSystemTrustDaysClient(): number {
   const raw = process.env['TWO_FACTOR_TRUST_DAYS'];
   if (!raw) return 14;
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : 14;
+  return Number.isInteger(n) && n > 0 ? n : 14;
 }
