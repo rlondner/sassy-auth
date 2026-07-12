@@ -42,9 +42,12 @@ export default defineConfig({
       testMatch: /auth-state\.setup\.ts/,
     },
     {
-      // Unauthed flow tests (e.g. login.spec.ts).
+      // Unauthed flow tests (e.g. login.spec.ts, two-factor.spec.ts).
+      // depends on 'setup' so that .auth/super-admin.json exists and is fresh
+      // when the admin-reset test's test.use({ storageState }) loads it.
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
       testIgnore: /(authed|matrix)\/.*\.spec\.ts/,
     },
     {

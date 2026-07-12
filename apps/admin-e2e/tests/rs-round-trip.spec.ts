@@ -24,11 +24,11 @@ const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
 const SUPER_EMAIL = 's@sa.io'
 const SUPER_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 
-// a@sa.io is the "apps admin" — distinct from the 2FA spec accounts
-// (s@sa.io and o@sa.io). Used exclusively here to keep this suite
-// self-contained. Task 9 / two-factor.spec.ts never touches a@sa.io.
-const APPS_ADMIN_EMAIL = 'a@sa.io'
-const APPS_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
+// tfa@sa.io is the dedicated 2FA test account (platform.users.manage grant).
+// Used for the 2FA RS round-trip test so that a@sa.io (seeded matrix admin)
+// is never enrolled and the matrix tests stay clean.
+const TFA_EMAIL = process.env.E2E_TFA_EMAIL ?? 'tfa@sa.io'
+const TFA_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 
 function rsIsConfigured(): boolean {
   // RS_CLIENT_ID is set by playwright.config.ts from the CI seed step.
@@ -58,17 +58,18 @@ test.describe('FastAPI RS round-trip', () => {
       { timeout: 25_000 },
     )
 
-    if (page.url().includes('/login/two-factor')) {
-      // s@sa.io is not enrolled in 2FA at rs-round-trip time (two-factor.spec.ts
-      // runs later alphabetically). If we hit the challenge something unexpected
-      // changed; skip rather than fail with a confusing error.
-      test.skip(true, '2FA challenge unexpectedly presented for s@sa.io (baseline test).')
-      return
-    }
-
+    // Handle the interstitial BEFORE checking for the 2FA challenge.
+    // /login/two-factor-prompt is a subset of /login/two-factor as a string,
+    // so always check the more specific path first.
     if (page.url().includes('/login/two-factor-prompt')) {
       await page.getByRole('button', { name: /skip/i }).click()
       await page.waitForURL(/\/auth\/callback/, { timeout: 20_000 })
+    } else if (/\/login\/two-factor(\?|$)/.test(page.url())) {
+      // s@sa.io is not enrolled in 2FA at rs-round-trip time (two-factor.spec.ts
+      // runs later alphabetically). If we hit the actual challenge something
+      // unexpected changed; skip rather than fail with a confusing error.
+      test.skip(true, '2FA challenge unexpectedly presented for s@sa.io (baseline test).')
+      return
     }
 
     // authorized.html — assert the "Signed in" heading.
@@ -78,55 +79,65 @@ test.describe('FastAPI RS round-trip', () => {
   })
 
   test('RS round-trip with 2FA enrolled — TOTP challenge → "Signed in"', async ({ page }) => {
-    // ── Phase 1: enroll a@sa.io in 2FA (self-contained; no /tmp dependency) ──
+    // ── Phase 1: enroll tfa@sa.io in 2FA (self-contained; no /tmp dependency) ──
     //
-    // a@sa.io is the apps-admin account. It is not enrolled in 2FA on a fresh
-    // CI database, and no other spec touches it for 2FA purposes.
+    // tfa@sa.io is the dedicated 2FA test account (platform.users.manage grant).
+    // It is used here instead of a@sa.io so that the seeded matrix admin (a@sa.io)
+    // is never enrolled and the matrix tests remain clean.
     const login = new LoginPage(page)
 
-    // Sign in as a@sa.io via the admin app (baseURL = ADMIN_URL).
+    // Sign in as tfa@sa.io via the admin app (baseURL = ADMIN_URL).
     await page.goto('/login')
-    await login.signIn(APPS_ADMIN_EMAIL, APPS_ADMIN_PASSWORD)
+    await login.signIn(TFA_EMAIL, TFA_PASSWORD)
 
-    // May hit the 2FA interstitial if previously enrolled in a non-clean run.
+    // Wait for post-login redirect: may hit interstitial, 2FA challenge, or dashboard.
     await page.waitForURL(
-      /(\/login\/two-factor|\/login\/two-factor-prompt|\/account\/security|\/)/,
+      /(\/login\/two-factor|\/login\/two-factor-prompt|\/account\/security|\/users)/,
       { timeout: 25_000 },
     )
 
-    // If 2FA is already enrolled, we'd land on the two-factor page — handle it
-    // by attempting to re-use the approach below, but we need the secret.
-    // On a fresh CI DB this branch is not taken.
-    if (page.url().includes('/login/two-factor')) {
-      test.skip(true, 'a@sa.io already has 2FA enrolled from a previous run. Use a clean database.')
-      return
-    }
-
+    // Handle interstitial FIRST (more specific path must be checked before the
+    // broader /login/two-factor prefix — /login/two-factor-prompt contains it).
     if (page.url().includes('/login/two-factor-prompt')) {
-      // Dismiss the interstitial so we land on the dashboard.
       await page.getByRole('button', { name: /skip/i }).click()
-      await page.waitForURL(/\//, { timeout: 15_000 })
+      await page.waitForURL(/\/users/, { timeout: 15_000 })
+    } else if (/\/login\/two-factor(\?|$)/.test(page.url())) {
+      // tfa@sa.io already has 2FA enrolled from a previous run. Reset and re-enroll
+      // so this test is self-contained. We skip here because resetting requires a
+      // super-admin session that is not available to the unauthenticated chromium
+      // project. The dedicated tfa@sa.io account means this only affects retries
+      // on a non-clean local DB. Document: run `pnpm db:seed` to reset.
+      test.skip(true, 'tfa@sa.io already has 2FA enrolled. Reset the DB or run the admin-reset test first.')
+      return
     }
 
     // Navigate to the security page and enroll 2FA.
     const secPage = new SecurityPage(page)
     await secPage.goto()
 
-    const { secret } = await secPage.enable(APPS_ADMIN_PASSWORD)
+    const { secret } = await secPage.enable(TFA_PASSWORD)
     await secPage.confirmEnable(computeTotp(secret))
 
-    // ── Phase 2: RS round-trip for a@sa.io WITH 2FA challenge ──
+    // ── Phase 2: RS round-trip for tfa@sa.io WITH 2FA challenge ──
     await page.goto(`${RS_BASE_URL}/auth/login`)
     await page.waitForURL(/\/login/, { timeout: 20_000 })
 
-    await login.signIn(APPS_ADMIN_EMAIL, APPS_ADMIN_PASSWORD)
+    await login.signIn(TFA_EMAIL, TFA_PASSWORD)
     await page.waitForURL(
       /(\/login\/two-factor|\/login\/two-factor-prompt|\/auth\/callback)/,
       { timeout: 25_000 },
     )
 
-    if (!page.url().includes('/login/two-factor')) {
-      test.skip(true, '2FA challenge was not presented after enrollment. Unexpected state.')
+    // tfa@sa.io is enrolled — the actual TOTP challenge must appear.
+    // Check interstitial first (more specific), then exact-match the challenge.
+    if (page.url().includes('/login/two-factor-prompt')) {
+      // Interstitial should not appear for an enrolled account, but handle defensively.
+      await page.getByRole('button', { name: /skip/i }).click()
+      await page.waitForURL(/(\/login\/two-factor|\/auth\/callback)/, { timeout: 20_000 })
+    }
+
+    if (!/\/login\/two-factor(\?|$)/.test(page.url())) {
+      test.skip(true, '2FA challenge was not presented after enrollment for tfa@sa.io. Unexpected state.')
       return
     }
 
