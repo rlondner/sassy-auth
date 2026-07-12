@@ -172,35 +172,7 @@ export async function confirmEnable(formData: FormData): Promise<ConfirmEnableRe
   // better-auth rotates the session when confirm flips twoFactorEnabled on —
   // it creates a new session and deletes the old one. Forward the new session
   // token so the browser's cookie stays valid after enable completes.
-  const setCookieHeader = res.headers.get('set-cookie')
-  if (setCookieHeader?.includes('better-auth.session_token')) {
-    const cookieStore = await cookies()
-    const parts = setCookieHeader.split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/)
-    for (const part of parts) {
-      const segments = part.split(';').map((s) => s.trim())
-      const [namePair, ...attrs] = segments
-      const eq = namePair.indexOf('=')
-      if (eq < 0) continue
-      const name = namePair.slice(0, eq)
-      if (name !== 'better-auth.session_token') continue
-      let value: string
-      try { value = decodeURIComponent(namePair.slice(eq + 1)) } catch { value = namePair.slice(eq + 1) }
-      const opts: Parameters<typeof cookieStore.set>[2] = { path: '/' }
-      for (const attr of attrs) {
-        const [k, v] = attr.split('=', 2)
-        switch (k.toLowerCase()) {
-          case 'httponly': opts.httpOnly = true; break
-          case 'secure': opts.secure = true; break
-          case 'samesite': { const l = (v ?? '').toLowerCase(); if (l === 'lax' || l === 'strict' || l === 'none') opts.sameSite = l; break }
-          case 'path': if (v) opts.path = v; break
-          case 'max-age': { const n = Number(v); if (Number.isFinite(n)) opts.maxAge = n; break }
-          case 'expires': if (v) { const d = new Date(v); if (!Number.isNaN(d.getTime())) opts.expires = d } break
-        }
-      }
-      cookieStore.set('better-auth.session_token', value, opts)
-      break
-    }
-  }
+  await forwardNamedCookie(res, 'better-auth.session_token')
 
   return { ok: true }
 }

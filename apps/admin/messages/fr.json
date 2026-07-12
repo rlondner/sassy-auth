@@ -557,6 +557,7 @@
     "submit": "Vérifier",
     "useBackupCode": "Utiliser un code de secours",
     "useTotpCode": "Utiliser l'application d'authentification",
+    "trustDevice": "Faire confiance à cet appareil pendant {days} jours",
     "error": {
       "invalidCode": "Code invalide ou expiré. Veuillez réessayer.",
       "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."

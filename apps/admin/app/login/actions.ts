@@ -208,10 +208,12 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
   } catch { /* fail open — no prompt on error */ }
 
   // Resolve interval: check if next contains a client_id for per-app override.
+  // validateNextUrl returns relative paths — parse with a base so both relative
+  // and absolute values work without throwing.
   let intervalDays = getSystemTrustDaysClient()
   if (nextSafe) {
     try {
-      const nextUrl = new URL(nextSafe)
+      const nextUrl = new URL(nextSafe, AUTH_SERVER_URL)
       const clientId = nextUrl.searchParams.get('client_id')
       if (clientId) {
         const trustRes = await fetch(
@@ -220,7 +222,10 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
         )
         if (trustRes.ok) {
           const data = (await trustRes.json()) as { effectiveTrustDays: number }
-          intervalDays = data.effectiveTrustDays
+          // FIX 8: guard against deployment-skew payloads
+          if (typeof data.effectiveTrustDays === 'number' && data.effectiveTrustDays > 0) {
+            intervalDays = data.effectiveTrustDays
+          }
         }
       }
     } catch { /* use system default */ }
@@ -327,12 +332,16 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
   const ok = await forwardSessionCookie(res)
   if (!ok) return { error: 'serverUnavailable' }
 
+  // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
+  await forwardNamedCookie(res, 'better-auth.two_factor')
+
   Sentry.addBreadcrumb({ category: 'auth', message: 'TOTP verify success', level: 'info' })
   redirect(nextSafe ?? '/users')
 }
 
 export async function verifyBackupCode(formData: FormData): Promise<{ error?: string }> {
   const code = formData.get('code') as string
+  const trustDevice = formData.get('trustDevice') === 'true'
   const nextRaw = formData.get('next')
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
 
@@ -351,7 +360,7 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
         Cookie: cookieHeader,
         ...(origin && { Origin: origin }),
       },
-      body: JSON.stringify({ code, trustDevice: false }),
+      body: JSON.stringify({ code, trustDevice }),
     })
   } catch (err) {
     Sentry.captureException(err, { tags: { area: 'auth', action: 'backup-code-verify' } })
@@ -365,6 +374,9 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
 
   const ok = await forwardSessionCookie(res)
   if (!ok) return { error: 'serverUnavailable' }
+
+  // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
+  await forwardNamedCookie(res, 'better-auth.two_factor')
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Backup code verify success', level: 'info' })
   redirect(nextSafe ?? '/users')

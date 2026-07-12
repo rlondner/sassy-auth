@@ -557,6 +557,7 @@
     "submit": "Verify",
     "useBackupCode": "Use a backup code instead",
     "useTotpCode": "Use authenticator app instead",
+    "trustDevice": "Trust this device for {days} days",
     "error": {
       "invalidCode": "Invalid or expired code. Please try again.",
       "serverUnavailable": "Service is unavailable. Please try again in a moment."

@@ -1,4 +1,5 @@
 import { validateNextUrl } from '@/lib/safe-next'
+import { getSystemTrustDaysClient } from '@/lib/two-factor-prompt'
 import { TwoFactorForm } from './TwoFactorForm'
 
 export const dynamic = 'force-dynamic'
@@ -10,5 +11,6 @@ export default async function TwoFactorPage({
 }) {
   const params = await searchParams
   const nextSafe = validateNextUrl(params.next)
-  return <TwoFactorForm next={nextSafe ?? ''} />
+  const trustDays = getSystemTrustDaysClient()
+  return <TwoFactorForm next={nextSafe ?? ''} trustDays={trustDays} />
 }

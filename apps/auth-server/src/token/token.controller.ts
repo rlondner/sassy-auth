@@ -73,15 +73,16 @@ export class TokenController {
   /**
    * GET /api/token/app-trust-days?client_id=<sqid>
    *
-   * Public (unauthenticated) endpoint. Returns the effective twoFactorTrustDays
+   * Public (unauthenticated) endpoint. Returns the effective 2FA trust interval
    * for the app identified by client_id (a public sqid). Used by the admin
    * console's signIn server action to resolve the per-app 2FA re-prompt interval
    * without duplicating resolveTrustDays logic client-side.
    *
-   * Disclosure is safe: twoFactorTrustDays is a non-sensitive configuration value
+   * Disclosure is safe: the trust interval is a non-sensitive configuration value
    * and client_id is already public (displayed in the apps list, embedded in OAuth
-   * authorize URLs). Returns { twoFactorTrustDays: number | null } — null means
-   * "no app found or no override; use the system default".
+   * authorize URLs). Returns { effectiveTrustDays: number } — always a resolved
+   * positive integer; the system default is returned when client_id is missing,
+   * the app is not found, or the app has no per-app override.
    */
   @Get('app-trust-days')
   async appTrustDays(@Query('client_id') clientId: string) {
