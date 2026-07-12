@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { magicLink, emailOTP, openAPI } from 'better-auth/plugins';
+import { magicLink, emailOTP, openAPI, twoFactor } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { getEmailer } from '../email/email.singleton';
@@ -75,6 +75,16 @@ export const auth = betterAuth({
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
+    },
+  },
+  rateLimit: {
+    // Additional rate-limit on the 2FA verify endpoints. The twoFactor plugin
+    // also registers its own internal limits; this adds an outer cap so a
+    // burst of verify attempts is caught at the framework level before the
+    // plugin's per-attempt counter increments.
+    customRules: {
+      '/two-factor/verify-totp': { window: 60, max: 10 },
+      '/two-factor/verify-backup-code': { window: 60, max: 10 },
     },
   },
   // bug-0186: BetterAuth creates a Session row on every successful
@@ -203,6 +213,15 @@ export const auth = betterAuth({
           { email, otp, type },
         );
       },
+    }),
+    twoFactor({
+      issuer: 'Sassy Auth',
+      // 10 backup codes (matches the spec; default is also 10, explicit for
+      // reviewability).
+      backupCodeOptions: { amount: 10 },
+      // skipVerificationOnEnable stays false (default): 2FA is not active
+      // until the user confirms with a live TOTP code. This prevents lockout
+      // from a mis-scanned QR.
     }),
     openAPI({ disableDefaultReference: true }),
   ],

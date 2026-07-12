@@ -66,6 +66,10 @@
     "moduleNameMapper": {
       "^better-auth/node$": "<rootDir>/__mocks__/better-auth-node.ts",
       "^better-auth/crypto$": "<rootDir>/__mocks__/better-auth-crypto.ts",
+      "^better-auth/plugins$": "<rootDir>/__mocks__/better-auth-plugins.ts",
+      "^better-auth/adapters/prisma$": "<rootDir>/__mocks__/better-auth-adapters-prisma.ts",
+      "^better-auth/api$": "<rootDir>/__mocks__/better-auth-api.ts",
+      "^better-auth$": "<rootDir>/__mocks__/better-auth.ts",
       "^uuid$": "<rootDir>/__mocks__/uuid.ts"
     },
     "coverageDirectory": "../coverage",
