@@ -8,9 +8,9 @@ import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppDto } from './dto/update-app.dto';
 import { ListAppsQueryDto } from './dto/list-apps-query.dto';
 
-type AppRow = { publicId: string; name: string; url: string; callbackUrl: string | null; isPlatform: boolean };
+type AppRow = { publicId: string; name: string; url: string; callbackUrl: string | null; isPlatform: boolean; twoFactorTrustDays: number | null };
 function formatApp(a: AppRow) {
-  return { publicId: a.publicId, name: a.name, url: a.url, callbackUrl: a.callbackUrl ?? null, isPlatform: a.isPlatform };
+  return { publicId: a.publicId, name: a.name, url: a.url, callbackUrl: a.callbackUrl ?? null, isPlatform: a.isPlatform, twoFactorTrustDays: a.twoFactorTrustDays ?? null };
 }
 
 function isPrismaCode(e: unknown, code: string): boolean {
@@ -70,7 +70,7 @@ export class AppsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
-          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, callbackUrl: dto.callbackUrl || null, isPlatform: false },
+          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, callbackUrl: dto.callbackUrl || null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null },
         });
         return tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
       });
@@ -83,8 +83,15 @@ export class AppsService {
   }
 
   async updateApp(callerBaId: string, publicId: string, dto: UpdateAppDto) {
-    if (dto.name === undefined && dto.url === undefined && dto.callbackUrl === undefined) {
-      throw new BadRequestException('At least one of name, url, or callbackUrl must be provided');
+    if (
+      dto.name === undefined &&
+      dto.url === undefined &&
+      dto.callbackUrl === undefined &&
+      dto.twoFactorTrustDays === undefined
+    ) {
+      throw new BadRequestException(
+        'At least one of name, url, callbackUrl, or twoFactorTrustDays must be provided',
+      );
     }
     await checkPermission(callerBaId, 'platform.apps.manage');
     const existing = await prisma.saApp.findUnique({ where: { publicId } });
@@ -97,6 +104,9 @@ export class AppsService {
           ...(dto.name !== undefined && { name: dto.name }),
           ...(dto.url !== undefined && { url: dto.url }),
           ...(dto.callbackUrl !== undefined && { callbackUrl: dto.callbackUrl ? dto.callbackUrl : null }),
+          ...(dto.twoFactorTrustDays !== undefined && {
+            twoFactorTrustDays: dto.twoFactorTrustDays,
+          }),
         },
       });
       this.logger.getWinstonLogger().info('App updated', { context: 'AppsService', appId: publicId });

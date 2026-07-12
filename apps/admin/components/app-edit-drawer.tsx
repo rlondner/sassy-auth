@@ -30,6 +30,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
   const [callbackUrl, setCallbackUrl] = React.useState(app.callbackUrl ?? '')
+  const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
   const { copiedKey, copy } = useCopyFeedback()
   const copied = copiedKey !== null
@@ -39,10 +40,11 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setName(app.name)
     setUrl(app.url)
     setCallbackUrl(app.callbackUrl ?? '')
+    setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setErrorKey(null)
   }, [app])
 
-  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '')
+  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '') || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -55,10 +57,11 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; callbackUrl?: string | null } = {}
+    const patch: { name?: string; url?: string; callbackUrl?: string | null; twoFactorTrustDays?: number | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (callbackUrl !== (app.callbackUrl ?? '')) patch.callbackUrl = callbackUrl.trim() || null
+    if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     startTransition(async () => {
       const result = await updateAppAction(app.publicId, patch)
       if ('errorKey' in result) {
@@ -109,6 +112,23 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.callbackUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="appTrustDays">{t('apps.fields.twoFactorTrustDays')}</Label>
+              <Input
+                id="appTrustDays"
+                type="number"
+                min={1}
+                max={3650}
+                value={twoFactorTrustDays ?? ''}
+                onChange={(e) =>
+                  setTwoFactorTrustDays(e.target.value === '' ? null : Number(e.target.value))
+                }
+                placeholder={t('apps.fields.twoFactorTrustDaysPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.twoFactorTrustDaysHint')}
               </p>
             </div>
             <div>

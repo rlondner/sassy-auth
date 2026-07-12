@@ -40,7 +40,10 @@
       "callbackUrlHint": "Laissez vide pour accepter tout rappel sous l’URL de l’application. Indiquez une URL complète pour exiger une correspondance exacte du redirect_uri.",
       "callbackUrlDefault": "Par défaut (tout chemin sous l’URL de l’application)",
       "publicId": "ID Public",
-      "urlHint": "URL de base principale de cette application."
+      "urlHint": "URL de base principale de cette application.",
+      "twoFactorTrustDays": "Intervalle de confiance 2FA (jours)",
+      "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
+      "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système."
     },
     "actions": {
       "view": "Voir",

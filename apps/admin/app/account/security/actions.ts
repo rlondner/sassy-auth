@@ -82,6 +82,55 @@ export async function forwardNamedCookie(
   return false
 }
 
+/**
+ * Same as forwardNamedCookie but overrides the Max-Age attribute.
+ * Used to honour per-app twoFactorTrustDays when re-setting the
+ * better-auth.trust_device cookie after a successful TOTP verify.
+ */
+export async function forwardNamedCookieWithMaxAge(
+  res: Response,
+  cookieName: string,
+  maxAgeOverride: number,
+): Promise<boolean> {
+  const cookieStore = await cookies()
+  const setCookieHeader = res.headers.get('set-cookie')
+  if (!setCookieHeader) return false
+
+  const parts = setCookieHeader.split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/)
+  for (const part of parts) {
+    const segments = part.split(';').map((s) => s.trim())
+    const [namePair = '', ...attrs] = segments
+    const eq = namePair.indexOf('=')
+    if (eq < 0) continue
+    const name = namePair.slice(0, eq)
+    if (name !== cookieName) continue
+
+    let value: string
+    try { value = decodeURIComponent(namePair.slice(eq + 1)) } catch { value = namePair.slice(eq + 1) }
+
+    const options: Parameters<typeof cookieStore.set>[2] = { path: '/', maxAge: maxAgeOverride }
+    for (const attr of attrs) {
+      const [k = '', v] = attr.split('=', 2)
+      switch (k.toLowerCase()) {
+        case 'httponly': options.httpOnly = true; break
+        case 'secure': options.secure = true; break
+        case 'samesite': {
+          const lower = (v ?? '').toLowerCase()
+          if (lower === 'lax' || lower === 'strict' || lower === 'none') {
+            options.sameSite = lower as 'lax' | 'strict' | 'none'
+          }
+          break
+        }
+        case 'path': if (v) options.path = v; break
+        // max-age from BetterAuth intentionally ignored — using maxAgeOverride.
+      }
+    }
+    cookieStore.set(cookieName, value, options)
+    return true
+  }
+  return false
+}
+
 // ---------------------------------------------------------------------------
 // 2FA server actions
 // ---------------------------------------------------------------------------

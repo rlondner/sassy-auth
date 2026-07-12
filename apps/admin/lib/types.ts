@@ -69,18 +69,21 @@ export interface App {
   url: string;
   callbackUrl?: string | null;
   isPlatform: boolean;
+  twoFactorTrustDays?: number | null;
 }
 
 export interface CreateAppPayload {
   name: string;
   url: string;
   callbackUrl?: string | null;
+  twoFactorTrustDays?: number | null;
 }
 
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
   callbackUrl?: string | null;
+  twoFactorTrustDays?: number | null;
 }
 
 export interface ListAppsParams {

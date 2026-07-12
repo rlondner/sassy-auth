@@ -40,7 +40,10 @@
       "callbackUrlHint": "Leave blank to accept any callback under the app's URL. Set a full URL to require an exact redirect_uri match.",
       "callbackUrlDefault": "Default (any path under app URL)",
       "publicId": "Public ID",
-      "urlHint": "The primary base URL for this application."
+      "urlHint": "The primary base URL for this application.",
+      "twoFactorTrustDays": "2FA trust interval (days)",
+      "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
+      "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default."
     },
     "actions": {
       "view": "View",
