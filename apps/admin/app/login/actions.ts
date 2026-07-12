@@ -315,18 +315,13 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
  * field (which may carry a client_id query param for per-app overrides) and
  * re-set the better-auth.trust_device cookie Max-Age accordingly.
  *
- * BetterAuth sets the trust-device cookie using its plugin-level default
- * duration (no trustDeviceMaxAge option is configured in auth.config.ts — the
- * plugin's built-in default applies). We override the browser cookie's Max-Age
- * here to honour per-app twoFactorTrustDays.
+ * BetterAuth uses its plugin DEFAULT trust-device duration (no
+ * `trustDeviceMaxAge` configured); per-app values SHORTER than that default
+ * are enforced (cookie evicts early) while LONGER values are capped
+ * server-side (cookie outlives the Verification record).
  *
- * NOTE on server-side cap: BetterAuth's Verification record for the trust
- * device has its own expiresAt fixed at the plugin default. The cookie Max-Age
- * controls browser eviction only. Shorter per-app values are fully enforced
- * (cookie evicts early); values longer than the server default are capped
- * server-side — the cookie outlives the Verification record, so the user is
- * re-challenged at the server default regardless of the cookie surviving
- * (acceptable risk for v1, documented in the UI field hint).
+ * We override the browser cookie's Max-Age here to honour per-app
+ * twoFactorTrustDays.
  */
 async function applyPerAppTrustCookie(
   res: Response,

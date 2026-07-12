@@ -37,6 +37,7 @@ const PLATFORM_ADMINS: ReadonlyArray<{
   { email: 'r@sa.io', firstName: 'Roles', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.roles.manage' } },
   { email: 'p@sa.io', firstName: 'Perms', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.permissions.manage' } },
   { email: 's@sa.io', firstName: 'Super', lastName: 'Admin', grant: { kind: 'role',   role: 'Platform Super Admin' } },
+  { email: 'tfa@sa.io', firstName: 'TwoFactor', lastName: 'Test', grant: { kind: 'direct', permission: 'platform.users.manage' } },
 ];
 
 const SUPER_ADMIN_ROLE_NAME = 'Platform Super Admin';

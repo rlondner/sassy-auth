@@ -65,3 +65,22 @@ describe('UpdateAppDto — twoFactorTrustDays validation', () => {
   it('rejects 7.5 (float)', async () => expect(await check(7.5)).not.toHaveLength(0));
   it('rejects "14" (string)', async () => expect(await check('14')).not.toHaveLength(0));
 });
+
+describe('CreateAppDto — twoFactorTrustDays validation', () => {
+  async function check(value: unknown): Promise<string[]> {
+    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'https://a.example.com', twoFactorTrustDays: value });
+    const errors = validateSync(dto);
+    return errors.flatMap((e) => Object.values(e.constraints ?? {}));
+  }
+
+  it('accepts null (clear override)', async () => expect(await check(null)).toHaveLength(0));
+  it('accepts undefined (omit)', async () => expect(await check(undefined)).toHaveLength(0));
+  it('accepts 1 (minimum positive)', async () => expect(await check(1)).toHaveLength(0));
+  it('accepts 14', async () => expect(await check(14)).toHaveLength(0));
+  it('accepts 3650 (maximum)', async () => expect(await check(3650)).toHaveLength(0));
+  it('rejects 0', async () => expect(await check(0)).not.toHaveLength(0));
+  it('rejects -1', async () => expect(await check(-1)).not.toHaveLength(0));
+  it('rejects 3651 (above max)', async () => expect(await check(3651)).not.toHaveLength(0));
+  it('rejects 7.5 (float)', async () => expect(await check(7.5)).not.toHaveLength(0));
+  it('rejects "14" (string)', async () => expect(await check('14')).not.toHaveLength(0));
+});
