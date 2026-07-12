@@ -30,7 +30,13 @@ jest.mock('@sassy-auth/db', () => ({
     },
     saPermission: { findMany: jest.fn() },
     saInvitation: { create: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn() },
-    user: { create: jest.fn() },
+    twoFactor: {
+      deleteMany: jest.fn(),
+    },
+    user: {
+      create: jest.fn(),
+      update: jest.fn(),
+    },
     account: { create: jest.fn(), findFirst: jest.fn() },
     session: { deleteMany: jest.fn() },
   },
@@ -79,7 +85,8 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   };
   saPermission: { findMany: jest.Mock };
   saInvitation: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
-  user: { create: jest.Mock };
+  twoFactor: { deleteMany: jest.Mock };
+  user: { create: jest.Mock; update: jest.Mock };
   account: { create: jest.Mock; findFirst: jest.Mock };
   session: { deleteMany: jest.Mock };
 };
@@ -1011,6 +1018,106 @@ describe('UsersService', () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ betterAuthUserId: 'ba-self', orgId: 1 }));
       await expect(service.updateUser('ba-self', 'usr1', { status: 'inactive' })).rejects.toBeInstanceOf(ForbiddenException);
       expect(mockPrisma.session.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reset2fa', () => {
+    const makeUserWith2fa = (overrides = {}) => ({
+      ...makeSaUser(overrides),
+      betterAuthUserId: 'ba-target',
+    });
+
+    it('deletes the TwoFactor row and clears twoFactorEnabled for the target user', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeUserWith2fa());
+      mockPrisma.twoFactor.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.user.update.mockResolvedValue({});
+
+      await service.reset2fa('ba-caller', 'usr1');
+
+      expect(mockPrisma.twoFactor.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'ba-target' },
+      });
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'ba-target' },
+        data: { twoFactorEnabled: false },
+      });
+    });
+
+    it('throws NotFoundException when the target user does not exist', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.reset2fa('ba-caller', 'no-such-user')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('emits a structured audit log with action "2fa_reset", actorId, and targetUserId', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeUserWith2fa());
+      mockPrisma.twoFactor.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.user.update.mockResolvedValue({});
+
+      const warnSpy = jest.fn();
+      // Retrieve the LoggerService mock from the module and override warn on
+      // the Winston logger returned by getWinstonLogger().
+      // The mock in beforeEach sets getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn() })
+      // We need to capture the specific warn call for this test.
+      // Re-create the module with a captured logger for this assertion.
+      const { Test } = await import('@nestjs/testing');
+      const { UsersService: US } = await import('./users.service');
+      const { SqidService: SS } = await import('../common/sqid/sqid.service');
+      const { LoggerService: LS } = await import('../common/logger/logger.service');
+      const { EmailService: ES } = await import('../email/email.service');
+      const warnLogger = { info: jest.fn(), warn: warnSpy };
+      const mod = await Test.createTestingModule({
+        providers: [
+          US, SS,
+          { provide: LS, useValue: { getWinstonLogger: () => warnLogger } },
+          { provide: ES, useValue: { send: jest.fn() } },
+        ],
+      }).compile();
+      const svc = mod.get(US);
+
+      await svc.reset2fa('ba-caller', 'usr1');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '2FA reset by admin',
+        expect.objectContaining({
+          context: 'UsersService',
+          actorId: 'ba-caller',
+          targetUserId: 'usr1',
+          action: '2fa_reset',
+        }),
+      );
+    });
+
+    it('never logs a secret or backup codes — log payload contains no "secret" or "backupCodes" key', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeUserWith2fa());
+      mockPrisma.twoFactor.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.user.update.mockResolvedValue({});
+
+      const { Test } = await import('@nestjs/testing');
+      const { UsersService: US } = await import('./users.service');
+      const { SqidService: SS } = await import('../common/sqid/sqid.service');
+      const { LoggerService: LS } = await import('../common/logger/logger.service');
+      const { EmailService: ES } = await import('../email/email.service');
+      const allLogArgs: unknown[][] = [];
+      const captureLogger = {
+        info: (...args: unknown[]) => allLogArgs.push(args),
+        warn: (...args: unknown[]) => allLogArgs.push(args),
+      };
+      const mod = await Test.createTestingModule({
+        providers: [
+          US, SS,
+          { provide: LS, useValue: { getWinstonLogger: () => captureLogger } },
+          { provide: ES, useValue: { send: jest.fn() } },
+        ],
+      }).compile();
+      const svc = mod.get(US);
+
+      await svc.reset2fa('ba-caller', 'usr1');
+
+      const allPayloads = JSON.stringify(allLogArgs);
+      expect(allPayloads).not.toContain('"secret"');
+      expect(allPayloads).not.toContain('"backupCodes"');
     });
   });
 

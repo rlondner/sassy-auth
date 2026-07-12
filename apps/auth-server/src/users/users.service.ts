@@ -655,6 +655,36 @@ export class UsersService {
     return { inviteUrl };
   }
 
+  async reset2fa(callerBaId: string, userPublicId: string): Promise<void> {
+    const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+
+    // Delete the TwoFactor row (one-to-one; deleteMany so a missing row is a
+    // no-op rather than a throw — idempotent).
+    await prisma.twoFactor.deleteMany({ where: { userId: user.betterAuthUserId } });
+
+    // Clear the flag on the BetterAuth User row so the plugin treats them as
+    // not enrolled.
+    await prisma.user.update({
+      where: { id: user.betterAuthUserId },
+      data: { twoFactorEnabled: false },
+    });
+
+    // Audit log — NEVER include secret or backupCodes.
+    this.logger.getWinstonLogger().warn('2FA reset by admin', {
+      context: 'UsersService',
+      actorId: callerBaId,
+      targetUserId: userPublicId,
+      action: '2fa_reset',
+    });
+  }
+
   async resetPassword(callerBaId: string, userPublicId: string): Promise<{ resetUrl: string | null }> {
     const user = await prisma.saUser.findUnique({
       where: { publicId: userPublicId },

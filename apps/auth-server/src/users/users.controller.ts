@@ -81,6 +81,12 @@ export class UsersController {
     return this.users.resetPassword(callerBaId(req), id);
   }
 
+  @Post(':id/reset-2fa')
+  @HttpCode(204)
+  reset2fa(@Req() req: Request, @Param('id') id: string) {
+    return this.users.reset2fa(callerBaId(req), id);
+  }
+
   @Put(':id/roles')
   @HttpCode(204)
   setRoles(
