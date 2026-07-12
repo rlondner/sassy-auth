@@ -411,6 +411,39 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
   // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
   await forwardNamedCookie(res, 'better-auth.two_factor')
 
+  // Re-set the better-auth.trust_device cookie Max-Age to the resolved per-app
+  // interval. BetterAuth sets it with the static trustDeviceMaxAge option.
+  // We override here to honour per-app twoFactorTrustDays.
+  // NOTE: BetterAuth's Verification record for the trust device has its own
+  // expiresAt set by the plugin (static trustDeviceMaxAge). The cookie Max-Age
+  // controls browser eviction; the Verification expiresAt is the server-side
+  // guard. Shorter per-app values are enforced by the cookie; the Verification
+  // record may outlive the cookie for shorter intervals (acceptable risk for v1).
+  if (trustDevice) {
+    let resolvedDays = getSystemTrustDaysClient()
+    const nextStrForTrust = typeof formData.get('next') === 'string' ? formData.get('next') as string : null
+    if (nextStrForTrust) {
+      try {
+        const nextUrl = new URL(nextStrForTrust, AUTH_SERVER_URL)
+        const clientId = nextUrl.searchParams.get('client_id')
+        if (clientId) {
+          const trustRes = await fetch(
+            `${AUTH_SERVER_URL}/api/token/app-trust-days?client_id=${encodeURIComponent(clientId)}`,
+            { cache: 'no-store' },
+          )
+          if (trustRes.ok) {
+            const data = (await trustRes.json()) as { effectiveTrustDays: number }
+            if (typeof data.effectiveTrustDays === 'number' && data.effectiveTrustDays > 0) {
+              resolvedDays = data.effectiveTrustDays
+            }
+          }
+        }
+      } catch { /* use system default */ }
+    }
+    const resolvedMaxAgeSecs = resolvedDays * 24 * 60 * 60
+    await forwardNamedCookieWithMaxAge(res, 'better-auth.trust_device', resolvedMaxAgeSecs)
+  }
+
   Sentry.addBreadcrumb({ category: 'auth', message: 'Backup code verify success', level: 'info' })
   redirect(nextSafe ?? '/users')
 }
