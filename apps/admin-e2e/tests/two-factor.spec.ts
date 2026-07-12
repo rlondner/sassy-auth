@@ -191,21 +191,25 @@ test.describe('2FA — challenge through authorize', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('2FA — no-bypass (email-OTP)', () => {
-  test('email-OTP sign-in for a 2FA-enrolled user routes to /login/two-factor', async ({ page }) => {
+  test('no code is issued to a 2FA-enrolled user requesting email-OTP', async ({ page }) => {
     const secret =
       readTempFile(TMP_SECRET) ?? process.env['TWO_FACTOR_TEST_SECRET']
     // Hard-assert: enroll must have run.
     expect(secret, '2FA secret must be available — enroll test must run first').toBeTruthy()
 
+    // Navigate to the email-OTP request page and submit the enrolled user's email.
+    // The backend (otp-sender.ts) returns early with outcome:'skipped_2fa' and
+    // never stores a code, so the test-only endpoint must return 404.
     const login = new LoginPage(page)
     await login.gotoOtp()
     await login.requestCode(SUPER_EMAIL)
-    const otp = await login.fetchOtp(SUPER_EMAIL)
-    await login.submitCode(otp)
 
-    // A 2FA-enrolled user MUST land on /login/two-factor, not /users.
-    // The no-bypass guarantee means the email-OTP flow cannot skip the TOTP step.
-    await expect(page).toHaveURL(/\/login\/two-factor/, { timeout: 15_000 })
+    // Assert: no OTP was issued — the auth-server test endpoint must return 404.
+    // Do NOT use login.fetchOtp() here — that helper asserts res.ok().
+    const res = await page.request.get(
+      `${AUTH_SERVER_URL}/test/last-otp?email=${encodeURIComponent(SUPER_EMAIL)}`,
+    )
+    expect(res.status()).toBe(404)
   })
 })
 

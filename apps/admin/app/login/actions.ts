@@ -261,7 +261,7 @@ export async function requestOtp(formData: FormData): Promise<{ sent: true } | {
   return { sent: true }
 }
 
-export async function verifyOtp(formData: FormData): Promise<{ error?: string }> {
+export async function verifyOtp(formData: FormData): Promise<{ error?: string } | { twoFactor: true }> {
   const email = formData.get('email') as string
   const otp = formData.get('otp') as string
   if (!email || !otp) return { error: 'invalidCode' }
@@ -284,6 +284,21 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string }>
     // The session-creation gate rejects non-active users with 403 → inactive.
     if (res.status === 403) return { error: 'inactive' }
     return { error: 'invalidCode' }
+  }
+
+  // Defense-in-depth: detect 2FA redirect (mirrors signIn). If a 2FA-enrolled
+  // user somehow holds a still-valid pre-enrollment OTP, redeeming it must route
+  // to the TOTP challenge rather than establishing a full session.
+  let responseBody: Record<string, unknown> = {}
+  try {
+    responseBody = (await res.clone().json()) as Record<string, unknown>
+  } catch {
+    // Non-JSON response — treat as normal session response.
+  }
+
+  if (responseBody['twoFactorRedirect'] === true) {
+    await forwardNamedCookie(res, 'better-auth.two_factor')
+    return { twoFactor: true } as { twoFactor: true }
   }
 
   const ok = await forwardSessionCookie(res)
