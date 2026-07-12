@@ -74,6 +74,9 @@ export function LoginOtpForm({ next }: { next: string }) {
             <input type="hidden" name="next" value={next} />
             <input type="hidden" name="email" value={email} />
             <p data-testid="otp-sent" className="text-body-sm text-[var(--muted-foreground)]">{t('otp.sent')}</p>
+            <p className="text-body-sm text-[var(--muted-foreground)]">
+              {t('otp.twoFactorHint')}
+            </p>
             <div className="flex flex-col gap-1.5">
               <label className="text-label-md font-semibold" htmlFor="otp">{t('otp.codeLabel')}</label>
               <input

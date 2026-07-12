@@ -472,7 +472,8 @@
       "resend": "Renvoyer le code",
       "changeEmail": "Utiliser une autre adresse",
       "sent": "Si un compte existe pour cette adresse, un code est en route.",
-      "usePassword": "Se connecter avec un mot de passe"
+      "usePassword": "Se connecter avec un mot de passe",
+      "twoFactorHint": "Si l'authentification à deux facteurs est activée sur votre compte, connectez-vous avec votre mot de passe."
     },
     "error": {
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
@@ -543,6 +544,21 @@
       "invalidPassword": "Mot de passe invalide.",
       "invalidCode": "Code invalide ou expiré.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."
+    }
+  },
+  "twoFactor": {
+    "title": "Authentification à deux facteurs",
+    "subtitle": "Saisissez le code à 6 chiffres de votre application d'authentification.",
+    "backupTitle": "Utiliser un code de secours",
+    "backupSubtitle": "Saisissez l'un de vos codes de secours enregistrés.",
+    "codeLabel": "Code d'authentification",
+    "backupCodeLabel": "Code de secours",
+    "submit": "Vérifier",
+    "useBackupCode": "Utiliser un code de secours",
+    "useTotpCode": "Utiliser l'application d'authentification",
+    "error": {
+      "invalidCode": "Code invalide ou expiré. Veuillez réessayer.",
       "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."
     }
   },

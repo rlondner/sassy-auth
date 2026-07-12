@@ -472,7 +472,8 @@
       "resend": "Resend code",
       "changeEmail": "Use a different email",
       "sent": "If an account exists for that email, a code is on its way.",
-      "usePassword": "Sign in with a password instead"
+      "usePassword": "Sign in with a password instead",
+      "twoFactorHint": "If two-factor authentication is enabled on your account, sign in with your password instead."
     },
     "error": {
       "invalidCredentials": "Invalid email or password.",
@@ -543,6 +544,21 @@
       "invalidPassword": "Invalid password.",
       "invalidCode": "Invalid or expired code.",
       "generic": "Something went wrong. Please try again.",
+      "serverUnavailable": "Service is unavailable. Please try again in a moment."
+    }
+  },
+  "twoFactor": {
+    "title": "Two-Factor Authentication",
+    "subtitle": "Enter the 6-digit code from your authenticator app.",
+    "backupTitle": "Use a Backup Code",
+    "backupSubtitle": "Enter one of your saved backup codes.",
+    "codeLabel": "Authenticator code",
+    "backupCodeLabel": "Backup code",
+    "submit": "Verify",
+    "useBackupCode": "Use a backup code instead",
+    "useTotpCode": "Use authenticator app instead",
+    "error": {
+      "invalidCode": "Invalid or expired code. Please try again.",
       "serverUnavailable": "Service is unavailable. Please try again in a moment."
     }
   },

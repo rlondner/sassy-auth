@@ -3,14 +3,27 @@
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useActionState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@sassy-auth/ui'
 import { signIn } from './actions'
 
 export function LoginForm({ next }: { next: string }) {
   const t = useTranslations('login')
+  const router = useRouter()
+
   const [state, formAction, isPending] = useActionState(
-    async (_prev: { error?: string }, formData: FormData) => signIn(formData),
-    {},
+    async (
+      _prev: { error?: string } | { twoFactor: true },
+      formData: FormData,
+    ): Promise<{ error?: string } | { twoFactor: true }> => {
+      formData.set('next', next)
+      const result = await signIn(formData)
+      if ('twoFactor' in result && result.twoFactor) {
+        router.push(`/login/two-factor${next ? `?next=${encodeURIComponent(next)}` : ''}`)
+      }
+      return result
+    },
+    {} as { error?: string } | { twoFactor: true },
   )
 
   return (
@@ -48,7 +61,7 @@ export function LoginForm({ next }: { next: string }) {
             />
           </div>
 
-          {state?.error && (
+          {'error' in state && state.error && (
             <p data-testid="login-error" className="text-label-md text-[var(--destructive)]">
               {state.error === 'invalidCredentials' ||
               state.error === 'inactive' ||
