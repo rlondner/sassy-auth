@@ -110,23 +110,11 @@ jobs:
         env:
           RS_APP_URL: 'http://localhost:8010'
           SEED_DEMO: '1'
+          APP_NAME: resourceserver01
+          OUT_FILE: /tmp/sassy-e2e-rs-client-id.txt
         run: |
           pnpm --filter @sassy-auth/auth-server seed
-          node -e "
-            const { PrismaClient } = require('./packages/db/node_modules/@prisma/client');
-            const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
-            prisma.saApp.findFirst({ where: { name: 'resourceserver01' } })
-              .then(app => {
-                if (app) {
-                  require('fs').writeFileSync('/tmp/sassy-e2e-rs-client-id.txt', app.publicId, 'utf8');
-                  process.stdout.write('RS publicId written: ' + app.publicId + '\n');
-                } else {
-                  process.stdout.write('WARNING: resourceserver01 not found\n');
-                }
-              })
-              .catch(err => { process.stderr.write(err.message + '\n'); process.exit(1); })
-              .finally(() => prisma.\$disconnect());
-          "
+          pnpm --filter @sassy-auth/db exec node scripts/print-app-public-id.cjs
 
       - name: Install Playwright browsers
         run: pnpm --filter @sassy-auth/admin-e2e exec playwright install --with-deps chromium
@@ -136,7 +124,8 @@ jobs:
         env:
           RS_BASE_URL: 'http://localhost:8010'
         run: |
-          RS_CLIENT_ID=$(cat /tmp/sassy-e2e-rs-client-id.txt 2>/dev/null || echo '')
+          test -s /tmp/sassy-e2e-rs-client-id.txt || { echo "ERROR: /tmp/sassy-e2e-rs-client-id.txt is missing or empty"; exit 1; }
+          RS_CLIENT_ID=$(cat /tmp/sassy-e2e-rs-client-id.txt)
           export RS_CLIENT_ID
           pnpm --filter @sassy-auth/admin-e2e test:e2e
 
