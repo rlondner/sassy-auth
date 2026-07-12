@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 import { readFileSync } from 'fs'
+import path from 'path'
 
 const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
@@ -106,7 +107,11 @@ export default defineConfig({
             `ADMIN_URL=${ADMIN_URL}`,
             'uvicorn app.main:app --port 8010',
           ].join(' '),
-          cwd: 'apps/resource-server-fastapi',
+          // Playwright resolves a relative webServer.cwd against the config
+          // directory (apps/admin-e2e), not the repo root — so a repo-relative
+          // path would resolve to apps/admin-e2e/apps/resource-server-fastapi
+          // (ENOENT) and abort the whole CI e2e run. Resolve from __dirname.
+          cwd: path.resolve(__dirname, '../resource-server-fastapi'),
           url: `${RS_BASE_URL}/`,
           reuseExistingServer: false,
           timeout: 60_000,
