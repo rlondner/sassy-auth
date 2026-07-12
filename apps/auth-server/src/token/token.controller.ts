@@ -70,6 +70,29 @@ export class TokenController {
   }
 
   /**
+   * GET /api/token/app-trust-days?client_id=<sqid>
+   *
+   * Public (unauthenticated) endpoint. Returns the effective twoFactorTrustDays
+   * for the app identified by client_id (a public sqid). Used by the admin
+   * console's signIn server action to resolve the per-app 2FA re-prompt interval
+   * without duplicating resolveTrustDays logic client-side.
+   *
+   * Disclosure is safe: twoFactorTrustDays is a non-sensitive configuration value
+   * and client_id is already public (displayed in the apps list, embedded in OAuth
+   * authorize URLs). Returns { twoFactorTrustDays: number | null } — null means
+   * "no app found or no override; use the system default".
+   */
+  @Get('app-trust-days')
+  async appTrustDays(@Query('client_id') clientId: string) {
+    if (!clientId) return { twoFactorTrustDays: null };
+    const app = await prisma.saApp.findUnique({
+      where: { publicId: clientId },
+      select: { twoFactorTrustDays: true },
+    });
+    return { twoFactorTrustDays: app?.twoFactorTrustDays ?? null };
+  }
+
+  /**
    * GET /api/token/oauth/authorize
    *
    * Validates the client_id (app), checks the requester has an active

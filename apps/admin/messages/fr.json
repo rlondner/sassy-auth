@@ -562,6 +562,12 @@
       "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."
     }
   },
+  "twoFactorPrompt": {
+    "title": "Sécurisez votre compte",
+    "body": "L'authentification à deux facteurs ajoute une couche de protection supplémentaire. Configurez-la en moins d'une minute.",
+    "setUp": "Configurer la 2FA",
+    "skip": "Ignorer pour l'instant"
+  },
   "oauthError": {
     "pageTitle": "Erreur d'autorisation — SassyAuth",
     "fallbackHeading": "Demande d'autorisation rejetée",

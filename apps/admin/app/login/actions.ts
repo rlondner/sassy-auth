@@ -7,6 +7,7 @@ import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
 import { forwardNamedCookie } from '../account/security/actions'
+import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '@/lib/two-factor-prompt'
 
 interface ParsedSessionCookie {
   value: string
@@ -179,6 +180,59 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
   Sentry.addBreadcrumb({ category: 'auth', message: 'Admin login successful', level: 'info' })
   const nextRaw = formData.get('next')
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
+
+  // Optional 2FA interstitial: show once per interval for unenrolled users.
+  // Read twoFactorEnabled from the just-established session.
+  const cookieStore2 = await cookies()
+  let twoFactorEnabled = false
+  let twoFactorPromptedAt: string | null = null
+  try {
+    const [sessRes, statusRes] = await Promise.all([
+      fetch(`${AUTH_SERVER_URL}/api/auth/get-session`, {
+        headers: { Cookie: cookieStore2.toString() },
+        cache: 'no-store',
+      }),
+      fetch(`${AUTH_SERVER_URL}/api/me/two-factor-status`, {
+        headers: { Cookie: cookieStore2.toString() },
+        cache: 'no-store',
+      }),
+    ])
+    if (sessRes.ok) {
+      const sess = (await sessRes.json()) as { user?: { twoFactorEnabled?: boolean } } | null
+      twoFactorEnabled = sess?.user?.twoFactorEnabled ?? false
+    }
+    if (statusRes.ok) {
+      const statusData = (await statusRes.json()) as { twoFactorPromptedAt: string | null }
+      twoFactorPromptedAt = statusData.twoFactorPromptedAt
+    }
+  } catch { /* fail open — no prompt on error */ }
+
+  // Resolve interval: check if next contains a client_id for per-app override.
+  let intervalDays = getSystemTrustDaysClient()
+  if (nextSafe) {
+    try {
+      const nextUrl = new URL(nextSafe)
+      const clientId = nextUrl.searchParams.get('client_id')
+      if (clientId) {
+        const trustRes = await fetch(
+          `${AUTH_SERVER_URL}/api/token/app-trust-days?client_id=${encodeURIComponent(clientId)}`,
+          { cache: 'no-store' },
+        )
+        if (trustRes.ok) {
+          const data = (await trustRes.json()) as { twoFactorTrustDays: number | null }
+          if (typeof data.twoFactorTrustDays === 'number' && data.twoFactorTrustDays > 0) {
+            intervalDays = data.twoFactorTrustDays
+          }
+        }
+      }
+    } catch { /* use system default */ }
+  }
+
+  if (shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
+    const encodedNext = nextSafe ? encodeURIComponent(nextSafe) : ''
+    redirect(`/login/two-factor-prompt${encodedNext ? `?next=${encodedNext}` : ''}`)
+  }
+
   redirect(nextSafe ?? '/users')
 }
 
