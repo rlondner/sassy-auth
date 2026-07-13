@@ -8,9 +8,9 @@ import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppDto } from './dto/update-app.dto';
 import { ListAppsQueryDto } from './dto/list-apps-query.dto';
 
-type AppRow = { publicId: string; name: string; url: string; callbackUrl: string | null; isPlatform: boolean; twoFactorTrustDays: number | null };
+type AppRow = { publicId: string; name: string; url: string; callbackUrl: string | null; isPlatform: boolean; twoFactorTrustDays: number | null; requireTwoFactor: boolean };
 function formatApp(a: AppRow) {
-  return { publicId: a.publicId, name: a.name, url: a.url, callbackUrl: a.callbackUrl ?? null, isPlatform: a.isPlatform, twoFactorTrustDays: a.twoFactorTrustDays ?? null };
+  return { publicId: a.publicId, name: a.name, url: a.url, callbackUrl: a.callbackUrl ?? null, isPlatform: a.isPlatform, twoFactorTrustDays: a.twoFactorTrustDays ?? null, requireTwoFactor: a.requireTwoFactor };
 }
 
 function isPrismaCode(e: unknown, code: string): boolean {
@@ -70,7 +70,7 @@ export class AppsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
-          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, callbackUrl: dto.callbackUrl || null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null },
+          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, callbackUrl: dto.callbackUrl || null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null, requireTwoFactor: dto.requireTwoFactor ?? false },
         });
         return tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
       });
@@ -87,10 +87,11 @@ export class AppsService {
       dto.name === undefined &&
       dto.url === undefined &&
       dto.callbackUrl === undefined &&
-      dto.twoFactorTrustDays === undefined
+      dto.twoFactorTrustDays === undefined &&
+      dto.requireTwoFactor === undefined
     ) {
       throw new BadRequestException(
-        'At least one of name, url, callbackUrl, or twoFactorTrustDays must be provided',
+        'At least one of name, url, callbackUrl, twoFactorTrustDays, or requireTwoFactor must be provided',
       );
     }
     await checkPermission(callerBaId, 'platform.apps.manage');
@@ -106,6 +107,9 @@ export class AppsService {
           ...(dto.callbackUrl !== undefined && { callbackUrl: dto.callbackUrl ? dto.callbackUrl : null }),
           ...(dto.twoFactorTrustDays !== undefined && {
             twoFactorTrustDays: dto.twoFactorTrustDays,
+          }),
+          ...(dto.requireTwoFactor !== undefined && {
+            requireTwoFactor: dto.requireTwoFactor,
           }),
         },
       });

@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 
 export class CreateAppDto {
@@ -23,4 +23,6 @@ export class CreateAppDto {
   @IsPositive()
   @Max(3650)
   twoFactorTrustDays?: number | null;
+
+  @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
 }

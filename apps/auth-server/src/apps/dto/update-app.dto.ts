@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 
 // "At least one of name / url / callbackUrl" is enforced server-side in
@@ -25,4 +25,6 @@ export class UpdateAppDto {
   @IsPositive()
   @Max(3650)
   twoFactorTrustDays?: number | null;
+
+  @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
 }
