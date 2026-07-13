@@ -545,6 +545,8 @@
       "submitButton": "Regénérer les codes",
       "submitting": "Regénération…"
     },
+    "forcedBanner": "Cette application requiert l'authentification à deux facteurs. Terminez la configuration ci-dessous pour continuer.",
+    "continueToApp": "Continuer",
     "errors": {
       "invalidPassword": "Mot de passe invalide.",
       "invalidCode": "Code invalide ou expiré.",

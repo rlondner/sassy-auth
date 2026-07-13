@@ -545,6 +545,8 @@
       "submitButton": "Regenerate codes",
       "submitting": "Regenerating…"
     },
+    "forcedBanner": "This application requires two-factor authentication. Finish setup below to continue.",
+    "continueToApp": "Continue",
     "errors": {
       "invalidPassword": "Invalid password.",
       "invalidCode": "Invalid or expired code.",
