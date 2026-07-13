@@ -54,6 +54,7 @@ import {
 } from './oauth-metadata';
 import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
 import { isTwoFactorRequired } from '../auth/two-factor-required';
+import { verifyUserTotp } from '../auth/verify-user-totp';
 
 @ApiTags('Token')
 @Controller(TOKEN_CONTROLLER_PATH)
@@ -480,6 +481,31 @@ export class TokenController {
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
     }
 
+    // 2b: enforce 2FA on the non-interactive path. When the app requires 2FA or
+    // the user has enrolled, a valid TOTP code is mandatory. We never emit a
+    // pwd-only JWT for a 2FA-enrolled user. The totpCode is never logged.
+    const twoFactorEnabled = await prisma.user
+      .findUnique({ where: { id: saUser.betterAuthUserId }, select: { twoFactorEnabled: true } })
+      .then((u) => u?.twoFactorEnabled ?? false);
+
+    let amr = ['pwd'];
+    if (isTwoFactorRequired(app) || twoFactorEnabled) {
+      if (!twoFactorEnabled) {
+        // Required app, user not enrolled: cannot self-enroll non-interactively.
+        this.logger.getWinstonLogger().warn('Direct login blocked: 2FA required, user not enrolled', {
+          context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
+        });
+        throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
+      }
+      if (!dto.totpCode || !(await verifyUserTotp(saUser.betterAuthUserId, dto.totpCode))) {
+        this.logger.getWinstonLogger().warn('Direct login blocked: missing/invalid 2FA code', {
+          context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
+        });
+        throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
+      }
+      amr = ['pwd', 'otp', 'mfa'];
+    }
+
     // bug-0186: record the login timestamp. This is the JWT-issuance
     // path; the BetterAuth sign-in path (email/password, magic-link,
     // OTP) is tracked separately in the databaseHooks in
@@ -502,6 +528,7 @@ export class TokenController {
       userPublicId: saUser.publicId,
       orgPublicId: saUser.org.publicId,
       appPublicId: app.publicId,
+      amr,
     });
 
     this.logger.getWinstonLogger().info('Direct login successful, JWT issued', {

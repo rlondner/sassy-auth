@@ -22,8 +22,11 @@ jest.mock('@sassy-auth/db', () => ({
     // care about the write don't need to touch it.
     saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     account: { findFirst: jest.fn() },
+    user: { findUnique: jest.fn() },
   },
 }));
+
+jest.mock('../auth/verify-user-totp');
 
 jest.mock('../auth/auth.config', () => ({
   auth: { api: { getSession: jest.fn() } },
@@ -33,6 +36,7 @@ jest.mock('better-auth/crypto', () => ({ verifyPassword: jest.fn().mockResolvedV
 
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';
+import { verifyUserTotp } from '../auth/verify-user-totp';
 
 const mockGetSession = auth.api.getSession as unknown as jest.Mock;
 
@@ -40,6 +44,7 @@ const mockPrisma = prisma as unknown as {
   saApp: { findUnique: jest.Mock };
   saUser: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
   account: { findFirst: jest.Mock };
+  user: { findUnique: jest.Mock };
 };
 
 const mockTokenService = {
@@ -73,6 +78,12 @@ describe('TokenController', () => {
     }).compile();
     controller = module.get(TokenController);
     jest.clearAllMocks();
+    // Default: user has 2FA disabled — tests that don't care about 2FA
+    // still need prisma.user.findUnique to return a value so directLogin
+    // doesn't crash at the 2FA-enforcement block.
+    mockPrisma.user.findUnique.mockResolvedValue({ twoFactorEnabled: false });
+    // Restore fire-and-forget default after clearAllMocks.
+    mockPrisma.saUser.update.mockResolvedValue({});
   });
 
   // ── GET /api/token/jwks ───────────────────────────────────────────────────
@@ -196,6 +207,62 @@ describe('TokenController', () => {
         ).rejects.toBeInstanceOf(UnauthorizedException);
       },
     );
+  });
+
+  // ── POST /api/token/direct/login — 2FA enforcement ───────────────────────
+
+  describe('directLogin 2FA enforcement', () => {
+    const app2fa = { id: 10, publicId: 'sqid-10', isPlatform: false, requireTwoFactor: false };
+    const baUser2fa = { id: 'ba-1', email: 'a@b.co' };
+    const saUser2fa = {
+      id: 1,
+      publicId: 'sqid-1',
+      betterAuthUserId: 'ba-1',
+      status: 'active',
+      orgId: 5,
+      org: { id: 5, publicId: 'sqid-5', appId: 10 },
+    };
+    const account2fa = { password: 'hashed', providerId: 'credential' };
+
+    const mockApp = (overrides: Partial<typeof app2fa> = {}) =>
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app2fa, ...overrides });
+
+    const mockDirectUser = (opts: { status: string; twoFactorEnabled: boolean; passwordOk: boolean }) => {
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser2fa, status: opts.status, betterAuthUser: baUser2fa });
+      mockPrisma.account.findFirst.mockResolvedValue(account2fa);
+      mockPrisma.user.findUnique.mockResolvedValue({ twoFactorEnabled: opts.twoFactorEnabled });
+      mockTokenService.issueJwt.mockResolvedValue('jwt.token');
+    };
+
+    it('rejects with 403 two_factor_required when required and no code supplied', async () => {
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockDirectUser({ status: 'active', twoFactorEnabled: true, passwordOk: true });
+      await expect(controller.directLogin({ identifier: 'a@b.co', password: 'pw', appId: 'sqid-10' } as any))
+        .rejects.toMatchObject({ status: 403 });
+    });
+
+    it('issues an mfa JWT when a valid totpCode is supplied', async () => {
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockDirectUser({ status: 'active', twoFactorEnabled: true, passwordOk: true });
+      (verifyUserTotp as jest.Mock).mockResolvedValue(true);
+      await controller.directLogin({ identifier: 'a@b.co', password: 'pw', appId: 'sqid-10', totpCode: '123456' } as any);
+      expect(mockTokenService.issueJwt).toHaveBeenCalledWith(expect.objectContaining({ amr: ['pwd', 'otp', 'mfa'] }));
+    });
+
+    it('rejects with 403 when the totpCode is wrong', async () => {
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockDirectUser({ status: 'active', twoFactorEnabled: true, passwordOk: true });
+      (verifyUserTotp as jest.Mock).mockResolvedValue(false);
+      await expect(controller.directLogin({ identifier: 'a@b.co', password: 'pw', appId: 'sqid-10', totpCode: '000000' } as any))
+        .rejects.toMatchObject({ status: 403 });
+    });
+
+    it('issues a pwd-only JWT for a non-required app with a non-2FA user', async () => {
+      mockApp({ requireTwoFactor: false, isPlatform: false });
+      mockDirectUser({ status: 'active', twoFactorEnabled: false, passwordOk: true });
+      await controller.directLogin({ identifier: 'a@b.co', password: 'pw', appId: 'sqid-10' } as any);
+      expect(mockTokenService.issueJwt).toHaveBeenCalledWith(expect.objectContaining({ amr: ['pwd'] }));
+    });
   });
 
   // ── GET /api/token/oauth/authorize ───────────────────────────────────────
