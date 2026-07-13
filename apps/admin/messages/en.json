@@ -43,7 +43,9 @@
       "urlHint": "The primary base URL for this application.",
       "twoFactorTrustDays": "2FA trust interval (days)",
       "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
-      "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server."
+      "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server.",
+      "requireTwoFactor": "Require two-factor authentication",
+      "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue."
     },
     "actions": {
       "view": "View",

@@ -33,8 +33,8 @@ jest.mock('@sassy-auth/ui', () => {
 })
 
 const apps: App[] = [
-  { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false },
-  { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth.example.com', isPlatform: true },
+  { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false },
+  { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth.example.com', isPlatform: true, requireTwoFactor: false },
 ]
 
 const initial = {

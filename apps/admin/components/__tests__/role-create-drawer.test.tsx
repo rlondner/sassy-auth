@@ -15,7 +15,7 @@ jest.mock('@/app/(admin)/roles/actions', () => ({
 }))
 
 const apps: App[] = [
-  { publicId: 'sq_a1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false },
+  { publicId: 'sq_a1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false },
 ]
 
 describe('RoleCreateDrawer', () => {
