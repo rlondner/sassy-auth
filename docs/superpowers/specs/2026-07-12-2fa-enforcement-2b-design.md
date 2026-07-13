@@ -53,10 +53,11 @@ JWT — not re-challenging already-enrolled users, whom 2a already covers.
   receives an auth code — no way into the app without enrolling.
 - **`amr` on the JWT** (RFC 8176) so resource servers can assert 2FA was used.
 - **`direct/login` enforcement**: the non-interactive path accepts an optional
-  `totpCode`/`backupCode`, verifies it, and issues a `mfa` JWT; otherwise it
-  returns `403 two_factor_required`.
-- A safe admin surface: a toggle on the app form, a soft warning, and a
-  self-first guardrail on the platform app.
+  `totpCode`, verifies it server-side (session-less), and issues a `mfa` JWT;
+  otherwise it returns `403 two_factor_required`.
+- A safe admin surface: a `requireTwoFactor` toggle on the app form for
+  **non-platform** apps; platform-app enforcement is configured **out-of-band**
+  via an env flag (the platform app is immutable through the app UI).
 
 ## Non-Goals
 
@@ -66,6 +67,13 @@ JWT — not re-challenging already-enrolled users, whom 2a already covers.
   per-app; the default is not-required.
 - Non-interactive **self-enrollment**. A user with no 2FA who hits `direct/login`
   for a required app is rejected; they must enroll once via the interactive flow.
+- **Backup codes on `direct/login`.** The non-interactive path accepts `totpCode`
+  only. Backup codes stay an interactive-only recovery factor — consuming a
+  one-time backup code outside better-auth's own verify endpoint would risk
+  double-spend divergence across paths.
+- A platform-app **UI toggle** or a UI/server "self-first" guardrail. Platform
+  enforcement is env-driven and operational; there is no mutable platform-app
+  edit path to guard.
 - Step-up / per-request AAL escalation, or distinguishing "fresh TOTP this login"
   from "trusted device" in `amr` (see Security Contract — both resolve to `mfa`).
 
@@ -73,7 +81,8 @@ JWT — not re-challenging already-enrolled users, whom 2a already covers.
 
 - **No un-enrolled access to a required app:** the authorize gate and the
   `direct/login` gate both fail closed. A non-enrolled user cannot obtain an auth
-  code or a JWT for a `requireTwoFactor` app.
+  code or a JWT for a `requireTwoFactor` app. "Required" is the effective value:
+  `app.requireTwoFactor || (app.isPlatform && PLATFORM_REQUIRE_2FA env flag)`.
 - **Truthful `amr`:** `amr` includes `mfa`/`otp` **iff** the user is
   `twoFactorEnabled` at authenticate time. This is truthful because 2a guarantees
   no `twoFactorEnabled` user obtains a session (or passes `direct/login`) without
@@ -82,9 +91,10 @@ JWT — not re-challenging already-enrolled users, whom 2a already covers.
 - **Never logged:** TOTP secrets, `otpauth` URIs, backup codes, and entered codes
   (unchanged from 2a's bearer-credential posture). `direct/login` code fields are
   never logged.
-- **No self-lockout by accident:** enabling `requireTwoFactor` on the platform
-  admin app requires the acting admin to already have 2FA; 2a's admin-assisted
-  "Reset 2FA" remains the recovery valve.
+- **No self-lockout by accident:** the platform app cannot be toggled through the
+  mutable app UI (it rejects all platform edits), so platform enforcement is a
+  deliberate env-flag decision; 2a's admin-assisted "Reset 2FA" remains the
+  recovery valve for any operator lockout.
 - The existing `status === 'active'` gates at authorize and token are unaffected
   and continue to run.
 
@@ -95,9 +105,12 @@ JWT — not re-challenging already-enrolled users, whom 2a already covers.
 - **`SaApp.requireTwoFactor Boolean @default(false)`** added to
   `packages/db/schema.prisma`, plus a Prisma migration.
 - No new `User`/`SaUser`/session columns. Enforcement reads the existing global
-  `User.twoFactorEnabled` (2a). No system-wide default is needed — the field
-  default (`false`) *is* the "not required" default, so no resolver analogous to
-  2a's `resolveTrustDays` is required.
+  `User.twoFactorEnabled` (2a).
+- **Effective-requirement resolver** `isTwoFactorRequired(app)` (mirroring 2a's
+  `getSystemTrustDays`/`resolveTrustDays` env pattern): returns
+  `app.requireTwoFactor || (app.isPlatform && PLATFORM_REQUIRE_2FA)`, where
+  `PLATFORM_REQUIRE_2FA` is a boolean env flag (default false). This is the single
+  source of truth consulted by both the authorize gate and `direct/login`.
 
 ## Section 2 — Forced-enrollment gate at authorize
 
@@ -105,7 +118,7 @@ In the `GET .../oauth/authorize` handler, **after** the existing session and
 `status === 'active'` checks and **before** issuing the code, add one gate:
 
 ```
-if (app.requireTwoFactor && !user.twoFactorEnabled) {
+if (isTwoFactorRequired(app) && !user.twoFactorEnabled) {
   redirect → <adminUrl>/account/security?enroll=1&next=<full authorize URL>
 }
 ```
@@ -146,52 +159,69 @@ cannot run an interactive TOTP challenge or forced enrollment. Enforcement runs
 **after** password verification (preserving the existing timing posture that does
 not distinguish invalid-password from inactive-user):
 
-- Add optional **`totpCode`** and **`backupCode`** to the direct-login DTO.
-- When the resolved app has `requireTwoFactor` **or** the user is
-  `twoFactorEnabled`:
+- Add an optional **`totpCode`** to the direct-login DTO (6-digit string).
+- When `isTwoFactorRequired(app)` **or** the user is `twoFactorEnabled`:
   - **No code supplied** → `403 two_factor_required`.
-  - **Code supplied** → verify server-side against the user's stored TOTP secret /
-    backup codes (no session). Invalid → `403 two_factor_required` (timing-safe
-    alongside the existing `INVALID_CREDENTIALS` handling). Valid → issue the JWT
-    with `amr = ["pwd", "otp", "mfa"]`.
-  - **Non-enrolled user on a `requireTwoFactor` app** → `403 two_factor_required`.
-    They cannot self-enroll non-interactively; they must enroll once via the
+  - **Code supplied** → verify server-side, session-less, against the user's
+    stored TOTP secret. Invalid → `403 two_factor_required` (kept opaque and
+    timing-comparable alongside the existing `INVALID_CREDENTIALS` handling).
+    Valid → issue the JWT with `amr = ["pwd", "otp", "mfa"]`.
+  - **Non-enrolled user on a required app** → `403 two_factor_required`. They
+    cannot self-enroll non-interactively; they must enroll once via the
     interactive flow. Documented as intended.
 - Password-only success on a non-required app for a non-2FA user → JWT with
   `amr = ["pwd"]`, unchanged from today.
-- The `direct/login` request `totpCode`/`backupCode` fields are never logged.
+- The `direct/login` request `totpCode` field is never logged.
 
-**Plan risk (spike):** the session-less verification mechanism. Options to
-resolve in planning: a BetterAuth server API that verifies TOTP/backup without a
-session, or a direct check against the stored (plugin-managed) secret using the
-same TOTP parameters. The requirement stands regardless of mechanism.
+**Session-less verification mechanism (confirmed).** A helper
+`verifyUserTotp(betterAuthUserId, code)` reads the user's `TwoFactor` row,
+decrypts the secret with better-auth's own `symmetricDecrypt({ key:
+BETTER_AUTH_SECRET, data: tf.secret })`, and checks it with
+`createOTP(secret, { period: 30, digits: 6 }).verify(code)` — exactly what
+better-auth's own `/two-factor/verify-totp` endpoint does internally. A live test
+(enroll → compute a code with `otplib` from the enrollment secret → assert the
+helper returns true; wrong code → false) is the guardrail that the decrypt key
+matches; if better-auth wraps the secret differently the test fails loudly and
+the key derivation is adjusted.
 
-## Section 5 — Admin UI & lockout safety
+## Section 5 — Admin UI & platform enforcement
 
-- **Toggle:** a `requireTwoFactor` checkbox on the existing app create/edit form
-  (beside 2a's `twoFactorTrustDays`).
-- **Soft warning:** when enabling it on the **platform admin app**, show an inline
-  warning: "This forces 2FA for all operators on next sign-in."
-- **Self-first guardrail:** enabling `requireTwoFactor` on the **platform app** is
-  blocked unless the acting admin already has `twoFactorEnabled`. Enforced
-  **server-side** in the app-update path (not just the UI), returning a clear
-  validation error; the checkbox warning mirrors it client-side.
+The platform app is immutable through the app UI — `AppsService.updateApp` (and
+`deleteApp`) already throw `ForbiddenException('Platform app cannot be modified')`
+for `isPlatform` apps. So enforcement splits cleanly by audience:
+
+- **Non-platform apps (UI):** a `requireTwoFactor` checkbox on the existing app
+  create/edit drawers (beside 2a's `twoFactorTrustDays`), wired through the
+  create/update DTOs and `AppsService`. Turning this on force-enrolls **that
+  app's own end users** — it does not affect admin-console operators, so no
+  operator-lockout guardrail is needed here.
+- **Platform app (out-of-band):** enforced by the `PLATFORM_REQUIRE_2FA` env flag,
+  read by `isTwoFactorRequired(app)` for `isPlatform` apps. Enabling it
+  force-enrolls all operators on next interactive sign-in. It is a deliberate
+  operational action (env/deploy config), documented in the README/`.env.example`
+  with the recommendation that the enabling operator enroll their own 2FA first.
 - **Recovery valve:** 2a's admin-assisted "Reset 2FA" remains the lockout escape
-  hatch.
+  hatch for any operator who gets stuck.
+
+The existing platform-immutability guard in `AppsService` is unchanged — a
+`requireTwoFactor` value in an update DTO for the platform app is still rejected
+wholesale by that guard, so no new server-side guardrail is required.
 
 ## Section 6 — Testing
 
 **Unit (auth-server, Jest):**
+- **`isTwoFactorRequired(app)`** — non-platform honors `requireTwoFactor`; platform
+  honors the `PLATFORM_REQUIRE_2FA` env flag; env-off platform → not required.
 - **Authorize gate** — required + non-enrolled → redirect to
   `/account/security?enroll=1&next=…`; required + enrolled → code issued;
   not-required → unchanged.
 - **`amr` resolution** — enabled → `["pwd","otp","mfa"]`, disabled → `["pwd"]`;
   `issueJwt` emits the claim when present and **omits** it when empty.
+- **`verifyUserTotp`** — a live enroll → `otplib` code → helper returns true;
+  wrong code → false; user without a `TwoFactor` row → false.
 - **`direct/login` matrix** — no code + (required or enabled) → `403`; valid code
   → JWT with `mfa`; invalid code → `403`; non-required password-only for a
   non-2FA user → JWT with `["pwd"]`.
-- **Platform-app self-first guardrail** — acting admin without 2FA is rejected
-  when enabling `requireTwoFactor` on the platform app; with 2FA it succeeds.
 
 **e2e — hermetic authorize-simulation** (extends 2a's
 `apps/admin-e2e/lib/oauth-fixtures.ts`):
@@ -207,27 +237,32 @@ same TOTP parameters. The requirement stands regardless of mechanism.
 
 ## Key implementation risks (resolve in planning)
 
-1. **Session-less TOTP/backup verification for `direct/login`** (Section 4) —
-   confirm the BetterAuth API or the direct-secret-check approach.
-2. **Auth-code `amr` propagation** (Section 3) — confirm the authorization-code
-   payload/format can carry the `amr` array through to token exchange.
-3. **Enroll-page forced-enrollment mode** (Section 2) — confirm the 2a
-   `/account/security` page can suppress the skip affordance and honor `next` on
-   completion when entered with `enroll=1`.
+1. **Session-less TOTP verification for `direct/login`** (Section 4) — mechanism
+   confirmed (`symmetricDecrypt` + `createOTP().verify`); the live enroll→verify
+   test guards the decrypt-key assumption.
+2. **Auth-code `amr` propagation** (Section 3) — the `SaOauthCode` row must carry
+   the `amr` array from authorize → token; adds an `amr String` column (JSON) to
+   `SaOauthCode`, defaulting to `["pwd"]` for codes minted before migration.
 
 ## File Impact (indicative)
 
-- `packages/db/schema.prisma` + migration — `SaApp.requireTwoFactor`.
+- `packages/db/schema.prisma` + migration — `SaApp.requireTwoFactor`,
+  `SaOauthCode.amr`.
+- `apps/auth-server/src/auth/two-factor-required.ts` (+ spec) —
+  `isTwoFactorRequired(app)` resolver + `PLATFORM_REQUIRE_2FA` env read.
+- `apps/auth-server/src/auth/verify-user-totp.ts` (+ spec) — session-less TOTP
+  verify helper.
+- `apps/auth-server/src/token/oauth.service.ts` — `generateCode`/`exchangeCode`
+  carry `amr`.
 - `apps/auth-server/src/token/token.controller.ts` — authorize forced-enrollment
-  gate; `direct/login` code fields + verification + `403 two_factor_required`.
+  gate; `direct/login` `totpCode` verification + `403 two_factor_required`.
 - `apps/auth-server/src/token/token.service.ts` — `issueJwt` `amr` param + claim.
-- authorization-code issuance/exchange — carry `amr` on the code.
-- `apps/auth-server/src/token/dto/direct-login.dto.ts` — optional `totpCode` /
-  `backupCode`.
-- `apps/auth-server/src/apps/` (app update path) — platform-app self-first
-  guardrail (server-side).
-- `apps/admin/app/(admin)/apps/` — `requireTwoFactor` checkbox + platform-app
-  warning.
-- `apps/admin/app/account/security/` — honor `enroll=1` forced-enrollment mode
-  (hide skip, redirect to `next`).
+- `apps/auth-server/src/token/dto/direct-login.dto.ts` — optional `totpCode`.
+- `apps/auth-server/src/apps/dto/{create,update}-app.dto.ts` + `apps.service.ts`
+  + `apps.controller` response shape — `requireTwoFactor` field (non-platform).
+- `apps/admin/components/app-{create,edit}-drawer.tsx`, `apps/admin/lib/types.ts`,
+  `apps/admin/messages/{en,fr}.json` — `requireTwoFactor` checkbox + copy.
+- `apps/admin/app/account/security/{page.tsx,SecurityClient.tsx}` — honor
+  `enroll=1` forced mode (hide skip, redirect to `next` on success).
+- `.env.example` + README — `PLATFORM_REQUIRE_2FA`.
 - `apps/admin-e2e/` — authorize-sim enforcement specs + live-RS `amr` slice.
