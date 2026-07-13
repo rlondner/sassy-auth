@@ -201,8 +201,8 @@ describe('TokenController', () => {
   // ── GET /api/token/oauth/authorize ───────────────────────────────────────
 
   describe('oauthAuthorize', () => {
-    const app = { id: 10, publicId: 'sqid-10', isPlatform: false, url: 'https://app.example.com' };
-    const fakeSession = { user: { id: 'ba-user-1', email: 'user@example.com' } };
+    const app = { id: 10, publicId: 'sqid-10', isPlatform: false, requireTwoFactor: false, url: 'https://app.example.com' };
+    const fakeSession = { user: { id: 'ba-user-1', email: 'user@example.com', twoFactorEnabled: false } };
     const saUser = {
       id: 1,
       publicId: 'sqid-1',
@@ -212,13 +212,22 @@ describe('TokenController', () => {
       org: { id: 5, publicId: 'sqid-5', appId: 10 },
     };
 
+    const fakeReq = { headers: {} } as unknown as import('express').Request;
+
+    // Helper to mock common authorize dependencies
+    const mockApp = (overrides: Partial<typeof app> = {}) =>
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, ...overrides });
+    const mockSession = (userOverrides: Record<string, unknown> = {}) =>
+      mockGetSession.mockResolvedValue({ user: { ...fakeSession.user, ...userOverrides } });
+    const mockSaUser = (overrides: Partial<typeof saUser & { status: string }> = {}) =>
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, ...overrides });
+
     it('returns redirect url with code when session is valid and org matches', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue(app);
-      mockGetSession.mockResolvedValue(fakeSession);
-      mockPrisma.saUser.findFirst.mockResolvedValue(saUser);
+      mockApp();
+      mockSession();
+      mockSaUser();
       mockOauthService.generateCode.mockReturnValue('test-code-abc');
 
-      const fakeReq = { headers: {} } as unknown as import('express').Request;
       const result = await controller.oauthAuthorize(
         'sqid-10',
         'https://app.example.com/callback',
@@ -234,24 +243,22 @@ describe('TokenController', () => {
     });
 
     it('throws UnauthorizedException when session is null', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockApp();
       mockGetSession.mockResolvedValue(null);
 
-      const fakeReq = { headers: {} } as unknown as import('express').Request;
       await expect(
         controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
       ).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws ForbiddenException when user org does not match app', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, id: 10 });
-      mockGetSession.mockResolvedValue(fakeSession);
+      mockApp();
+      mockSession();
       mockPrisma.saUser.findFirst.mockResolvedValue({
         ...saUser,
         org: { id: 5, publicId: 'sqid-5', appId: 999 }, // wrong app
       });
 
-      const fakeReq = { headers: {} } as unknown as import('express').Request;
       await expect(
         controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
       ).rejects.toThrow(ForbiddenException);
@@ -262,16 +269,46 @@ describe('TokenController', () => {
     it.each(['inactive', 'pending'] as const)(
       'throws ForbiddenException when user status is %s',
       async (status) => {
-        mockPrisma.saApp.findUnique.mockResolvedValue(app);
-        mockGetSession.mockResolvedValue(fakeSession);
-        mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, status });
+        mockApp();
+        mockSession();
+        mockSaUser({ status });
 
-        const fakeReq = { headers: {} } as unknown as import('express').Request;
         await expect(
           controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
         ).rejects.toThrow(ForbiddenException);
       },
     );
+
+    // 2FA forced-enrollment gate
+    it('redirects required+unenrolled users to forced enrollment', async () => {
+      process.env.ADMIN_URL = 'https://admin.example';
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockSession({ twoFactorEnabled: false });
+      mockSaUser({ status: 'active' });
+
+      const res = await controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq);
+      expect(res.url).toContain('/account/security?enroll=1&next=');
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+
+      delete process.env.ADMIN_URL;
+    });
+
+    it('issues a code with mfa amr for enrolled users when 2FA is required', async () => {
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockSession({ twoFactorEnabled: true });
+      mockSaUser({ status: 'active' });
+      mockOauthService.generateCode.mockReturnValue('mfa-code-xyz');
+
+      await controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq);
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['pwd', 'otp', 'mfa'],
+      );
+    });
   });
 
   // ── POST /api/token/oauth/token ───────────────────────────────────────────

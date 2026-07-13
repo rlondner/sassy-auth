@@ -53,6 +53,7 @@ import {
   TOKEN_CONTROLLER_PATH,
 } from './oauth-metadata';
 import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
+import { isTwoFactorRequired } from '../auth/two-factor-required';
 
 @ApiTags('Token')
 @Controller(TOKEN_CONTROLLER_PATH)
@@ -164,12 +165,40 @@ export class TokenController {
         throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
       }
 
+      // 2b: forced 2FA enrollment. If the app requires 2FA (per-app flag, or the
+      // platform env flag for the platform app) and this active user has not yet
+      // enrolled, bounce them into the self-service enrollment page carrying the
+      // full authorize URL as `next`, so they return here and get a code only
+      // after enrolling. `enroll=1` puts the page in forced (no-skip) mode.
+      if (isTwoFactorRequired(app) && !(session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled) {
+        const adminUrl = process.env.ADMIN_URL;
+        if (adminUrl) {
+          const query = new URLSearchParams({
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            code_challenge: codeChallenge,
+            code_challenge_method: codeChallengeMethod,
+          });
+          if (state) query.set('state', state);
+          const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
+          const enrollUrl = `${adminUrl.replace(/\/$/, '')}/account/security?enroll=1&next=${encodeURIComponent(nextPath)}`;
+          this.logger.getWinstonLogger().info('OAuth authorize: forced 2FA enrollment', {
+            context: 'TokenController', appId: clientId, userId: saUser.publicId,
+          });
+          return { url: enrollUrl, statusCode: 302 };
+        }
+        // No ADMIN_URL (dev): fail closed rather than minting a non-2FA code.
+        throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+      }
+
+      const amr = (session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled ? ['pwd', 'otp', 'mfa'] : ['pwd'];
       const code = await this.oauthService.generateCode(
         saUser.publicId,
         app.publicId,
         redirectUri,
         codeChallenge,
         'S256',
+        amr,
       );
       const url = new URL(redirectUri);
       url.searchParams.set('code', code);
@@ -255,6 +284,7 @@ export class TokenController {
 
     let userPublicId: string;
     let appPublicId: string;
+    let exchangedAmr: string[] = ['pwd'];
     try {
       const exchanged = await this.oauthService.exchangeCode(
         dto.code,
@@ -264,6 +294,7 @@ export class TokenController {
       );
       userPublicId = exchanged.userId;
       appPublicId = exchanged.appPublicId;
+      exchangedAmr = exchanged.amr ?? ['pwd'];
     } catch (err) {
       this.logger.getWinstonLogger().warn('oauth.pkce.verify_failed', {
         context: 'TokenController',
@@ -292,6 +323,7 @@ export class TokenController {
       userPublicId: saUser.publicId,
       orgPublicId: saUser.org.publicId,
       appPublicId,
+      amr: exchangedAmr,
     });
 
     this.logger.getWinstonLogger().info('OAuth code exchanged, JWT issued', {
