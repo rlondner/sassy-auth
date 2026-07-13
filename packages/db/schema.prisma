@@ -102,6 +102,7 @@ model SaApp {
   url         String
   callbackUrl        String?
   twoFactorTrustDays Int?
+  requireTwoFactor   Boolean        @default(false)
   isPlatform         Boolean        @default(false)
   orgs        SaOrg[]
   permissions SaPermission[]
@@ -252,6 +253,7 @@ model SaOauthCode {
   redirectUri         String
   codeChallenge       String
   codeChallengeMethod String
+  amr                 String   @default("[\"pwd\"]")
   expiresAt           DateTime
   createdAt           DateTime @default(now())
 
