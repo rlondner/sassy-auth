@@ -1,9 +1,8 @@
 import 'dotenv/config';
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
-import { hashPassword } from 'better-auth/crypto';
-import * as crypto from 'crypto';
 import { generatePendingPublicId } from '../common/pending-public-id';
+import { createBetterAuthUser } from './seed-utils';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -94,34 +93,12 @@ async function seedPlatformAdmin(
     return;
   }
 
-  const baUserId = crypto.randomUUID();
-  const hashedPassword = await hashPassword(ADMIN_PASSWORD);
-  const now = new Date();
-
   const saUser = await prisma.$transaction(async (tx: any) => {
-    // 1. Create BetterAuth user
-    await tx.user.create({
-      data: {
-        id: baUserId,
-        name: `${admin.firstName} ${admin.lastName}`,
-        email: admin.email,
-        emailVerified: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-    });
-
-    // 2. Create Credential account
-    await tx.account.create({
-      data: {
-        id: crypto.randomUUID(),
-        accountId: baUserId,
-        providerId: 'credential',
-        userId: baUserId,
-        password: hashedPassword,
-        createdAt: now,
-        updatedAt: now,
-      },
+    // 1 & 2. Create BetterAuth user and account
+    const baUserId = await createBetterAuthUser(tx, {
+      email: admin.email,
+      password: ADMIN_PASSWORD,
+      name: `${admin.firstName} ${admin.lastName}`,
     });
 
     // 3. Create SaUser

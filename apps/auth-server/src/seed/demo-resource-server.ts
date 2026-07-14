@@ -1,7 +1,7 @@
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
-import { auth } from '../auth/auth.config';
 import { generatePendingPublicId } from '../common/pending-public-id';
+import { createBetterAuthUser } from './seed-utils';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -141,16 +141,18 @@ async function ensureUser(
   if (existing) {
     baUserId = existing.id;
   } else {
-    const result = await auth.api.signUpEmail({
-      body: { email, password: PASSWORD, name: `${firstName} ${lastName}` },
+    baUserId = await prisma.$transaction(async (tx: any) => {
+      return createBetterAuthUser(tx, {
+        email,
+        password: PASSWORD,
+        name: `${firstName} ${lastName}`,
+      });
     });
-    baUserId = result.user.id;
-    await prisma.user.update({ where: { id: baUserId }, data: { emailVerified: true } });
   }
 
   let saUser = await prisma.saUser.findFirst({ where: { betterAuthUserId: baUserId } });
   if (!saUser) {
-    saUser = await prisma.$transaction(async (tx) => {
+    saUser = await prisma.$transaction(async (tx: any) => {
       const c = await tx.saUser.create({
         data: {
           publicId: generatePendingPublicId(),
@@ -169,8 +171,8 @@ async function ensureUser(
   }
 
   await prisma.saUserRole.upsert({
-    where: { userId_roleId: { userId: saUser.id, roleId } },
-    create: { userId: saUser.id, roleId },
+    where: { userId_roleId: { userId: saUser!.id, roleId } },
+    create: { userId: saUser!.id, roleId },
     update: {},
   });
 }
