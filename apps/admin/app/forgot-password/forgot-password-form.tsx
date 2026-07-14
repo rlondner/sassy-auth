@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useActionState } from 'react'
-import { Button } from '@sassy-auth/ui'
+import { Button, FormField } from '@sassy-auth/ui'
 import { requestPasswordResetAction } from './actions'
 
 export function ForgotPasswordForm() {
@@ -24,12 +24,17 @@ export function ForgotPasswordForm() {
           <p data-testid="forgot-sent" className="text-body-md text-[var(--foreground)]">{t('sent')}</p>
         ) : (
           <form action={formAction} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-label-md font-semibold" htmlFor="email">{t('email')}</label>
-              <input id="email" name="email" type="email" autoComplete="email" required
-                className="flex h-9 w-full rounded border border-[var(--border)] bg-[var(--card)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
-            </div>
-            <Button type="submit" className="w-full" disabled={isPending}>{isPending ? '…' : t('submit')}</Button>
+            <FormField
+              label={t('email')}
+              name="email"
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+            />
+            <Button type="submit" className="w-full" loading={isPending}>
+              {t('submit')}
+            </Button>
           </form>
         )}
         <div className="mt-4 text-center">
