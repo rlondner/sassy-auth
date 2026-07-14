@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, IsOptional, MinLength } from 'class-validator';
 
 export class DirectLoginDto {
   /** Username, email address, or phone number. */
@@ -17,4 +17,14 @@ export class DirectLoginDto {
   @IsString()
   @IsNotEmpty()
   appId!: string;
+
+  /**
+   * Optional 6-digit TOTP code. Required when the target app enforces 2FA or the
+   * user has 2FA enabled. Bounded to 6 chars; never logged.
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(6)
+  totpCode?: string;
 }

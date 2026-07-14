@@ -22,8 +22,11 @@ jest.mock('@sassy-auth/db', () => ({
     // care about the write don't need to touch it.
     saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     account: { findFirst: jest.fn() },
+    user: { findUnique: jest.fn() },
   },
 }));
+
+jest.mock('../auth/verify-user-totp');
 
 jest.mock('../auth/auth.config', () => ({
   auth: { api: { getSession: jest.fn() } },
@@ -33,6 +36,7 @@ jest.mock('better-auth/crypto', () => ({ verifyPassword: jest.fn().mockResolvedV
 
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';
+import { verifyUserTotp } from '../auth/verify-user-totp';
 
 const mockGetSession = auth.api.getSession as unknown as jest.Mock;
 
@@ -40,6 +44,7 @@ const mockPrisma = prisma as unknown as {
   saApp: { findUnique: jest.Mock };
   saUser: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
   account: { findFirst: jest.Mock };
+  user: { findUnique: jest.Mock };
 };
 
 const mockTokenService = {
@@ -73,6 +78,12 @@ describe('TokenController', () => {
     }).compile();
     controller = module.get(TokenController);
     jest.clearAllMocks();
+    // Default: user has 2FA disabled — tests that don't care about 2FA
+    // still need prisma.user.findUnique to return a value so directLogin
+    // doesn't crash at the 2FA-enforcement block.
+    mockPrisma.user.findUnique.mockResolvedValue({ twoFactorEnabled: false });
+    // Restore fire-and-forget default after clearAllMocks.
+    mockPrisma.saUser.update.mockResolvedValue({});
   });
 
   // ── GET /api/token/jwks ───────────────────────────────────────────────────
@@ -198,11 +209,67 @@ describe('TokenController', () => {
     );
   });
 
+  // ── POST /api/token/direct/login — 2FA enforcement ───────────────────────
+
+  describe('directLogin 2FA enforcement', () => {
+    const app2fa = { id: 10, publicId: 'sqid-10', isPlatform: false, requireTwoFactor: false };
+    const baUser2fa = { id: 'ba-1', email: 'a@b.co' };
+    const saUser2fa = {
+      id: 1,
+      publicId: 'sqid-1',
+      betterAuthUserId: 'ba-1',
+      status: 'active',
+      orgId: 5,
+      org: { id: 5, publicId: 'sqid-5', appId: 10 },
+    };
+    const account2fa = { password: 'hashed', providerId: 'credential' };
+
+    const mockApp = (overrides: Partial<typeof app2fa> = {}) =>
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app2fa, ...overrides });
+
+    const mockDirectUser = (opts: { status: string; twoFactorEnabled: boolean; passwordOk: boolean }) => {
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser2fa, status: opts.status, betterAuthUser: baUser2fa });
+      mockPrisma.account.findFirst.mockResolvedValue(account2fa);
+      mockPrisma.user.findUnique.mockResolvedValue({ twoFactorEnabled: opts.twoFactorEnabled });
+      mockTokenService.issueJwt.mockResolvedValue('jwt.token');
+    };
+
+    it('rejects with 403 two_factor_required when required and no code supplied', async () => {
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockDirectUser({ status: 'active', twoFactorEnabled: true, passwordOk: true });
+      await expect(controller.directLogin({ identifier: 'a@b.co', password: 'pw', appId: 'sqid-10' } as any))
+        .rejects.toMatchObject({ status: 403 });
+    });
+
+    it('issues an mfa JWT when a valid totpCode is supplied', async () => {
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockDirectUser({ status: 'active', twoFactorEnabled: true, passwordOk: true });
+      (verifyUserTotp as jest.Mock).mockResolvedValue(true);
+      await controller.directLogin({ identifier: 'a@b.co', password: 'pw', appId: 'sqid-10', totpCode: '123456' } as any);
+      expect(mockTokenService.issueJwt).toHaveBeenCalledWith(expect.objectContaining({ amr: ['pwd', 'otp', 'mfa'] }));
+    });
+
+    it('rejects with 403 when the totpCode is wrong', async () => {
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockDirectUser({ status: 'active', twoFactorEnabled: true, passwordOk: true });
+      (verifyUserTotp as jest.Mock).mockResolvedValue(false);
+      await expect(controller.directLogin({ identifier: 'a@b.co', password: 'pw', appId: 'sqid-10', totpCode: '000000' } as any))
+        .rejects.toMatchObject({ status: 403 });
+    });
+
+    it('issues a pwd-only JWT for a non-required app with a non-2FA user', async () => {
+      mockApp({ requireTwoFactor: false, isPlatform: false });
+      mockDirectUser({ status: 'active', twoFactorEnabled: false, passwordOk: true });
+      await controller.directLogin({ identifier: 'a@b.co', password: 'pw', appId: 'sqid-10' } as any);
+      expect(mockTokenService.issueJwt).toHaveBeenCalledWith(expect.objectContaining({ amr: ['pwd'] }));
+    });
+  });
+
   // ── GET /api/token/oauth/authorize ───────────────────────────────────────
 
   describe('oauthAuthorize', () => {
-    const app = { id: 10, publicId: 'sqid-10', isPlatform: false, url: 'https://app.example.com' };
-    const fakeSession = { user: { id: 'ba-user-1', email: 'user@example.com' } };
+    const app = { id: 10, publicId: 'sqid-10', isPlatform: false, requireTwoFactor: false, url: 'https://app.example.com' };
+    const fakeSession = { user: { id: 'ba-user-1', email: 'user@example.com', twoFactorEnabled: false } };
     const saUser = {
       id: 1,
       publicId: 'sqid-1',
@@ -212,13 +279,22 @@ describe('TokenController', () => {
       org: { id: 5, publicId: 'sqid-5', appId: 10 },
     };
 
+    const fakeReq = { headers: {} } as unknown as import('express').Request;
+
+    // Helper to mock common authorize dependencies
+    const mockApp = (overrides: Partial<typeof app> = {}) =>
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, ...overrides });
+    const mockSession = (userOverrides: Record<string, unknown> = {}) =>
+      mockGetSession.mockResolvedValue({ user: { ...fakeSession.user, ...userOverrides } });
+    const mockSaUser = (overrides: Partial<typeof saUser & { status: string }> = {}) =>
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, ...overrides });
+
     it('returns redirect url with code when session is valid and org matches', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue(app);
-      mockGetSession.mockResolvedValue(fakeSession);
-      mockPrisma.saUser.findFirst.mockResolvedValue(saUser);
+      mockApp();
+      mockSession();
+      mockSaUser();
       mockOauthService.generateCode.mockReturnValue('test-code-abc');
 
-      const fakeReq = { headers: {} } as unknown as import('express').Request;
       const result = await controller.oauthAuthorize(
         'sqid-10',
         'https://app.example.com/callback',
@@ -234,24 +310,22 @@ describe('TokenController', () => {
     });
 
     it('throws UnauthorizedException when session is null', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockApp();
       mockGetSession.mockResolvedValue(null);
 
-      const fakeReq = { headers: {} } as unknown as import('express').Request;
       await expect(
         controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
       ).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws ForbiddenException when user org does not match app', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, id: 10 });
-      mockGetSession.mockResolvedValue(fakeSession);
+      mockApp();
+      mockSession();
       mockPrisma.saUser.findFirst.mockResolvedValue({
         ...saUser,
         org: { id: 5, publicId: 'sqid-5', appId: 999 }, // wrong app
       });
 
-      const fakeReq = { headers: {} } as unknown as import('express').Request;
       await expect(
         controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
       ).rejects.toThrow(ForbiddenException);
@@ -262,16 +336,46 @@ describe('TokenController', () => {
     it.each(['inactive', 'pending'] as const)(
       'throws ForbiddenException when user status is %s',
       async (status) => {
-        mockPrisma.saApp.findUnique.mockResolvedValue(app);
-        mockGetSession.mockResolvedValue(fakeSession);
-        mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, status });
+        mockApp();
+        mockSession();
+        mockSaUser({ status });
 
-        const fakeReq = { headers: {} } as unknown as import('express').Request;
         await expect(
           controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
         ).rejects.toThrow(ForbiddenException);
       },
     );
+
+    // 2FA forced-enrollment gate
+    it('redirects required+unenrolled users to forced enrollment', async () => {
+      process.env.ADMIN_URL = 'https://admin.example';
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockSession({ twoFactorEnabled: false });
+      mockSaUser({ status: 'active' });
+
+      const res = await controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq);
+      expect(res.url).toContain('/account/security?enroll=1&next=');
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+
+      delete process.env.ADMIN_URL;
+    });
+
+    it('issues a code with mfa amr for enrolled users when 2FA is required', async () => {
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockSession({ twoFactorEnabled: true });
+      mockSaUser({ status: 'active' });
+      mockOauthService.generateCode.mockReturnValue('mfa-code-xyz');
+
+      await controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq);
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['pwd', 'otp', 'mfa'],
+      );
+    });
   });
 
   // ── POST /api/token/oauth/token ───────────────────────────────────────────

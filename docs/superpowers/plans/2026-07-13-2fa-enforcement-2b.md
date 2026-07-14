@@ -171,45 +171,46 @@ Expected: `otplib` appears under `devDependencies` in `apps/auth-server/package.
 
 - [ ] **Step 2: Write the failing test**
 
-This test enrolls a real user through better-auth so the stored secret is encrypted exactly as production, then computes a live code with `otplib` and asserts the helper accepts it. It reuses the auth-server's existing test DB harness (same as 2a's plugin tests — a live `auth.api` against the test database).
+**Hermetic unit test (no DB).** The auth-server unit suite mocks Prisma and has no database, so do NOT enroll via live better-auth here. Instead, encrypt a known base32 secret with better-auth's own `symmetricEncrypt` under `BETTER_AUTH_SECRET` (exactly how the plugin stores it), stub `prisma.twoFactor.findUnique` to return that row, and compute the code with `otplib`. This exercises the real `symmetricDecrypt` → `createOTP().verify()` round-trip and the base32-secret compatibility between `otplib` and `@better-auth/utils`, all in-process. (The remaining assumption — that `BETTER_AUTH_SECRET` equals better-auth's runtime `secretConfig` for a *genuinely* enrolled user — is guarded by the direct/login e2e in Task 12.)
+
+Follow the repo's existing Prisma-mock pattern (the auth-server specs already mock `@sassy-auth/db`; reuse that mock style rather than inventing one).
 
 ```typescript
 // apps/auth-server/src/auth/verify-user-totp.spec.ts
 import { authenticator } from 'otplib';
+import { symmetricEncrypt } from 'better-auth/crypto';
 import { prisma } from '@sassy-auth/db';
-import { auth } from './auth.config';
-import { symmetricDecrypt } from 'better-auth/crypto';
 import { verifyUserTotp } from './verify-user-totp';
 
-// otplib default is SHA1 / 6 digits / 30s — matches better-auth twoFactor.
-async function enrollAndGetSecret(userId: string, email: string, password: string) {
-  // sign in to get a session, enable 2FA, decrypt the stored secret for the test
-  const enable = await auth.api.enableTwoFactor({
-    body: { password },
-    headers: await signInHeaders(email, password),
-  });
-  const tf = await prisma.twoFactor.findUniqueOrThrow({ where: { userId } });
-  return symmetricDecrypt({ key: process.env.BETTER_AUTH_SECRET!, data: tf.secret });
-}
+jest.mock('@sassy-auth/db', () => ({
+  prisma: { twoFactor: { findUnique: jest.fn() } },
+}));
+
+const findUnique = prisma.twoFactor.findUnique as jest.Mock;
 
 describe('verifyUserTotp', () => {
-  it('accepts a live code and rejects a wrong one', async () => {
-    const { userId, email, password } = await seedTwoFactorUser();
-    const secret = await enrollAndGetSecret(userId, email, password);
+  const OLD = process.env.BETTER_AUTH_SECRET;
+  beforeAll(() => { process.env.BETTER_AUTH_SECRET = 'test-secret-32-chars-min-aaaaaaaa'; });
+  afterAll(() => { process.env.BETTER_AUTH_SECRET = OLD; });
+
+  it('accepts a valid code and rejects a wrong one', async () => {
+    const secret = authenticator.generateSecret(); // base32
+    const stored = await symmetricEncrypt({ key: process.env.BETTER_AUTH_SECRET!, data: secret });
+    findUnique.mockResolvedValue({ userId: 'ba_1', secret: stored, backupCodes: '', verified: true });
 
     const good = authenticator.generate(secret);
-    expect(await verifyUserTotp(userId, good)).toBe(true);
-    expect(await verifyUserTotp(userId, '000000')).toBe(false);
+    expect(await verifyUserTotp('ba_1', good)).toBe(true);
+    expect(await verifyUserTotp('ba_1', '000000')).toBe(false);
   });
 
   it('returns false when the user has no TwoFactor row', async () => {
-    const { userId } = await seedPlainUser();
-    expect(await verifyUserTotp(userId, '123456')).toBe(false);
+    findUnique.mockResolvedValue(null);
+    expect(await verifyUserTotp('ba_missing', '123456')).toBe(false);
   });
 });
 ```
 
-> Reuse the existing 2a 2FA-enrollment test helpers (`seedTwoFactorUser`, `signInHeaders`) from the auth-server test utils; if a helper is missing, add it next to the other seed helpers rather than inlining. The assertion that matters is `verifyUserTotp(userId, good) === true` — that proves the decrypt key (`BETTER_AUTH_SECRET`) matches better-auth's `secretConfig`. If it fails, adjust the `key` to match better-auth's `buildSecretConfig` output and re-run; do not weaken the assertion.
+> The assertion `verifyUserTotp('ba_1', good) === true` proves the `symmetricEncrypt`/`symmetricDecrypt` round-trip and that `otplib`'s base32 secret verifies under `@better-auth/utils`'s `createOTP`. If it fails on secret encoding, do not weaken the assertion — adjust how the secret is generated to match what better-auth's enrollment stores (base32), and confirm against Task 12's live e2e.
 
 - [ ] **Step 3: Run it to verify it fails**
 
@@ -999,6 +1000,29 @@ test('required app challenges an enrolled user and stamps mfa amr', async ({ pag
 ```
 
 Reuse `completeEnrollment`/`completeTotpChallenge`/`decodeJwt` helpers from 2a's suite; add any missing helper to `oauth-fixtures.ts`.
+
+- [ ] **Step 3b: direct/login real-key guard**
+
+This is the definitive check that `verifyUserTotp`'s `BETTER_AUTH_SECRET` key matches better-auth's runtime `secretConfig` for a genuinely-enrolled user (Task 3's unit test is hermetic and cannot cover this). Using the enrolled `tfa@sa.io` account and its known TOTP secret from the seed/enrollment, POST to `direct/login` with a live `otplib` code and assert a `mfa` JWT; and assert a `403 two_factor_required` when the code is omitted:
+
+```typescript
+test('direct/login enforces 2FA and issues an mfa JWT with a valid code', async ({ request }) => {
+  const noCode = await request.post(`${AUTH_SERVER_URL}/api/token/direct/login`, {
+    data: { identifier: 'tfa@sa.io', password: TFA_PASSWORD, appId: REQUIRED_APP_CLIENT_ID },
+  });
+  expect(noCode.status()).toBe(403);
+
+  const totpCode = authenticator.generate(TFA_TOTP_SECRET); // otplib, seed secret
+  const ok = await request.post(`${AUTH_SERVER_URL}/api/token/direct/login`, {
+    data: { identifier: 'tfa@sa.io', password: TFA_PASSWORD, appId: REQUIRED_APP_CLIENT_ID, totpCode },
+  });
+  expect(ok.status()).toBe(201);
+  const jwt = (await ok.json()).access_token;
+  expect(decodeJwt(jwt).amr).toEqual(expect.arrayContaining(['pwd', 'otp', 'mfa']));
+});
+```
+
+> The enrolled account's TOTP secret must be captured at enrollment time and exposed to the test (mirror how 2a's suite computes live TOTP from the enrollment secret). If `tfa@sa.io` is enrolled via a UI step rather than a fixed seed secret, capture the secret during that enrollment and reuse it here.
 
 - [ ] **Step 4: Live-RS amr assertion**
 

@@ -43,7 +43,9 @@
       "urlHint": "URL de base principale de cette application.",
       "twoFactorTrustDays": "Intervalle de confiance 2FA (jours)",
       "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
-      "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système."
+      "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système.",
+      "requireTwoFactor": "Exiger l'authentification à deux facteurs",
+      "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer."
     },
     "actions": {
       "view": "Voir",
@@ -543,6 +545,8 @@
       "submitButton": "Regénérer les codes",
       "submitting": "Regénération…"
     },
+    "forcedBanner": "Cette application requiert l'authentification à deux facteurs. Terminez la configuration ci-dessous pour continuer.",
+    "continueToApp": "Continuer",
     "errors": {
       "invalidPassword": "Mot de passe invalide.",
       "invalidCode": "Code invalide ou expiré.",

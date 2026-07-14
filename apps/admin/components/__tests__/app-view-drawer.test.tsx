@@ -4,8 +4,8 @@ import { NextIntlClientProvider } from 'next-intl'
 import en from '@/messages/en.json'
 import { AppViewDrawer } from '../app-view-drawer'
 
-const app = { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false }
-const platformApp = { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', isPlatform: true }
+const app = { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false }
+const platformApp = { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', isPlatform: true, requireTwoFactor: false }
 
 function withIntl(node: React.ReactNode) {
   return <NextIntlClientProvider locale="en" messages={en}>{node}</NextIntlClientProvider>

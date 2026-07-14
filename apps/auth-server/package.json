@@ -46,6 +46,7 @@
     "@types/nodemailer": "^8.0.1",
     "@types/supertest": "^6.0.2",
     "jest": "^29.7.0",
+    "otplib": "^13.4.1",
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.4",
     "ts-node": "^10.9.2",
@@ -64,12 +65,14 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
+      "^otplib$": "<rootDir>/__mocks__/otplib.ts",
       "^better-auth/node$": "<rootDir>/__mocks__/better-auth-node.ts",
       "^better-auth/crypto$": "<rootDir>/__mocks__/better-auth-crypto.ts",
       "^better-auth/plugins$": "<rootDir>/__mocks__/better-auth-plugins.ts",
       "^better-auth/adapters/prisma$": "<rootDir>/__mocks__/better-auth-adapters-prisma.ts",
       "^better-auth/api$": "<rootDir>/__mocks__/better-auth-api.ts",
       "^better-auth$": "<rootDir>/__mocks__/better-auth.ts",
+      "^@better-auth/utils/otp$": "<rootDir>/../../../node_modules/.pnpm/node_modules/@better-auth/utils/dist/otp.cjs",
       "^uuid$": "<rootDir>/__mocks__/uuid.ts"
     },
     "coverageDirectory": "../coverage",

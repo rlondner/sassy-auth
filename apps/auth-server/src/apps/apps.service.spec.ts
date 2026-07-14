@@ -34,8 +34,8 @@ const loggerFake: Partial<LoggerService> = {
   getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() } as never),
 };
 
-const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null };
-const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', callbackUrl: null, isPlatform: true, twoFactorTrustDays: null };
+const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false };
+const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', callbackUrl: null, isPlatform: true, twoFactorTrustDays: null, requireTwoFactor: false };
 
 describe('AppsService', () => {
   let service: AppsService;
@@ -58,7 +58,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -81,7 +81,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
     expect(result).toEqual({
       publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
-      callbackUrl: null, isPlatform: false, twoFactorTrustDays: null,
+      callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -119,10 +119,11 @@ describe('AppsService', () => {
         callbackUrl: null,
         isPlatform: false,
         twoFactorTrustDays: null,
+        requireTwoFactor: false,
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false });
   });
 
   it('createApp stores a provided callbackUrl', async () => {
@@ -255,6 +256,33 @@ describe('AppsService', () => {
     mockPrisma.saApp.delete.mockResolvedValue(appRow);
     await service.deleteApp('ba-caller', 'sq_1');
     expect(mockPrisma.saApp.delete).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
+  });
+
+  it('persists requireTwoFactor on create and update for non-platform apps', async () => {
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
+    mockPrisma.saApp.update
+      .mockResolvedValueOnce({ ...appRow, requireTwoFactor: true })
+      .mockResolvedValueOnce({ ...appRow, requireTwoFactor: false });
+    const created = await service.createApp('ba-caller', { name: 'X', url: 'https://x.example', requireTwoFactor: true });
+    expect(created.requireTwoFactor).toBe(true);
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ requireTwoFactor: true }),
+    }));
+
+    mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, requireTwoFactor: true });
+    const updated = await service.updateApp('ba-caller', 'sq_1', { requireTwoFactor: false });
+    expect(updated.requireTwoFactor).toBe(false);
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { requireTwoFactor: false },
+    });
+  });
+
+  it('still rejects requireTwoFactor updates on the platform app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(platformRow);
+    await expect(service.updateApp('ba-caller', 'sq_2', { requireTwoFactor: true }))
+      .rejects.toThrow('Platform app cannot be modified');
   });
 
   describe('createApp re-throw non-P2002 error', () => {

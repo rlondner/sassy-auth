@@ -23,6 +23,8 @@ type Step =
 
 interface Props {
   twoFactorEnabled: boolean
+  forced?: boolean
+  next?: string | null
 }
 
 function BackupCodesDisplay({
@@ -82,7 +84,7 @@ function BackupCodesDisplay({
   )
 }
 
-export function SecurityClient({ twoFactorEnabled: initialEnabled }: Props) {
+export function SecurityClient({ twoFactorEnabled: initialEnabled, forced, next }: Props) {
   const t = useTranslations('security')
   const [isPending, startTransition] = useTransition()
   const [enabled, setEnabled] = useState(initialEnabled)
@@ -171,6 +173,16 @@ export function SecurityClient({ twoFactorEnabled: initialEnabled }: Props) {
         <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
       </div>
 
+      {/* Forced-enrollment banner: shown only when app requires 2FA and user is not yet enrolled */}
+      {forced && !enabled && (
+        <div
+          role="alert"
+          className="rounded-md border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-100"
+        >
+          {t('forcedBanner')}
+        </div>
+      )}
+
       {/* Status badge */}
       <p className="text-sm font-medium">
         {enabled ? t('status.enabled') : t('status.disabled')}
@@ -254,6 +266,17 @@ export function SecurityClient({ twoFactorEnabled: initialEnabled }: Props) {
       {/* Post-enable done state */}
       {enabled && step === 'done' && backupCodes && (
         <BackupCodesDisplay codes={backupCodes} t={t} />
+      )}
+
+      {/* Forced-enrollment Continue button: shown after enrollment is confirmed */}
+      {enabled && step === 'done' && forced && next && (
+        <button
+          type="button"
+          onClick={() => { window.location.href = next }}
+          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+        >
+          {t('continueToApp')}
+        </button>
       )}
 
       {/* ---- Disable flow ---- */}
