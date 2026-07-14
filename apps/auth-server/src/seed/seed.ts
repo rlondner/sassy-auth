@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
-import { auth } from '../auth/auth.config';
+import { hashPassword } from 'better-auth/crypto';
+import * as crypto from 'crypto';
 import { generatePendingPublicId } from '../common/pending-public-id';
 
 const sqids = new Sqids({
@@ -47,7 +48,7 @@ async function ensurePlatformSuperAdminRole(platformAppId: number) {
   });
 
   if (!role) {
-    role = await prisma.$transaction(async (tx) => {
+    role = await prisma.$transaction(async (tx: any) => {
       const created = await tx.saRole.create({
         data: {
           publicId: generatePendingPublicId(),
@@ -61,7 +62,7 @@ async function ensurePlatformSuperAdminRole(platformAppId: number) {
         data: { publicId },
       });
     });
-    console.log(`Created role: ${SUPER_ADMIN_ROLE_NAME} (publicId=${role.publicId})`);
+    console.log(`Created role: ${SUPER_ADMIN_ROLE_NAME} (publicId=${role!.publicId})`);
   } else {
     console.log(`Role already exists: ${SUPER_ADMIN_ROLE_NAME} (publicId=${role.publicId})`);
   }
@@ -72,8 +73,8 @@ async function ensurePlatformSuperAdminRole(platformAppId: number) {
 
   for (const perm of platformPerms) {
     await prisma.saRolePermission.upsert({
-      where: { roleId_permissionId: { roleId: role.id, permissionId: perm.id } },
-      create: { roleId: role.id, permissionId: perm.id },
+      where: { roleId_permissionId: { roleId: role!.id, permissionId: perm.id } },
+      create: { roleId: role!.id, permissionId: perm.id },
       update: {},
     });
   }
@@ -93,21 +94,37 @@ async function seedPlatformAdmin(
     return;
   }
 
-  const result = await auth.api.signUpEmail({
-    body: {
-      email: admin.email,
-      password: ADMIN_PASSWORD,
-      name: `${admin.firstName} ${admin.lastName}`,
-    },
-  });
-  const baUserId: string = result.user.id;
+  const baUserId = crypto.randomUUID();
+  const hashedPassword = await hashPassword(ADMIN_PASSWORD);
+  const now = new Date();
 
-  await prisma.user.update({
-    where: { id: baUserId },
-    data: { emailVerified: true },
-  });
+  const saUser = await prisma.$transaction(async (tx: any) => {
+    // 1. Create BetterAuth user
+    await tx.user.create({
+      data: {
+        id: baUserId,
+        name: `${admin.firstName} ${admin.lastName}`,
+        email: admin.email,
+        emailVerified: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
 
-  const saUser = await prisma.$transaction(async (tx) => {
+    // 2. Create Credential account
+    await tx.account.create({
+      data: {
+        id: crypto.randomUUID(),
+        accountId: baUserId,
+        providerId: 'credential',
+        userId: baUserId,
+        password: hashedPassword,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    // 3. Create SaUser
     const created = await tx.saUser.create({
       data: {
         publicId: generatePendingPublicId(),
@@ -147,7 +164,7 @@ async function main() {
   let platformApp = await prisma.saApp.findFirst({ where: { isPlatform: true } });
 
   if (!platformApp) {
-    platformApp = await prisma.$transaction(async (tx) => {
+    platformApp = await prisma.$transaction(async (tx: any) => {
       const created = await tx.saApp.create({
         data: {
           publicId: generatePendingPublicId(),
@@ -162,7 +179,7 @@ async function main() {
         data: { publicId },
       });
     });
-    console.log(`Created platform app: id=${platformApp.id}, publicId=${platformApp.publicId}`);
+    console.log(`Created platform app: id=${platformApp!.id}, publicId=${platformApp!.publicId}`);
   } else {
     console.log(`Platform app already exists: publicId=${platformApp.publicId}`);
   }
@@ -171,7 +188,7 @@ async function main() {
   let platformOrg = await prisma.saOrg.findFirst({ where: { isPlatform: true } });
 
   if (!platformOrg) {
-    platformOrg = await prisma.$transaction(async (tx) => {
+    platformOrg = await prisma.$transaction(async (tx: any) => {
       const created = await tx.saOrg.create({
         data: {
           publicId: generatePendingPublicId(),
@@ -186,7 +203,7 @@ async function main() {
         data: { publicId },
       });
     });
-    console.log(`Created platform org: id=${platformOrg.id}, publicId=${platformOrg.publicId}`);
+    console.log(`Created platform org: id=${platformOrg!.id}, publicId=${platformOrg!.publicId}`);
   } else {
     console.log(`Platform org already exists: publicId=${platformOrg.publicId}`);
   }
@@ -196,7 +213,7 @@ async function main() {
     const isSystem = name.startsWith('org.');
     const existing = await prisma.saPermission.findUnique({ where: { name } });
     if (!existing) {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: any) => {
         const c = await tx.saPermission.create({
           data: { publicId: generatePendingPublicId(), name, appId: platformApp!.id, isSystem },
         });
@@ -223,11 +240,11 @@ async function main() {
   }
 
   // 4. Platform Super Admin role
-  const superAdminRole = await ensurePlatformSuperAdminRole(platformApp.id);
+  const superAdminRole = await ensurePlatformSuperAdminRole(platformApp!.id);
 
   // 5. Platform admin users
   for (const admin of PLATFORM_ADMINS) {
-    await seedPlatformAdmin(admin, platformOrg.id, superAdminRole.id);
+    await seedPlatformAdmin(admin, platformOrg!.id, superAdminRole!.id);
   }
 
   if (process.env.SEED_DEMO === '1') {
