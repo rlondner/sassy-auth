@@ -1,7 +1,7 @@
 'use client'
 
 import { LogOut } from 'lucide-react'
-import { UserAvatar } from '@sassy-auth/ui'
+import { UserAvatar, Tooltip, TooltipTrigger, TooltipContent } from '@sassy-auth/ui'
 import { LocaleSwitcher } from './locale-switcher'
 import { ThemeToggle } from './theme-toggle'
 import { signOutAction } from '@/app/(admin)/actions'
@@ -30,14 +30,18 @@ export function UserFooter({
         <ThemeToggle lightLabel={lightModeLabel} darkLabel={darkModeLabel} />
         <LocaleSwitcher currentLocale={currentLocale} availableLocales={availableLocales} />
         <form action={signOutAction}>
-          <button
-            type="submit"
-            className="text-sidebar-foreground hover:text-white"
-            title={signOutLabel}
-            aria-label={signOutLabel}
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="submit"
+                className="text-sidebar-foreground hover:text-white focus-visible:ring-2"
+                aria-label={signOutLabel}
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{signOutLabel}</TooltipContent>
+          </Tooltip>
         </form>
       </div>
 

@@ -13,6 +13,7 @@ jest.mock('@/app/(admin)/permissions/actions', () => ({
 }))
 
 jest.mock('@sassy-auth/ui', () => {
+  const React = require('react')
   const actual = jest.requireActual('@sassy-auth/ui')
   const Passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>
   const Trigger = ({ children, asChild: _asChild, ...rest }: { children?: React.ReactNode; asChild?: boolean }) =>
@@ -27,6 +28,10 @@ jest.mock('@sassy-auth/ui', () => {
     DropdownMenuContent: Passthrough,
     DropdownMenuItem: Item,
     DropdownMenuSeparator: () => <hr />,
+    Tooltip: Passthrough,
+    TooltipTrigger: Trigger,
+    TooltipContent: Passthrough,
+    TooltipProvider: Passthrough,
     SidebarTrigger: () => <button type="button" aria-label="Toggle Sidebar" />,
   }
 })

@@ -7,7 +7,7 @@ import { Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger, Badge,
+  DropdownMenuSeparator, DropdownMenuTrigger, Badge, Tooltip, TooltipTrigger, TooltipContent,
 } from '@sassy-auth/ui'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteAppAction, listAppsAction } from '@/app/(admin)/apps/actions'
@@ -85,17 +85,22 @@ export function AppsTable({ initial }: Props) {
         return (
           <div className="flex items-center gap-2">
             <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-label-md">{a.publicId}</code>
-            <button
-              type="button"
-              aria-label={t('apps.actions.copy')}
-              onClick={(e) => {
-                e.stopPropagation()
-                void copySqid(a.publicId, a.publicId)
-              }}
-              className="text-muted-foreground hover:text-primary"
-            >
-              <span className="material-symbols-outlined text-[14px]">{copied ? 'check' : 'content_copy'}</span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={copied ? t('common.copied') : t('common.copy')}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void copySqid(a.publicId, a.publicId)
+                  }}
+                  className="text-muted-foreground hover:text-primary focus-visible:ring-2"
+                >
+                  <span className="material-symbols-outlined text-[14px]">{copied ? 'check' : 'content_copy'}</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{copied ? t('common.copied') : t('common.copy')}</TooltipContent>
+            </Tooltip>
           </div>
         )
       },
@@ -107,11 +112,19 @@ export function AppsTable({ initial }: Props) {
         const a = row.original
         return (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
-                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
-              </button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <button
+                    aria-label={t('common.moreActions')}
+                    className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted focus-visible:ring-2"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>{t('common.moreActions')}</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(a); setViewOpen(true) }}>
                 {t('apps.actions.view')}

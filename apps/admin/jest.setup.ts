@@ -39,6 +39,49 @@ beforeEach(() => {
   jest.setMock('next/headers', nextHeadersMock)
 })
 
+jest.mock('@sassy-auth/ui', () => {
+  const React = require('react')
+  const actual = jest.requireActual('@sassy-auth/ui')
+
+  // Tooltip components require TooltipProvider context which is often missing
+  // in unit tests. We mock them as passthroughs.
+  const Tooltip = ({ children }: any) => children
+  const TooltipTrigger = ({ children, asChild }: any) => {
+    if (asChild) {
+      return React.cloneElement(React.Children.only(children))
+    }
+    return children
+  }
+  const TooltipContent = () => null
+  const TooltipProvider = ({ children }: any) => children
+
+  // DropdownMenu is often closed/portal-hidden in JSDOM, making it hard to
+  // test content. We mock it to always render its content.
+  const DropdownMenu = ({ children }: any) => children
+  const DropdownMenuTrigger = ({ children, asChild }: any) => {
+    if (asChild) {
+      return React.cloneElement(React.Children.only(children))
+    }
+    return children
+  }
+  const DropdownMenuContent = ({ children }: any) => children
+
+  // SidebarTrigger uses SidebarContext
+  const SidebarTrigger = () => null
+
+  return {
+    ...actual,
+    Tooltip,
+    TooltipTrigger,
+    TooltipContent,
+    TooltipProvider,
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    SidebarTrigger,
+  }
+})
+
 jest.mock('@sentry/nextjs', () => ({
   addBreadcrumb: jest.fn(),
   setUser: jest.fn(),
