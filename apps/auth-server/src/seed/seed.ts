@@ -142,6 +142,11 @@ async function seedPlatformAdmin(
 }
 
 async function main() {
+  // bug-0210: the session gate blocks session creation for non-active users.
+  // During seeding, we create BetterAuth users (via signUpEmail) which
+  // immediately triggers session creation BEFORE the SaUser record is
+  // inserted and set to 'active'. Skip the gate for the duration of the seed.
+  process.env.SKIP_SESSION_GATE = 'true';
   console.log('Seeding platform data...');
 
   // 1. Platform app
