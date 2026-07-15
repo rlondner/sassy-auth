@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
-import { AUTH_SERVER_URL } from '@/lib/config'
+import { AUTH_SERVER_URL, CI_TESTS } from '@/lib/config'
 import { forwardNamedCookie, forwardNamedCookieWithMaxAge } from '../account/security/actions'
 import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '@/lib/two-factor-prompt'
 
@@ -231,7 +231,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
     } catch { /* use system default */ }
   }
 
-  if (process.env.CI_TESTS !== 'true' && shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
+  if (!CI_TESTS && shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
     const encodedNext = nextSafe ? encodeURIComponent(nextSafe) : ''
     redirect(`/login/two-factor-prompt${encodedNext ? `?next=${encodedNext}` : ''}`)
   }
