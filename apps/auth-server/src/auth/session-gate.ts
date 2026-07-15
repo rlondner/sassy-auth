@@ -1,3 +1,5 @@
+import { prisma } from '@sassy-auth/db';
+
 export interface GateClient {
   saUser: {
     findUnique(args: {
@@ -17,6 +19,13 @@ export async function evaluateSessionGate(
   db: GateClient,
   userId: string,
 ): Promise<{ allowed: boolean; status: string | null }> {
+  // During seeding, the BetterAuth user is created before the SaUser record
+  // is inserted. To avoid blocking the seed, we check if the user is being
+  // created by the seed script via an environment variable.
+  if (process.env.SKIP_SESSION_GATE === 'true') {
+    return { allowed: true, status: 'active' };
+  }
+
   const saUser = await db.saUser.findUnique({
     where: { betterAuthUserId: userId },
     select: { status: true },

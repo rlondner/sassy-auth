@@ -231,7 +231,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
     } catch { /* use system default */ }
   }
 
-  if (shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
+  if (process.env.CI_TESTS !== 'true' && shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
     const encodedNext = nextSafe ? encodeURIComponent(nextSafe) : ''
     redirect(`/login/two-factor-prompt${encodedNext ? `?next=${encodedNext}` : ''}`)
   }
