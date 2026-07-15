@@ -38,6 +38,7 @@ function makeEntry(overrides: Partial<Record<string, unknown>> = {}) {
     codeChallenge: CHALLENGE,
     codeChallengeMethod: 'S256',
     expiresAt: new Date(Date.now() + 60_000),
+    amr: JSON.stringify(['pwd']),
     ...overrides,
   };
 }
@@ -57,7 +58,7 @@ describe('OauthService', () => {
 
   describe('generateCode', () => {
     it('inserts a row with all fields and returns the code', async () => {
-      const code = await service.generateCode('user-1', 'app-1', REDIRECT_URI, CHALLENGE, 'S256');
+      const code = await service.generateCode('user-1', 'app-1', REDIRECT_URI, CHALLENGE, 'S256', ['pwd']);
       expect(typeof code).toBe('string');
       expect(code.length).toBeGreaterThan(10);
       expect(mockPrisma.saOauthCode.create).toHaveBeenCalledWith({
@@ -68,24 +69,46 @@ describe('OauthService', () => {
           redirectUri: REDIRECT_URI,
           codeChallenge: CHALLENGE,
           codeChallengeMethod: 'S256',
+          amr: JSON.stringify(['pwd']),
           expiresAt: expect.any(Date),
         }),
       });
     });
 
     it('produces unique codes across consecutive calls', async () => {
-      const a = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256');
-      const b = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256');
+      const a = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256', ['pwd']);
+      const b = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256', ['pwd']);
       expect(a).not.toBe(b);
     });
   });
 
   describe('exchangeCode', () => {
-    it('returns userId and appPublicId when everything matches', async () => {
+    it('returns userId, appPublicId, and amr when everything matches', async () => {
       mockPrisma.saOauthCode.delete.mockResolvedValue(makeEntry());
       const result = await service.exchangeCode('some-code', 'app-55', REDIRECT_URI, VERIFIER);
-      expect(result).toEqual({ userId: 'user-99', appPublicId: 'app-55' });
+      expect(result).toEqual({ userId: 'user-99', appPublicId: 'app-55', amr: ['pwd'] });
       expect(mockPrisma.saOauthCode.delete).toHaveBeenCalledWith({ where: { code: 'some-code' } });
+    });
+
+    it('round-trips amr from generateCode to exchangeCode', async () => {
+      const verifier = 'a'.repeat(64);
+      const challenge = require('crypto').createHash('sha256').update(verifier)
+        .digest('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      // Wire up the mock: create captures the data, delete returns it back
+      let capturedData: Record<string, unknown> = {};
+      mockPrisma.saOauthCode.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+        capturedData = data;
+        return Promise.resolve({});
+      });
+      mockPrisma.saOauthCode.delete.mockImplementation(() =>
+        Promise.resolve({
+          ...capturedData,
+          expiresAt: new Date(Date.now() + 60_000),
+        }),
+      );
+      const code = await service.generateCode('u_pub', 'a_pub', 'https://rs.example/cb', challenge, 'S256', ['pwd', 'otp', 'mfa']);
+      const out = await service.exchangeCode(code, 'a_pub', 'https://rs.example/cb', verifier);
+      expect(out.amr).toEqual(['pwd', 'otp', 'mfa']);
     });
 
     // Prisma raises P2025 when `delete` targets a row that does not

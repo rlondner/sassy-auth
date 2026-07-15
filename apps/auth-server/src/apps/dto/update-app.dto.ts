@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 
 // "At least one of name / url / callbackUrl" is enforced server-side in
@@ -13,4 +13,18 @@ export class UpdateAppDto {
   @IsAppUrl()
   @MaxLength(2048)
   callbackUrl?: string | null;
+
+  /**
+   * Per-app 2FA trust / re-prompt interval in days.
+   * null → use system default (TWO_FACTOR_TRUST_DAYS env var, default 14).
+   * Must be a positive integer when provided; max 3650 (10 years).
+   */
+  @IsOptional()
+  @ValidateIf((o: UpdateAppDto) => o.twoFactorTrustDays !== null && o.twoFactorTrustDays !== undefined)
+  @IsInt()
+  @IsPositive()
+  @Max(3650)
+  twoFactorTrustDays?: number | null;
+
+  @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
 }

@@ -30,6 +30,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
   const [callbackUrl, setCallbackUrl] = React.useState(app.callbackUrl ?? '')
+  const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
+  const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
   const { copiedKey, copy } = useCopyFeedback()
   const copied = copiedKey !== null
@@ -39,10 +41,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setName(app.name)
     setUrl(app.url)
     setCallbackUrl(app.callbackUrl ?? '')
+    setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
+    setRequireTwoFactor(app.requireTwoFactor ?? false)
     setErrorKey(null)
   }, [app])
 
-  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '')
+  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '') || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -55,10 +59,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; callbackUrl?: string | null } = {}
+    const patch: { name?: string; url?: string; callbackUrl?: string | null; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (callbackUrl !== (app.callbackUrl ?? '')) patch.callbackUrl = callbackUrl.trim() || null
+    if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
+    if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
     startTransition(async () => {
       const result = await updateAppAction(app.publicId, patch)
       if ('errorKey' in result) {
@@ -109,6 +115,38 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.callbackUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="appTrustDays">{t('apps.fields.twoFactorTrustDays')}</Label>
+              <Input
+                id="appTrustDays"
+                type="number"
+                min={1}
+                max={3650}
+                value={twoFactorTrustDays ?? ''}
+                onChange={(e) =>
+                  setTwoFactorTrustDays(e.target.value === '' ? null : Number(e.target.value))
+                }
+                placeholder={t('apps.fields.twoFactorTrustDaysPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.twoFactorTrustDaysHint')}
+              </p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="requireTwoFactor"
+                  checked={requireTwoFactor}
+                  onChange={(e) => setRequireTwoFactor(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                />
+                {t('apps.fields.requireTwoFactor')}
+              </label>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.requireTwoFactorHint')}
               </p>
             </div>
             <div>

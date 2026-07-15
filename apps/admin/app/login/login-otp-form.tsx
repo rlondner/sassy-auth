@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { useActionState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@sassy-auth/ui'
 import { requestOtp, verifyOtp } from './actions'
 
@@ -12,6 +13,7 @@ const inputClass =
 
 export function LoginOtpForm({ next }: { next: string }) {
   const t = useTranslations('login')
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [step, setStep] = useState<'email' | 'code'>('email')
 
@@ -28,10 +30,16 @@ export function LoginOtpForm({ next }: { next: string }) {
   )
 
   const [verifyState, verifyActionFn, verifyPending] = useActionState<
-    { error?: string },
+    { error?: string } | { twoFactor: true },
     FormData
   >(
-    async (_prev, formData) => verifyOtp(formData),
+    async (_prev, formData) => {
+      const result = await verifyOtp(formData)
+      if ('twoFactor' in result && result.twoFactor) {
+        router.push(`/login/two-factor${next ? `?next=${encodeURIComponent(next)}` : ''}`)
+      }
+      return result
+    },
     {},
   )
 
@@ -74,6 +82,9 @@ export function LoginOtpForm({ next }: { next: string }) {
             <input type="hidden" name="next" value={next} />
             <input type="hidden" name="email" value={email} />
             <p data-testid="otp-sent" className="text-body-sm text-[var(--muted-foreground)]">{t('otp.sent')}</p>
+            <p className="text-body-sm text-[var(--muted-foreground)]">
+              {t('otp.twoFactorHint')}
+            </p>
             <div className="flex flex-col gap-1.5">
               <label className="text-label-md font-semibold" htmlFor="otp">{t('otp.codeLabel')}</label>
               <input
@@ -85,7 +96,7 @@ export function LoginOtpForm({ next }: { next: string }) {
                 className={inputClass}
               />
             </div>
-            {verifyState?.error && (
+            {'error' in verifyState && verifyState.error && (
               <p data-testid="otp-error" className="text-label-md text-[var(--destructive)]">{errKey(verifyState.error)}</p>
             )}
             <Button type="submit" className="w-full" loading={verifyPending}>{t('otp.verify')}</Button>

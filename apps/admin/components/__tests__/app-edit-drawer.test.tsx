@@ -8,7 +8,7 @@ import * as actions from '@/app/(admin)/apps/actions'
 jest.mock('@/app/(admin)/apps/actions', () => ({ updateAppAction: jest.fn() }))
 Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } })
 
-const app = { publicId: 'sq_1', name: 'Old', url: 'https://old.example', isPlatform: false }
+const app = { publicId: 'sq_1', name: 'Old', url: 'https://old.example', isPlatform: false, requireTwoFactor: false }
 
 function withIntl(node: React.ReactNode) {
   return (

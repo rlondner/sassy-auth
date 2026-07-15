@@ -24,6 +24,24 @@ export class MeService {
     return { permissions: Array.from(names).sort() };
   }
 
+  async getTwoFactorStatus(baId: string): Promise<{ twoFactorPromptedAt: Date | null }> {
+    const user = await prisma.saUser.findUnique({
+      where: { betterAuthUserId: baId },
+      select: { twoFactorPromptedAt: true },
+    });
+    if (!user) throw new ForbiddenException();
+    return { twoFactorPromptedAt: user.twoFactorPromptedAt };
+  }
+
+  async recordTwoFactorPrompted(baId: string): Promise<void> {
+    await prisma.saUser.updateMany({
+      where: { betterAuthUserId: baId },
+      data: { twoFactorPromptedAt: new Date() },
+    });
+    // updateMany is used (not update) because we key by betterAuthUserId,
+    // which is unique but not the Prisma model primary key. Idempotent.
+  }
+
   async getMyProfile(callerBaId: string): Promise<{
     userId: string;
     org: { id: string; name: string; isPlatform: boolean };

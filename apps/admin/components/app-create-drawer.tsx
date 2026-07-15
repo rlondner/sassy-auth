@@ -28,6 +28,8 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
   const [name, setName] = React.useState('')
   const [url, setUrl] = React.useState('')
   const [callbackUrl, setCallbackUrl] = React.useState('')
+  const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(null)
+  const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(false)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
   const [pending, startTransition] = React.useTransition()
 
@@ -36,6 +38,8 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       setName('')
       setUrl('')
       setCallbackUrl('')
+      setTwoFactorTrustDays(null)
+      setRequireTwoFactor(false)
       setErrorKey(null)
     }
   }, [open])
@@ -52,6 +56,8 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
         name: name.trim(),
         url: url.trim(),
         callbackUrl: callbackUrl.trim() || null,
+        twoFactorTrustDays,
+        requireTwoFactor,
       })
       if ('errorKey' in result) {
         setErrorKey(result.errorKey)
@@ -108,6 +114,38 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.callbackUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="appTrustDays">{t('apps.fields.twoFactorTrustDays')}</Label>
+              <Input
+                id="appTrustDays"
+                type="number"
+                min={1}
+                max={3650}
+                value={twoFactorTrustDays ?? ''}
+                onChange={(e) =>
+                  setTwoFactorTrustDays(e.target.value === '' ? null : Number(e.target.value))
+                }
+                placeholder={t('apps.fields.twoFactorTrustDaysPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.twoFactorTrustDaysHint')}
+              </p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="requireTwoFactor"
+                  checked={requireTwoFactor}
+                  onChange={(e) => setRequireTwoFactor(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                />
+                {t('apps.fields.requireTwoFactor')}
+              </label>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.requireTwoFactorHint')}
               </p>
             </div>
             <div className="rounded border border-border bg-muted p-3 text-body-sm text-muted-foreground">

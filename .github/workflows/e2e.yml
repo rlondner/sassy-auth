@@ -96,12 +96,38 @@ jobs:
           SEED_DEMO_MULTITENANT: '1'
         run: pnpm --filter @sassy-auth/auth-server seed
 
+      - name: Set up Python for FastAPI RS
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install FastAPI RS dependencies
+        working-directory: apps/resource-server-fastapi
+        run: |
+          pip install fastapi "uvicorn[standard]" httpx "pyjwt[crypto]" pydantic-settings jinja2
+
+      - name: Seed RS app and write publicId
+        env:
+          RS_APP_URL: 'http://localhost:8010'
+          SEED_DEMO: '1'
+          APP_NAME: resourceserver01
+          OUT_FILE: /tmp/sassy-e2e-rs-client-id.txt
+        run: |
+          pnpm --filter @sassy-auth/auth-server seed
+          pnpm --filter @sassy-auth/db exec node scripts/print-app-public-id.cjs
+
       - name: Install Playwright browsers
         run: pnpm --filter @sassy-auth/admin-e2e exec playwright install --with-deps chromium
 
       - name: Run e2e
         id: run-e2e
-        run: pnpm --filter @sassy-auth/admin-e2e test:e2e
+        env:
+          RS_BASE_URL: 'http://localhost:8010'
+        run: |
+          test -s /tmp/sassy-e2e-rs-client-id.txt || { echo "ERROR: /tmp/sassy-e2e-rs-client-id.txt is missing or empty"; exit 1; }
+          RS_CLIENT_ID=$(cat /tmp/sassy-e2e-rs-client-id.txt)
+          export RS_CLIENT_ID
+          pnpm --filter @sassy-auth/admin-e2e test:e2e
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

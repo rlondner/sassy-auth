@@ -23,7 +23,7 @@ export default async function RolesPage() {
       ? getApps({ page: 1, pageSize: 200 })
       : Promise.resolve({
           items: profile
-            ? [{ publicId: profile.app.id, name: profile.app.name, url: '', isPlatform: profile.app.isPlatform }]
+            ? [{ publicId: profile.app.id, name: profile.app.name, url: '', isPlatform: profile.app.isPlatform, requireTwoFactor: false }]
             : [],
           total: 0,
           page: 1,

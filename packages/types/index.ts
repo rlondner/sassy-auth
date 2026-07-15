@@ -29,6 +29,7 @@ export enum TokenErrorCode {
   INVALID_REDIRECT_URI = 'invalid_redirect_uri',
   INVALID_GRANT = 'invalid_grant',
   UNAUTHORIZED_CLIENT = 'unauthorized_client',
+  TWO_FACTOR_REQUIRED = 'TWO_FACTOR_REQUIRED',
 }
 
 /** Identifier type detected from the login identifier string. */

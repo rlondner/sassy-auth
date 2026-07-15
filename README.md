@@ -481,6 +481,20 @@ A Python/FastAPI example using `pyjwt[crypto]` and `PyJWKClient` is in [`apps/re
 
 Cache the JWKS document locally and refresh it only when you encounter a `kid` you do not recognise. Do not fetch it on every request.
 
+### Two-Factor Authentication (2FA)
+
+SassyAuth supports optional two-factor authentication on a per-app basis. Users can enable 2FA for their account via the admin console (`/account/security`), and each application can require it for its users.
+
+**Per-app enforcement:** Non-platform apps can set the `requireTwoFactor` flag when creating or editing an app in the admin console. When enabled, users must complete a 2FA challenge (TOTP) during login to that app.
+
+**Platform app enforcement:** The platform admin app (immutable via UI) requires 2FA via the `PLATFORM_REQUIRE_2FA` environment variable. Set it to exactly `"true"` to enforce 2FA for all platform operators. If enforcement locks you out, use the admin "Reset 2FA" action to recover.
+
+**JWT authentication methods:** When a JWT is issued, it includes an `amr` (Authentication Methods) claim:
+- `["pwd"]` — password authentication only (2FA not satisfied)
+- `["pwd","otp","mfa"]` — password + TOTP one-time password (2FA satisfied)
+
+Resource servers can inspect the `amr` claim to gate sensitive operations.
+
 ---
 
 ## API Reference

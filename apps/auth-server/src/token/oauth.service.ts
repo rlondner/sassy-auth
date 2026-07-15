@@ -43,6 +43,7 @@ export class OauthService {
     redirectUri: string,
     codeChallenge: string,
     codeChallengeMethod: 'S256',
+    amr: string[],
   ): Promise<string> {
     const code = crypto.randomBytes(32).toString('hex');
     await prisma.saOauthCode.create({
@@ -53,6 +54,7 @@ export class OauthService {
         redirectUri,
         codeChallenge,
         codeChallengeMethod,
+        amr: JSON.stringify(amr),
         expiresAt: new Date(Date.now() + CODE_TTL_MS),
       },
     });
@@ -64,7 +66,7 @@ export class OauthService {
     appPublicId: string,
     redirectUri: string,
     codeVerifier: string,
-  ): Promise<{ userId: string; appPublicId: string }> {
+  ): Promise<{ userId: string; appPublicId: string; amr: string[] }> {
     // Atomic delete-and-return: race-safe against concurrent
     // exchanges. P2025 = record not found = INVALID_GRANT.
     // Any successful delete removes the row regardless of the
@@ -77,6 +79,7 @@ export class OauthService {
       codeChallenge: string;
       codeChallengeMethod: string;
       expiresAt: Date;
+      amr: string;
     };
     try {
       entry = await prisma.saOauthCode.delete({ where: { code } });
@@ -109,6 +112,15 @@ export class OauthService {
       throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
     }
 
-    return { userId: entry.userId, appPublicId: entry.appPublicId };
+    return { userId: entry.userId, appPublicId: entry.appPublicId, amr: safeParseAmr(entry.amr) };
+  }
+}
+
+function safeParseAmr(raw: string): string[] {
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : ['pwd'];
+  } catch {
+    return ['pwd'];
   }
 }

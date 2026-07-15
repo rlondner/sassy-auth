@@ -1,8 +1,22 @@
 import { defineConfig, devices } from '@playwright/test'
+import { readFileSync } from 'fs'
+import path from 'path'
 
 const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
+
+let RS_CLIENT_ID = process.env.RS_CLIENT_ID ?? ''
+if (!RS_CLIENT_ID) {
+  try {
+    RS_CLIENT_ID = readFileSync('/tmp/sassy-e2e-rs-client-id.txt', 'utf8').trim()
+  } catch { /* file not written; RS specs skip */ }
+}
+// Expose for spec files that read process.env.RS_CLIENT_ID
+if (RS_CLIENT_ID) {
+  process.env.RS_CLIENT_ID = RS_CLIENT_ID
+}
 
 export default defineConfig({
   testDir: './tests',
@@ -28,9 +42,12 @@ export default defineConfig({
       testMatch: /auth-state\.setup\.ts/,
     },
     {
-      // Unauthed flow tests (e.g. login.spec.ts).
+      // Unauthed flow tests (e.g. login.spec.ts, two-factor.spec.ts).
+      // depends on 'setup' so that .auth/super-admin.json exists and is fresh
+      // when the admin-reset test's test.use({ storageState }) loads it.
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
       testIgnore: /(authed|matrix)\/.*\.spec\.ts/,
     },
     {
@@ -81,6 +98,26 @@ export default defineConfig({
           url: ADMIN_URL,
           reuseExistingServer: false,
           timeout: 120_000,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+        {
+          command: [
+            `SASSY_CLIENT_ID=${RS_CLIENT_ID}`,
+            `REDIRECT_URI=${RS_BASE_URL}/auth/callback`,
+            `RS_BASE_URL=${RS_BASE_URL}`,
+            `AUTH_SERVER_URL=${AUTH_SERVER_URL}`,
+            `ADMIN_URL=${ADMIN_URL}`,
+            'uvicorn app.main:app --port 8010',
+          ].join(' '),
+          // Playwright resolves a relative webServer.cwd against the config
+          // directory (apps/admin-e2e), not the repo root — so a repo-relative
+          // path would resolve to apps/admin-e2e/apps/resource-server-fastapi
+          // (ENOENT) and abort the whole CI e2e run. Resolve from __dirname.
+          cwd: path.resolve(__dirname, '../resource-server-fastapi'),
+          url: `${RS_BASE_URL}/`,
+          reuseExistingServer: false,
+          timeout: 60_000,
           stdout: 'pipe',
           stderr: 'pipe',
         },

@@ -96,6 +96,20 @@ describe('TokenService', () => {
   // ── JWT issuance ───────────────────────────────────────────────────────────
 
   describe('issueJwt', () => {
+    it('includes amr when provided and omits it when empty', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
+      jest.spyOn(service as any, 'resolvePermissions').mockResolvedValue([]);
+
+      const withMfa = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', amr: ['pwd', 'otp', 'mfa'] })) as jwt.JwtPayload;
+      expect(withMfa.amr).toEqual(['pwd', 'otp', 'mfa']);
+
+      const none = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', amr: [] })) as jwt.JwtPayload;
+      expect('amr' in none).toBe(false);
+
+      const undef = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a' })) as jwt.JwtPayload;
+      expect('amr' in undef).toBe(false);
+    });
+
     it('returns a verifiable RS256 JWT with correct claims', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
 

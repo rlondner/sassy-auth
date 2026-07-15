@@ -40,7 +40,12 @@
       "callbackUrlHint": "Laissez vide pour accepter tout rappel sous l’URL de l’application. Indiquez une URL complète pour exiger une correspondance exacte du redirect_uri.",
       "callbackUrlDefault": "Par défaut (tout chemin sous l’URL de l’application)",
       "publicId": "ID Public",
-      "urlHint": "URL de base principale de cette application."
+      "urlHint": "URL de base principale de cette application.",
+      "twoFactorTrustDays": "Intervalle de confiance 2FA (jours)",
+      "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
+      "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système.",
+      "requireTwoFactor": "Exiger l'authentification à deux facteurs",
+      "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer."
     },
     "actions": {
       "view": "Voir",
@@ -472,7 +477,8 @@
       "resend": "Renvoyer le code",
       "changeEmail": "Utiliser une autre adresse",
       "sent": "Si un compte existe pour cette adresse, un code est en route.",
-      "usePassword": "Se connecter avec un mot de passe"
+      "usePassword": "Se connecter avec un mot de passe",
+      "twoFactorHint": "Si l'authentification à deux facteurs est activée sur votre compte, connectez-vous avec votre mot de passe."
     },
     "error": {
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
@@ -495,6 +501,80 @@
       "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
       "genericError": "Une erreur est survenue."
     }
+  },
+  "security": {
+    "title": "Authentification à deux facteurs",
+    "subtitle": "Protégez votre compte avec une application d'authentification.",
+    "status": {
+      "enabled": "La 2FA est activée",
+      "disabled": "La 2FA n'est pas activée"
+    },
+    "enable": {
+      "heading": "Configurer la 2FA",
+      "passwordLabel": "Confirmez votre mot de passe",
+      "passwordPlaceholder": "Votre mot de passe actuel",
+      "submitButton": "Générer le QR code",
+      "submitting": "Génération…",
+      "scanHeading": "Scannez avec votre application d'authentification",
+      "manualEntry": "Ou saisissez ce secret manuellement :",
+      "confirmHeading": "Confirmez votre configuration",
+      "codeLabel": "Saisissez le code à 6 chiffres de votre application",
+      "confirmButton": "Confirmer et activer",
+      "confirming": "Vérification…"
+    },
+    "backupCodes": {
+      "heading": "Enregistrez vos codes de secours",
+      "body": "Chacun de ces codes peut être utilisé une fois si vous perdez l'accès à votre application d'authentification. Conservez-les en lieu sûr — ils ne seront plus affichés.",
+      "copyButton": "Tout copier",
+      "copied": "Copié !",
+      "downloadButton": "Télécharger"
+    },
+    "disable": {
+      "heading": "Désactiver la 2FA",
+      "body": "Vous ne serez plus invité à fournir un second facteur lors de la connexion.",
+      "passwordLabel": "Confirmez votre mot de passe",
+      "passwordPlaceholder": "Votre mot de passe actuel",
+      "submitButton": "Désactiver la 2FA",
+      "submitting": "Désactivation…"
+    },
+    "regenerate": {
+      "heading": "Regénérer les codes de secours",
+      "body": "Vos codes de secours existants seront invalidés. Les nouveaux codes ne seront affichés qu'une seule fois.",
+      "passwordLabel": "Confirmez votre mot de passe",
+      "passwordPlaceholder": "Votre mot de passe actuel",
+      "submitButton": "Regénérer les codes",
+      "submitting": "Regénération…"
+    },
+    "forcedBanner": "Cette application requiert l'authentification à deux facteurs. Terminez la configuration ci-dessous pour continuer.",
+    "continueToApp": "Continuer",
+    "errors": {
+      "invalidPassword": "Mot de passe invalide.",
+      "invalidCode": "Code invalide ou expiré.",
+      "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."
+    }
+  },
+  "twoFactor": {
+    "title": "Authentification à deux facteurs",
+    "subtitle": "Saisissez le code à 6 chiffres de votre application d'authentification.",
+    "backupTitle": "Utiliser un code de secours",
+    "backupSubtitle": "Saisissez l'un de vos codes de secours enregistrés.",
+    "codeLabel": "Code d'authentification",
+    "backupCodeLabel": "Code de secours",
+    "submit": "Vérifier",
+    "useBackupCode": "Utiliser un code de secours",
+    "useTotpCode": "Utiliser l'application d'authentification",
+    "trustDevice": "Faire confiance à cet appareil pendant {days} jours",
+    "error": {
+      "invalidCode": "Code invalide ou expiré. Veuillez réessayer.",
+      "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."
+    }
+  },
+  "twoFactorPrompt": {
+    "title": "Sécurisez votre compte",
+    "body": "L'authentification à deux facteurs ajoute une couche de protection supplémentaire. Configurez-la en moins d'une minute.",
+    "setUp": "Configurer la 2FA",
+    "skip": "Ignorer pour l'instant"
   },
   "oauthError": {
     "pageTitle": "Erreur d'autorisation — SassyAuth",

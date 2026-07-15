@@ -1,6 +1,11 @@
 import { sendSignInOtp } from './otp-sender';
 
-function makeDeps(user: { status: string } | null) {
+type MockUser = {
+  status: string;
+  betterAuthUser: { twoFactorEnabled: boolean } | null;
+};
+
+function makeDeps(user: MockUser | null) {
   const send = jest.fn().mockResolvedValue({ sent: true });
   const set = jest.fn();
   const info = jest.fn();
@@ -15,8 +20,11 @@ function makeDeps(user: { status: string } | null) {
 }
 
 describe('sendSignInOtp', () => {
-  it('emails the code and logs sent for an active user', async () => {
-    const { deps, send, set, info } = makeDeps({ status: 'active' });
+  it('emails the code and logs sent for an active user without 2FA', async () => {
+    const { deps, send, set, info } = makeDeps({
+      status: 'active',
+      betterAuthUser: { twoFactorEnabled: false },
+    });
     await sendSignInOtp(deps, { email: 'a@x.com', otp: '654321', type: 'sign-in' });
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({ to: 'a@x.com', subject: expect.stringMatching(/code|sign.?in/i) }),
@@ -27,7 +35,10 @@ describe('sendSignInOtp', () => {
   });
 
   it('skips delivery and logs skipped_inactive for a non-active user', async () => {
-    const { deps, send, info } = makeDeps({ status: 'inactive' });
+    const { deps, send, info } = makeDeps({
+      status: 'inactive',
+      betterAuthUser: { twoFactorEnabled: false },
+    });
     await sendSignInOtp(deps, { email: 'a@x.com', otp: '654321', type: 'sign-in' });
     expect(send).not.toHaveBeenCalled();
     expect(info).toHaveBeenCalledWith('Sign-in code requested', expect.objectContaining({ outcome: 'skipped_inactive' }));
@@ -40,8 +51,33 @@ describe('sendSignInOtp', () => {
     expect(info).toHaveBeenCalledWith('Sign-in code requested', expect.objectContaining({ outcome: 'skipped_unknown' }));
   });
 
+  it('skips delivery and logs skipped_2fa for an active user with twoFactorEnabled', async () => {
+    const { deps, send, info } = makeDeps({
+      status: 'active',
+      betterAuthUser: { twoFactorEnabled: true },
+    });
+    await sendSignInOtp(deps, { email: 'a@x.com', otp: '654321', type: 'sign-in' });
+    expect(send).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(
+      'Sign-in code requested',
+      expect.objectContaining({ outcome: 'skipped_2fa' }),
+    );
+  });
+
+  it('also skips for a 2FA user whose betterAuthUser relation is null (defensive)', async () => {
+    // twoFactorEnabled cannot be true if betterAuthUser is null, but guard defensively.
+    const { deps, send, info } = makeDeps({
+      status: 'active',
+      betterAuthUser: null,
+    });
+    await sendSignInOtp(deps, { email: 'a@x.com', otp: '654321', type: 'sign-in' });
+    // betterAuthUser is null → twoFactorEnabled check is false → code IS sent.
+    expect(send).toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith('Sign-in code requested', expect.objectContaining({ outcome: 'sent' }));
+  });
+
   it('never logs the OTP value', async () => {
-    const { deps, info } = makeDeps({ status: 'active' });
+    const { deps, info } = makeDeps({ status: 'active', betterAuthUser: { twoFactorEnabled: false } });
     await sendSignInOtp(deps, { email: 'a@x.com', otp: '654321', type: 'sign-in' });
     for (const call of info.mock.calls) {
       expect(JSON.stringify(call)).not.toContain('654321');

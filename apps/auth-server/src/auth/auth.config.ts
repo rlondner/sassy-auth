@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { magicLink, emailOTP, openAPI } from 'better-auth/plugins';
+import { magicLink, emailOTP, openAPI, twoFactor } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { getEmailer } from '../email/email.singleton';
@@ -75,6 +75,22 @@ export const auth = betterAuth({
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
+    },
+  },
+  rateLimit: {
+    // Explicit rate-limit for the 2FA verify endpoints. In better-auth 1.6.11
+    // customRules *override* the twoFactor plugin's built-in per-path limit
+    // (window: 10, max: 3 in dist/plugins/two-factor/index.mjs:269) for exact
+    // path matches — they do NOT stack on top of it. These rules are therefore
+    // set at the same value as the plugin default so the intent (at most 3
+    // attempts per 10 s) is preserved explicitly in config and visible to
+    // reviewers. If stricter limits are needed, lower max here rather than
+    // relying on the plugin's implicit default.
+    // Note: storage defaults to in-memory; limits are per-process, not global
+    // across replicas. Wire secondaryStorage (Redis) for a cross-replica cap.
+    customRules: {
+      '/two-factor/verify-totp': { window: 10, max: 3 },
+      '/two-factor/verify-backup-code': { window: 10, max: 3 },
     },
   },
   // bug-0186: BetterAuth creates a Session row on every successful
@@ -203,6 +219,15 @@ export const auth = betterAuth({
           { email, otp, type },
         );
       },
+    }),
+    twoFactor({
+      issuer: 'Sassy Auth',
+      // 10 backup codes (matches the spec; default is also 10, explicit for
+      // reviewability).
+      backupCodeOptions: { amount: 10 },
+      // skipVerificationOnEnable stays false (default): 2FA is not active
+      // until the user confirms with a live TOTP code. This prevents lockout
+      // from a mis-scanned QR.
     }),
     openAPI({ disableDefaultReference: true }),
   ],

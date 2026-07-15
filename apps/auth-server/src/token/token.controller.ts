@@ -52,6 +52,9 @@ import {
   OAUTH_TOKEN_ROUTE,
   TOKEN_CONTROLLER_PATH,
 } from './oauth-metadata';
+import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
+import { isTwoFactorRequired } from '../auth/two-factor-required';
+import { verifyUserTotp } from '../auth/verify-user-totp';
 
 @ApiTags('Token')
 @Controller(TOKEN_CONTROLLER_PATH)
@@ -67,6 +70,31 @@ export class TokenController {
   @Get(JWKS_ROUTE)
   getJwks() {
     return this.tokenService.getJwks();
+  }
+
+  /**
+   * GET /api/token/app-trust-days?client_id=<sqid>
+   *
+   * Public (unauthenticated) endpoint. Returns the effective 2FA trust interval
+   * for the app identified by client_id (a public sqid). Used by the admin
+   * console's signIn server action to resolve the per-app 2FA re-prompt interval
+   * without duplicating resolveTrustDays logic client-side.
+   *
+   * Disclosure is safe: the trust interval is a non-sensitive configuration value
+   * and client_id is already public (displayed in the apps list, embedded in OAuth
+   * authorize URLs). Returns { effectiveTrustDays: number } — always a resolved
+   * positive integer; the system default is returned when client_id is missing,
+   * the app is not found, or the app has no per-app override.
+   */
+  @Get('app-trust-days')
+  async appTrustDays(@Query('client_id') clientId: string) {
+    if (!clientId) return { effectiveTrustDays: getSystemTrustDays() };
+    const app = await prisma.saApp.findUnique({
+      where: { publicId: clientId },
+      select: { twoFactorTrustDays: true },
+    });
+    if (!app) return { effectiveTrustDays: getSystemTrustDays() };
+    return { effectiveTrustDays: resolveTrustDays(app, getSystemTrustDays()) };
   }
 
   /**
@@ -138,12 +166,40 @@ export class TokenController {
         throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
       }
 
+      // 2b: forced 2FA enrollment. If the app requires 2FA (per-app flag, or the
+      // platform env flag for the platform app) and this active user has not yet
+      // enrolled, bounce them into the self-service enrollment page carrying the
+      // full authorize URL as `next`, so they return here and get a code only
+      // after enrolling. `enroll=1` puts the page in forced (no-skip) mode.
+      if (isTwoFactorRequired(app) && !(session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled) {
+        const adminUrl = process.env.ADMIN_URL;
+        if (adminUrl) {
+          const query = new URLSearchParams({
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            code_challenge: codeChallenge,
+            code_challenge_method: codeChallengeMethod,
+          });
+          if (state) query.set('state', state);
+          const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
+          const enrollUrl = `${adminUrl.replace(/\/$/, '')}/account/security?enroll=1&next=${encodeURIComponent(nextPath)}`;
+          this.logger.getWinstonLogger().info('OAuth authorize: forced 2FA enrollment', {
+            context: 'TokenController', appId: clientId, userId: saUser.publicId,
+          });
+          return { url: enrollUrl, statusCode: 302 };
+        }
+        // No ADMIN_URL (dev): fail closed rather than minting a non-2FA code.
+        throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+      }
+
+      const amr = (session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled ? ['pwd', 'otp', 'mfa'] : ['pwd'];
       const code = await this.oauthService.generateCode(
         saUser.publicId,
         app.publicId,
         redirectUri,
         codeChallenge,
         'S256',
+        amr,
       );
       const url = new URL(redirectUri);
       url.searchParams.set('code', code);
@@ -229,6 +285,7 @@ export class TokenController {
 
     let userPublicId: string;
     let appPublicId: string;
+    let exchangedAmr: string[] = ['pwd'];
     try {
       const exchanged = await this.oauthService.exchangeCode(
         dto.code,
@@ -238,6 +295,7 @@ export class TokenController {
       );
       userPublicId = exchanged.userId;
       appPublicId = exchanged.appPublicId;
+      exchangedAmr = exchanged.amr ?? ['pwd'];
     } catch (err) {
       this.logger.getWinstonLogger().warn('oauth.pkce.verify_failed', {
         context: 'TokenController',
@@ -266,6 +324,7 @@ export class TokenController {
       userPublicId: saUser.publicId,
       orgPublicId: saUser.org.publicId,
       appPublicId,
+      amr: exchangedAmr,
     });
 
     this.logger.getWinstonLogger().info('OAuth code exchanged, JWT issued', {
@@ -422,6 +481,31 @@ export class TokenController {
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
     }
 
+    // 2b: enforce 2FA on the non-interactive path. When the app requires 2FA or
+    // the user has enrolled, a valid TOTP code is mandatory. We never emit a
+    // pwd-only JWT for a 2FA-enrolled user. The totpCode is never logged.
+    const twoFactorEnabled = await prisma.user
+      .findUnique({ where: { id: saUser.betterAuthUserId }, select: { twoFactorEnabled: true } })
+      .then((u) => u?.twoFactorEnabled ?? false);
+
+    let amr = ['pwd'];
+    if (isTwoFactorRequired(app) || twoFactorEnabled) {
+      if (!twoFactorEnabled) {
+        // Required app, user not enrolled: cannot self-enroll non-interactively.
+        this.logger.getWinstonLogger().warn('Direct login blocked: 2FA required, user not enrolled', {
+          context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
+        });
+        throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
+      }
+      if (!dto.totpCode || !(await verifyUserTotp(saUser.betterAuthUserId, dto.totpCode))) {
+        this.logger.getWinstonLogger().warn('Direct login blocked: missing/invalid 2FA code', {
+          context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
+        });
+        throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
+      }
+      amr = ['pwd', 'otp', 'mfa'];
+    }
+
     // bug-0186: record the login timestamp. This is the JWT-issuance
     // path; the BetterAuth sign-in path (email/password, magic-link,
     // OTP) is tracked separately in the databaseHooks in
@@ -444,6 +528,7 @@ export class TokenController {
       userPublicId: saUser.publicId,
       orgPublicId: saUser.org.publicId,
       appPublicId: app.publicId,
+      amr,
     });
 
     this.logger.getWinstonLogger().info('Direct login successful, JWT issued', {

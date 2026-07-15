@@ -9,7 +9,8 @@ const sqids = new Sqids({
 });
 
 const APP_NAME = 'resourceserver01';
-const APP_URL = 'https://cheryl-crescentlike-monte.ngrok-free.dev/';
+const APP_URL = process.env['RS_APP_URL'] ?? 'https://cheryl-crescentlike-monte.ngrok-free.dev/';
+const CALLBACK_URL = new URL('/auth/callback', APP_URL).toString();
 const ORG_NAME = 'Citadel';
 
 const PERMISSIONS = [
@@ -59,7 +60,7 @@ async function ensureApp() {
   if (found) return found;
   return prisma.$transaction(async (tx) => {
     const created = await tx.saApp.create({
-      data: { publicId: generatePendingPublicId(), name: APP_NAME, url: APP_URL, isPlatform: false },
+      data: { publicId: generatePendingPublicId(), name: APP_NAME, url: APP_URL, callbackUrl: CALLBACK_URL, isPlatform: false },
     });
     return tx.saApp.update({
       where: { id: created.id },

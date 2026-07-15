@@ -40,7 +40,12 @@
       "callbackUrlHint": "Leave blank to accept any callback under the app's URL. Set a full URL to require an exact redirect_uri match.",
       "callbackUrlDefault": "Default (any path under app URL)",
       "publicId": "Public ID",
-      "urlHint": "The primary base URL for this application."
+      "urlHint": "The primary base URL for this application.",
+      "twoFactorTrustDays": "2FA trust interval (days)",
+      "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
+      "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server.",
+      "requireTwoFactor": "Require two-factor authentication",
+      "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue."
     },
     "actions": {
       "view": "View",
@@ -472,7 +477,8 @@
       "resend": "Resend code",
       "changeEmail": "Use a different email",
       "sent": "If an account exists for that email, a code is on its way.",
-      "usePassword": "Sign in with a password instead"
+      "usePassword": "Sign in with a password instead",
+      "twoFactorHint": "If two-factor authentication is enabled on your account, sign in with your password instead."
     },
     "error": {
       "invalidCredentials": "Invalid email or password.",
@@ -495,6 +501,80 @@
       "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
       "genericError": "Something went wrong."
     }
+  },
+  "security": {
+    "title": "Two-Factor Authentication",
+    "subtitle": "Protect your account with an authenticator app.",
+    "status": {
+      "enabled": "2FA is enabled",
+      "disabled": "2FA is not enabled"
+    },
+    "enable": {
+      "heading": "Set up 2FA",
+      "passwordLabel": "Confirm your password",
+      "passwordPlaceholder": "Your current password",
+      "submitButton": "Generate QR code",
+      "submitting": "Generating…",
+      "scanHeading": "Scan with your authenticator app",
+      "manualEntry": "Or enter this secret manually:",
+      "confirmHeading": "Confirm your setup",
+      "codeLabel": "Enter the 6-digit code from your app",
+      "confirmButton": "Confirm & enable",
+      "confirming": "Verifying…"
+    },
+    "backupCodes": {
+      "heading": "Save your backup codes",
+      "body": "These codes can each be used once if you lose access to your authenticator. Store them somewhere safe — they will not be shown again.",
+      "copyButton": "Copy all",
+      "copied": "Copied!",
+      "downloadButton": "Download"
+    },
+    "disable": {
+      "heading": "Disable 2FA",
+      "body": "You will no longer be prompted for a second factor when signing in.",
+      "passwordLabel": "Confirm your password",
+      "passwordPlaceholder": "Your current password",
+      "submitButton": "Disable 2FA",
+      "submitting": "Disabling…"
+    },
+    "regenerate": {
+      "heading": "Regenerate backup codes",
+      "body": "Your existing backup codes will be invalidated. New codes will be shown once.",
+      "passwordLabel": "Confirm your password",
+      "passwordPlaceholder": "Your current password",
+      "submitButton": "Regenerate codes",
+      "submitting": "Regenerating…"
+    },
+    "forcedBanner": "This application requires two-factor authentication. Finish setup below to continue.",
+    "continueToApp": "Continue",
+    "errors": {
+      "invalidPassword": "Invalid password.",
+      "invalidCode": "Invalid or expired code.",
+      "generic": "Something went wrong. Please try again.",
+      "serverUnavailable": "Service is unavailable. Please try again in a moment."
+    }
+  },
+  "twoFactor": {
+    "title": "Two-Factor Authentication",
+    "subtitle": "Enter the 6-digit code from your authenticator app.",
+    "backupTitle": "Use a Backup Code",
+    "backupSubtitle": "Enter one of your saved backup codes.",
+    "codeLabel": "Authenticator code",
+    "backupCodeLabel": "Backup code",
+    "submit": "Verify",
+    "useBackupCode": "Use a backup code instead",
+    "useTotpCode": "Use authenticator app instead",
+    "trustDevice": "Trust this device for {days} days",
+    "error": {
+      "invalidCode": "Invalid or expired code. Please try again.",
+      "serverUnavailable": "Service is unavailable. Please try again in a moment."
+    }
+  },
+  "twoFactorPrompt": {
+    "title": "Secure your account",
+    "body": "Two-factor authentication adds an extra layer of protection. Set it up in under a minute.",
+    "setUp": "Set up 2FA",
+    "skip": "Skip for now"
   },
   "oauthError": {
     "pageTitle": "Authorization error — SassyAuth",
