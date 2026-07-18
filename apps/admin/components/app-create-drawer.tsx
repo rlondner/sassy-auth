@@ -140,7 +140,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                   id="requireTwoFactor"
                   checked={requireTwoFactor}
                   onChange={(e) => setRequireTwoFactor(e.target.checked)}
-                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 />
                 {t('apps.fields.requireTwoFactor')}
               </label>
