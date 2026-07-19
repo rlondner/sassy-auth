@@ -29,7 +29,7 @@ export function ForgotPasswordForm() {
               <input id="email" name="email" type="email" autoComplete="email" required
                 className="flex h-9 w-full rounded border border-[var(--border)] bg-[var(--card)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
             </div>
-            <Button type="submit" className="w-full" disabled={isPending}>{isPending ? '…' : t('submit')}</Button>
+            <Button type="submit" className="w-full" loading={isPending}>{t('submit')}</Button>
           </form>
         )}
         <div className="mt-4 text-center">

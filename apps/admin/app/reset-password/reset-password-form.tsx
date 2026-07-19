@@ -50,7 +50,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
                   className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
               </div>
               {error && <p data-testid="reset-error" className="text-label-md text-[var(--destructive)]">{error}</p>}
-              <Button type="submit" className="w-full" disabled={submitting}>{submitting ? '…' : t('submit')}</Button>
+              <Button type="submit" className="w-full" loading={submitting}>{t('submit')}</Button>
             </form>
           </>
         )}
