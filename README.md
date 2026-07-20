@@ -265,6 +265,15 @@ Omit the client ID and secret for any provider you do not want to enable.
 | `GITHUB_CLIENT_SECRET`       | GitHub OAuth client secret |
 | `SQIDS_ALPHABET`             | Custom alphabet for Sqids encoding; leave blank for default |
 
+### Security / 2FA (optional)
+
+See [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa) for behavior.
+
+| Variable                | Description                                                                                       |
+|-------------------------|--------------------------------------------------------------------------------------------------|
+| `PLATFORM_REQUIRE_2FA`  | Force 2FA for **all** operators of the immutable platform admin app. Only the exact string `"true"` (case-insensitive) enables it; any other value is off. Default: off. Enroll your own 2FA at `/account/security` first — recover from lockout via the admin "Reset 2FA" action. |
+| `TWO_FACTOR_TRUST_DAYS` | How many days a user is trusted before the optional "set up 2FA" interstitial re-prompts (and the trust-cookie lifetime). Must be a positive integer; any missing/invalid value falls back to **14**. |
+
 ---
 
 ## Auth Flows
@@ -762,6 +771,42 @@ Then in `.env.local` set:
     EMAIL_SMTP_PORT=1025
 
 Sent emails appear at http://localhost:8025. For production, set `RESEND_API_KEY` instead (takes precedence over SMTP).
+
+---
+
+## Developer tooling — GitHub MCP
+
+This repo checks in a team-wide MCP config at **`.mcp.json`** that registers a GitHub MCP
+server for use inside Claude Code / compatible agents:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp",
+      "headers": { "Authorization": "Bearer ${GITHUB_PAT}" }
+    }
+  }
+}
+```
+
+The token is **interpolated from the environment** — no secret is stored in the file.
+
+- **Required env var:** `GITHUB_PAT` — a GitHub Personal Access Token used only by the MCP
+  server (and by the daily-review scheduled task for GitHub API/PR operations). Set it in
+  your shell profile or `.env.local`. A fine-grained PAT needs at least `Contents: Read`
+  and `Pull requests: Read/Write` on this repo; a classic PAT needs the `repo` scope.
+  Verify with:
+
+      curl -H "Authorization: Bearer $GITHUB_PAT" https://api.github.com/user
+
+- **Opting out:** If you don't want the extra MCP server, unset `GITHUB_PAT` (the server
+  fails to authenticate and can be ignored) or remove the entry from your local
+  `.mcp.json`. The server is **not** required to build, run, test, or develop the app — it
+  only powers agent-driven GitHub workflows.
+
+> Note: this is developer tooling, not an application runtime dependency. None of the
+> auth-server, admin, or resource-server processes read `GITHUB_PAT` or `.mcp.json`.
 
 ---
 

@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-07-20
+
+**No code changes landed in the 24h review window.** The newest commit on `origin/master`,
+`a78d4a7` (2026-07-15), is the merge of the two-factor-authentication feature. The daily
+runs on 2026-07-16 and 2026-07-17 were blocked (GitHub API unreachable and the local
+checkout was ~40 commits behind the remote), so **the 2FA merge was never covered by a daily
+review**. This run reconciled the local tree to `origin/master` and reviewed the 2FA feature
+retroactively, alongside the email-OTP UI.
+
+### Documented (previously undocumented)
+
+- **Two-Factor Authentication (2FA)** — the 2FA feature (self-service enrollment at
+  `/account/security`, password-login TOTP challenge, per-app `requireTwoFactor` enforcement,
+  platform-wide `PLATFORM_REQUIRE_2FA`, `amr` claim on issued JWTs, admin "Reset 2FA")
+  shipped in `a78d4a7` **without a CHANGELOG entry**. Recording it here for the trail; the
+  feature itself is documented in the README "Two-Factor Authentication (2FA)" section.
+- Added a README **"Developer tooling — GitHub MCP"** section documenting the checked-in
+  `.mcp.json` and its `GITHUB_PAT` env var (carried over from the 2026-07-12/13 reviews).
+- Added a README **2FA environment-variable** subsection (`PLATFORM_REQUIRE_2FA`,
+  `TWO_FACTOR_TRUST_DAYS`).
+
+### New bugs found (4)
+
+See [BUGS_2026-07-20.md](./bugs/BUGS_2026-07-20.md) and [TODO_2026-07-20.md](./todo/TODO_2026-07-20.md).
+
+- **bug-0239** (Warning) — French locale regressed to English for `users.toast.*` and
+  `users.actions.resend`; same class as the previously-fixed bug-0112.
+- **bug-0240** (Minor) — `TWO_FACTOR_TRUST_DAYS` is an operative config var but is
+  undocumented in `.env.example`.
+- **bug-0241** (Minor) — OTP request-step error renders the raw key `invalidCredentials`
+  (and the copy is wrong for a passwordless flow).
+- **bug-0242** (Minor) — dead `login.otp.resend` i18n key; no "resend code" control is wired
+  in the OTP form.
+
+A PR was opened for each of the four bugs. No auth-bypass, tenant-isolation, or
+credential-leak defects were found in the 2FA feature.
+
+### Note
+
+The three bugs from the 2026-07-15 run (bug-0236 case-sensitive OTP email gate, bug-0237 raw
+email in OTP logs, bug-0238 `_to_delete/` hygiene) remain open — their fixes are not yet on
+`origin/master`.
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
