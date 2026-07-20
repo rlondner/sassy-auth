@@ -16,7 +16,8 @@
     "save": "Save",
     "edit": "Edit",
     "delete": "Delete",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "copyError": "Failed to copy — clipboard access denied"
   },
   "apps": {
     "title": "Applications",

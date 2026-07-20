@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { copyToClipboard } from './clipboard'
 
 /**
@@ -28,6 +29,7 @@ import { copyToClipboard } from './clipboard'
  *   </button>
  */
 export function useCopyFeedback(resetMs = 2000) {
+  const t = useTranslations('common')
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -50,7 +52,7 @@ export function useCopyFeedback(resetMs = 2000) {
         // they thought the click didn't register. Surface a toast so
         // they know to try again (e.g. after granting the clipboard
         // permission on their browser).
-        toast.error('Failed to copy — clipboard access denied')
+        toast.error(t('copyError'))
         return false
       }
       if (timerRef.current !== null) clearTimeout(timerRef.current)
