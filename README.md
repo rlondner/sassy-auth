@@ -249,6 +249,15 @@ Leave blank to disable. See [Observability](#observability) for behavior.
 | `SENTRY_ORG`                | admin | Sentry organization slug (build-time only)                           |
 | `SENTRY_PROJECT`            | admin | Sentry project slug (build-time only)                                |
 
+### Two-Factor Authentication (optional)
+
+See [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa) for behavior.
+
+| Variable                 | Description                                                                                                                                             |
+|--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `PLATFORM_REQUIRE_2FA`   | Set to exactly `"true"` to force 2FA (TOTP) for all platform-admin operators. Any other value (or unset) leaves platform 2FA optional. Default: `false` |
+| `TWO_FACTOR_TRUST_DAYS`  | System-default "trust this device / don't re-prompt" window, in days, used when an app does not set its own `twoFactorTrustDays`. Non-numeric or missing values fall back to `14`. Default: `14` |
+
 ### Social providers (optional)
 
 Omit the client ID and secret for any provider you do not want to enable.

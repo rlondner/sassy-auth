@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-07-21
+
+Quiet 24h. The only repository activity was three Jules-bot "Palette" (UI polish) commits, all
+on **unmerged** PR branches — `master` has not advanced since `a78d4a7` (2026-07-15). Today's
+daily review reads the PR diffs, files 3 new bugs (0243–0245), and documents the 2FA env vars
+in the README.
+
+### Changed (unmerged, on PR branches)
+
+- **Localize `useCopyFeedback` clipboard errors** (`c55d026`, PR #285) — the hardcoded English
+  "Failed to copy" toast now reads `common.copyError` via `next-intl`; added `en.json`/`fr.json`
+  keys and a `use-copy-feedback.test.tsx` suite. Also patches the stale `app-create-drawer`
+  test (see bug-0243).
+- **Focus states on native checkboxes** (`7c4e605`, PR #286) — adds
+  `focus-visible:ring-2 …` to the 3 native checkboxes (`TwoFactorForm`, app create/edit
+  drawers) for WCAG 2.1 keyboard focus visibility. Also patches the same stale test.
+
+### Docs
+
+- README Environment-Variables section now documents the 2FA config vars `PLATFORM_REQUIRE_2FA`
+  and `TWO_FACTOR_TRUST_DAYS` (partially addresses bug-0240).
+
+### New bugs found (3)
+
+See [BUGS_2026-07-21.md](./bugs/BUGS_2026-07-21.md) and [TODO_2026-07-21.md](./todo/TODO_2026-07-21.md).
+
+- **bug-0243** (Warning) — `app-create-drawer` "creates app" unit test is stale vs the 2FA
+  create payload (`twoFactorTrustDays`/`requireTwoFactor`) and **fails on `master`**; both PR
+  #285 and #286 independently patched it, indicating a missing admin-Jest CI gate.
+- **bug-0244** (Minor) — French `common.save`/`edit`/`delete`/`confirm` are untranslated
+  English (same class as bug-0112 / bug-0239, `common` subtree).
+- **bug-0245** (Minor) — PR #286 head `09391e7` is an empty commit and its real change
+  duplicates PR #285's `app-create-drawer.test.tsx` edit → guaranteed merge conflict (Jules
+  automation, related to bug-0090).
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
