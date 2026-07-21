@@ -24,6 +24,7 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
     - [Required](#required)
     - [Admin console](#admin-console)
     - [Observability (optional)](#observability-optional)
+    - [Two-Factor Authentication (optional)](#two-factor-authentication-optional)
     - [Social providers (optional)](#social-providers-optional)
   - [Auth Flows](#auth-flows)
     - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
