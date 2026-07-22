@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-07-22
+
+**Daily review: no new source activity.** `master` has not advanced since `a78d4a7`
+(2026-07-15). The last-24h window contained only (a) the 2026-07-21 review's own output
+(bugs 0243–0245 + docs, still unmerged in PRs #287–#290) and (b) two Jules-bot "Palette"
+commits (`7c4e605`, `09391e7`) that the 2026-07-21 review already covered under bug-0245.
+
+- **0 new bugs** — see [BUGS_2026-07-22.md](./bugs/BUGS_2026-07-22.md). Highest bug number
+  remains **0245**.
+- **Verified bug-0243 is still red on `master`**: the `apps/admin` Jest suite fails because
+  `app-create-drawer.test.tsx` asserts a 3-field create payload while the component now sends
+  5 (`twoFactorTrustDays`, `requireTwoFactor`). Fix exists only in unmerged PRs.
+- **Follow-ups are merge-hygiene, not code** — the daily review keeps re-reviewing a frozen
+  tree because its output PRs never merge. See [TODO_2026-07-22.md](./todo/TODO_2026-07-22.md).
+
+> Note: the 2026-07-21 CHANGELOG entry (Jules palette PRs + bugs 0243–0245) is not yet on
+> `master`; it is pending in PR #290. This entry stacks above it once #290 lands.
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
