@@ -36,7 +36,7 @@ export function TwoFactorForm({ next, trustDays = 14 }: { next: string; trustDay
         type="checkbox"
         checked={trustDevice}
         onChange={(e) => setTrustDevice(e.target.checked)}
-        className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+        className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       />
       {t('trustDevice', { days: trustDays })}
     </label>
