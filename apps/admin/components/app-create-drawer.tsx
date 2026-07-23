@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import * as React from 'react'
-import { useTranslations } from 'next-intl'
-import { toast } from 'sonner'
+import * as React from "react";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import {
   Sheet,
   SheetBody,
@@ -14,43 +14,46 @@ import {
   ButtonGroup,
   Input,
   Label,
-} from '@sassy-auth/ui'
-import { createAppAction } from '@/app/(admin)/apps/actions'
+} from "@sassy-auth/ui";
+import { createAppAction } from "@/app/(admin)/apps/actions";
 
 interface Props {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSuccess?: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
 export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
-  const t = useTranslations()
-  const [name, setName] = React.useState('')
-  const [url, setUrl] = React.useState('')
-  const [callbackUrl, setCallbackUrl] = React.useState('')
-  const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(null)
-  const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(false)
-  const [errorKey, setErrorKey] = React.useState<string | null>(null)
-  const [pending, startTransition] = React.useTransition()
+  const t = useTranslations();
+  const [name, setName] = React.useState("");
+  const [url, setUrl] = React.useState("");
+  const [callbackUrl, setCallbackUrl] = React.useState("");
+  const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<
+    number | null
+  >(null);
+  const [requireTwoFactor, setRequireTwoFactor] =
+    React.useState<boolean>(false);
+  const [errorKey, setErrorKey] = React.useState<string | null>(null);
+  const [pending, startTransition] = React.useTransition();
 
   React.useEffect(() => {
     if (!open) {
-      setName('')
-      setUrl('')
-      setCallbackUrl('')
-      setTwoFactorTrustDays(null)
-      setRequireTwoFactor(false)
-      setErrorKey(null)
+      setName("");
+      setUrl("");
+      setCallbackUrl("");
+      setTwoFactorTrustDays(null);
+      setRequireTwoFactor(false);
+      setErrorKey(null);
     }
-  }, [open])
+  }, [open]);
 
   function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (!name.trim()) {
-      setErrorKey('apps.errors.nameRequired')
-      return
+      setErrorKey("apps.errors.nameRequired");
+      return;
     }
-    setErrorKey(null)
+    setErrorKey(null);
     startTransition(async () => {
       const result = await createAppAction({
         name: name.trim(),
@@ -58,15 +61,15 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
         callbackUrl: callbackUrl.trim() || null,
         twoFactorTrustDays,
         requireTwoFactor,
-      })
-      if ('errorKey' in result) {
-        setErrorKey(result.errorKey)
-        return
+      });
+      if ("errorKey" in result) {
+        setErrorKey(result.errorKey);
+        return;
       }
-      toast.success(t('apps.toast.created'))
-      onSuccess?.()
-      onOpenChange(false)
-    })
+      toast.success(t("apps.toast.created"));
+      onSuccess?.();
+      onOpenChange(false);
+    });
   }
 
   return (
@@ -74,14 +77,16 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       <SheetContent>
         <SheetHeader>
           <div>
-            <SheetTitle>{t('apps.drawer.createTitle')}</SheetTitle>
-            <SheetDescription>{t('apps.drawer.createSubtitle')}</SheetDescription>
+            <SheetTitle>{t("apps.drawer.createTitle")}</SheetTitle>
+            <SheetDescription>
+              {t("apps.drawer.createSubtitle")}
+            </SheetDescription>
           </div>
         </SheetHeader>
         <SheetBody>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="appName">{t('apps.fields.name')}</Label>
+              <Label htmlFor="appName">{t("apps.fields.name")}</Label>
               <Input
                 id="appName"
                 value={name}
@@ -90,7 +95,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
               />
             </div>
             <div>
-              <Label htmlFor="appUrl">{t('apps.fields.url')}</Label>
+              <Label htmlFor="appUrl">{t("apps.fields.url")}</Label>
               <Input
                 id="appUrl"
                 type="url"
@@ -100,11 +105,13 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                 placeholder="https://app.example.com"
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.urlHint')}
+                {t("apps.fields.urlHint")}
               </p>
             </div>
             <div>
-              <Label htmlFor="appCallbackUrl">{t('apps.fields.callbackUrl')}</Label>
+              <Label htmlFor="appCallbackUrl">
+                {t("apps.fields.callbackUrl")}
+              </Label>
               <Input
                 id="appCallbackUrl"
                 type="url"
@@ -113,24 +120,28 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                 placeholder="https://app.example.com/auth/callback"
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.callbackUrlHint')}
+                {t("apps.fields.callbackUrlHint")}
               </p>
             </div>
             <div>
-              <Label htmlFor="appTrustDays">{t('apps.fields.twoFactorTrustDays')}</Label>
+              <Label htmlFor="appTrustDays">
+                {t("apps.fields.twoFactorTrustDays")}
+              </Label>
               <Input
                 id="appTrustDays"
                 type="number"
                 min={1}
                 max={3650}
-                value={twoFactorTrustDays ?? ''}
+                value={twoFactorTrustDays ?? ""}
                 onChange={(e) =>
-                  setTwoFactorTrustDays(e.target.value === '' ? null : Number(e.target.value))
+                  setTwoFactorTrustDays(
+                    e.target.value === "" ? null : Number(e.target.value),
+                  )
                 }
-                placeholder={t('apps.fields.twoFactorTrustDaysPlaceholder')}
+                placeholder={t("apps.fields.twoFactorTrustDaysPlaceholder")}
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.twoFactorTrustDaysHint')}
+                {t("apps.fields.twoFactorTrustDaysHint")}
               </p>
             </div>
             <div>
@@ -140,19 +151,19 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                   id="requireTwoFactor"
                   checked={requireTwoFactor}
                   onChange={(e) => setRequireTwoFactor(e.target.checked)}
-                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
-                {t('apps.fields.requireTwoFactor')}
+                {t("apps.fields.requireTwoFactor")}
               </label>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.requireTwoFactorHint')}
+                {t("apps.fields.requireTwoFactorHint")}
               </p>
             </div>
             <div className="rounded border border-border bg-muted p-3 text-body-sm text-muted-foreground">
               <span className="material-symbols-outlined align-middle text-[16px] text-primary">
                 info
-              </span>{' '}
-              {t('apps.drawer.identifiersAutoGenerated')}
+              </span>{" "}
+              {t("apps.drawer.identifiersAutoGenerated")}
             </div>
             {errorKey && (
               <p role="alert" className="text-body-sm text-destructive">
@@ -167,10 +178,10 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                   onClick={() => onOpenChange(false)}
                   loading={pending}
                 >
-                  {t('apps.drawer.cancel')}
+                  {t("apps.drawer.cancel")}
                 </Button>
                 <Button type="submit" loading={pending}>
-                  {t('apps.drawer.createTitle')}
+                  {t("apps.drawer.createTitle")}
                 </Button>
               </ButtonGroup>
             </div>
@@ -178,5 +189,5 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
         </SheetBody>
       </SheetContent>
     </Sheet>
-  )
+  );
 }
