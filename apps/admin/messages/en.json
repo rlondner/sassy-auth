@@ -465,6 +465,8 @@
     "subtitle": "Sign in to continue",
     "email": "Email Address",
     "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "submit": "Sign In",
     "forgotPassword": "Forgot password?",
     "useCode": "Sign in with a code instead",
