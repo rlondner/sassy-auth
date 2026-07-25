@@ -14,7 +14,8 @@ jest.mock('@/app/(admin)/users/actions', () => ({
 }))
 
 jest.mock('../user-view-drawer', () => ({
-  UserViewDrawer: () => null,
+  UserViewDrawer: ({ user, open }: { user: any; open: boolean }) =>
+    open && user ? <div data-testid="drawer-user-name">{user.firstName} {user.lastName}</div> : null,
 }))
 
 jest.mock('../user-create-drawer', () => ({
@@ -48,8 +49,8 @@ jest.mock('@sassy-auth/ui', () => {
 })
 
 const mockUsers: User[] = [
-  { id: '1', firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', status: 'active', orgId: 'org1', phoneNumber: null, username: null },
-  { id: '2', firstName: 'Bob', lastName: 'Jones', email: 'bob@example.com', status: 'pending', orgId: 'org1', phoneNumber: null, username: null },
+  { id: '1', firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', status: 'active', orgId: 'org1', phoneNumber: null, username: null, createdAt: new Date().toISOString(), lastLoginAt: null },
+  { id: '2', firstName: 'Bob', lastName: 'Jones', email: 'bob@example.com', status: 'pending', orgId: 'org1', phoneNumber: null, username: null, createdAt: new Date().toISOString(), lastLoginAt: null },
 ]
 
 const mockOrgs: Org[] = [{ id: 'org1', name: 'Acme Corp', appId: 'app1', isPlatform: true }]
@@ -87,5 +88,23 @@ describe('UsersTable', () => {
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toBeInTheDocument()
     expect(dialog).toHaveTextContent(/Alice Smith/)
+  })
+
+  it('rebases selectedUser when users prop changes', () => {
+    const { rerender } = render(withIntl(<UsersTable users={mockUsers} orgs={mockOrgs} />))
+
+    // Click on Alice Smith's row to select her
+    fireEvent.click(screen.getByText('Alice Smith'))
+    expect(screen.getByTestId('drawer-user-name')).toHaveTextContent('Alice Smith')
+
+    // Rerender with updated users prop (Alice's first name changed to Alicia)
+    const updatedUsers: User[] = [
+      { id: '1', firstName: 'Alicia', lastName: 'Smith', email: 'alice@example.com', status: 'active', orgId: 'org1', phoneNumber: null, username: null, createdAt: new Date().toISOString(), lastLoginAt: null },
+      { id: '2', firstName: 'Bob', lastName: 'Jones', email: 'bob@example.com', status: 'pending', orgId: 'org1', phoneNumber: null, username: null, createdAt: new Date().toISOString(), lastLoginAt: null },
+    ]
+    rerender(withIntl(<UsersTable users={updatedUsers} orgs={mockOrgs} />))
+
+    // The drawer should now show Alicia Smith
+    expect(screen.getByTestId('drawer-user-name')).toHaveTextContent('Alicia Smith')
   })
 })

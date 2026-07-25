@@ -51,4 +51,24 @@ describe('AppEditDrawer', () => {
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
+
+  it('displays validation error when name is whitespace-only', async () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    const nameInput = screen.getByLabelText(en.apps.fields.name) as HTMLInputElement
+
+    fireEvent.change(nameInput, { target: { value: '' } })
+    fireEvent.click(save)
+    expect(screen.getByText(en.apps.errors.nameRequired)).toBeInTheDocument()
+  })
+
+  it('displays validation error when url is whitespace-only', async () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    const urlInput = screen.getByLabelText(en.apps.fields.url) as HTMLInputElement
+
+    fireEvent.change(urlInput, { target: { value: '' } })
+    fireEvent.click(save)
+    expect(screen.getByText(en.apps.errors.urlRequired)).toBeInTheDocument()
+  })
 })

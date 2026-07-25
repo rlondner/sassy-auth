@@ -47,6 +47,14 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
   // mutating action). This swaps the table data silently without a navigation.
   const refresh = React.useCallback(() => router.refresh(), [router])
 
+  // bug-0233: rebase `selectedUser` on the refreshed `users` prop so drawers
+  // reflect current data, or clear if the user is gone.
+  React.useEffect(() => {
+    setSelectedUser((prev) =>
+      prev ? users.find((u) => u.id === prev.id) ?? null : null,
+    )
+  }, [users])
+
   const orgMap = React.useMemo(
     () => Object.fromEntries(orgs.map((o) => [o.id, o])),
     [orgs],
