@@ -2,14 +2,16 @@
 
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@sassy-auth/ui'
+import { Eye, EyeOff } from 'lucide-react'
 import { signIn } from './actions'
 
 export function LoginForm({ next }: { next: string }) {
   const t = useTranslations('login')
   const router = useRouter()
+  const [showPassword, setShowPassword] = useState(false)
 
   const [state, formAction, isPending] = useActionState(
     async (
@@ -51,14 +53,28 @@ export function LoginForm({ next }: { next: string }) {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-label-md font-semibold" htmlFor="password">{t('password')}</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="flex h-9 w-full rounded border border-[var(--border)] bg-[var(--card)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                className="flex h-9 w-full rounded border border-[var(--border)] bg-[var(--card)] pl-3 pr-10 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-sm p-0.5 flex items-center justify-center"
+                aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           {'error' in state && state.error && (
