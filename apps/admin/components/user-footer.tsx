@@ -32,7 +32,7 @@ export function UserFooter({
         <form action={signOutAction}>
           <button
             type="submit"
-            className="text-sidebar-foreground hover:text-white"
+            className="rounded text-sidebar-foreground hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
             title={signOutLabel}
             aria-label={signOutLabel}
           >
