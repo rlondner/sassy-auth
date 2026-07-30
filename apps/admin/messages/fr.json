@@ -13,10 +13,10 @@
     "switchToDark": "Passer en mode sombre"
   },
   "common": {
-    "save": "Save",
-    "edit": "Edit",
-    "delete": "Delete",
-    "confirm": "Confirm"
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirm": "Confirmer"
   },
   "apps": {
     "title": "Applications",
@@ -90,9 +90,9 @@
       "showing": "{from} à {to} sur {total} applications"
     },
     "toast": {
-      "created": "App created",
-      "updated": "App updated",
-      "deleted": "App deleted"
+      "created": "Application créée",
+      "updated": "Application mise à jour",
+      "deleted": "Application supprimée"
     }
   },
   "orgs": {
@@ -170,9 +170,9 @@
       "showing": "{from} à {to} sur {total} organisations"
     },
     "toast": {
-      "created": "Org created",
-      "updated": "Org updated",
-      "deleted": "Org deleted"
+      "created": "Organisation créée",
+      "updated": "Organisation mise à jour",
+      "deleted": "Organisation supprimée"
     }
   },
   "permissions": {
@@ -231,9 +231,9 @@
       "next": "Suivant"
     },
     "toast": {
-      "created": "Permission created",
-      "updated": "Permission updated",
-      "deleted": "Permission deleted"
+      "created": "Permission créée",
+      "updated": "Permission mise à jour",
+      "deleted": "Permission supprimée"
     },
     "confirmDelete": {
       "title": "Supprimer la permission",
@@ -312,9 +312,9 @@
       "next": "Suivant"
     },
     "toast": {
-      "created": "Role created",
-      "updated": "Role updated",
-      "deleted": "Role deleted"
+      "created": "Rôle créé",
+      "updated": "Rôle mis à jour",
+      "deleted": "Rôle supprimé"
     },
     "confirmDelete": {
       "title": "Supprimer le rôle",
@@ -337,7 +337,7 @@
     "title": "Utilisateurs",
     "search": "Rechercher des utilisateurs…",
     "addUser": "Ajouter un utilisateur",
-    "create": "Add User",
+    "create": "Ajouter un utilisateur",
     "columns": {
       "user": "Utilisateur",
       "status": "Statut",
@@ -406,13 +406,13 @@
       "activate": "Activer",
       "delete": "Supprimer",
       "resendInvitation": "Renvoyer l’invitation",
-      "resend": "Resend Invitation"
+      "resend": "Renvoyer l’invitation"
     },
     "toast": {
-      "created": "User created",
-      "updated": "User updated",
-      "deleted": "User deleted",
-      "resent": "Invitation resent",
+      "created": "Utilisateur créé",
+      "updated": "Utilisateur mis à jour",
+      "deleted": "Utilisateur supprimé",
+      "resent": "Invitation renvoyée",
       "resetLinkGenerated": "Lien de réinitialisation généré",
       "activated": "Utilisateur activé",
       "deactivated": "Utilisateur désactivé"
