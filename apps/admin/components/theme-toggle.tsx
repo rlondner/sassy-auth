@@ -23,7 +23,7 @@ export function ThemeToggle({ lightLabel, darkLabel }: ThemeToggleProps) {
     <button
       type="button"
       onClick={() => setTheme(next)}
-      className="text-sidebar-foreground hover:text-white"
+      className="text-sidebar-foreground hover:text-white hover:bg-sidebar-accent rounded-md p-1.5 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar flex items-center justify-center"
       aria-label={label}
       title={label}
     >
