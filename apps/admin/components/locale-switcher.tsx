@@ -28,7 +28,7 @@ export function LocaleSwitcher({ currentLocale, availableLocales }: LocaleSwitch
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-sidebar-foreground hover:bg-sidebar-accent hover:text-white disabled:opacity-50"
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-sidebar-foreground hover:bg-sidebar-accent hover:text-white disabled:opacity-50 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
           disabled={isPending}
           aria-label="Change language"
         >
