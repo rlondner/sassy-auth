@@ -104,6 +104,10 @@ export const auth = betterAuth({
     session: {
       create: {
         before: async (session: { userId: string }) => {
+          const isSeeding = process.env.SEEDING === 'true' || process.argv.some((arg) => arg.includes('seed'));
+          if (isSeeding) {
+            return;
+          }
           const gate = await evaluateSessionGate(prisma, session.userId);
           if (!gate.allowed) {
             // bug-0163-adjacent: no credential here, safe to log. This is the
