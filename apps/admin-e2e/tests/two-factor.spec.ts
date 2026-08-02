@@ -185,7 +185,11 @@ test.describe('2FA — challenge through authorize', () => {
     // Hard-assert: enroll must have succeeded in this same run.
     expect(secret, '2FA secret must be available — enroll test must run first').toBeTruthy()
 
-    const platformApp = await fetchPlatformApp(request)
+    const superCtx = await page.context().browser()!.newContext({
+      storageState: '.auth/super-admin.json',
+    })
+    const platformApp = await fetchPlatformApp(superCtx.request)
+    await superCtx.close()
     const { authorizeUrl, redirectUri } = buildValidAuthorizeFlow(platformApp, 'tf-challenge-state')
 
     // Stub the redirect_uri so the browser doesn't 404 when the auth-server
