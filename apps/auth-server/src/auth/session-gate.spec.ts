@@ -24,4 +24,23 @@ describe('evaluateSessionGate', () => {
     const res = await evaluateSessionGate(dbWith(null), 'ba-unknown');
     expect(res).toEqual({ allowed: false, status: null });
   });
+
+  it('allows a recently created user even if no SaUser exists', async () => {
+    const db = {
+      saUser: { findUnique: jest.fn().mockResolvedValue(null) },
+      user: { findUnique: jest.fn().mockResolvedValue({ createdAt: new Date() }) },
+    };
+    const res = await evaluateSessionGate(db, 'ba-recent');
+    expect(res).toEqual({ allowed: true, status: null });
+  });
+
+  it('blocks a user created long ago if no SaUser exists', async () => {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const db = {
+      saUser: { findUnique: jest.fn().mockResolvedValue(null) },
+      user: { findUnique: jest.fn().mockResolvedValue({ createdAt: tenMinutesAgo }) },
+    };
+    const res = await evaluateSessionGate(db, 'ba-old');
+    expect(res).toEqual({ allowed: false, status: null });
+  });
 });
