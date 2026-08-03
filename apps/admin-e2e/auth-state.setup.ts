@@ -8,6 +8,16 @@ for (const admin of SEED_ADMINS) {
     const login = new LoginPage(page)
     await login.goto()
     await login.signIn(admin.email, ADMIN_PASSWORD)
+
+    // Handle optional 2FA setup interstitial for newly seeded admins on their first login.
+    await page.waitForURL(
+      /(\/login\/two-factor-prompt|\/(users|apps|orgs|permissions|roles))$/,
+      { timeout: 25_000 }
+    )
+    if (page.url().includes('/login/two-factor-prompt')) {
+      await page.getByRole('button', { name: /skip/i }).click()
+    }
+
     // All 5 seeded admins land on /users post-login (their initial landing
     // page is whatever their nav allows first; /users redirect happens
     // because the admin landing layout picks /users as a default).
