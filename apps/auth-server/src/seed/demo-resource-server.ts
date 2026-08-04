@@ -1,66 +1,74 @@
-import { prisma } from '@sassy-auth/db';
-import Sqids from 'sqids';
-import { auth } from '../auth/auth.config';
-import { generatePendingPublicId } from '../common/pending-public-id';
+import { prisma } from "@sassy-auth/db";
+import Sqids from "sqids";
+import { auth } from "../auth/auth.config";
+import { generatePendingPublicId } from "../common/pending-public-id";
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
   minLength: 4,
 });
 
-const APP_NAME = 'resourceserver01';
-const APP_URL = process.env['RS_APP_URL'] ?? 'https://cheryl-crescentlike-monte.ngrok-free.dev/';
-const CALLBACK_URL = new URL('/auth/callback', APP_URL).toString();
-const ORG_NAME = 'Citadel';
+const APP_NAME = "resourceserver01";
+const APP_URL =
+  process.env["RS_APP_URL"] ??
+  "https://cheryl-crescentlike-monte.ngrok-free.dev/";
+const CALLBACK_URL = new URL("/auth/callback", APP_URL).toString();
+const ORG_NAME = "Citadel";
 
 const PERMISSIONS = [
-  'rs.properties.create',
-  'rs.properties.read',
-  'rs.properties.update',
-  'rs.properties.delete',
-  'rs.inspections.create',
-  'rs.inspections.read',
-  'rs.inspections.update',
-  'rs.inspections.delete',
+  "rs.properties.create",
+  "rs.properties.read",
+  "rs.properties.update",
+  "rs.properties.delete",
+  "rs.inspections.create",
+  "rs.inspections.read",
+  "rs.inspections.update",
+  "rs.inspections.delete",
 ] as const;
 
-const ROLE_PROPERTY_MANAGERS = 'Citadel Property Managers';
-const ROLE_INSPECTORS = 'Citadel Inspectors';
+const ROLE_PROPERTY_MANAGERS = "Citadel Property Managers";
+const ROLE_INSPECTORS = "Citadel Inspectors";
 
 const ROLE_PERMS: Record<string, readonly string[]> = {
   [ROLE_PROPERTY_MANAGERS]: PERMISSIONS, // all 8
   [ROLE_INSPECTORS]: [
-    'rs.inspections.create',
-    'rs.inspections.read',
-    'rs.inspections.update',
-    'rs.properties.read',
-    'rs.properties.update',
+    "rs.inspections.create",
+    "rs.inspections.read",
+    "rs.inspections.update",
+    "rs.properties.read",
+    "rs.properties.update",
   ],
 };
 
 const USERS = [
   {
-    email: 'm@cpm.io',
-    firstName: 'Citadel',
-    lastName: 'Manager',
+    email: "m@cpm.io",
+    firstName: "Citadel",
+    lastName: "Manager",
     role: ROLE_PROPERTY_MANAGERS,
   },
   {
-    email: 'i@cpm.io',
-    firstName: 'Citadel',
-    lastName: 'Inspector',
+    email: "i@cpm.io",
+    firstName: "Citadel",
+    lastName: "Inspector",
     role: ROLE_INSPECTORS,
   },
 ] as const;
 
-const PASSWORD = 'Pass@word1234';
+const PASSWORD = "Pass@word1234";
 
 async function ensureApp() {
   const found = await prisma.saApp.findUnique({ where: { name: APP_NAME } });
   if (found) return found;
   return prisma.$transaction(async (tx) => {
     const created = await tx.saApp.create({
-      data: { publicId: generatePendingPublicId(), name: APP_NAME, url: APP_URL, callbackUrl: CALLBACK_URL, isPlatform: false },
+      data: {
+        publicId: generatePendingPublicId(),
+        name: APP_NAME,
+        url: APP_URL,
+        callbackUrl: CALLBACK_URL,
+        isPlatform: false,
+      },
     });
     return tx.saApp.update({
       where: { id: created.id },
@@ -70,11 +78,18 @@ async function ensureApp() {
 }
 
 async function ensureOrg(appId: number) {
-  const found = await prisma.saOrg.findFirst({ where: { appId, name: ORG_NAME } });
+  const found = await prisma.saOrg.findFirst({
+    where: { appId, name: ORG_NAME },
+  });
   if (found) return found;
   return prisma.$transaction(async (tx) => {
     const created = await tx.saOrg.create({
-      data: { publicId: generatePendingPublicId(), name: ORG_NAME, appId, isPlatform: false },
+      data: {
+        publicId: generatePendingPublicId(),
+        name: ORG_NAME,
+        appId,
+        isPlatform: false,
+      },
     });
     return tx.saOrg.update({
       where: { id: created.id },
@@ -103,12 +118,10 @@ async function ensurePermissions(appId: number) {
   return out;
 }
 
-async function ensureRole(
-  appId: number,
-  roleName: string,
-  permIds: number[],
-) {
-  let role = await prisma.saRole.findFirst({ where: { appId, name: roleName } });
+async function ensureRole(appId: number, roleName: string, permIds: number[]) {
+  let role = await prisma.saRole.findFirst({
+    where: { appId, name: roleName },
+  });
   if (!role) {
     role = await prisma.$transaction(async (tx) => {
       const c = await tx.saRole.create({
@@ -146,10 +159,15 @@ async function ensureUser(
       body: { email, password: PASSWORD, name: `${firstName} ${lastName}` },
     });
     baUserId = result.user.id;
-    await prisma.user.update({ where: { id: baUserId }, data: { emailVerified: true } });
+    await prisma.user.update({
+      where: { id: baUserId },
+      data: { emailVerified: true },
+    });
   }
 
-  let saUser = await prisma.saUser.findFirst({ where: { betterAuthUserId: baUserId } });
+  let saUser = await prisma.saUser.findFirst({
+    where: { betterAuthUserId: baUserId },
+  });
   if (!saUser) {
     saUser = await prisma.$transaction(async (tx) => {
       const c = await tx.saUser.create({
@@ -159,7 +177,8 @@ async function ensureUser(
           orgId,
           firstName,
           lastName,
-          status: 'active',
+          status: "active",
+          twoFactorPromptedAt: new Date(),
         },
       });
       return tx.saUser.update({
@@ -177,7 +196,7 @@ async function ensureUser(
 }
 
 export async function seedDemoResourceServer() {
-  console.log('[demo] Seeding resourceserver01 demo data...');
+  console.log("[demo] Seeding resourceserver01 demo data...");
   const app = await ensureApp();
   const org = await ensureOrg(app.id);
   const perms = await ensurePermissions(app.id);
@@ -198,7 +217,13 @@ export async function seedDemoResourceServer() {
   };
 
   for (const u of USERS) {
-    await ensureUser(u.email, u.firstName, u.lastName, org.id, rolesByName[u.role]);
+    await ensureUser(
+      u.email,
+      u.firstName,
+      u.lastName,
+      org.id,
+      rolesByName[u.role],
+    );
   }
-  console.log('[demo] Done.');
+  console.log("[demo] Done.");
 }

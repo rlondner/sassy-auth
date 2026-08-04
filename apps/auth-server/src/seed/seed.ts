@@ -163,6 +163,7 @@ async function seedPlatformAdmin(
         firstName: admin.firstName,
         lastName: admin.lastName,
         status: "active",
+        twoFactorPromptedAt: new Date(),
       },
     });
     const publicId = sqids.encode([created.id]);
