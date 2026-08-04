@@ -1,78 +1,102 @@
-'use client'
+"use client";
 
-import * as React from 'react'
-import { useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
-import { ColumnDef } from '@tanstack/react-table'
-import { Plus, Search } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from "react";
+import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import { ColumnDef } from "@tanstack/react-table";
+import { Plus, Search } from "lucide-react";
+import { toast } from "sonner";
 import {
-  Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger, StatusChip, UserAvatar,
-} from '@sassy-auth/ui'
-import type { User, Org } from '@/lib/types'
-import { UserViewDrawer } from './user-view-drawer'
-import { UserCreateDrawer } from './user-create-drawer'
-import { DeleteAlertDialog } from './delete-alert-dialog'
-import { PageHeader } from './page-header'
-import { deleteUserAction, resetPasswordAction, resendInvitationAction, setUserStatusAction } from '@/app/(admin)/users/actions'
-import { ShareLinkDialog } from './share-link-dialog'
+  Button,
+  ButtonGroup,
+  DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  StatusChip,
+  UserAvatar,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@sassy-auth/ui";
+import type { User, Org } from "@/lib/types";
+import { UserViewDrawer } from "./user-view-drawer";
+import { UserCreateDrawer } from "./user-create-drawer";
+import { DeleteAlertDialog } from "./delete-alert-dialog";
+import { PageHeader } from "./page-header";
+import {
+  deleteUserAction,
+  resetPasswordAction,
+  resendInvitationAction,
+  setUserStatusAction,
+} from "@/app/(admin)/users/actions";
+import { ShareLinkDialog } from "./share-link-dialog";
 
 interface UsersTableProps {
-  users: User[]
-  orgs: Org[]
-  initialOrgId?: string
-  canPickOrg?: boolean
-  currentUserId?: string
+  users: User[];
+  orgs: Org[];
+  initialOrgId?: string;
+  canPickOrg?: boolean;
+  currentUserId?: string;
 }
 
-export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, currentUserId }: UsersTableProps) {
-  const t = useTranslations()
-  const router = useRouter()
-  void initialOrgId
-  void canPickOrg
-  const [globalFilter, setGlobalFilter] = React.useState('')
-  const [selectedUser, setSelectedUser] = React.useState<User | null>(null)
-  const [viewOpen, setViewOpen] = React.useState(false)
-  const [createOpen, setCreateOpen] = React.useState(false)
-  const [deleteOpen, setDeleteOpen] = React.useState(false)
-  const [deleteError, setDeleteError] = React.useState<string | null>(null)
-  const [statusTarget, setStatusTarget] = React.useState<User | null>(null)
-  const [statusError, setStatusError] = React.useState<string | null>(null)
-  const [resetLink, setResetLink] = React.useState<string | null>(null)
-  const [inviteLink, setInviteLink] = React.useState<string | null>(null)
+export function UsersTable({
+  users,
+  orgs,
+  initialOrgId,
+  canPickOrg = true,
+  currentUserId,
+}: UsersTableProps) {
+  const t = useTranslations();
+  const router = useRouter();
+  void initialOrgId;
+  void canPickOrg;
+  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
+  const [viewOpen, setViewOpen] = React.useState(false);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [statusTarget, setStatusTarget] = React.useState<User | null>(null);
+  const [statusError, setStatusError] = React.useState<string | null>(null);
+  const [resetLink, setResetLink] = React.useState<string | null>(null);
+  const [inviteLink, setInviteLink] = React.useState<string | null>(null);
 
   // No client-side list action for users — the page is a Server Component
   // that re-fetches on router.refresh() (paired with revalidatePath in the
   // mutating action). This swaps the table data silently without a navigation.
-  const refresh = React.useCallback(() => router.refresh(), [router])
+  const refresh = React.useCallback(() => router.refresh(), [router]);
 
   const orgMap = React.useMemo(
     () => Object.fromEntries(orgs.map((o) => [o.id, o])),
     [orgs],
-  )
+  );
 
   const columns: ColumnDef<User>[] = [
     {
-      id: 'user',
+      id: "user",
       accessorFn: (row) => `${row.firstName} ${row.lastName} ${row.email}`,
-      header: t('users.columns.user'),
+      header: t("users.columns.user"),
       cell: ({ row }) => {
-        const u = row.original
+        const u = row.original;
         return (
           <div className="flex items-center gap-3">
             <UserAvatar firstName={u.firstName} lastName={u.lastName} />
             <div>
-              <p className="text-body-sm font-semibold text-foreground">{u.firstName} {u.lastName}</p>
+              <p className="text-body-sm font-semibold text-foreground">
+                {u.firstName} {u.lastName}
+              </p>
               <p className="text-label-md text-muted-foreground">{u.email}</p>
             </div>
           </div>
-        )
+        );
       },
     },
     {
-      accessorKey: 'status',
-      header: t('users.columns.status'),
+      accessorKey: "status",
+      header: t("users.columns.status"),
       cell: ({ row }) => (
         <StatusChip
           variant={row.original.status}
@@ -81,100 +105,142 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
       ),
     },
     {
-      id: 'org',
-      header: t('users.columns.org'),
+      id: "org",
+      header: t("users.columns.org"),
       cell: ({ row }) => orgMap[row.original.orgId]?.name ?? row.original.orgId,
     },
     {
-      id: 'lastLogin',
-      header: t('users.columns.lastLogin'),
+      id: "lastLogin",
+      header: t("users.columns.lastLogin"),
       cell: ({ row }) => {
-        const ts = row.original.lastLoginAt
-        if (!ts) return <span className="text-muted-foreground">{t('users.fields.never')}</span>
-        return new Date(ts).toLocaleDateString()
+        const ts = row.original.lastLoginAt;
+        if (!ts)
+          return (
+            <span className="text-muted-foreground">
+              {t("users.fields.never")}
+            </span>
+          );
+        return new Date(ts).toLocaleDateString();
       },
     },
     {
-      id: 'actions',
-      header: '',
+      id: "actions",
+      header: "",
       cell: ({ row }) => {
-        const u = row.original
+        const u = row.original;
         return (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
-                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
-              </button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger
+                  asChild
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    aria-label={t("common.moreActions")}
+                    className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-shadow"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-muted-foreground">
+                      more_vert
+                    </span>
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>{t("common.moreActions")}</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedUser(u); setViewOpen(true) }}>
-                {t('users.actions.edit')}
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedUser(u);
+                  setViewOpen(true);
+                }}
+              >
+                {t("users.actions.edit")}
               </DropdownMenuItem>
-              {u.status === 'active' && (
+              {u.status === "active" && (
                 <DropdownMenuItem
                   onClick={async (e) => {
-                    e.stopPropagation()
-                    const res = await resetPasswordAction(u.id)
-                    if ('errorKey' in res) { toast.error(t(res.errorKey)); return }
-                    toast.success(t('users.toast.resetLinkGenerated'))
-                    if (res.resetUrl) setResetLink(res.resetUrl)
+                    e.stopPropagation();
+                    const res = await resetPasswordAction(u.id);
+                    if ("errorKey" in res) {
+                      toast.error(t(res.errorKey));
+                      return;
+                    }
+                    toast.success(t("users.toast.resetLinkGenerated"));
+                    if (res.resetUrl) setResetLink(res.resetUrl);
                   }}
                 >
-                  {t('users.actions.resetPassword')}
+                  {t("users.actions.resetPassword")}
                 </DropdownMenuItem>
               )}
-              {u.status === 'pending' && (
+              {u.status === "pending" && (
                 <DropdownMenuItem
                   onClick={async (e) => {
-                    e.stopPropagation()
-                    const res = await resendInvitationAction(u.id)
-                    if ('errorKey' in res) { toast.error(t(res.errorKey)); return }
-                    toast.success(t('users.toast.resent'))
-                    setInviteLink(res.inviteUrl)
+                    e.stopPropagation();
+                    const res = await resendInvitationAction(u.id);
+                    if ("errorKey" in res) {
+                      toast.error(t(res.errorKey));
+                      return;
+                    }
+                    toast.success(t("users.toast.resent"));
+                    setInviteLink(res.inviteUrl);
                   }}
                 >
-                  {t('users.actions.resendInvitation')}
+                  {t("users.actions.resendInvitation")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              {u.status === 'active' && u.id !== currentUserId ? (
+              {u.status === "active" && u.id !== currentUserId ? (
                 <DropdownMenuItem
                   className="text-destructive"
-                  onClick={(e) => { e.stopPropagation(); setStatusError(null); setStatusTarget(u) }}
-                >
-                  {t('users.actions.deactivate')}
-                </DropdownMenuItem>
-              ) : u.status === 'inactive' ? (
-                <DropdownMenuItem
-                  onClick={async (e) => {
-                    e.stopPropagation()
-                    const res = await setUserStatusAction(u.id, 'active')
-                    if ('errorKey' in res) { toast.error(t(res.errorKey)); return }
-                    toast.success(t('users.toast.activated'))
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setStatusError(null);
+                    setStatusTarget(u);
                   }}
                 >
-                  {t('users.actions.activate')}
+                  {t("users.actions.deactivate")}
+                </DropdownMenuItem>
+              ) : u.status === "inactive" ? (
+                <DropdownMenuItem
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const res = await setUserStatusAction(u.id, "active");
+                    if ("errorKey" in res) {
+                      toast.error(t(res.errorKey));
+                      return;
+                    }
+                    toast.success(t("users.toast.activated"));
+                  }}
+                >
+                  {t("users.actions.activate")}
                 </DropdownMenuItem>
               ) : null}
               <DropdownMenuItem
                 className="text-destructive"
-                onClick={(e) => { e.stopPropagation(); setSelectedUser(u); setDeleteError(null); setDeleteOpen(true) }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedUser(u);
+                  setDeleteError(null);
+                  setDeleteOpen(true);
+                }}
               >
-                {t('users.actions.delete')}
+                {t("users.actions.delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )
+        );
       },
     },
-  ]
+  ];
 
   return (
     <>
       <PageHeader
         crumbs={[
-          { href: '/users', label: t('nav.directory') },
-          { label: t('users.title') },
+          { href: "/users", label: t("nav.directory") },
+          { label: t("users.title") },
         ]}
         actions={
           <>
@@ -182,7 +248,7 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="search"
-                placeholder={t('users.search')}
+                placeholder={t("users.search")}
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
@@ -191,7 +257,7 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
             <ButtonGroup>
               <Button size="sm" onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4" />
-                {t('users.addUser')}
+                {t("users.addUser")}
               </Button>
             </ButtonGroup>
           </>
@@ -204,7 +270,10 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
           columns={columns}
           data={users}
           globalFilter={globalFilter}
-          onRowClick={(user) => { setSelectedUser(user); setViewOpen(true) }}
+          onRowClick={(user) => {
+            setSelectedUser(user);
+            setViewOpen(true);
+          }}
         />
       </div>
 
@@ -226,56 +295,69 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
         <DeleteAlertDialog
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
-          title={t('users.confirmDelete.title')}
-          description={t('users.confirmDelete.body', { name: `${selectedUser.firstName} ${selectedUser.lastName}` })}
-          confirmLabel={t('users.confirmDelete.button')}
-          cancelLabel={t('users.drawer.cancel')}
+          title={t("users.confirmDelete.title")}
+          description={t("users.confirmDelete.body", {
+            name: `${selectedUser.firstName} ${selectedUser.lastName}`,
+          })}
+          confirmLabel={t("users.confirmDelete.button")}
+          cancelLabel={t("users.drawer.cancel")}
           error={deleteError}
           onConfirm={async () => {
-            const result = await deleteUserAction(selectedUser.id)
-            if ('errorKey' in result) {
-              setDeleteError(t(result.errorKey))
-              return
+            const result = await deleteUserAction(selectedUser.id);
+            if ("errorKey" in result) {
+              setDeleteError(t(result.errorKey));
+              return;
             }
-            toast.success(t('users.toast.deleted'))
-            setDeleteOpen(false)
+            toast.success(t("users.toast.deleted"));
+            setDeleteOpen(false);
             // bug-0116: also close the view drawer if the deleted user was open in it.
-            setViewOpen(false)
-            refresh()
+            setViewOpen(false);
+            refresh();
           }}
         />
       )}
       {statusTarget && (
         <DeleteAlertDialog
           open
-          onOpenChange={(o) => { if (!o) setStatusTarget(null) }}
-          title={t('users.confirmDeactivate.title')}
-          description={t('users.confirmDeactivate.body', { name: `${statusTarget.firstName} ${statusTarget.lastName}` })}
-          confirmLabel={t('users.confirmDeactivate.button')}
-          cancelLabel={t('users.drawer.cancel')}
+          onOpenChange={(o) => {
+            if (!o) setStatusTarget(null);
+          }}
+          title={t("users.confirmDeactivate.title")}
+          description={t("users.confirmDeactivate.body", {
+            name: `${statusTarget.firstName} ${statusTarget.lastName}`,
+          })}
+          confirmLabel={t("users.confirmDeactivate.button")}
+          cancelLabel={t("users.drawer.cancel")}
           error={statusError}
           onConfirm={async () => {
-            const res = await setUserStatusAction(statusTarget.id, 'inactive')
-            if ('errorKey' in res) { setStatusError(t(res.errorKey)); return }
-            toast.success(t('users.toast.deactivated'))
-            setStatusTarget(null)
+            const res = await setUserStatusAction(statusTarget.id, "inactive");
+            if ("errorKey" in res) {
+              setStatusError(t(res.errorKey));
+              return;
+            }
+            toast.success(t("users.toast.deactivated"));
+            setStatusTarget(null);
           }}
         />
       )}
       <ShareLinkDialog
         open={resetLink !== null}
-        onOpenChange={(o) => { if (!o) setResetLink(null) }}
-        title={t('users.drawer.resetLinkTitle')}
-        description={t('users.drawer.resetLinkBody')}
-        url={resetLink ?? ''}
+        onOpenChange={(o) => {
+          if (!o) setResetLink(null);
+        }}
+        title={t("users.drawer.resetLinkTitle")}
+        description={t("users.drawer.resetLinkBody")}
+        url={resetLink ?? ""}
       />
       <ShareLinkDialog
         open={inviteLink !== null}
-        onOpenChange={(o) => { if (!o) setInviteLink(null) }}
-        title={t('users.drawer.resendLinkTitle')}
-        description={t('users.drawer.resendLinkBody')}
-        url={inviteLink ?? ''}
+        onOpenChange={(o) => {
+          if (!o) setInviteLink(null);
+        }}
+        title={t("users.drawer.resendLinkTitle")}
+        description={t("users.drawer.resendLinkBody")}
+        url={inviteLink ?? ""}
       />
     </>
-  )
+  );
 }

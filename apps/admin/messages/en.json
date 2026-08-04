@@ -16,7 +16,10 @@
     "save": "Save",
     "edit": "Edit",
     "delete": "Delete",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "moreActions": "More actions"
   },
   "apps": {
     "title": "Applications",

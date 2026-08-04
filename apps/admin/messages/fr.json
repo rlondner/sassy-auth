@@ -13,10 +13,13 @@
     "switchToDark": "Passer en mode sombre"
   },
   "common": {
-    "save": "Save",
-    "edit": "Edit",
-    "delete": "Delete",
-    "confirm": "Confirm"
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
+    "copy": "Copier",
+    "copied": "Copié !",
+    "moreActions": "Plus d'actions"
   },
   "apps": {
     "title": "Applications",
@@ -223,7 +226,10 @@
       "showingTop50": "Affichage des 50 premiers sur {total}",
       "inUseTooltip": "Utilisée par {roleCount} rôles, {userCount} utilisateurs — retirez les assignations d'abord"
     },
-    "filter": { "appLabel": "Filtrer par application", "allApps": "Toutes les applications" },
+    "filter": {
+      "appLabel": "Filtrer par application",
+      "allApps": "Toutes les applications"
+    },
     "pagination": {
       "showing": "Affichage de {from}–{to} sur {total}",
       "pageSize": "{count} par page",
@@ -304,7 +310,10 @@
       "showingTop50": "Affichage des 50 premières sur {total}",
       "inUseTooltip": "Assigné à {userCount} utilisateurs — retirez d'abord les assignations"
     },
-    "filter": { "appLabel": "Filtrer par application", "allApps": "Toutes les applications" },
+    "filter": {
+      "appLabel": "Filtrer par application",
+      "allApps": "Toutes les applications"
+    },
     "pagination": {
       "showing": "Affichage de {from}–{to} sur {total}",
       "pageSize": "{count} par page",
