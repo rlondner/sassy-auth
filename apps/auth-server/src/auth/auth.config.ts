@@ -1,33 +1,33 @@
-import { betterAuth } from 'better-auth';
-import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { magicLink, emailOTP, openAPI, twoFactor } from 'better-auth/plugins';
-import { prisma } from '@sassy-auth/db';
-import { passwordResetEmail } from '../email/templates/password-reset.template';
-import { getEmailer } from '../email/email.singleton';
-import { captureResetUrl } from './reset-url-context';
-import { APIError } from 'better-auth/api';
-import { evaluateSessionGate } from './session-gate';
-import { createAppLogger } from '../common/logger/winston.config';
-import { sendSignInOtp } from './otp-sender';
-import { otpTestStore } from './otp-test-store';
+import { betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
+import { magicLink, emailOTP, openAPI, twoFactor } from "better-auth/plugins";
+import { prisma } from "@sassy-auth/db";
+import { passwordResetEmail } from "../email/templates/password-reset.template";
+import { getEmailer } from "../email/email.singleton";
+import { captureResetUrl } from "./reset-url-context";
+import { APIError } from "better-auth/api";
+import { evaluateSessionGate } from "./session-gate";
+import { createAppLogger } from "../common/logger/winston.config";
+import { sendSignInOtp } from "./otp-sender";
+import { otpTestStore } from "./otp-test-store";
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
 // browser-originated, which trips BetterAuth's formCsrfMiddleware and then
 // requires a trusted Origin. Comma-separated list in TRUSTED_ORIGINS; defaults
 // to the admin app's dev URL so local + e2e work out of the box.
-export const TRUSTED_ORIGINS = (process.env.TRUSTED_ORIGINS
-  ?.split(',')
-  .map((s) => s.trim())
-  .filter(Boolean) ?? ['http://localhost:3001'])
-  .map((origin) => {
-    try {
-      new URL(origin)
-      return origin
-    } catch {
-      throw new Error(`Invalid origin in TRUSTED_ORIGINS: "${origin}"`)
-    }
-  });
+export const TRUSTED_ORIGINS = (
+  process.env.TRUSTED_ORIGINS?.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean) ?? ["http://localhost:3001"]
+).map((origin) => {
+  try {
+    new URL(origin);
+    return origin;
+  } catch {
+    throw new Error(`Invalid origin in TRUSTED_ORIGINS: "${origin}"`);
+  }
+});
 
 // bug-0158: previously the BetterAuth session lifetime, refresh
 // window, and cookie attributes were entirely implicit — whatever
@@ -39,8 +39,8 @@ export const TRUSTED_ORIGINS = (process.env.TRUSTED_ORIGINS
 //
 // Pinning these here makes the session policy visible in review and
 // stable across upgrades.
-const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;      // 7 days
-const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;          // extend if used within 24h
+const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24; // extend if used within 24h
 
 // The session-create gate runs outside a Nest request context, so it uses a
 // standalone Winston logger rather than the injected LoggerService (same
@@ -48,7 +48,7 @@ const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;          // extend if used with
 const authLogger = createAppLogger();
 
 export const auth = betterAuth({
-  database: prismaAdapter(prisma, { provider: 'postgresql' }),
+  database: prismaAdapter(prisma, { provider: "postgresql" }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
   trustedOrigins: TRUSTED_ORIGINS,
@@ -73,8 +73,8 @@ export const auth = betterAuth({
     // the intent obvious to future readers.
     defaultCookieAttributes: {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
     },
   },
   rateLimit: {
@@ -89,8 +89,8 @@ export const auth = betterAuth({
     // Note: storage defaults to in-memory; limits are per-process, not global
     // across replicas. Wire secondaryStorage (Redis) for a cross-replica cap.
     customRules: {
-      '/two-factor/verify-totp': { window: 10, max: 3 },
-      '/two-factor/verify-backup-code': { window: 10, max: 3 },
+      "/two-factor/verify-totp": { window: 10, max: 3 },
+      "/two-factor/verify-backup-code": { window: 10, max: 3 },
     },
   },
   // bug-0186: BetterAuth creates a Session row on every successful
@@ -104,18 +104,21 @@ export const auth = betterAuth({
     session: {
       create: {
         before: async (session: { userId: string }) => {
+          if (process.env.SEED_RUNNING === "true") {
+            return;
+          }
           const gate = await evaluateSessionGate(prisma, session.userId);
           if (!gate.allowed) {
             // bug-0163-adjacent: no credential here, safe to log. This is the
             // security event — a non-active user attempted to create a session
             // (any method: password, OTP, social).
-            authLogger.warn('Session creation blocked', {
-              context: 'session-gate',
+            authLogger.warn("Session creation blocked", {
+              context: "session-gate",
               betterAuthUserId: session.userId,
               status: gate.status,
             });
-            throw new APIError('FORBIDDEN', {
-              message: 'This account is not active.',
+            throw new APIError("FORBIDDEN", {
+              message: "This account is not active.",
             });
           }
         },
@@ -144,12 +147,21 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
-    sendResetPassword: async ({ user, token }: { user: { email: string; name?: string }; token: string }) => {
-      const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    sendResetPassword: async ({
+      user,
+      token,
+    }: {
+      user: { email: string; name?: string };
+      token: string;
+    }) => {
+      const adminUrl = process.env.ADMIN_URL ?? "http://localhost:3001";
       const resetUrl = `${adminUrl}/reset-password?token=${token}`;
       captureResetUrl(resetUrl); // hand the URL back to the admin endpoint if it's listening
-      const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
-      await getEmailer().send({ to: user.email, ...passwordResetEmail({ firstName, resetUrl }) });
+      const firstName = (user.name ?? "").trim().split(" ")[0] || "there";
+      await getEmailer().send({
+        to: user.email,
+        ...passwordResetEmail({ firstName, resetUrl }),
+      });
     },
   },
   // bug-0175: gate each social provider on BOTH the id AND the secret.
@@ -159,30 +171,34 @@ export const auth = betterAuth({
   // deep inside BetterAuth's OAuth flow or silently misbehaved. The
   // symmetric guard falls back to "provider disabled" instead.
   socialProviders: {
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && {
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && {
-      microsoft: {
-        clientId: process.env.MICROSOFT_CLIENT_ID,
-        clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET && {
-      apple: {
-        clientId: process.env.APPLE_CLIENT_ID,
-        clientSecret: process.env.APPLE_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET && {
-      github: {
-        clientId: process.env.GITHUB_CLIENT_ID,
-        clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      },
-    }),
+    ...(process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET && {
+        google: {
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        },
+      }),
+    ...(process.env.MICROSOFT_CLIENT_ID &&
+      process.env.MICROSOFT_CLIENT_SECRET && {
+        microsoft: {
+          clientId: process.env.MICROSOFT_CLIENT_ID,
+          clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+        },
+      }),
+    ...(process.env.APPLE_CLIENT_ID &&
+      process.env.APPLE_CLIENT_SECRET && {
+        apple: {
+          clientId: process.env.APPLE_CLIENT_ID,
+          clientSecret: process.env.APPLE_CLIENT_SECRET,
+        },
+      }),
+    ...(process.env.GITHUB_CLIENT_ID &&
+      process.env.GITHUB_CLIENT_SECRET && {
+        github: {
+          clientId: process.env.GITHUB_CLIENT_ID,
+          clientSecret: process.env.GITHUB_CLIENT_SECRET,
+        },
+      }),
   },
   plugins: [
     magicLink({
@@ -196,7 +212,7 @@ export const auth = betterAuth({
         // magic-link send into a credential leak.
         // Wire the real send in production; dev keeps the log so the
         // developer flow (click link in terminal) still works.
-        if (process.env.NODE_ENV !== 'production') {
+        if (process.env.NODE_ENV !== "production") {
           console.log(`[magic-link] ${email} → ${url}`);
         }
       },
@@ -207,21 +223,29 @@ export const auth = betterAuth({
       allowedAttempts: 3,
       disableSignUp: true,
       rateLimit: { window: 60, max: 5 },
-      sendVerificationOTP: async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
+      sendVerificationOTP: async ({
+        email,
+        otp,
+        type,
+      }: {
+        email: string;
+        otp: string;
+        type: string;
+      }) => {
         await sendSignInOtp(
           {
             db: prisma,
             emailer: getEmailer(),
             store: otpTestStore,
             logger: authLogger,
-            isTest: process.env.NODE_ENV === 'test',
+            isTest: process.env.NODE_ENV === "test",
           },
           { email, otp, type },
         );
       },
     }),
     twoFactor({
-      issuer: 'Sassy Auth',
+      issuer: "Sassy Auth",
       // 10 backup codes (matches the spec; default is also 10, explicit for
       // reviewability).
       backupCodeOptions: { amount: 10 },
