@@ -176,6 +176,8 @@ The seed also creates 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `
 
 **Optional — multi-tenant demo data.** Set `SEED_DEMO_MULTITENANT=1` to create a second sample app (`app01`) with two orgs (Acme, Globex), 3 users each, and org-scoped permissions (`contracts.read`, `contracts.create`, `org.users.manage`, `org.roles.manage`). Useful for testing the org-scoped admin experience.
 
+> ⚠️ **`SEED_RUNNING` is seed-internal — never set it yourself.** The seed script sets `SEED_RUNNING=true` in its own process so it can create BetterAuth sessions before the corresponding `SaUser` rows are marked active. This flag relaxes the session-activation gate and **must never be exported in a deployed or shared environment** (see `bugs/bug-0246.md`). Do not add it to `.env.local`, container images, or CI jobs that also boot the auth-server.
+
 
 
 ### 6. Start the development servers

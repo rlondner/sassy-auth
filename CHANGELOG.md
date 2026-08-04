@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-04
+
+**Daily review: `master` still frozen at `a78d4a7` (2026-07-15).** The only activity in the
+last-24h window is **PR #303** (`palette/table-a11y-tooltips-…`, Jules bot) — a "🎨 Palette"
+UI-polish PR that turns out to carry backend changes too.
+
+### Reviewed — PR #303 (unmerged)
+
+- **UI/a11y:** wraps row-level copy + "more actions" buttons in the five admin tables
+  (`Apps`, `Orgs`, `Roles`, `Permissions`, `Users`) in Radix `<Tooltip>`, adds
+  `focus-visible:ring-2` keyboard-focus rings and transitions, and localizes the new
+  `common.copy` / `common.copied` / `common.moreActions` strings (en + fr).
+- **Incidentally fixes bug-0243** — `app-create-drawer.test.tsx` now asserts the 5-field
+  create payload (`requireTwoFactor`, `twoFactorTrustDays`), and **bug-0244** — `fr.json`
+  `common.save/edit/delete/confirm` are now translated (`Enregistrer/Modifier/Supprimer/Confirmer`).
+  Both fixes are **unmerged**, so `master` stays red on the `apps/admin` Jest suite.
+
+### New bug
+
+- **bug-0246 (Warning)** — PR #303 also adds `if (process.env.SEED_RUNNING === "true") return;`
+  to the BetterAuth **session-create gate** in `auth.config.ts`, skipping the account-status
+  enforcement (bug-0074) whenever that env var is set, with no `NODE_ENV` fence, no log, and no
+  test. Seed convenience leaking into production auth code. Filed on `bugs/bug-0246`, **PR #304**.
+  See [BUGS_2026-08-04.md](./bugs/BUGS_2026-08-04.md).
+
+### Risky patterns / follow-ups
+
+- **Scope creep:** a tooltip PR that also edits `auth.config.ts` + three seed files and reformats
+  18 files to double-quotes (+2427/−1223) — the ~10 substantive backend lines were buried under
+  cosmetic churn (which is how bug-0246 nearly slipped by). Recommend splitting. There is **no**
+  enforced Prettier/ESLint quote rule in the repo, so the reformatting is opt-in churn, not a fix.
+- **Verified false positive (not filed):** the new `<Tooltip>` usages have no local
+  `TooltipProvider`, but `SidebarShell → SidebarProvider` supplies a global one — no crash. The
+  table tests mock the provider away, so this load-bearing coupling is untested.
+- Full list in [TODO_2026-08-04.md](./todo/TODO_2026-08-04.md). Highest bug number is now **0246**.
+
+> Note: the 2026-07-20/21/22 CHANGELOG entries are **not** on `master` (pending in PRs #284 /
+> #290 / #291). This entry stacks above them once those land.
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
