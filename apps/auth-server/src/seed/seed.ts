@@ -1,4 +1,5 @@
 import 'dotenv/config';
+process.env.SEEDING = '1';
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
