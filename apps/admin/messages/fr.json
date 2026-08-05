@@ -223,7 +223,10 @@
       "showingTop50": "Affichage des 50 premiers sur {total}",
       "inUseTooltip": "Utilisée par {roleCount} rôles, {userCount} utilisateurs — retirez les assignations d'abord"
     },
-    "filter": { "appLabel": "Filtrer par application", "allApps": "Toutes les applications" },
+    "filter": {
+      "appLabel": "Filtrer par application",
+      "allApps": "Toutes les applications"
+    },
     "pagination": {
       "showing": "Affichage de {from}–{to} sur {total}",
       "pageSize": "{count} par page",
@@ -304,7 +307,10 @@
       "showingTop50": "Affichage des 50 premières sur {total}",
       "inUseTooltip": "Assigné à {userCount} utilisateurs — retirez d'abord les assignations"
     },
-    "filter": { "appLabel": "Filtrer par application", "allApps": "Toutes les applications" },
+    "filter": {
+      "appLabel": "Filtrer par application",
+      "allApps": "Toutes les applications"
+    },
     "pagination": {
       "showing": "Affichage de {from}–{to} sur {total}",
       "pageSize": "{count} par page",
@@ -465,6 +471,8 @@
     "subtitle": "Connectez-vous pour continuer",
     "email": "Adresse e-mail",
     "password": "Mot de passe",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
     "submit": "Se connecter",
     "forgotPassword": "Mot de passe oublié ?",
     "useCode": "Se connecter avec un code",
