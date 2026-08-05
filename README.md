@@ -235,6 +235,17 @@ Copy the two output lines directly into your `.env.local` file.
 | `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
 | `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
 
+> ⚠️ **Seed-internal flags — never set these in a deployed environment.**
+> The `db:seed` script needs `signUpEmail` to succeed before the seeded `SaUser` rows exist and
+> are marked active, so it toggles a process-level flag that short-circuits the auth-server's
+> session-activation gate (the check that blocks pending/suspended/deleted accounts from creating
+> a session). If that flag is ever exported in a real deployment, the gate stops running and
+> inactive accounts can mint sessions again. Treat any such flag as **seed-only**: it must be
+> `NODE_ENV`-fenced so it can never fire in production. Two in-flight Jules PRs currently propose
+> this flag under **different names** (`SEED_RUNNING` in PR #303, `SEEDING` in PR #306), both
+> **unfenced** — see `bugs/bug-0246.md` and `bugs/bug-0247.md`. Do not merge either as-is, and do
+> not add the flag to any `.env` file used by a running server. It is not on `master`.
+
 ### Observability (optional)
 
 Leave blank to disable. See [Observability](#observability) for behavior.

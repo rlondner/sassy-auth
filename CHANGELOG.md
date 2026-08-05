@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-05
+
+**Daily review: GitHub access restored, one new PR reviewed, 2 new bugs.** The `github` MCP
+connector was available this run (prior runs 2026-07-27 → 2026-08-04 were blocked by the proxy /
+rejected PAT and produced only blocker reports). `master` is still frozen at `a78d4a7`
+(2026-07-15); the only new source activity in the window was **Jules PR #306** ("🎨 Palette:
+Interactive Show/Hide Password Toggle for LoginForm", opened 2026-08-05), reviewed in full.
+
+- **2 new bugs** — see [BUGS_2026-08-05.md](./bugs/BUGS_2026-08-05.md). Highest bug number is now
+  **0248**.
+  - **[bug-0247](./bugs/bug-0247.md)** (Warning / security) — PR #306 bundles a **second,
+    divergent unfenced session-gate bypass** (`process.env.SEEDING === '1'`) into
+    `apps/auth-server/src/auth/auth.config.ts`. It reintroduces the bug-0246 defect under a
+    renamed variable, with no `NODE_ENV` fence, no regression test, and no docs. Two open PRs
+    (#303 `SEED_RUNNING`, #306 `SEEDING`) now patch the same `create.before` hook incompatibly —
+    a regression risk for the bug-0074 account-status enforcement if either merges as-is.
+    Confirmed absent on `master`.
+  - **[bug-0248](./bugs/bug-0248.md)** (Minor / process) — three open PRs (#294, #296, #306)
+    implement the **same** login password toggle (guaranteed conflicts + wasted review), and
+    #306 exhibits **scope creep**: it silently bundles the bug-0243 test fix and an unrelated
+    `fr.json` reformat under a cosmetic UI title, hiding the security-relevant `auth.config.ts`
+    edit.
+- **The password-toggle feature itself is sound** — correct `type="button"`, aria-labels,
+  `pr-10` padding, and it ships a unit test. The findings are about what PR #306 bundles around
+  it, not the toggle.
+- **`master` is still red.** The `apps/admin` Jest suite has failed since `a78d4a7` (bug-0243)
+  and has now been independently patched by three Jules PRs because the standalone fix (PR #287)
+  never merged. CI is not gating on this suite.
+- **Follow-ups** (mostly merge-hygiene, plus the in-flight bug-0247 security item) →
+  [TODO_2026-08-05.md](./todo/TODO_2026-08-05.md). Full review detail →
+  [CR_2026-08-05.md](./code_reviews/CR_2026-08-05.md).
+
+> Note: this entry, like every daily-review entry since 2026-07-21, stacks above unmerged work.
+> `master`'s CHANGELOG still tops out earlier; these entries live on the review branches / PRs
+> until the backlog (#287–#290, #304, #305, and today's) is merged.
+
 ## [Unreleased] — 2026-07-22
 
 **Daily review: no new source activity.** `master` has not advanced since `a78d4a7`
