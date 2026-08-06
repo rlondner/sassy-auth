@@ -100,6 +100,7 @@ async function ensureUser(seed: UserSeed, orgIdByName: Record<string, number>, s
           firstName: seed.firstName,
           lastName: seed.lastName,
           status: 'active',
+          twoFactorPromptedAt: new Date(),
         },
       });
       return tx.saUser.update({
