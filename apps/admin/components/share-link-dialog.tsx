@@ -34,8 +34,8 @@ export function ShareLinkDialog({ open, onOpenChange, title, description, url }:
             readOnly
             value={url}
             aria-label={title}
-            onFocus={(e) => e.target.select()}
-            onClick={(e) => e.target.select()}
+            onFocus={(e) => e.currentTarget.select()}
+            onClick={(e) => e.currentTarget.select()}
             className="flex-1 rounded border border-border bg-muted px-3 py-2 text-body-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
           <Button
