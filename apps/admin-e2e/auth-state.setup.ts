@@ -14,6 +14,13 @@ for (const admin of SEED_ADMINS) {
     // If a future change makes per-admin landing differ, replace the regex.
     // Allow extra time for the cold-start /login compile+hydrate on the first
     // admin; do NOT re-submit (rapid re-submits trip the auth rate limiter).
+    await page.waitForURL(
+      /(\/login\/two-factor-prompt|\/(users|apps|orgs|permissions|roles))$/,
+      { timeout: 20_000 },
+    )
+    if (page.url().includes('/login/two-factor-prompt')) {
+      await page.getByRole('button', { name: /skip/i }).click()
+    }
     await expect(page).toHaveURL(/\/(users|apps|orgs|permissions|roles)$/, { timeout: 20_000 })
     const out = path.join(__dirname, admin.storageStatePath)
     await context.storageState({ path: out })
