@@ -117,6 +117,7 @@ async function seedPlatformAdmin(
         firstName: admin.firstName,
         lastName: admin.lastName,
         status: 'active',
+        twoFactorPromptedAt: admin.email === 'o@sa.io' ? null : new Date(),
       },
     });
     const publicId = sqids.encode([created.id]);
