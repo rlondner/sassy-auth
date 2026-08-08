@@ -51,4 +51,22 @@ describe('AppEditDrawer', () => {
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
+
+  it('validates empty name and empty url separately', async () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    const nameInput = screen.getByLabelText(en.apps.fields.name) as HTMLInputElement
+    const urlInput = screen.getByLabelText(en.apps.fields.url) as HTMLInputElement
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+
+    // Empty out name first
+    fireEvent.change(nameInput, { target: { value: '   ' } })
+    fireEvent.click(save)
+    await waitFor(() => expect(screen.getByText(en.apps.errors.nameRequired)).toBeInTheDocument())
+
+    // Restore name, and empty out url
+    fireEvent.change(nameInput, { target: { value: 'Valid Name' } })
+    fireEvent.change(urlInput, { target: { value: '   ' } })
+    fireEvent.click(save)
+    await waitFor(() => expect(screen.getByText(en.apps.errors.urlRequired)).toBeInTheDocument())
+  })
 })

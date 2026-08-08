@@ -77,7 +77,8 @@
       "generic": "Something went wrong. Please try again.",
       "urlInvalid": "Please enter a valid URL.",
       "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
-      "nameRequired": "App name is required."
+      "nameRequired": "App name is required.",
+      "urlRequired": "App URL is required."
     },
     "badges": {
       "platform": "Platform"

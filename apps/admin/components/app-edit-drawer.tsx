@@ -55,8 +55,13 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     // failure at the client layer. Server would reject with a 400
     // and a generic errorKey, but the UX is cleaner if we flag it
     // here — an empty trimmed name means "no name," not "clear name."
-    if (name.trim() === '' || url.trim() === '') {
+    // bug-0229: split checks to avoid misleading error keys.
+    if (name.trim() === '') {
       setErrorKey('apps.errors.nameRequired')
+      return
+    }
+    if (url.trim() === '') {
+      setErrorKey('apps.errors.urlRequired')
       return
     }
     const patch: { name?: string; url?: string; callbackUrl?: string | null; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean } = {}
@@ -84,7 +89,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
           <SheetTitle>{t('apps.drawer.editTitle')}</SheetTitle>
         </SheetHeader>
         <SheetBody>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div>
               <Label htmlFor="appName">{t('apps.fields.name')}</Label>
               <Input
