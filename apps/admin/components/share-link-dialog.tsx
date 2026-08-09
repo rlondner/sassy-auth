@@ -6,7 +6,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 
 interface ShareLinkDialogProps {
   open: boolean
@@ -18,9 +18,9 @@ interface ShareLinkDialogProps {
 
 export function ShareLinkDialog({ open, onOpenChange, title, description, url }: ShareLinkDialogProps) {
   const t = useTranslations()
-  const [copied, setCopied] = React.useState(false)
+  const { copiedKey, copy } = useCopyFeedback()
 
-  React.useEffect(() => { if (!open) setCopied(false) }, [open])
+  const isCopied = copiedKey === 'shareLink'
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -34,14 +34,16 @@ export function ShareLinkDialog({ open, onOpenChange, title, description, url }:
             readOnly
             value={url}
             aria-label={title}
-            className="flex-1 rounded border border-border bg-muted px-3 py-2 text-body-sm font-mono"
+            onClick={(e) => e.currentTarget.select()}
+            onFocus={(e) => e.currentTarget.select()}
+            className="flex-1 rounded border border-border bg-muted px-3 py-2 text-body-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
           <Button
             variant="outline"
             size="sm"
-            onClick={async () => { if (await copyToClipboard(url)) { setCopied(true); setTimeout(() => setCopied(false), 2000) } }}
+            onClick={() => copy(url, 'shareLink')}
           >
-            {copied ? t('users.drawer.copied') : t('users.drawer.copyLink')}
+            {isCopied ? t('users.drawer.copied') : t('users.drawer.copyLink')}
           </Button>
         </div>
         <AlertDialogFooter>
