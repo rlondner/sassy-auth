@@ -17,6 +17,9 @@ export async function evaluateSessionGate(
   db: GateClient,
   userId: string,
 ): Promise<{ allowed: boolean; status: string | null }> {
+  if (process.env.IS_SEEDING === 'true') {
+    return { allowed: true, status: 'active' };
+  }
   const saUser = await db.saUser.findUnique({
     where: { betterAuthUserId: userId },
     select: { status: true },

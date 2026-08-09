@@ -142,6 +142,7 @@ async function seedPlatformAdmin(
 }
 
 async function main() {
+  process.env.IS_SEEDING = 'true';
   console.log('Seeding platform data...');
 
   // 1. Platform app
