@@ -12,8 +12,7 @@ import {
   SheetTitle,
   Button,
   ButtonGroup,
-  Input,
-  Label,
+  FormField,
 } from '@sassy-auth/ui'
 import { createAppAction } from '@/app/(admin)/apps/actions'
 
@@ -50,6 +49,10 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
+    if (!url.trim()) {
+      setErrorKey('apps.errors.urlRequired')
+      return
+    }
     setErrorKey(null)
     startTransition(async () => {
       const result = await createAppAction({
@@ -79,60 +82,46 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
           </div>
         </SheetHeader>
         <SheetBody>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="appName">{t('apps.fields.name')}</Label>
-              <Input
-                id="appName"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="appUrl">{t('apps.fields.url')}</Label>
-              <Input
-                id="appUrl"
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                required
-                placeholder="https://app.example.com"
-              />
-              <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.urlHint')}
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="appCallbackUrl">{t('apps.fields.callbackUrl')}</Label>
-              <Input
-                id="appCallbackUrl"
-                type="url"
-                value={callbackUrl}
-                onChange={(e) => setCallbackUrl(e.target.value)}
-                placeholder="https://app.example.com/auth/callback"
-              />
-              <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.callbackUrlHint')}
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="appTrustDays">{t('apps.fields.twoFactorTrustDays')}</Label>
-              <Input
-                id="appTrustDays"
-                type="number"
-                min={1}
-                max={3650}
-                value={twoFactorTrustDays ?? ''}
-                onChange={(e) =>
-                  setTwoFactorTrustDays(e.target.value === '' ? null : Number(e.target.value))
-                }
-                placeholder={t('apps.fields.twoFactorTrustDaysPlaceholder')}
-              />
-              <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.twoFactorTrustDaysHint')}
-              </p>
-            </div>
+          <form noValidate onSubmit={handleSubmit} className="space-y-4">
+            <FormField
+              id="appName"
+              label={t('apps.fields.name')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <FormField
+              id="appUrl"
+              type="url"
+              label={t('apps.fields.url')}
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+              placeholder="https://app.example.com"
+              hint={t('apps.fields.urlHint')}
+            />
+            <FormField
+              id="appCallbackUrl"
+              type="url"
+              label={t('apps.fields.callbackUrl')}
+              value={callbackUrl}
+              onChange={(e) => setCallbackUrl(e.target.value)}
+              placeholder="https://app.example.com/auth/callback"
+              hint={t('apps.fields.callbackUrlHint')}
+            />
+            <FormField
+              id="appTrustDays"
+              type="number"
+              min={1}
+              max={3650}
+              label={t('apps.fields.twoFactorTrustDays')}
+              value={twoFactorTrustDays ?? ''}
+              onChange={(e) =>
+                setTwoFactorTrustDays(e.target.value === '' ? null : Number(e.target.value))
+              }
+              placeholder={t('apps.fields.twoFactorTrustDaysPlaceholder')}
+              hint={t('apps.fields.twoFactorTrustDaysHint')}
+            />
             <div>
               <label className="flex items-center gap-2 text-label-md cursor-pointer">
                 <input
@@ -140,7 +129,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                   id="requireTwoFactor"
                   checked={requireTwoFactor}
                   onChange={(e) => setRequireTwoFactor(e.target.checked)}
-                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
                 {t('apps.fields.requireTwoFactor')}
               </label>

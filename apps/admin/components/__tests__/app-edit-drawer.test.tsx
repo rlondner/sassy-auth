@@ -33,7 +33,7 @@ describe('AppEditDrawer', () => {
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
     const save = screen.getByRole('button', { name: en.apps.drawer.save })
     expect(save).toBeDisabled()
-    const nameInput = screen.getByLabelText(en.apps.fields.name) as HTMLInputElement
+    const nameInput = screen.getByLabelText(en.apps.fields.name, { exact: false }) as HTMLInputElement
     fireEvent.change(nameInput, { target: { value: 'New' } })
     expect(save).toBeEnabled()
   })
@@ -44,11 +44,27 @@ describe('AppEditDrawer', () => {
     })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
-    fireEvent.change(screen.getByLabelText(en.apps.fields.name), { target: { value: 'New' } })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.name, { exact: false }), { target: { value: 'New' } })
     fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
     await waitFor(() =>
       expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', { name: 'New' }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  it('surfaces custom client-side validation error when name is cleared', async () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    fireEvent.change(screen.getByLabelText(en.apps.fields.name, { exact: false }), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+    await waitFor(() => expect(screen.getByText(en.apps.errors.nameRequired)).toBeInTheDocument())
+    expect(actions.updateAppAction).not.toHaveBeenCalled()
+  })
+
+  it('surfaces custom client-side validation error when URL is cleared', async () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    fireEvent.change(screen.getByLabelText(en.apps.fields.url, { exact: false }), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+    await waitFor(() => expect(screen.getByText(en.apps.errors.urlRequired)).toBeInTheDocument())
+    expect(actions.updateAppAction).not.toHaveBeenCalled()
   })
 })
