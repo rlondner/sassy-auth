@@ -77,7 +77,8 @@
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "urlInvalid": "Veuillez saisir une URL valide.",
       "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
-      "nameRequired": "Le nom de l’application est requis."
+      "nameRequired": "Le nom de l’application est requis.",
+      "urlRequired": "L'URL de l’application est requise."
     },
     "badges": {
       "platform": "Plateforme"

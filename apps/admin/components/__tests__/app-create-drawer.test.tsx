@@ -34,6 +34,8 @@ describe('AppCreateDrawer', () => {
         name: 'X',
         url: 'https://x.example',
         callbackUrl: null,
+        twoFactorTrustDays: null,
+        requireTwoFactor: false,
       }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
@@ -46,5 +48,21 @@ describe('AppCreateDrawer', () => {
     fireEvent.change(screen.getByLabelText(en.apps.fields.url), { target: { value: 'https://x.example' } })
     fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.createTitle }))
     await waitFor(() => expect(screen.getByText(en.apps.errors.nameExists)).toBeInTheDocument())
+  })
+
+  it('validates empty name and url separately', async () => {
+    render(withIntl(<AppCreateDrawer open onOpenChange={() => undefined} />))
+    const nameInput = screen.getByLabelText(en.apps.fields.name) as HTMLInputElement
+    const urlInput = screen.getByLabelText(en.apps.fields.url) as HTMLInputElement
+    const createBtn = screen.getByRole('button', { name: en.apps.drawer.createTitle })
+
+    // Empty name, empty URL -> triggers name required first
+    fireEvent.click(createBtn)
+    await waitFor(() => expect(screen.getByText(en.apps.errors.nameRequired)).toBeInTheDocument())
+
+    // Filled name, empty URL -> triggers url required
+    fireEvent.change(nameInput, { target: { value: 'Test App' } })
+    fireEvent.click(createBtn)
+    await waitFor(() => expect(screen.getByText(en.apps.errors.urlRequired)).toBeInTheDocument())
   })
 })

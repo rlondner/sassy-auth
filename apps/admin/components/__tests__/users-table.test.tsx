@@ -13,8 +13,12 @@ jest.mock('@/app/(admin)/users/actions', () => ({
   deleteUserAction: jest.fn().mockResolvedValue({ ok: true }),
 }))
 
+const mockUserViewDrawer = jest.fn()
 jest.mock('../user-view-drawer', () => ({
-  UserViewDrawer: () => null,
+  UserViewDrawer: (props: any) => {
+    mockUserViewDrawer(props)
+    return null
+  },
 }))
 
 jest.mock('../user-create-drawer', () => ({
@@ -87,5 +91,31 @@ describe('UsersTable', () => {
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toBeInTheDocument()
     expect(dialog).toHaveTextContent(/Alice Smith/)
+  })
+
+  it('rebases selectedUser when users prop changes', async () => {
+    mockUserViewDrawer.mockClear()
+    const { rerender } = render(withIntl(<UsersTable users={mockUsers} orgs={mockOrgs} />))
+
+    // Select the first user (Alice)
+    const aliceRow = screen.getByText('Alice Smith')
+    fireEvent.click(aliceRow)
+
+    // Verify UserViewDrawer is called with Alice as user prop
+    expect(mockUserViewDrawer).toHaveBeenLastCalledWith(
+      expect.objectContaining({ user: mockUsers[0], open: true })
+    )
+
+    // Now update users prop via rerender (Alice becomes updated)
+    const updatedUsers: User[] = [
+      { id: '1', firstName: 'Alice Updated', lastName: 'Smith', email: 'alice@example.com', status: 'active', orgId: 'org1', phoneNumber: null, username: null, createdAt: new Date().toISOString(), lastLoginAt: null },
+      { id: '2', firstName: 'Bob', lastName: 'Jones', email: 'bob@example.com', status: 'pending', orgId: 'org1', phoneNumber: null, username: null, createdAt: new Date().toISOString(), lastLoginAt: null },
+    ]
+    rerender(withIntl(<UsersTable users={updatedUsers} orgs={mockOrgs} />))
+
+    // Verify UserViewDrawer is called with updated Alice as user prop
+    expect(mockUserViewDrawer).toHaveBeenLastCalledWith(
+      expect.objectContaining({ user: updatedUsers[0] })
+    )
   })
 })

@@ -42,6 +42,15 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
   const [resetLink, setResetLink] = React.useState<string | null>(null)
   const [inviteLink, setInviteLink] = React.useState<string | null>(null)
 
+  // bug-0233: rebase `selectedUser` on the refreshed users prop so any open drawer
+  // reflects current data, or clear if the user is gone.
+  React.useEffect(() => {
+    setSelectedUser((prev) => {
+      if (!prev) return null
+      return users.find((u) => u.id === prev.id) ?? null
+    })
+  }, [users])
+
   // No client-side list action for users — the page is a Server Component
   // that re-fetches on router.refresh() (paired with revalidatePath in the
   // mutating action). This swaps the table data silently without a navigation.

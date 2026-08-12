@@ -51,12 +51,16 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!dirty) return
-    // bug-0141: a submit with whitespace-only fields is a validation
+    // bug-0141 / bug-0229: a submit with whitespace-only fields is a validation
     // failure at the client layer. Server would reject with a 400
     // and a generic errorKey, but the UX is cleaner if we flag it
     // here — an empty trimmed name means "no name," not "clear name."
-    if (name.trim() === '' || url.trim() === '') {
+    if (name.trim() === '') {
       setErrorKey('apps.errors.nameRequired')
+      return
+    }
+    if (url.trim() === '') {
+      setErrorKey('apps.errors.urlRequired')
       return
     }
     const patch: { name?: string; url?: string; callbackUrl?: string | null; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean } = {}
@@ -84,7 +88,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
           <SheetTitle>{t('apps.drawer.editTitle')}</SheetTitle>
         </SheetHeader>
         <SheetBody>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div>
               <Label htmlFor="appName">{t('apps.fields.name')}</Label>
               <Input

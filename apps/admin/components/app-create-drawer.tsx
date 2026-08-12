@@ -50,6 +50,10 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
+    if (!url.trim()) {
+      setErrorKey('apps.errors.urlRequired')
+      return
+    }
     setErrorKey(null)
     startTransition(async () => {
       const result = await createAppAction({
@@ -79,7 +83,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
           </div>
         </SheetHeader>
         <SheetBody>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div>
               <Label htmlFor="appName">{t('apps.fields.name')}</Label>
               <Input
