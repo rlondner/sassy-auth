@@ -160,6 +160,7 @@ async function ensureUser(
           firstName,
           lastName,
           status: 'active',
+          twoFactorPromptedAt: new Date(),
         },
       });
       return tx.saUser.update({
