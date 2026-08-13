@@ -785,7 +785,7 @@ Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Accoun
 The JWT includes all of the user's permissions (including `platform.*` ones), not just those relevant to the requesting app. Resource servers receive scope entries they cannot act on. Tracked as **bug-0157**.
 
 **Rate limiting uses in-memory store.**
-Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/min/IP on auth endpoints, 10 requests/hour/IP on registration). In a horizontally-scaled deployment, each instance maintains its own counter. For consistent enforcement across pods, replace with a shared Redis backend.
+Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/min/IP on auth endpoints, 10 requests/hour/IP on registration). BetterAuth's routes are mounted on Express ahead of NestJS, so the Nest guard never sees them; they are covered separately by the Express-level limiter in `apps/auth-server/src/auth/auth-rate-limit.ts` (same 10/min/IP budget, credential-bearing paths only — `get-session` and `sign-out` are exempt). See **bug-0232**. Both limiters keep counters in-process, so in a horizontally-scaled deployment each instance maintains its own. For consistent enforcement across pods, replace both with a shared Redis backend.
 
 **LIKE wildcard characters not escaped in search.**
 The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.
