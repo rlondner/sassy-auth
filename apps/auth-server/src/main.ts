@@ -9,6 +9,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import { toNodeHandler } from 'better-auth/node';
 import { AppModule } from './app.module';
 import { auth } from './auth/auth.config';
+import { createDefaultAuthRateLimiter } from './auth/auth-rate-limit';
 import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
@@ -70,7 +71,15 @@ async function bootstrap() {
   const expressApp = express();
 
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.
-  expressApp.all('/api/auth/*', toNodeHandler(auth));
+  //
+  // bug-0232: because that interception happens ahead of NestJS, the
+  // `ThrottlerGuard` registered as APP_GUARD in app.module.ts never runs for
+  // these routes — sign-in/sign-up/magic-link/OTP were entirely unthrottled
+  // despite the bug-0080 work. The limiter below runs as plain Express
+  // middleware in front of the handler and applies the same 10/min/IP budget
+  // as the Nest `auth` bucket to credential-bearing paths only (session reads
+  // and sign-out are exempt — the admin console polls them constantly).
+  expressApp.all('/api/auth/*', createDefaultAuthRateLimiter(), toNodeHandler(auth));
 
   const loggerService = new LoggerService();
 
