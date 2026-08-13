@@ -437,7 +437,10 @@
       "notPending": "This user is no longer pending an invitation.",
       "rolesSetFailed": "Failed to update roles.",
       "directPermissionsSetFailed": "Failed to update direct permissions.",
-      "selfDeactivate": "You cannot deactivate your own account."
+      "selfDeactivate": "You cannot deactivate your own account.",
+      "selfModify": "You cannot modify your own account.",
+      "emailExists": "A user with this email already exists.",
+      "validation": "Some of the details you entered are not valid. Please check and try again."
     }
   },
   "forgotPassword": {

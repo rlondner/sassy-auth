@@ -15,6 +15,7 @@ import {
   resetPassword,
   resendInvitation,
 } from '@/lib/api'
+import { isRedirectSentinel } from '@/lib/redirect-sentinel'
 import type { CreateUserPayload, Permission, Role, User } from '@/lib/types'
 
 interface CreateUserInput extends CreateUserPayload {
@@ -22,9 +23,28 @@ interface CreateUserInput extends CreateUserPayload {
   roleId?: string
 }
 
+// bug-0234: since bug-0050 made `apiFetch` fold the NestJS response body
+// into the thrown Error message, returning `err.message` to the client
+// leaks server internals (service paths, stack frames, query structure,
+// validation internals) into a `<p>` in the drawer. Map to a stable i18n
+// key instead — the same shape the orgs/apps/roles/permissions actions
+// already use — and let the raw error stay server-side where the API
+// client's Sentry capture already records it.
+function mapUserError(
+  err: unknown,
+  opts: { on409?: string; on403Own?: string } = {},
+): string {
+  const message = err instanceof Error ? err.message : ''
+  if (opts.on409 && (message.includes('409') || message.includes('already'))) return opts.on409
+  if (opts.on403Own && message.includes('403') && /\bown\b/i.test(message)) return opts.on403Own
+  if (message.includes('403')) return 'users.errors.forbidden'
+  if (message.includes('400')) return 'users.errors.validation'
+  return 'users.errors.generic'
+}
+
 export async function createUserAction(
   input: CreateUserInput,
-): Promise<{ inviteUrl: string } | { error: string }> {
+): Promise<{ inviteUrl: string } | { errorKey: string }> {
   try {
     const { roleId, roleIds, ...rest } = input
     // Prefer the new multi-id arrays; if a single roleId came in, fold it
@@ -37,11 +57,8 @@ export async function createUserAction(
     revalidatePath('/users')
     return { inviteUrl }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    if (message.includes('409') || message.includes('already')) {
-      return { error: 'A user with this email already exists.' }
-    }
-    return { error: message }
+    if (isRedirectSentinel(err)) throw err
+    return { errorKey: mapUserError(err, { on409: 'users.errors.emailExists' }) }
   }
 }
 
@@ -140,10 +157,21 @@ export async function getAppPermissionsAction(
   }
 }
 
-export async function updateUserAction(id: string, patch: Partial<User>): Promise<User> {
-  const result = await updateUser(id, patch)
-  revalidatePath('/users')
-  return result
+// bug-0234 / bug-0221: previously this had no try/catch at all, so a raw
+// Error (with the NestJS body attached) propagated to the drawer, which
+// rendered `e.message` verbatim.
+export async function updateUserAction(
+  id: string,
+  patch: Partial<User>,
+): Promise<{ user: User } | { errorKey: string }> {
+  try {
+    const user = await updateUser(id, patch)
+    revalidatePath('/users')
+    return { user }
+  } catch (err) {
+    if (isRedirectSentinel(err)) throw err
+    return { errorKey: mapUserError(err, { on403Own: 'users.errors.selfModify' }) }
+  }
 }
 
 function mapActionError(err: unknown, map: { on400?: string; on403Own?: string; on403?: string }): string {

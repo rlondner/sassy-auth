@@ -119,6 +119,30 @@ describe('UserCreateDrawer', () => {
     expect(screen.getByText('users.drawer.accessPerms')).toBeInTheDocument()
   })
 
+  // bug-0234: the action hands back an i18n key, and the drawer must render
+  // the translation of it — never a raw server message.
+  it('renders the translated errorKey returned by createUserAction', async () => {
+    const actions = jest.requireMock('@/app/(admin)/users/actions')
+    actions.createUserAction.mockResolvedValue({ errorKey: 'users.errors.emailExists' })
+
+    render(
+      <UserCreateDrawer
+        orgs={[{ id: 'org-1', name: 'Org One', appId: 'app-1', isPlatform: false }]}
+        open
+        onOpenChange={() => {}}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/^users\.fields\.firstName/), { target: { value: 'A' } })
+    fireEvent.change(screen.getByLabelText(/^users\.fields\.lastName/), { target: { value: 'B' } })
+    fireEvent.change(screen.getByLabelText(/^users\.fields\.email/), { target: { value: 'a@b.io' } })
+    fireEvent.change(screen.getByLabelText('Select org'), { target: { value: 'org-1' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'users.drawer.create' }))
+
+    expect(await screen.findByText('users.errors.emailExists')).toBeInTheDocument()
+  })
+
   it('passes roleIds + directPermissionIds when submitting', async () => {
     const actions = jest.requireMock('@/app/(admin)/users/actions')
     actions.createUserAction.mockResolvedValue({ inviteUrl: 'https://example.com/i' })

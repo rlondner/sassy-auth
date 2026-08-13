@@ -122,6 +122,31 @@ describe('UserViewDrawer', () => {
     })
   })
 
+  // bug-0221: when the session expires mid-edit, apiFetch calls redirect('/login'),
+  // which throws a NEXT_REDIRECT sentinel. The action re-throws it so Next.js can
+  // perform the bounce; the drawer must not turn it into a misleading error
+  // message over a page that is already navigating away.
+  it('does not render an error message when updateUserAction throws a NEXT_REDIRECT sentinel', async () => {
+    const actions = await import('@/app/(admin)/users/actions')
+    const sentinel = Object.assign(new Error('NEXT_REDIRECT'), {
+      digest: 'NEXT_REDIRECT;replace;/login;307;',
+    })
+    ;(actions.updateUserAction as jest.Mock).mockRejectedValueOnce(sentinel)
+
+    render(<UserViewDrawer user={mockUser} orgs={orgsProp} open onOpenChange={() => {}} />)
+    await screen.findByText('Alice Smith')
+
+    fireEvent.click(screen.getByRole('button', { name: 'users.drawer.edit' }))
+    // The edit-mode profile inputs are not label-associated, so target the
+    // first-name box by the value it was seeded with.
+    fireEvent.change(await screen.findByDisplayValue('Alice'), { target: { value: 'Alicia' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'users.drawer.save' }))
+    await waitFor(() => expect(actions.updateUserAction).toHaveBeenCalled())
+
+    expect(screen.queryByText('users.errors.generic')).not.toBeInTheDocument()
+  })
+
   it('Cancel restores roles to the pre-Edit snapshot', async () => {
     const actions = await import('@/app/(admin)/users/actions')
     ;(actions.getRolesAction as jest.Mock).mockResolvedValueOnce([

@@ -24,6 +24,7 @@ import {
 import { RoleRowsEditor, type RoleOption } from './user-role-rows-editor'
 import { PermissionRowsEditor, type PermOption } from './role-permission-rows-editor'
 
+import { isRedirectSentinel } from '@/lib/redirect-sentinel'
 import type { User, Role, Permission, Org } from '@/lib/types'
 
 const MAX_PERMISSIONS_SHOWN = 5
@@ -154,7 +155,9 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
     const cleanRoleIds = Array.from(new Set(roleRows.filter((id) => id !== '')))
     const cleanPermIds = Array.from(new Set(permRows.filter((id) => id !== '')))
 
-    const tasks: Array<Promise<{ axis: 'profile' | 'roles' | 'perms'; ok: boolean; errorKey?: string; error?: string }>> = []
+    // `silent` marks a failure the user must not see a message for: the
+    // NEXT_REDIRECT case, where a bounce to /login is already in flight.
+    const tasks: Array<Promise<{ axis: 'profile' | 'roles' | 'perms'; ok: boolean; errorKey?: string; error?: string; silent?: boolean }>> = []
 
     if (profileDirty) {
       tasks.push(
@@ -164,12 +167,22 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
           phoneNumber: editProfile.phoneNumber || null,
           username: editProfile.username || null,
         })
-          .then(() => ({ axis: 'profile' as const, ok: true }))
-          .catch((e: unknown): { axis: 'profile'; ok: false; errorKey?: string; error?: string } =>
-            e instanceof Error
-              ? { axis: 'profile', ok: false, error: e.message }
-              : { axis: 'profile', ok: false, errorKey: 'users.errors.generic' },
-          ),
+          // bug-0234: the action now resolves with either the updated user
+          // or a stable i18n key — no raw server message reaches the UI.
+          .then((r) =>
+            'errorKey' in r
+              ? { axis: 'profile' as const, ok: false, errorKey: r.errorKey }
+              : { axis: 'profile' as const, ok: true },
+          )
+          .catch((e: unknown): { axis: 'profile'; ok: false; errorKey?: string; silent?: boolean } => {
+            // bug-0221: a session that expired mid-edit makes `apiFetch` call
+            // redirect('/login'), which throws a NEXT_REDIRECT sentinel. The
+            // action re-throws it so Next.js performs the bounce; if one still
+            // reaches here, stay quiet rather than flashing a misleading
+            // "something went wrong" over a page that is already navigating.
+            if (isRedirectSentinel(e)) return { axis: 'profile', ok: false, silent: true }
+            return { axis: 'profile', ok: false, errorKey: 'users.errors.generic' }
+          }),
       )
     }
     if (rolesDirty) {
@@ -196,6 +209,7 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
     for (const r of results) {
       if (!r.ok) {
         allOk = false
+        if (r.silent) continue
         const msg = r.errorKey ? t(r.errorKey) : (r.error ?? '')
         if (r.axis === 'profile') setProfileError(msg)
         if (r.axis === 'roles') setRolesError(msg)

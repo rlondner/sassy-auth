@@ -437,7 +437,10 @@
       "notPending": "Cet utilisateur n’est plus en attente d’invitation.",
       "rolesSetFailed": "Échec de la mise à jour des rôles.",
       "directPermissionsSetFailed": "Échec de la mise à jour des permissions directes.",
-      "selfDeactivate": "Vous ne pouvez pas désactiver votre propre compte."
+      "selfDeactivate": "Vous ne pouvez pas désactiver votre propre compte.",
+      "selfModify": "Vous ne pouvez pas modifier votre propre compte.",
+      "emailExists": "Un utilisateur avec cet e-mail existe déjà.",
+      "validation": "Certaines informations saisies ne sont pas valides. Veuillez vérifier et réessayer."
     }
   },
   "forgotPassword": {

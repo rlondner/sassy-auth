@@ -114,8 +114,9 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
           directPermissionIds: Array.from(new Set(form.directPermissionIds.filter((id) => id !== ''))),
         }),
       })
-      if ('error' in result) {
-        setServerError(result.error)
+      if ('errorKey' in result) {
+        // bug-0234: the action returns an i18n key, never raw server text.
+        setServerError(t(result.errorKey))
       } else {
         toast.success(t('users.toast.created'))
         setInviteUrl(result.inviteUrl)
