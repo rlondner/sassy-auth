@@ -234,6 +234,8 @@ Copy the two output lines directly into your `.env.local` file.
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
 | `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
 | `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
+| `PLATFORM_REQUIRE_2FA` | Set to exactly `"true"` to require 2FA for all platform-admin operators. Default: unset (not enforced). See [Two-Factor Authentication](#two-factor-authentication-2fa). |
+| `TWO_FACTOR_TRUST_DAYS` | Positive integer. How long (in days) after a user is shown the 2FA-enrollment prompt before they are prompted again. Drives `shouldPromptTwoFactor` via the `twoFactorPromptedAt` timestamp. Default: `14`. |
 
 > ⚠️ **Seed-internal flags — never set these in a deployed environment.**
 > The `db:seed` script needs `signUpEmail` to succeed before the seeded `SaUser` rows exist and
@@ -499,6 +501,10 @@ SassyAuth supports optional two-factor authentication on a per-app basis. Users 
 **Per-app enforcement:** Non-platform apps can set the `requireTwoFactor` flag when creating or editing an app in the admin console. When enabled, users must complete a 2FA challenge (TOTP) during login to that app.
 
 **Platform app enforcement:** The platform admin app (immutable via UI) requires 2FA via the `PLATFORM_REQUIRE_2FA` environment variable. Set it to exactly `"true"` to enforce 2FA for all platform operators. If enforcement locks you out, use the admin "Reset 2FA" action to recover.
+
+**Enrollment prompt:** When a user without 2FA logs into the admin console, `shouldPromptTwoFactor` (`apps/admin/lib/two-factor-prompt.ts`) routes them to `/login/two-factor-prompt` if they have never been prompted (`twoFactorPromptedAt` is null) or if `TWO_FACTOR_TRUST_DAYS` (default 14) have elapsed since the last prompt.
+
+> ⚠️ **Do not pre-set `twoFactorPromptedAt` in seed data.** Stamping it at seed time marks seeded users as "already prompted" and silently suppresses the enrollment prompt for `TWO_FACTOR_TRUST_DAYS` — for exactly the high-privilege platform-admin accounts. Leave the column null in seeds (or gate any suppression behind an explicit, `NODE_ENV`-fenced flag). Two in-flight Jules PRs (#315, #316) currently add `twoFactorPromptedAt: new Date()` to the seeds — see `bugs/bug-0250.md`. It is not on `master`.
 
 **JWT authentication methods:** When a JWT is issued, it includes an `amr` (Authentication Methods) claim:
 - `["pwd"]` — password authentication only (2FA not satisfied)

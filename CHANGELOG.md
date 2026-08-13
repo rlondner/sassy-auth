@@ -4,6 +4,53 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-13
+
+**Daily review: one new PR (#316) reviewed via `gh`, 4 new bugs (2 Critical).** GitHub access
+worked this run through the authenticated **`gh` CLI** (keyring token) — `curl api.github.com`
+is still proxy-blocked and a raw `git fetch` still fails on the rejected `.env.local` PAT.
+`master` is still frozen at `a78d4a7` (2026-07-15, the 2FA merge) — **29 days** with no merge.
+The only new activity in the window is **Jules PR #316** ("🎨 Palette: Standardized Table Copy
+and Row Action Accessible Tooltips", opened 2026-08-13), reviewed in full.
+
+- **4 new bugs** (each filed as its own PR — bug-0249 → #317, bug-0250 → #318, bug-0251 → #319,
+  bug-0252 → #320) — see [BUGS_2026-08-13.md](./bugs/BUGS_2026-08-13.md). Highest bug number is
+  now **0252**.
+  - **[bug-0249](./bugs/bug-0249.md)** (🔴 Critical / runtime crash) — PR #316 renders Radix
+    `<Tooltip>` in all 5 admin tables with **no `TooltipProvider`** anywhere in `apps/admin`. In
+    `@radix-ui/react-tooltip@1.2.8` the provider context has no default, so `Tooltip.Root`
+    **throws** `` `Tooltip` must be used within `TooltipProvider` `` at render → the
+    Apps/Orgs/Roles/Permissions/Users pages crash. The table tests mock the primitive to
+    passthroughs, so they stay green. Confirmed absent on `master`. Fix: mount one
+    `<TooltipProvider>` around `AdminShell` / in `app/layout.tsx`.
+  - **[bug-0250](./bugs/bug-0250.md)** (🔴 Critical / security posture) — seed scripts
+    (`seed.ts`, `demo-multitenant.ts`, `demo-resource-server.ts`) set
+    `twoFactorPromptedAt: new Date()`, so `shouldPromptTwoFactor` returns `false` and the 2FA
+    enrollment prompt is **suppressed for every seeded user** (platform admins + demo) for
+    `TWO_FACTOR_TRUST_DAYS` (14 default). Not cleared by re-seed. Present in **#316 and #315**;
+    absent on `master`.
+  - **[bug-0251](./bugs/bug-0251.md)** (🟡 Warning / process) — scope creep: the cosmetically
+    titled "table tooltips" PR silently bundles `auth.config.ts` (`autoSignIn: false`) + three
+    seed-file edits (bug-0250), and mocks away the exact `@sassy-auth/ui` primitive it
+    introduces so CI can't catch bug-0249. Recurrence of bug-0247/0248 + bug-0093. Conflicts
+    with open PRs #315/#314.
+  - **[bug-0252](./bugs/bug-0252.md)** (🟡 Minor / a11y) — nested double-`asChild`
+    (`TooltipTrigger asChild` → `DropdownMenuTrigger asChild` → one `<button>`) on the row-action
+    trigger across all 5 tables; fragile Radix Slot merge, tooltip may not dismiss when the menu
+    opens. Secondary to bug-0249.
+- **The a11y intent is sound** — localized `aria-label`s (the previously **hardcoded**
+  `"more actions"` is now `t('common.moreActions')`) and a dynamic "copied" announcement are
+  genuine improvements. The findings are about the missing provider, the bundled seed regression,
+  and the scope creep — not the tooltip idea.
+- **`master` is still red** (bug-0243 admin Jest suite) and **frozen for 29 days**; three open
+  Jules PRs (#314/#315/#316) collide on `auth.config.ts` + seeds.
+- **Follow-ups** (blockers on #316 + the merge backlog + infra) →
+  [TODO_2026-08-13.md](./todo/TODO_2026-08-13.md). Full review detail →
+  [CR_2026-08-13.md](./code_reviews/CR_2026-08-13.md).
+
+> Note: this entry, like every daily-review entry since 2026-07-21, stacks above unmerged work.
+> `master`'s CHANGELOG still tops out earlier; these entries live on the review branches / PRs.
+
 ## [Unreleased] — 2026-08-05
 
 **Daily review: GitHub access restored, one new PR reviewed, 2 new bugs.** The `github` MCP
