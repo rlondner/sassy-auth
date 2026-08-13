@@ -34,6 +34,11 @@ describe('AppCreateDrawer', () => {
         name: 'X',
         url: 'https://x.example',
         callbackUrl: null,
+        // 2FA per-app enforcement (bug-free defaults for a fresh app): the
+        // drawer always sends both fields so an unchecked box is an explicit
+        // `false` rather than an omission the API would have to interpret.
+        requireTwoFactor: false,
+        twoFactorTrustDays: null,
       }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
