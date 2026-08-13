@@ -13,8 +13,11 @@ jest.mock('@/app/(admin)/users/actions', () => ({
   deleteUserAction: jest.fn().mockResolvedValue({ ok: true }),
 }))
 
+// Render just enough of the drawer to observe which snapshot of the user it
+// was handed — that is what bug-0233 is about.
 jest.mock('../user-view-drawer', () => ({
-  UserViewDrawer: () => null,
+  UserViewDrawer: ({ user, open }: { user: { firstName: string; lastName: string } | null; open: boolean }) =>
+    open && user ? <div data-testid="view-drawer">{`${user.firstName} ${user.lastName}`}</div> : null,
 }))
 
 jest.mock('../user-create-drawer', () => ({
@@ -76,6 +79,35 @@ describe('UsersTable', () => {
   it('shows org name for user', () => {
     render(withIntl(<UsersTable users={mockUsers} orgs={mockOrgs} />))
     expect(screen.getAllByText('Acme Corp').length).toBeGreaterThan(0)
+  })
+
+  // bug-0233: the bug-0206 rebase landed in apps/orgs/permissions/roles tables
+  // but not here. After an in-drawer save, router.refresh() delivers new props
+  // while `selectedUser` still points at the pre-edit snapshot, so the drawer
+  // shows stale values until it is closed and reopened.
+  it('rebases the open drawer selection when the users prop changes', async () => {
+    const { rerender } = render(withIntl(<UsersTable users={mockUsers} orgs={mockOrgs} />))
+
+    const editItems = await screen.findAllByRole('menuitem', { name: en.users.actions.edit })
+    fireEvent.click(editItems[0])
+    expect(screen.getByTestId('view-drawer')).toHaveTextContent('Alice Smith')
+
+    const renamed = [{ ...mockUsers[0], firstName: 'Alicia' }, mockUsers[1]]
+    rerender(withIntl(<UsersTable users={renamed} orgs={mockOrgs} />))
+
+    expect(screen.getByTestId('view-drawer')).toHaveTextContent('Alicia Smith')
+  })
+
+  it('drops the drawer selection when the selected user disappears from the list', async () => {
+    const { rerender } = render(withIntl(<UsersTable users={mockUsers} orgs={mockOrgs} />))
+
+    const editItems = await screen.findAllByRole('menuitem', { name: en.users.actions.edit })
+    fireEvent.click(editItems[0])
+    expect(screen.getByTestId('view-drawer')).toBeInTheDocument()
+
+    rerender(withIntl(<UsersTable users={[mockUsers[1]]} orgs={mockOrgs} />))
+
+    expect(screen.queryByTestId('view-drawer')).not.toBeInTheDocument()
   })
 
   it('clicking Delete on a user opens ConfirmDialog with the user name', async () => {

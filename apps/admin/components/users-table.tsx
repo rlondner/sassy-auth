@@ -47,6 +47,19 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
   // mutating action). This swaps the table data silently without a navigation.
   const refresh = React.useCallback(() => router.refresh(), [router])
 
+  // bug-0233: the sibling tables (apps, orgs, permissions, roles) rebase their
+  // `selected` row against refreshed data in their own refresh callback
+  // (bug-0206); this table has no such callback because the list arrives as a
+  // prop from the Server Component. Without the rebase, an in-drawer edit +
+  // save leaves `selectedUser` pointing at the pre-edit snapshot, so the drawer
+  // keeps showing old values — and a concurrent edit by another admin is
+  // invisible. Re-point at the fresh row, or drop the selection if the user is
+  // no longer in the list.
+  React.useEffect(() => {
+    setSelectedUser((prev) => (prev ? users.find((u) => u.id === prev.id) ?? null : null))
+    setStatusTarget((prev) => (prev ? users.find((u) => u.id === prev.id) ?? null : null))
+  }, [users])
+
   const orgMap = React.useMemo(
     () => Object.fromEntries(orgs.map((o) => [o.id, o])),
     [orgs],
