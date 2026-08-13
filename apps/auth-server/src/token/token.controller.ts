@@ -439,12 +439,16 @@ export class TokenController {
       saUser = found;
     }
 
-    // 3. Check org/app match BEFORE password validation
-    if (saUser.org.appId !== app.id) {
-      throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
-    }
-
-    // 4. Validate password against BetterAuth account table
+    // 3. Validate password against BetterAuth account table.
+    //
+    // bug-0214: the org/app match used to be checked here, *before* the
+    // password work, and answered with a 403 USER_ORG_MISMATCH. That gave an
+    // attacker two oracles the bug-0209 timing guard was built to close: a
+    // valid identifier in another tenant answered instantly with a different
+    // status code, while an unknown identifier answered 401 after a full
+    // scrypt. Enumeration and tenant-membership probing both fell out of the
+    // difference. The check now happens after verification (step 5) and
+    // answers INVALID_CREDENTIALS like every other failure on this path.
     const account = await prisma.account.findFirst({
       where: {
         user: { email: betterAuthEmail },
@@ -452,6 +456,12 @@ export class TokenController {
       },
     });
     if (!account?.password) {
+      // bug-0215: a social-only user (Google/GitHub, no credential row) used
+      // to short-circuit here with no scrypt work at all, so response time
+      // told an attacker which accounts use a password and which use SSO —
+      // a ready-made target list for provider-specific phishing. Burn the
+      // same scrypt budget as the user-found path before answering.
+      await verifyPassword({ hash: await getDummyPasswordHash(), password: dto.password });
       this.logger.getWinstonLogger().warn('Direct login failed: invalid credentials', {
         context: 'TokenController',
         identifierType: detectIdentifierType(dto.identifier),
@@ -468,6 +478,21 @@ export class TokenController {
       });
       throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
     }
+    // bug-0214: org/app match, now behind the password check. A caller who
+    // does not know the password learns nothing about which tenant the
+    // identifier belongs to; a caller who does know it gets the same opaque
+    // INVALID_CREDENTIALS as any other rejection. The specific reason is
+    // recorded server-side only.
+    if (saUser.org.appId !== app.id) {
+      this.logger.getWinstonLogger().warn('Direct login failed: user org does not match app', {
+        context: 'TokenController',
+        identifierType: detectIdentifierType(dto.identifier),
+        appId: dto.appId,
+        userId: saUser.publicId,
+      });
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CREDENTIALS);
+    }
+
     // Only 'active' users may complete direct login. Placed AFTER password
     // verification so the response timing does not distinguish inactive-with-
     // valid-password from wrong-password (kept opaque as INVALID_CREDENTIALS).

@@ -32,13 +32,18 @@ jest.mock('../auth/auth.config', () => ({
   auth: { api: { getSession: jest.fn() } },
 }));
 
-jest.mock('better-auth/crypto', () => ({ verifyPassword: jest.fn().mockResolvedValue(true) }));
+jest.mock('better-auth/crypto', () => ({
+  verifyPassword: jest.fn().mockResolvedValue(true),
+  hashPassword: jest.fn().mockResolvedValue('dummy-hash'),
+}));
 
+import { verifyPassword } from 'better-auth/crypto';
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';
 import { verifyUserTotp } from '../auth/verify-user-totp';
 
 const mockGetSession = auth.api.getSession as unknown as jest.Mock;
+const mockVerifyPassword = verifyPassword as unknown as jest.Mock;
 
 const mockPrisma = prisma as unknown as {
   saApp: { findUnique: jest.Mock };
@@ -111,7 +116,12 @@ describe('TokenController', () => {
     };
     const account = { password: 'hashed', providerId: 'credential' };
 
-    it('throws ForbiddenException (USER_ORG_MISMATCH) when user org does not match app', async () => {
+    // bug-0214: the org/app mismatch used to short-circuit with a 403
+    // USER_ORG_MISMATCH *before* the scrypt verify. That handed an attacker
+    // both a user-enumeration oracle (403 instantly vs 401 after ~100ms) and
+    // a tenant-membership oracle. The response must now be indistinguishable
+    // from a wrong password: same status, same code, same work done.
+    it('throws UnauthorizedException (INVALID_CREDENTIALS), not 403, when user org does not match app', async () => {
       mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, id: 10 });
       mockPrisma.saUser.findFirst.mockResolvedValue({
         ...saUser,
@@ -122,7 +132,84 @@ describe('TokenController', () => {
 
       await expect(
         controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('verifies the password before rejecting an org/app mismatch', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, id: 10 });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        ...saUser,
+        org: { id: 5, publicId: 'sqid-5', appId: 999 },
+        betterAuthUser: baUser,
+      });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+
+      await expect(
+        controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(mockVerifyPassword).toHaveBeenCalledWith({ hash: 'hashed', password: 'pw' });
+    });
+
+    it('does not issue a JWT for a user whose org belongs to another app', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, id: 10 });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        ...saUser,
+        org: { id: 5, publicId: 'sqid-5', appId: 999 },
+        betterAuthUser: baUser,
+      });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+
+      await expect(
+        controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(mockTokenService.issueJwt).not.toHaveBeenCalled();
+    });
+
+    // bug-0215: a user with no credential-provider account row (social-only
+    // sign-in) used to bail out before any scrypt work, so response time
+    // revealed which accounts authenticate with a password and which with
+    // Google/GitHub — a targeted-phishing shopping list.
+    it('burns a dummy scrypt verify when the user has no credential account row', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(null); // social-only user
+
+      await expect(
+        controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(mockVerifyPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ password: 'pw' }),
+      );
+    });
+
+    it('burns a dummy scrypt verify when the account row exists but carries no password', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue({ providerId: 'credential', password: null });
+
+      await expect(
+        controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(mockVerifyPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ password: 'pw' }),
+      );
+    });
+
+    it('never verifies against the real hash when there is no credential row', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(null);
+
+      await expect(
+        controller.directLogin({ identifier: 'user@example.com', password: 'pw', appId: 'sqid-10' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      // The dummy hash is generated internally, never the (absent) stored one.
+      expect(mockVerifyPassword).not.toHaveBeenCalledWith({ hash: 'hashed', password: 'pw' });
     });
 
     it('throws NotFoundException when app does not exist', async () => {
