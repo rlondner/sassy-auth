@@ -7,7 +7,7 @@ import { ShieldEllipsis, Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger, Tooltip, TooltipTrigger, TooltipContent,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@sassy-auth/ui'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteRoleAction, listRolesAction } from '@/app/(admin)/roles/actions'
@@ -89,24 +89,18 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
         return (
           <div className="flex items-center gap-2">
             <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-label-md">{r.publicId}</code>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={copied ? t('common.copied') : t('common.copy')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void copySqid(r.publicId, r.publicId)
-                  }}
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  <span className="material-symbols-outlined text-[14px]">{copied ? 'check' : 'content_copy'}</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {copied ? t('common.copied') : t('common.copy')}
-              </TooltipContent>
-            </Tooltip>
+            <button
+              type="button"
+              aria-label={copied ? t('common.copied') : t('common.copy')}
+              title={copied ? t('common.copied') : t('common.copy')}
+              onClick={(e) => {
+                e.stopPropagation()
+                void copySqid(r.publicId, r.publicId)
+              }}
+              className="text-muted-foreground hover:text-primary"
+            >
+              <span className="material-symbols-outlined text-[14px]">{copied ? 'check' : 'content_copy'}</span>
+            </button>
           </div>
         )
       },
@@ -128,16 +122,15 @@ export function RolesTable({ initial, apps, canWrite = true, canPickApp = true }
         const inUse = r.userCount > 0
         return (
           <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <button aria-label={t('common.moreActions')} className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
-                    <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
-                  </button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">{t('common.moreActions')}</TooltipContent>
-            </Tooltip>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <button
+                aria-label={t('common.moreActions')}
+                title={t('common.moreActions')}
+                className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted"
+              >
+                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
+              </button>
+            </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(r); setViewOpen(true) }}>
                 {t('roles.actions.view')}
