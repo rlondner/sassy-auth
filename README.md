@@ -504,7 +504,7 @@ SassyAuth supports optional two-factor authentication on a per-app basis. Users 
 
 **Enrollment prompt:** When a user without 2FA logs into the admin console, `shouldPromptTwoFactor` (`apps/admin/lib/two-factor-prompt.ts`) routes them to `/login/two-factor-prompt` if they have never been prompted (`twoFactorPromptedAt` is null) or if `TWO_FACTOR_TRUST_DAYS` (default 14) have elapsed since the last prompt.
 
-> ⚠️ **Do not pre-set `twoFactorPromptedAt` in seed data.** Stamping it at seed time marks seeded users as "already prompted" and silently suppresses the enrollment prompt for `TWO_FACTOR_TRUST_DAYS` — for exactly the high-privilege platform-admin accounts. Leave the column null in seeds (or gate any suppression behind an explicit, `NODE_ENV`-fenced flag). Two in-flight Jules PRs (#315, #316) currently add `twoFactorPromptedAt: new Date()` to the seeds — see `bugs/bug-0250.md`. It is not on `master`.
+> ⚠️ **Do not pre-set `twoFactorPromptedAt` in seed data.** Stamping it at seed time marks seeded users as "already prompted" and silently suppresses the enrollment prompt for `TWO_FACTOR_TRUST_DAYS` — for exactly the high-privilege platform-admin accounts. Leave the column null in seeds (or gate any suppression behind an explicit, `NODE_ENV`-fenced flag). Two in-flight Jules PRs (#315, #316) currently add `twoFactorPromptedAt: new Date()` to the seeds — see `bugs/bug-0250.md`. It is not on `master`. (As of 2026-08-14 the regression **persists** in PR #316's latest head `b3acc18`, which reworked only the admin tooltip UI and left the seed writes untouched.)
 
 **JWT authentication methods:** When a JWT is issued, it includes an `amr` (Authentication Methods) claim:
 - `["pwd"]` — password authentication only (2FA not satisfied)

@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-14
+
+**Daily review: strict 24h window empty; reviewed the one revision the prior run missed (PR #316
+`b3acc18`), 1 new Minor bug (0253).** `git fetch origin` **worked** this run (keyring credential)
+and refreshed the PR refs; `gh` also works. `master` is still frozen at `a78d4a7` (2026-07-15, the
+2FA merge) — **30 days** with no merge. No new commits or PR updates landed in the strict last-24h
+window. The only unreviewed change was **PR #316**'s force-push to head **`b3acc18`** (2026-08-13
+10:14 UTC — 9 minutes *after* the 2026-08-13 review pulled its data at head `42a518d`), reviewed
+here in full.
+
+- **What `b3acc18` changed:** it **replaces the Radix `<Tooltip>` with a native `title=`**
+  attribute on the copy button and the `more_vert` row-action button across all 5 admin tables,
+  and removes the now-unused `Tooltip*` imports and their passthrough test mocks (10 files,
+  `+98 / −142`). **The seed / `auth.config.ts` edits were not touched.**
+- **Status changes to prior findings:**
+  - ✅ **[bug-0252](./bugs/bug-0252.md)** (nested double-`asChild`) — **resolved by this revision**
+    (no Radix Slot stack remains). Fix is in the PR head, not on `master`, so `bug-0252.md` keeps
+    `Fixed: false`.
+  - ✅ **[bug-0249](./bugs/bug-0249.md)** (retracted "missing `TooltipProvider`") — **permanently
+    moot**; no Radix Tooltip remains.
+  - 🟡 **[bug-0251](./bugs/bug-0251.md)** (scope creep + mocks-away-its-primitive) — the test-mock
+    half is **mooted** (primitive + mocks removed); the **scope-creep half stands** (the PR still
+    silently bundles `auth.config.ts` + 3 seed edits under a cosmetic title).
+  - 🔴 **[bug-0250](./bugs/bug-0250.md)** (Critical — seed `twoFactorPromptedAt: new Date()`
+    suppresses the 2FA enrollment prompt) — **persists unchanged** in `b3acc18`
+    (`seed.ts:120`, `demo-multitenant.ts:103`, `demo-resource-server.ts:163`; `autoSignIn:false`
+    at `auth.config.ts:146`). Still the merge blocker on #316 (and #315).
+- **1 new bug** (filed as its own PR — bug-0253 → **#322**) — see
+  [BUGS_2026-08-14.md](./bugs/BUGS_2026-08-14.md). Highest real bug number is now **0253**.
+  - **[bug-0253](./bugs/bug-0253.md)** (🟡 Minor / a11y-UX) — the native-`title` rewrite binds the
+    copy button's `title`/`aria-label` to the transient `copied` state, but a native `title`
+    doesn't update while the pointer stays on the button (browsers sample it at hover-start) and an
+    `aria-label` mutation doesn't re-announce — so PR #316's own advertised "dynamic copied
+    announcement" no longer works in the normal hover→click path; only the `content_copy → check`
+    icon swap survives. Restore a reactive tooltip or add an `aria-live` announcement.
+- **Net:** `b3acc18` is a reasonable cleanup of the tooltip layer (kills the retracted-crash
+  concern and the nested-`asChild` fragility) but leaves the Critical seed 2FA-suppression
+  (bug-0250) intact under a still-cosmetic title (bug-0251) and quietly regresses the copy
+  confirmation (bug-0253). `master` itself is unchanged and safe — none of this is merged.
+- **Docs:** `README.md` reviewed and confirmed current (it already documents `PLATFORM_REQUIRE_2FA`
+  / `TWO_FACTOR_TRUST_DAYS` and carries a warning box against pre-setting `twoFactorPromptedAt` in
+  seeds); the bug-0250 note was refreshed to record that the regression persists in #316's latest
+  head despite the tooltip rewrite.
+
 ## [Unreleased] — 2026-08-13
 
 **Daily review: one new PR (#316) reviewed via `gh`, 3 new bugs (1 Critical) + 1 retracted.**
