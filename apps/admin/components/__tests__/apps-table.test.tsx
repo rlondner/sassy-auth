@@ -53,10 +53,12 @@ function withIntl(node: React.ReactNode) {
 describe('AppsTable', () => {
   beforeEach(() => jest.clearAllMocks())
 
-  it('renders rows from initial data', () => {
+  it('renders rows from initial data with localized more actions ARIA label', () => {
     render(withIntl(<AppsTable initial={initial} />))
     expect(screen.getByText('Customer Portal')).toBeInTheDocument()
     expect(screen.getByText('SassyAuth')).toBeInTheDocument()
+    const moreActionsButtons = screen.getAllByRole('button', { name: en.common.moreActions })
+    expect(moreActionsButtons).toHaveLength(2)
   })
 
   it('clicking Delete on an ordinary app opens ConfirmDialog with the app name', async () => {
