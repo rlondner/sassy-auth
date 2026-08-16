@@ -94,17 +94,17 @@ function parseSessionCookie(header: string): ParsedSessionCookie | null {
   return null
 }
 
-async function forwardSessionCookie(res: Response): Promise<boolean> {
+async function forwardSessionCookie(res: Response): Promise<{ ok: boolean; sessionToken?: string }> {
   const cookieStore = await cookies()
   const setCookieHeader = res.headers.get('set-cookie')
   if (!setCookieHeader) {
     Sentry.captureMessage('Auth server returned 200 but no Set-Cookie header', { level: 'error' })
-    return false
+    return { ok: false }
   }
   const parsed = parseSessionCookie(setCookieHeader)
   if (!parsed) {
     Sentry.captureMessage('Failed to parse session cookie from auth server response', { level: 'error' })
-    return false
+    return { ok: false }
   }
   cookieStore.set('better-auth.session_token', parsed.value, {
     httpOnly: parsed.httpOnly,
@@ -115,7 +115,7 @@ async function forwardSessionCookie(res: Response): Promise<boolean> {
     ...(parsed.expires !== undefined && { expires: parsed.expires }),
     ...(parsed.domain !== undefined && { domain: parsed.domain }),
   })
-  return true
+  return { ok: true, sessionToken: parsed.value }
 }
 
 export async function signIn(formData: FormData): Promise<{ error?: string } | { twoFactor: true }> {
@@ -174,8 +174,8 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
     return { twoFactor: true } as { twoFactor: true }
   }
 
-  const ok = await forwardSessionCookie(res)
-  if (!ok) return { error: 'invalidCredentials' }
+  const sessionResult = await forwardSessionCookie(res)
+  if (!sessionResult.ok || !sessionResult.sessionToken) return { error: 'invalidCredentials' }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Admin login successful', level: 'info' })
   const nextRaw = formData.get('next')
@@ -183,17 +183,17 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
 
   // Optional 2FA interstitial: show once per interval for unenrolled users.
   // Read twoFactorEnabled from the just-established session.
-  const cookieStore2 = await cookies()
+  const upstreamCookieHeader = `better-auth.session_token=${encodeURIComponent(sessionResult.sessionToken)}`
   let twoFactorEnabled = false
   let twoFactorPromptedAt: string | null = null
   try {
     const [sessRes, statusRes] = await Promise.all([
       fetch(`${AUTH_SERVER_URL}/api/auth/get-session`, {
-        headers: { Cookie: cookieStore2.toString() },
+        headers: { Cookie: upstreamCookieHeader },
         cache: 'no-store',
       }),
       fetch(`${AUTH_SERVER_URL}/api/me/two-factor-status`, {
-        headers: { Cookie: cookieStore2.toString() },
+        headers: { Cookie: upstreamCookieHeader },
         cache: 'no-store',
       }),
     ])
@@ -301,8 +301,8 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
     return { twoFactor: true } as { twoFactor: true }
   }
 
-  const ok = await forwardSessionCookie(res)
-  if (!ok) return { error: 'invalidCode' }
+  const sessionResult = await forwardSessionCookie(res)
+  if (!sessionResult.ok) return { error: 'invalidCode' }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Admin OTP login successful', level: 'info' })
   const nextRaw = formData.get('next')
@@ -384,8 +384,8 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
     return { error: 'invalidCode' }
   }
 
-  const ok = await forwardSessionCookie(res)
-  if (!ok) return { error: 'serverUnavailable' }
+  const sessionResult = await forwardSessionCookie(res)
+  if (!sessionResult.ok) return { error: 'serverUnavailable' }
 
   // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
   await forwardNamedCookie(res, 'better-auth.two_factor')
@@ -432,8 +432,8 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
     return { error: 'invalidCode' }
   }
 
-  const ok = await forwardSessionCookie(res)
-  if (!ok) return { error: 'serverUnavailable' }
+  const sessionResult = await forwardSessionCookie(res)
+  if (!sessionResult.ok) return { error: 'serverUnavailable' }
 
   // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
   await forwardNamedCookie(res, 'better-auth.two_factor')
