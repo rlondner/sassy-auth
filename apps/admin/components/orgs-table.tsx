@@ -7,7 +7,7 @@ import { Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Button, ButtonGroup, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger, Badge,
+  DropdownMenuSeparator, DropdownMenuTrigger, Badge, Tooltip, TooltipTrigger, TooltipContent,
 } from '@sassy-auth/ui'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { deleteOrgAction, listOrgsAction } from '@/app/(admin)/orgs/actions'
@@ -123,11 +123,16 @@ export function OrgsTable({ initial, apps }: Props) {
         const o = row.original
         return (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button aria-label="more actions" className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
-                <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
-              </button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <button aria-label={t('common.moreActions')} className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted">
+                    <span className="material-symbols-outlined text-[20px] text-muted-foreground">more_vert</span>
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>{t('common.moreActions')}</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelected(o); setViewOpen(true) }}>
                 {t('orgs.actions.view')}

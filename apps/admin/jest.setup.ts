@@ -46,3 +46,20 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   withScope: jest.fn((cb: any) => cb({ setExtra: jest.fn(), setTag: jest.fn() })),
 }))
+
+jest.mock('@sassy-auth/ui', () => {
+  const React = require('react')
+  const actual = jest.requireActual('@sassy-auth/ui')
+  return {
+    ...actual,
+    TooltipProvider: ({ children }: any) => React.createElement(React.Fragment, null, children),
+    Tooltip: ({ children }: any) => React.createElement(React.Fragment, null, children),
+    TooltipTrigger: React.forwardRef(({ children, asChild, ...props }: any, ref: any) => {
+      if (asChild && React.isValidElement(children)) {
+        return React.cloneElement(children, { ...props, ref })
+      }
+      return React.createElement('button', { ...props, ref }, children)
+    }),
+    TooltipContent: ({ children }: any) => React.createElement('div', { role: 'tooltip' }, children),
+  }
+})
