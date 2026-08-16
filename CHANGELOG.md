@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-15
+
+**Daily review: one new PR in the window (#324), functionally correct and — for the first time in
+this lineage — cleanly scoped; 2 new hygiene bugs (0254 Medium, 0255 Low).** `git fetch origin` and
+`gh` both work (keyring credential). `master` is still frozen at `a78d4a7` (2026-07-15, the 2FA
+merge) — **31 days** with no merge.
+
+- **New activity: [PR #324](https://github.com/rlondner/sassy-auth/pull/324)** (Jules, "🎨 Palette:
+  Add localized ARIA labels to table row action buttons"). Admin-only (8 files, 5 tables + 1 test +
+  `en.json`/`fr.json`) — **no `apps/auth-server`/seed edits**, unlike #303/#306/#316. It swaps the
+  hardcoded `aria-label="more actions"` on each table's `more_vert` button for
+  `aria-label={t('common.moreActions')}`, adds that key to both message files, and translates the
+  top-level `common` block in `fr.json` (save/edit/delete/confirm → French).
+  - ✅ **Correct** — all 5 tables use root-scope `useTranslations()`, so the key resolves; verified.
+  - ✅ **Fixes [bug-0244](./bugs/bug-0244.md)** (fr.json `common` labels were English placeholders) —
+    in the PR head, not on `master`.
+- **2 new bugs** (each filed as its own PR) — see [BUGS_2026-08-15.md](./bugs/BUGS_2026-08-15.md).
+  Highest real bug number is now **0255**.
+  - 🟠 **[bug-0254](./bugs/bug-0254.md)** (Medium) — #324 **duplicates the still-open PR #316**: the
+    identical 5 `aria-label` hunks, the same `common.moreActions` keys, and the same `fr.json`
+    `common` fix all already live in #316. Both open → guaranteed merge conflict. #324 is the *clean
+    subset* (no bug-0250/0251 auth/seed payload); #316 does more (copy-button localization) but is
+    blocked. Recurring Jules duplicate-generation pattern (cf. bug-0245, bug-0248). Recommended
+    resolution: land the a11y/i18n slice via #324, reduce #316 to only its unique safe delta.
+  - 🟢 **[bug-0255](./bugs/bug-0255.md)** (Low) — the label change lands in 5 tables but only
+    `apps-table.test.tsx` gets an assertion; the 4 sibling table suites are left unverified.
+- **Unchanged prior findings** (all in unmerged PRs; `master` unaffected): 🔴 bug-0250 (seed 2FA
+  suppression, still in #316/#315), 🟡 bug-0251 (#316 scope creep), 🟡 bug-0253 (native-`title` copy
+  confirmation in #316), 🔴 bug-0243 (`apps/admin` Jest red on `master`, fix #287 unmerged).
+- **Net:** the first Jules PR here that doesn't smuggle an auth-server change; correct and low-risk.
+  Its only issues are pre-merge hygiene (duplicates the blocked #316, under-tests itself). The
+  systemic blocker remains the **31-day merge freeze**, which keeps producing overlapping PRs.
+
 ## [Unreleased] — 2026-08-14
 
 **Daily review: strict 24h window empty; reviewed the one revision the prior run missed (PR #316
