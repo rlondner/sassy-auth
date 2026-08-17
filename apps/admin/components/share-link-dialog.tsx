@@ -6,7 +6,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button,
 } from '@sassy-auth/ui'
-import { copyToClipboard } from '@/lib/clipboard'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 
 interface ShareLinkDialogProps {
   open: boolean
@@ -18,9 +18,8 @@ interface ShareLinkDialogProps {
 
 export function ShareLinkDialog({ open, onOpenChange, title, description, url }: ShareLinkDialogProps) {
   const t = useTranslations()
-  const [copied, setCopied] = React.useState(false)
-
-  React.useEffect(() => { if (!open) setCopied(false) }, [open])
+  const { copiedKey, copy } = useCopyFeedback()
+  const copied = copiedKey === url
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -39,7 +38,7 @@ export function ShareLinkDialog({ open, onOpenChange, title, description, url }:
           <Button
             variant="outline"
             size="sm"
-            onClick={async () => { if (await copyToClipboard(url)) { setCopied(true); setTimeout(() => setCopied(false), 2000) } }}
+            onClick={() => void copy(url, url)}
           >
             {copied ? t('users.drawer.copied') : t('users.drawer.copyLink')}
           </Button>
