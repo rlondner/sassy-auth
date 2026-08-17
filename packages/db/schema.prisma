@@ -243,9 +243,12 @@ model SaUserPermission {
 // generated at /api/token/oauth/authorize and deleted on /api/token/oauth/token
 // (or on any validation failure — see OauthService.exchangeCode). The
 // row also carries the fields bound at issuance for PKCE + redirect_uri
-// verification per RFC 6749 §4.1.3 (bug-0054). Rows accumulate past
-// `expiresAt` but the exchange path rejects them, so a periodic cleanup
-// job is optional (not shipped in v1).
+// verification per RFC 6749 §4.1.3 (bug-0054).
+//
+// bug-0220: abandoned flows leave rows behind that the exchange path never
+// consumes. They are harmless to correctness (exchange rejects anything past
+// `expiresAt`) but grew without bound. OauthCodeCleanupService now sweeps
+// them every 15 minutes via the `expiresAt` index below.
 model SaOauthCode {
   code                String   @id
   userId              String
