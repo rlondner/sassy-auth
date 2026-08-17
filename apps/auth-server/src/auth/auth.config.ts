@@ -143,7 +143,6 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    autoSignIn: false,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
     sendResetPassword: async ({ user, token }: { user: { email: string; name?: string }; token: string }) => {
       const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
