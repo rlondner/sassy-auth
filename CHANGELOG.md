@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-17
+
+**Daily review: two new PRs in the window (#328, #329), both Jules "Palette" PRs that again ride an
+`apps/auth-server` change under a cosmetic title; 3 new bugs (0256 Medium, 0257 Medium, 0258 Low),
+all pre-merge hygiene / scope-creep / test-quality.** `git fetch origin` and `gh` both work (keyring
+credential). `master` is still frozen at `a78d4a7` (2026-07-15, the 2FA merge) — **33 days** with no
+merge.
+
+- **New activity: [PR #328](https://github.com/rlondner/sassy-auth/pull/328)** (Jules, "🎨 Palette:
+  Add localized ARIA labels and tooltips to row action triggers") and
+  **[PR #329](https://github.com/rlondner/sassy-auth/pull/329)** (Jules, "🎨 Palette: Standardize
+  ShareLinkDialog copy feedback hook"). No new commits on `master` (`git log --since` in-window = empty).
+- **PR #329 is mostly good:** it moves `ShareLinkDialog` off inline `useState`+`setTimeout` onto the
+  existing `useCopyFeedback` hook (`apps/admin/lib/use-copy-feedback.ts`, present on `master` —
+  verified), removing the unmount `setTimeout` leak; adds a real `share-link-dialog.test.tsx`; and
+  fixes the `app-create-drawer.test.tsx` payload assertion (**bug-0243** fix in the PR head). Its one
+  problem is an unrelated `autoSignIn: false` rider.
+- **PR #328 is a duplicate + heavily over-scoped:** it re-does the same
+  `aria-label={t('common.moreActions')}` + `en/fr.json` localization already in the open PRs #316
+  and #324, and additionally rewrites `apps/admin/app/login/actions.ts` (untested), adds
+  `autoSignIn: false`, edits `apps/admin-e2e/auth-state.setup.ts`, and globally stubs the UI Tooltip
+  in `jest.setup.ts` — all under a "row action tooltips" title.
+- **3 new bugs** (each filed as its own PR) — see [BUGS_2026-08-17.md](./bugs/BUGS_2026-08-17.md).
+  Highest real bug number is now **0258**.
+  - 🟠 **[bug-0256](./bugs/bug-0256.md)** (Medium) — `autoSignIn: false` is added to
+    `auth.config.ts` by **three** open PRs (#316, #328, #329): an unstated, untested auth-server
+    behavior change (disables auto-session on sign-up) smuggled under cosmetic titles → guaranteed
+    3-way merge conflict on one line. Continuation of the auth-server-smuggling lineage
+    (bug-0246/0247/0251). Fix: extract it to one purpose-named auth PR with a test; strip from all three.
+  - 🟠 **[bug-0257](./bugs/bug-0257.md)** (Medium) — PR #328 is the **third** overlapping
+    row-action-tooltip/`common.moreActions` localization PR (dup of #316 and #324; extends bug-0254
+    to three-way) and re-bundles an untested `login/actions.ts` rewrite + `auth.config.ts` +
+    e2e-setup edits under a UI title. Fix: pick one carrier (prefer #324), split #328's real non-UI
+    improvements into their own tested PRs.
+  - 🟢 **[bug-0258](./bugs/bug-0258.md)** (Low) — PR #328 globally stubs the `@sassy-auth/ui` Tooltip
+    primitives in `jest.setup.ts`, blinding the whole admin Jest suite to real tooltip behavior
+    (provider requirement, `asChild` composition) — escalates bug-0251, masks bug-0252.
+- **Not filed (verified):** #329's `useCopyFeedback` refactor (hook exists on `master`, correct);
+  and #328's `login/actions.ts` cookie rewrite is a refactor, **not** a `master` defect — on
+  `master`, `cookies().toString()` reflects the just-set session token within the same request
+  (same false-positive discipline that retracted bug-0249).
+- **Unchanged prior findings** (all in unmerged PRs; `master` unaffected): 🔴 bug-0250 (seed 2FA
+  suppression, #316/#315), 🟡 bug-0251 (#316 scope creep), 🟡 bug-0253 (native-`title` copy
+  confirmation in #316), 🟠 bug-0254 / 🟢 bug-0255 (#324↔#316 duplication + coverage), 🔴 bug-0243
+  (`apps/admin` Jest red on `master`, fix #287 unmerged).
+- **Net:** the row-action-tooltip concern is now spread across **three** open PRs (#316/#324/#328)
+  and `autoSignIn:false` across three (#316/#328/#329). The systemic blocker remains the **33-day
+  merge freeze**, which keeps regenerating overlapping PRs. #329's copy-feedback refactor is the one
+  piece worth landing (minus its auth rider).
+
 ## [Unreleased] — 2026-08-15
 
 **Daily review: one new PR in the window (#324), functionally correct and — for the first time in

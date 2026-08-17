@@ -795,6 +795,9 @@ The `code_verifier` field is checked for presence but not for RFC 7636 format (4
 **CI — no lint, single-package typecheck.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
 
+**Admin unit test suite is red on `master`.**
+`pnpm --filter @sassy-auth/admin test` currently fails on `master`: `app-create-drawer.test.tsx` asserts a 3-field `createAppAction` payload while the component sends 5 (it added `requireTwoFactor` / `twoFactorTrustDays` with the 2FA merge). The standalone fix (PR #287) and the assertion updates bundled into later PRs (#328, #329) have not merged. Expect that suite to fail until one lands. Tracked as **bug-0243**. CI does not gate on the admin unit suite, so this does not block the E2E workflow.
+
 **`deleteUser` does not remove BetterAuth identity.**
 Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
 
