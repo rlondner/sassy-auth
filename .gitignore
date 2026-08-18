@@ -48,3 +48,5 @@ apps/auth-server/.env
 .claude/scheduled_tasks.lock
 # roborev snapshots
 /.roborev/
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json

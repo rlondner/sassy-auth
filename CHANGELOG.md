@@ -36,7 +36,7 @@ bug-0173, 0178, 0181, 0208, 0211, 0212, 0213
 
 ### New bugs found (15)
 
-See [BUGS_2026-07-08.md](./bugs/BUGS_2026-07-08.md) and [TODO_2026-07-08.md](./todo/TODO_2026-07-08.md).
+See [BUGS_2026-07-08.md](./docs/history/bugs/BUGS_2026-07-08.md) and [TODO_2026-07-08.md](./docs/history/todo/TODO_2026-07-08.md).
 
 #### Critical (2) — timing side-channels undermining the bug-0209 fix
 
@@ -94,7 +94,7 @@ Reviewing the 15 commits that landed on 2026-07-08 — a massive overnight bug-f
 
 ### Bugs found (16) — 9 fixed same-day, 7 open
 
-See [BUGS_2026-07-09.md](./bugs/BUGS_2026-07-09.md) and [TODO_2026-07-09.md](./todo/TODO_2026-07-09.md).
+See [BUGS_2026-07-09.md](./docs/history/bugs/BUGS_2026-07-09.md) and [TODO_2026-07-09.md](./docs/history/todo/TODO_2026-07-09.md).
 
 #### Fixed same-day (9) — PRs #238–#246
 
@@ -196,7 +196,7 @@ No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), 
 
 ### Bugs found (22 new)
 
-See [BUGS_2026-07-07.md](./bugs/BUGS_2026-07-07.md) and [TODO_2026-07-07.md](./todo/TODO_2026-07-07.md).
+See [BUGS_2026-07-07.md](./docs/history/bugs/BUGS_2026-07-07.md) and [TODO_2026-07-07.md](./docs/history/todo/TODO_2026-07-07.md).
 
 #### Warning (10)
 
@@ -242,7 +242,7 @@ No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), 
 
 ### Bugs found (16 new)
 
-See [BUGS_2026-07-06.md](./bugs/BUGS_2026-07-06.md) and [TODO_2026-07-06.md](./todo/TODO_2026-07-06.md).
+See [BUGS_2026-07-06.md](./docs/history/bugs/BUGS_2026-07-06.md) and [TODO_2026-07-06.md](./docs/history/todo/TODO_2026-07-06.md).
 
 #### Critical (1)
 
@@ -288,7 +288,7 @@ No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), 
 
 ### Bugs found (9 new)
 
-See [BUGS_2026-07-05.md](./bugs/BUGS_2026-07-05.md) and [TODO_2026-07-05.md](./todo/TODO_2026-07-05.md).
+See [BUGS_2026-07-05.md](./docs/history/bugs/BUGS_2026-07-05.md) and [TODO_2026-07-05.md](./docs/history/todo/TODO_2026-07-05.md).
 
 #### Warning (2)
 
@@ -324,7 +324,7 @@ No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), 
 
 ### Bugs found (17 new)
 
-See [BUGS_2026-07-04.md](./bugs/BUGS_2026-07-04.md) and [TODO_2026-07-04.md](./todo/TODO_2026-07-04.md).
+See [BUGS_2026-07-04.md](./docs/history/bugs/BUGS_2026-07-04.md) and [TODO_2026-07-04.md](./docs/history/todo/TODO_2026-07-04.md).
 
 #### Critical (2)
 
@@ -371,7 +371,7 @@ No new commits in the last 24 hours. The last commit is `37f738a` (2026-07-01), 
 
 ### Bugs found (11 new)
 
-See [BUGS_2026-07-03.md](./bugs/BUGS_2026-07-03.md) and [TODO_2026-07-03.md](./todo/TODO_2026-07-03.md).
+See [BUGS_2026-07-03.md](./docs/history/bugs/BUGS_2026-07-03.md) and [TODO_2026-07-03.md](./docs/history/todo/TODO_2026-07-03.md).
 
 #### Warning (5)
 
@@ -410,7 +410,7 @@ Daily review of commit `37f738a` (2026-07-01). One commit in the last 24 hours �
 
 ### Bugs found (5 new)
 
-See [BUGS_2026-07-02.md](./bugs/BUGS_2026-07-02.md) and [TODO_2026-07-02.md](./todo/TODO_2026-07-02.md).
+See [BUGS_2026-07-02.md](./docs/history/bugs/BUGS_2026-07-02.md) and [TODO_2026-07-02.md](./docs/history/todo/TODO_2026-07-02.md).
 
 #### Warning
 
@@ -459,7 +459,7 @@ Ships the toast/refresh admin UX, the OAuth issuer DRY refactor, and the E2E rac
 - **README — `SEED_DEMO_MULTITENANT`** documented (app01 + Acme/Globex orgs) alongside the existing `SEED_DEMO`.
 - **README — API surface** now lists `GET /.well-known/oauth-authorization-server`, `GET /api/me`, and the `/oauth-error` admin route; adds a note that all admin CRUD flows show Sonner toasts.
 - **README — Known Limitations** entry for `BETTER_AUTH_URL` not being validated at startup (bug-0115), and for the incomplete escalation-guard coverage on `removeRole` / `checkPermissionForApp` (bug-0094, bug-0097).
-- **README — bug/CR paths** now reference `bugs/BUGS_*.md` and `todo/TODO_*.md` daily-file convention instead of the legacy `TODO.md` / `BUGs.md`.
+- **README — bug/CR paths** now reference `docs/history/bugs/BUGS_*.md` and `docs/history/todo/TODO_*.md` daily-file convention instead of the legacy `TODO.md` / `BUGs.md`.
 - **`.env.example`** — adds `SEED_DEMO_MULTITENANT=` alongside `SEED_DEMO=`, so developers copying `.env.example` discover the multi-tenant demo seed.
 - **`.gitignore`** — ignore `/.roborev/` snapshots.
 
@@ -474,7 +474,7 @@ Ships the toast/refresh admin UX, the OAuth issuer DRY refactor, and the E2E rac
 
 ### Known open bugs
 
-Daily bug/CR/TODO snapshots continue to live under `bugs/BUGS_*.md`, `code_reviews/CR_*.md`, and `todo/TODO_*.md`. Notable open items observed during the review window (bug-0112 … bug-0130) — French toast i18n untranslated (bug-0112), `refresh()` errors unhandled after mutations (bug-0114), `resolveIssuer()` accepts non-URL strings (bug-0115), `DeleteAlertDialog` error `<div>` missing `role="alert"` (bug-0120), `OrgsService` cross-tenant listing (bug-0121), double `stripTrailingSlash` (bug-0122) — remain open and are not addressed here.
+Daily bug/CR/TODO snapshots continue to live under `docs/history/bugs/BUGS_*.md`, `docs/history/code-reviews/CR_*.md`, and `docs/history/todo/TODO_*.md`. Notable open items observed during the review window (bug-0112 … bug-0130) — French toast i18n untranslated (bug-0112), `refresh()` errors unhandled after mutations (bug-0114), `resolveIssuer()` accepts non-URL strings (bug-0115), `DeleteAlertDialog` error `<div>` missing `role="alert"` (bug-0120), `OrgsService` cross-tenant listing (bug-0121), double `stripTrailingSlash` (bug-0122) — remain open and are not addressed here.
 
 ---
 
@@ -543,7 +543,7 @@ Massive day — 48 commits across two major feature branches (#114 feat/flox, #1
 
 ### Bugs found (18 new)
 
-See [TODO_2026-06-19.md](./todo/TODO_2026-06-19.md) and [BUGS_2026-06-19.md](./bugs/BUGS_2026-06-19.md).
+See [TODO_2026-06-19.md](./docs/history/todo/TODO_2026-06-19.md) and [BUGS_2026-06-19.md](./docs/history/bugs/BUGS_2026-06-19.md).
 
 #### Critical
 
@@ -602,7 +602,7 @@ After today's review: 2 bugs fixed (bug-0027, bug-0078), 18 new bugs found. Net 
 
 ### Bugs found
 
-See [TODO_2026-06-18.md](./todo/TODO_2026-06-18.md) and [BUGS_2026-06-18.md](./bugs/BUGS_2026-06-18.md).
+See [TODO_2026-06-18.md](./docs/history/todo/TODO_2026-06-18.md) and [BUGS_2026-06-18.md](./docs/history/bugs/BUGS_2026-06-18.md).
 
 #### Warning
 
@@ -626,7 +626,7 @@ No new code commits. Deep scan across auth-server token issuance, role/permissio
 
 ### Bugs found
 
-See [TODO_2026-06-07.md](./todo/TODO_2026-06-07.md) and [BUGS_2026-06-07.md](./bugs/BUGS_2026-06-07.md).
+See [TODO_2026-06-07.md](./docs/history/todo/TODO_2026-06-07.md) and [BUGS_2026-06-07.md](./docs/history/bugs/BUGS_2026-06-07.md).
 
 #### Critical
 
@@ -665,7 +665,7 @@ No new code commits. Deep scan across auth-server OAuth flow, admin server actio
 
 ### Bugs found
 
-See [TODO_2026-06-06.md](./todo/TODO_2026-06-06.md) and [BUGS_2026-06-06.md](./bugs/BUGS_2026-06-06.md).
+See [TODO_2026-06-06.md](./docs/history/todo/TODO_2026-06-06.md) and [BUGS_2026-06-06.md](./docs/history/bugs/BUGS_2026-06-06.md).
 
 #### Critical
 
@@ -708,7 +708,7 @@ No new code commits. Targeted scan of the admin console client layer and compone
 
 ### Bugs found
 
-See [TODO_2026-06-05.md](./todo/TODO_2026-06-05.md) and [BUGS_2026-06-05.md](./bugs/BUGS_2026-06-05.md).
+See [TODO_2026-06-05.md](./docs/history/todo/TODO_2026-06-05.md) and [BUGS_2026-06-05.md](./docs/history/bugs/BUGS_2026-06-05.md).
 
 - **bug-0050** — `apiFetch` discards auth-server error response bodies; admin UI shows generic "API error 400" instead of actionable messages like "Email already exists."
 - **bug-0051** — `validateInvitation` includes raw invitation token in Error message strings, leaking to Sentry, error boundaries, and console.
@@ -727,7 +727,7 @@ Quiet day — no new code commits landed. One docs-only commit (`b1ff9cf`) from 
 
 ### Bugs found
 
-See [TODO_2026-06-04.md](./todo/TODO_2026-06-04.md) and [BUGS_2026-06-04.md](./bugs/BUGS_2026-06-04.md).
+See [TODO_2026-06-04.md](./docs/history/todo/TODO_2026-06-04.md) and [BUGS_2026-06-04.md](./docs/history/bugs/BUGS_2026-06-04.md).
 
 - **bug-0048** — Magic link URLs and OTP codes logged to `console.log` with no production guard; leaks authentication secrets to log aggregators.
 - **bug-0049** — JWT token lifetime hardcoded to 3600 seconds (`token.service.ts:74`); not configurable via environment variable.
@@ -789,7 +789,7 @@ OAuth2 PKCE (S256) shipped end-to-end on `docs/pkce-resource-server-design` — 
 
 ### Risky patterns / missing tests
 
-See [TODO_2026-06-03.md](./todo/TODO_2026-06-03.md) and [BUGS_2026-06-03.md](./bugs/BUGS_2026-06-03.md).
+See [TODO_2026-06-03.md](./docs/history/todo/TODO_2026-06-03.md) and [BUGS_2026-06-03.md](./docs/history/bugs/BUGS_2026-06-03.md).
 
 - **bug-0038** — JWT `permissions` → `scope` is a breaking change with no migration path or version bump.
 - **bug-0039** — In-memory authorization code storage lost on restart; blocks horizontal scaling.
@@ -845,11 +845,11 @@ User access management shipped end-to-end — 28 commits across auth-server (rol
 - **SheetContent scroll** — added `flex flex-col` to `SheetContent` so `SheetBody` scrolls correctly when content overflows. (`8ae19b3`)
 - **Profile-save error routing** — non-Error failures in user profile save now route through `t()` for i18n instead of crashing. (`7cbfc5a`)
 - **Unused i18n keys** — dropped unused `users.fields.directPermission*` keys from message bundles. (`ae9772f`)
-- **bug-0024 through bug-0032** — all 9 bugs from the 2026-06-01 review merged to master via `feat/test-coverage-campaign`. See [BUGS_2026-06-01.md](./bugs/BUGS_2026-06-01.md).
+- **bug-0024 through bug-0032** — all 9 bugs from the 2026-06-01 review merged to master via `feat/test-coverage-campaign`. See [BUGS_2026-06-01.md](./docs/history/bugs/BUGS_2026-06-01.md).
 
 ### Risky patterns / missing tests
 
-See [TODO_2026-06-02.md](./todo/TODO_2026-06-02.md) and [BUGS_2026-06-02.md](./bugs/BUGS_2026-06-02.md).
+See [TODO_2026-06-02.md](./docs/history/todo/TODO_2026-06-02.md) and [BUGS_2026-06-02.md](./docs/history/bugs/BUGS_2026-06-02.md).
 
 - **bug-0033** — Sidebar `startsWith()` matching can false-positive on overlapping route prefixes.
 - **bug-0034** — `SetUserRolesDto` / `SetUserDirectPermissionsDto` have no `@ArrayMaxSize` or empty-array guard.
@@ -913,7 +913,7 @@ Massive day — 47 commits across three workstreams: (1) full permissions and ro
 
 ### Risky patterns / missing tests
 
-See [TODO_2026-06-01.md](./todo/TODO_2026-06-01.md) and [BUGS_2026-06-01.md](./bugs/BUGS_2026-06-01.md).
+See [TODO_2026-06-01.md](./docs/history/todo/TODO_2026-06-01.md) and [BUGS_2026-06-01.md](./docs/history/bugs/BUGS_2026-06-01.md).
 
 - **bug-0024** — Missing org/tenant isolation in `PermissionsService` — all operations check `platform.permissions.manage` but never pass `targetOrgId`.
 - **bug-0025** — Missing org/tenant isolation in `RolesService` — same issue.
@@ -944,7 +944,7 @@ Light day — one critical cookie-encoding bugfix, the orgs-admin-ui feature bra
 
 ### Risky patterns / missing tests
 
-See [TODO_2026-05-31.md](./todo/TODO_2026-05-31.md) and [BUGS_2026-05-31.md](./bugs/BUGS_2026-05-31.md).
+See [TODO_2026-05-31.md](./docs/history/todo/TODO_2026-05-31.md) and [BUGS_2026-05-31.md](./docs/history/bugs/BUGS_2026-05-31.md).
 
 - **bug-0022** — `decodeURIComponent` in `parseSessionCookie` can throw `URIError` on malformed percent-encoded values (no try-catch).
 - **bug-0023** — `.claude/worktrees/agent-*` submodule references committed to git history via merge commit.

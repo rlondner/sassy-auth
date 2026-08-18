@@ -790,7 +790,7 @@ Sent emails appear at http://localhost:8025. For production, set `RESEND_API_KEY
 
 ## Known Limitations
 
-The following items are deferred to later sub-projects and are not yet production-ready. See `todo/TODO_*.md` for daily follow-up lists and `bugs/BUGS_*.md` for the full bug catalog.
+The following items are deferred to later sub-projects and are not yet production-ready. See [`docs/history/`](docs/history/) for the full bug catalog, daily follow-up lists, and the design docs behind each feature.
 
 **`redirect_uri` validation granularity.**
 By default `redirect_uri` is validated against the app's registered `url` origin (scheme + host + port), and any path under that origin is accepted. Apps that need tighter control can now set an optional `callbackUrl` on the `SaApp` row, which forces an exact `redirect_uri` match (trailing-slash tolerant). A full allowlist of multiple distinct redirect paths per app is still not supported. Partially addresses **bug-0047**.
