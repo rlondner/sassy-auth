@@ -34,6 +34,8 @@ describe('AppCreateDrawer', () => {
         name: 'X',
         url: 'https://x.example',
         callbackUrl: null,
+        twoFactorTrustDays: null,
+        requireTwoFactor: false,
       }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
