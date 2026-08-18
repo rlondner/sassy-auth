@@ -78,10 +78,10 @@ export const SEED_ADMINS: readonly SeedAdmin[] = [
  * tests that exercise the tenant-admin promotion / visibility path.
  */
 export const DEMO_TENANT_USERS = {
-  acmeAdmin:   { email: 'acme-admin@app01.io',   password: 'Pass@word1234' },
-  acmeAlice:   { email: 'acme-alice@app01.io',   password: 'Pass@word1234' },
-  acmeBob:     { email: 'acme-bob@app01.io',     password: 'Pass@word1234' },
-  globexAdmin: { email: 'globex-admin@app01.io', password: 'Pass@word1234' },
+  acmeAdmin:   { email: 'acme-admin@app01.io',   password: ADMIN_PASSWORD },
+  acmeAlice:   { email: 'acme-alice@app01.io',   password: ADMIN_PASSWORD },
+  acmeBob:     { email: 'acme-bob@app01.io',     password: ADMIN_PASSWORD },
+  globexAdmin: { email: 'globex-admin@app01.io', password: ADMIN_PASSWORD },
 } as const
 
 export type ResourceArea = 'apps' | 'orgs' | 'roles' | 'permissions' | 'users'

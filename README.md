@@ -1,8 +1,25 @@
 # SassyAuth
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Status: experimental](https://img.shields.io/badge/Status-experimental-orange.svg)](SECURITY.md)
+
 A multitenant authentication and authorization server with an admin console. Resource servers delegate all login, session, and token concerns to SassyAuth and verify the resulting RS256 JWTs independently.
 
 Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000) and `admin` (Next.js, port 3001). Three shared packages: `db` (Prisma), `types`, and `ui` (Tailwind + Radix design system).
+
+> ### ⚠️ Project status
+>
+> **Experimental — not security-audited, and not recommended for production use
+> without your own review.**
+>
+> SassyAuth handles authentication, sessions, and token issuance, where defects
+> are costly. It is published as useful and instructive work, not as a hardened
+> product: there is no 1.0, no stability guarantee, and no upgrade path promised
+> between commits.
+>
+> [**Known Limitations**](#known-limitations) is kept current and lists the gaps
+> we already know about — read it before evaluating. To report a vulnerability,
+> see [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -172,6 +189,11 @@ pnpm --filter @sassy-auth/db db:seed
 
 The seed also creates 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `p@sa.io`, `s@sa.io`), each with password `Pass@word1234`. `s@sa.io` is the super admin and is the recommended account for first sign-in.
 
+> **The default password is for local development only.** It applies when
+> `NODE_ENV` is `development` or `test`; anywhere else the seed refuses to run
+> until you set `SEED_ADMIN_PASSWORD`. Never expose a deployment seeded with the
+> default to a network you do not control.
+
 **Optional — demo resource server data.** Set `SEED_DEMO=1` to additionally create a sample app (`resourceserver01`), an org (`Citadel`), 8 `rs.*` permissions, 2 roles, and 2 demo users (`m@cpm.io`, `i@cpm.io`) used by the [FastAPI sample resource server](apps/resource-server-fastapi/README.md).
 
 **Optional — multi-tenant demo data.** Set `SEED_DEMO_MULTITENANT=1` to create a second sample app (`app01`) with two orgs (Acme, Globex), 3 users each, and org-scoped permissions (`contracts.read`, `contracts.create`, `org.users.manage`, `org.roles.manage`). Useful for testing the org-scoped admin experience.
@@ -223,6 +245,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`. Also used as the JWT `iss` claim. |
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
 | `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
+| `SEED_ADMIN_PASSWORD` | Password given to every account created by the seed scripts. Falls back to `E2E_ADMIN_PASSWORD`, then to the documented dev default `Pass@word1234`. **Required when `NODE_ENV` is anything other than `development` or `test`** — the seed throws rather than provision admins with a publicly known password. |
 
 ### Admin console
 

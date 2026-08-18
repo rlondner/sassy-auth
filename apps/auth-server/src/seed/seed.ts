@@ -3,6 +3,7 @@ import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
 import { generatePendingPublicId } from '../common/pending-public-id';
+import { resolveSeedPassword } from './seed-password';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -19,7 +20,7 @@ const PLATFORM_PERMISSIONS = [
   'org.roles.manage',
 ] as const;
 
-const ADMIN_PASSWORD = 'Pass@word1234';
+const ADMIN_PASSWORD = resolveSeedPassword();
 
 type AdminGrant =
   | { kind: 'direct'; permission: string }

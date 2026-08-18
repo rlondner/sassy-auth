@@ -2,6 +2,7 @@ import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
 import { generatePendingPublicId } from '../common/pending-public-id';
+import { resolveSeedPassword } from './seed-password';
 
 const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
@@ -53,7 +54,7 @@ const USERS = [
   },
 ] as const;
 
-const PASSWORD = 'Pass@word1234';
+const PASSWORD = resolveSeedPassword();
 
 async function ensureApp() {
   const found = await prisma.saApp.findUnique({ where: { name: APP_NAME } });
