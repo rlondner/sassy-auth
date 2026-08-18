@@ -46,6 +46,18 @@ export class RegistrationService {
       throw e;
     }
 
+    // `emailAndPassword.autoSignIn` is disabled (see auth.config.ts — a session
+    // at sign-up can never pass the session-create gate). A side effect of that
+    // flag is that BetterAuth no longer throws on a duplicate email: to avoid
+    // leaking which addresses are registered, it returns a synthetic user whose
+    // id was never written to the database. Taking that id at face value would
+    // point an SaUser at a BetterAuth user that does not exist. The catch above
+    // still handles the throwing shape, so both paths end in the same 409.
+    const persisted = await prisma.user.findUnique({ where: { id: baUserId }, select: { id: true } });
+    if (!persisted) {
+      throw new ConflictException('email already registered');
+    }
+
     // 3. Atomically create saOrg (with publicId) + saUser linked to the BA user
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];

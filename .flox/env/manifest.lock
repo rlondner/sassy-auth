@@ -24,9 +24,9 @@
       "ADMIN_URL": "http://localhost:3001",
       "AUTH_SERVER_URL": "http://localhost:3000",
       "BETTER_AUTH_URL": "http://localhost:3000",
-      "PGDATABASE": "sassyauth",
+      "PGDATABASE": "sassyauth_0.1",
       "PGHOST": "localhost",
-      "PGPORT": "5433",
+      "PGPORT": "5432",
       "PGUSER": "postgres",
       "TRUSTED_ORIGINS": "http://localhost:3001"
     },
@@ -97,35 +97,6 @@
         "out": "/nix/store/f4mq152z1j84c7aj1h6w4gwa3mwvbk3z-nodejs-26.3.0"
       },
       "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "nodejs_26",
-      "broken": false,
-      "derivation": "/nix/store/gp962mrmr1h49z2m6s8k4r0y7w7mmwm1-nodejs-26.3.0.drv",
-      "description": "Event-driven I/O framework for the V8 JavaScript engine",
-      "install_id": "nodejs",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "name": "nodejs-26.3.0",
-      "pname": "nodejs_26",
-      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "rev_count": 1017464,
-      "rev_date": "2026-06-16T02:33:49Z",
-      "scrape_date": "2026-06-17T04:13:32.480785Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "26.3.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/24psmxnybpswr7r21vrdca2lji15rfjl-nodejs-26.3.0"
-      },
-      "system": "x86_64-darwin",
       "group": "toplevel",
       "priority": 5
     },
@@ -213,35 +184,6 @@
         "out": "/nix/store/575mdxcjkv465s9p8fsib0bd7lkfzzfg-pnpm-11.5.3"
       },
       "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "pnpm",
-      "broken": false,
-      "derivation": "/nix/store/i74bp9a78j651ad5lv8yjrlfwxh6jw9s-pnpm-11.5.3.drv",
-      "description": "Fast, disk space efficient package manager for JavaScript",
-      "install_id": "pnpm",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "name": "pnpm-11.5.3",
-      "pname": "pnpm",
-      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "rev_count": 1017464,
-      "rev_date": "2026-06-16T02:33:49Z",
-      "scrape_date": "2026-06-17T04:13:47.698894Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "11.5.3",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/qgxl8idhx4wk2k906psq7250srwnr2ln-pnpm-11.5.3"
-      },
-      "system": "x86_64-darwin",
       "group": "toplevel",
       "priority": 5
     },
@@ -354,44 +296,6 @@
     {
       "attr_path": "postgresql",
       "broken": false,
-      "derivation": "/nix/store/f48lnpbd2qa77s0gj3hnd9ix1alm5qx0-postgresql-17.10.drv",
-      "description": "Powerful, open source object-relational database system",
-      "install_id": "postgresql",
-      "license": "PostgreSQL",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "name": "postgresql-17.10",
-      "pname": "postgresql",
-      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "rev_count": 1017464,
-      "rev_date": "2026-06-16T02:33:49Z",
-      "scrape_date": "2026-06-17T04:13:47.885431Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "17.10",
-      "outputs_to_install": [
-        "man",
-        "out"
-      ],
-      "outputs": {
-        "dev": "/nix/store/3f6llql2ck6q7gnnyz0ysrrwkv2gghky-postgresql-17.10-dev",
-        "doc": "/nix/store/1235f75980ib2z42isq8w00css1n4f66-postgresql-17.10-doc",
-        "jit": "/nix/store/sax9v31mpzjxngi20jwfhy32hn1d1anm-postgresql-17.10-jit",
-        "lib": "/nix/store/s3fshal7dhhmbcsm336fghkq6bzd70lq-postgresql-17.10-lib",
-        "man": "/nix/store/rg1kk7km61j8z1j6wbz3cv76zdccijp0-postgresql-17.10-man",
-        "out": "/nix/store/2d6cqkal090xcmk7vpkvh24sl3infbby-postgresql-17.10",
-        "plperl": "/nix/store/rbdah6bn3zm84inf5b5aqyshvri7d7lz-postgresql-17.10-plperl",
-        "plpython3": "/nix/store/7bli73px1dfsfy1fwsxs30yxq17kvaxs-postgresql-17.10-plpython3",
-        "pltcl": "/nix/store/s0flr58ascaiv0mlvwfgq2gmpzgy277a-postgresql-17.10-pltcl"
-      },
-      "system": "x86_64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "postgresql",
-      "broken": false,
       "derivation": "/nix/store/m4hmh7sgknl9byyq3nnww11g84354z5l-postgresql-17.10.drv",
       "description": "Powerful, open source object-relational database system",
       "install_id": "postgresql",
@@ -492,35 +396,6 @@
     {
       "attr_path": "python311",
       "broken": false,
-      "derivation": "/nix/store/a3dlsqpsnfj2127sfp7bigv86y063w30-python3-3.11.15.drv",
-      "description": "High-level dynamically-typed programming language",
-      "install_id": "python",
-      "license": "Python-2.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "name": "python3-3.11.15",
-      "pname": "python311",
-      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "rev_count": 1017464,
-      "rev_date": "2026-06-16T02:33:49Z",
-      "scrape_date": "2026-06-17T04:13:49.662339Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "python3-3.11.15",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/rkf8x15x8la8xij5zr6wkwm9fvx1c8xz-python3-3.11.15"
-      },
-      "system": "x86_64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "python311",
-      "broken": false,
       "derivation": "/nix/store/cc94n19221rv4hkrml3aq2pwy9ir595v-python3-3.11.15.drv",
       "description": "High-level dynamically-typed programming language",
       "install_id": "python",
@@ -603,35 +478,6 @@
         "out": "/nix/store/d247y1hg4d7hb38h3bnb6r503qy2ky78-uv-0.11.19"
       },
       "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "uv",
-      "broken": false,
-      "derivation": "/nix/store/krw8vs7zd628pgksi33r3m22axssx5mb-uv-0.11.19.drv",
-      "description": "Extremely fast Python package installer and resolver, written in Rust",
-      "install_id": "uv",
-      "license": "[ Apache-2.0, MIT ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "name": "uv-0.11.19",
-      "pname": "uv",
-      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
-      "rev_count": 1017464,
-      "rev_date": "2026-06-16T02:33:49Z",
-      "scrape_date": "2026-06-17T04:15:56.262354Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "0.11.19",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/285wms6br1rpnjydfl1x1qd82bvvrhc1-uv-0.11.19"
-      },
-      "system": "x86_64-darwin",
       "group": "toplevel",
       "priority": 5
     },

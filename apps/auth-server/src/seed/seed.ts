@@ -89,9 +89,27 @@ async function seedPlatformAdmin(
   platformOrgId: number,
   superAdminRoleId: number,
 ) {
+  // A BetterAuth user alone is not a seeded admin. Any run that died between
+  // sign-up and the SaUser insert — which is exactly what the session-gate
+  // deadlock used to cause — leaves a BetterAuth user with no SaUser behind.
+  // Such a user cannot sign in at all (the session gate blocks them), and
+  // treating the BetterAuth row as proof of completion made the seed skip them
+  // forever, so a re-run could never repair the database. Resume from wherever
+  // the previous run stopped instead. (Related: the bug-0161 question of which
+  // side is authoritative — here the BetterAuth user is the anchor and the
+  // SaUser is derived from it.)
   const existing = await prisma.user.findUnique({ where: { email: admin.email } });
   if (existing) {
-    console.log(`Admin already exists: ${admin.email}`);
+    const existingSaUser = await prisma.saUser.findUnique({
+      where: { betterAuthUserId: existing.id },
+      select: { id: true },
+    });
+    if (existingSaUser) {
+      console.log(`Admin already exists: ${admin.email}`);
+      return;
+    }
+    console.log(`Repairing half-created admin (no SaUser): ${admin.email}`);
+    await completeAdminSetup(admin, existing.id, platformOrgId, superAdminRoleId);
     return;
   }
 
@@ -104,6 +122,21 @@ async function seedPlatformAdmin(
   });
   const baUserId: string = result.user.id;
 
+  await completeAdminSetup(admin, baUserId, platformOrgId, superAdminRoleId);
+}
+
+/**
+ * Everything that turns a BetterAuth user into a usable platform admin: verify
+ * the email, create the linked SaUser, and apply the permission or role grant.
+ * Split out so a run that died part-way (see seedPlatformAdmin) can resume
+ * without re-running sign-up.
+ */
+async function completeAdminSetup(
+  admin: (typeof PLATFORM_ADMINS)[number],
+  baUserId: string,
+  platformOrgId: number,
+  superAdminRoleId: number,
+) {
   await prisma.user.update({
     where: { id: baUserId },
     data: { emailVerified: true },

@@ -143,6 +143,22 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+    // The session-create gate below (`databaseHooks.session.create.before` →
+    // evaluateSessionGate) refuses a session unless a matching SaUser exists
+    // and is 'active'. BetterAuth's signUpEmail auto-creates a session, but
+    // every caller in this codebase — the seed, the demo seeds, and
+    // /api/register — necessarily creates the SaUser *after* sign-up, because
+    // it needs the BetterAuth user id for the link. So the auto sign-in can
+    // never pass the gate; it can only throw FORBIDDEN and abort the caller
+    // mid-way, leaving an orphaned BetterAuth user behind. Nothing here reads
+    // the session sign-up would return, so disabling it is the fix rather than
+    // a workaround.
+    //
+    // Side effect to be aware of: with autoSignIn disabled, BetterAuth stops
+    // throwing on a duplicate email and instead returns a *synthetic*
+    // (never-persisted) user so sign-up cannot be used to enumerate accounts.
+    // RegistrationService checks for that explicitly — see its 409 path.
+    autoSignIn: false,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
     sendResetPassword: async ({ user, token }: { user: { email: string; name?: string }; token: string }) => {
       const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';

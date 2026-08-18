@@ -10,7 +10,7 @@ jest.mock('@sassy-auth/db', () => ({
     saApp: { findUnique: jest.fn() },
     saOrg: { create: jest.fn(), update: jest.fn() },
     saUser: { create: jest.fn() },
-    user: { delete: jest.fn() },
+    user: { delete: jest.fn(), findUnique: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -29,7 +29,7 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saApp: { findUnique: jest.Mock };
   saOrg: { create: jest.Mock; update: jest.Mock };
   saUser: { create: jest.Mock };
-  user: { delete: jest.Mock };
+  user: { delete: jest.Mock; findUnique: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -65,6 +65,10 @@ describe('RegistrationService', () => {
     }).compile();
     service = module.get(RegistrationService);
     jest.clearAllMocks();
+    // Default: the id signUpEmail returned really was persisted. The
+    // synthetic-duplicate cases below override this with null (see
+    // auth.config.ts autoSignIn).
+    mockPrisma.user.findUnique.mockResolvedValue({ id: baUserId });
   });
 
   describe('register', () => {
@@ -149,4 +153,52 @@ describe('RegistrationService', () => {
       await expect(service.register(baseDto)).rejects.toThrow('TX failure');
     });
   });
+
+  // With emailAndPassword.autoSignIn disabled (required by the session-create
+  // gate), BetterAuth stops throwing on a duplicate email and instead returns a
+  // *synthetic* user — an id that was never persisted — so that sign-up cannot
+  // be used to enumerate accounts. Taking that id at face value would create an
+  // SaUser pointing at a non-existent BetterAuth user.
+  describe('duplicate email under autoSignIn=false (synthetic response)', () => {
+    it('returns 409 when signUpEmail resolves with an id that is not in the database', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockSignUpEmail.mockResolvedValue({ token: null, user: { id: 'synthetic-id', email: baseDto.email } });
+      mockPrisma.user.findUnique.mockResolvedValue(null); // never persisted
+
+      await expect(service.register(baseDto)).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('does not create an org or user for a synthetic response', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockSignUpEmail.mockResolvedValue({ token: null, user: { id: 'synthetic-id', email: baseDto.email } });
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.register(baseDto)).rejects.toBeInstanceOf(ConflictException);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockPrisma.saUser.create).not.toHaveBeenCalled();
+    });
+
+    it('does not delete the pre-existing BetterAuth user when rejecting a duplicate', async () => {
+      // The compensation path must not touch the incumbent account.
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockSignUpEmail.mockResolvedValue({ token: null, user: { id: 'synthetic-id', email: baseDto.email } });
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.register(baseDto)).rejects.toBeInstanceOf(ConflictException);
+      expect(mockPrisma.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('proceeds normally when the returned id really was persisted', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockSignUpEmail.mockResolvedValue({ token: null, user: { id: baUserId, email: baseDto.email } });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: baUserId });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockPrisma.saUser.create.mockResolvedValue({ id: 1 });
+
+      await expect(service.register(baseDto)).resolves.toEqual({ ok: true, orgPublicId: finalOrgRow.publicId });
+    });
+  });
+
 });

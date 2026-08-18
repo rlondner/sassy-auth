@@ -65,3 +65,18 @@ describe('auth.config — twoFactor plugin', () => {
     expect(customRules?.['/two-factor/verify-backup-code']).toEqual({ window: 10, max: 3 });
   });
 });
+
+// bug: the session-create gate (evaluateSessionGate) refuses a session unless a
+// matching *active* SaUser exists. BetterAuth's signUpEmail auto-creates a
+// session, but every caller necessarily creates the SaUser *after* sign-up (it
+// needs the BetterAuth user id for the FK). So an auto sign-in at sign-up can
+// never pass the gate — it can only throw. Disabling it is the architectural
+// fix, not a workaround.
+describe('auth.config — emailAndPassword.autoSignIn', () => {
+  it('disables auto sign-in so sign-up never creates a gate-blocked session', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const eap = options['emailAndPassword'] as Record<string, unknown>;
+    expect(eap['autoSignIn']).toBe(false);
+  });
+});
