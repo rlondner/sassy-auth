@@ -16,18 +16,37 @@ By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 Full instructions are in the [README](README.md#getting-started). The short
 version:
 
+**With [Flox](https://flox.dev) (least setup).** `flox activate` in the project
+root provisions Node, pnpm and PostgreSQL, generates `.env.local` with an RSA
+key pair already filled in, then migrates and seeds:
+
 ```bash
-pnpm install
-docker compose -f docker-compose.dev.yml up -d      # Postgres
-pnpm --filter @sassy-auth/db exec prisma migrate dev --schema=schema.prisma
-pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
-pnpm --filter @sassy-auth/auth-server seed
-pnpm dev                                            # auth-server :3000, admin :3001
+flox activate
+pnpm dev                                     # auth-server :3000, admin :3001
 ```
 
-You will need `RSA_PRIVATE_KEY` and `RSA_PUBLIC_KEY` in your `.env` — see
-[RSA Key Pair Generation](README.md#rsa-key-pair-generation). Copy
-`.env.example` to `.env` and work from there.
+Note that Flox puts its Postgres cluster in `~/.local/share/sassy-auth/postgres`,
+which is per-user rather than per-checkout — two clones share one database.
+
+**Without Flox**, bring your own PostgreSQL 14+ and run:
+
+```bash
+pnpm install
+cp .env.example .env.local                   # config lives in .env.local, not .env
+# set DATABASE_URL, BETTER_AUTH_SECRET, and the RSA key pair in .env.local
+pnpm --filter @sassy-auth/db db:migrate
+pnpm --filter @sassy-auth/db db:generate
+pnpm --filter @sassy-auth/db db:seed
+pnpm dev
+```
+
+`RSA_PRIVATE_KEY` and `RSA_PUBLIC_KEY` are required — see
+[RSA Key Pair Generation](README.md#rsa-key-pair-generation) for the two
+`openssl` commands that produce them.
+
+`docker-compose.dev.yml` is **not** a database. It starts [Mailpit](README.md#local-email-testing-mailpit)
+for local email testing only; you still need Postgres from Flox or your own
+installation.
 
 The seed creates platform admins with a well-known development password; sign in
 as `s@sa.io`. That default only works when `NODE_ENV` is `development` or

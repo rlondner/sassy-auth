@@ -15,7 +15,12 @@ node_modules/
 .pnpm-store/
 
 # Environment variables (Never commit secrets!)
+# The trailing * matters: `.env*.local` alone does not match backup copies such
+# as `.env.local.bak-1787084941`, which is how one got committed. `.env.example`
+# is still tracked — these patterns all require `.local` in the name.
 .env*.local
+.env*.local.*
+.env*.local-*
 
 # TypeScript incremental compilation cache
 **/*.tsbuildinfo
