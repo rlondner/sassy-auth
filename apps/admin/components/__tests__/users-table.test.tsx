@@ -120,4 +120,13 @@ describe('UsersTable', () => {
     expect(dialog).toBeInTheDocument()
     expect(dialog).toHaveTextContent(/Alice Smith/)
   })
+
+  // bug-0225: the search box had only a placeholder, which is not an accessible
+  // name. (No page-size select here — this table has no pagination; see
+  // bug-0235 for the 500-row truncation that leaves in its place.)
+  it('exposes the search box with an accessible name', () => {
+    render(withIntl(<UsersTable users={mockUsers} orgs={mockOrgs} />))
+    expect(screen.getByRole('searchbox', { name: en.users.search })).toBeInTheDocument()
+  })
+
 })

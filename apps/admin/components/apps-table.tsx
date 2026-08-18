@@ -177,6 +177,10 @@ export function AppsTable({ initial }: Props) {
               <input
                 type="search"
                 placeholder={t('apps.search')}
+                // bug-0225: a placeholder is not an accessible name — it is not
+                // exposed as one consistently, and it vanishes once the user
+                // types. Name the control explicitly.
+                aria-label={t('apps.search')}
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setPage(1) }}
                 className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
@@ -253,6 +257,9 @@ function Pagination({
         <select
           value={pageSize}
           onChange={(e) => onPageSize(Number(e.target.value))}
+          // bug-0226: without a name this announced as a bare "combo box, 25"
+          // with no clue what the number governs.
+          aria-label={t('common.itemsPerPage')}
           className="rounded border border-border bg-card px-2 py-1 text-body-sm"
         >
           {[5, 10, 25, 50].map((n) => (

@@ -76,4 +76,20 @@ describe('OrgsTable', () => {
     await waitFor(() => expect(actions.listOrgsAction).toHaveBeenCalledWith({ appId: 'sq_1', page: 1, pageSize: 25 }))
     jest.useRealTimers()
   })
+
+  // bug-0225: the search box had only a placeholder. A placeholder is not an
+  // accessible name — it is not exposed as one by every browser/AT pair, and it
+  // disappears the moment the user types, so on re-focus there is no name left.
+  it('exposes the search box with an accessible name', () => {
+    render(withIntl(<OrgsTable initial={initial} apps={apps} />))
+    expect(screen.getByRole('searchbox', { name: en.orgs.search })).toBeInTheDocument()
+  })
+
+  // bug-0226: the page-size select announced as a bare "combo box, 25" with no
+  // indication of what the number governs.
+  it('exposes the page-size select with an accessible name', () => {
+    render(withIntl(<OrgsTable initial={initial} apps={apps} />))
+    expect(screen.getByRole('combobox', { name: en.common.itemsPerPage })).toBeInTheDocument()
+  })
+
 })

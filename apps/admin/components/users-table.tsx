@@ -196,6 +196,10 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
               <input
                 type="search"
                 placeholder={t('users.search')}
+                // bug-0225: a placeholder is not an accessible name — it is not
+                // exposed as one consistently, and it vanishes once the user
+                // types. Name the control explicitly.
+                aria-label={t('users.search')}
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 className="h-9 w-64 rounded-md border border-input bg-muted pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"

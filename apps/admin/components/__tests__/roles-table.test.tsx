@@ -109,4 +109,20 @@ describe('RolesTable', () => {
     render(withIntl(<RolesTable initial={initial} apps={apps} canPickApp={false} />))
     expect(screen.queryByLabelText(en.roles.filter.appLabel)).not.toBeInTheDocument()
   })
+
+  // bug-0225: the search box had only a placeholder. A placeholder is not an
+  // accessible name — it is not exposed as one by every browser/AT pair, and it
+  // disappears the moment the user types, so on re-focus there is no name left.
+  it('exposes the search box with an accessible name', () => {
+    render(withIntl(<RolesTable initial={initial} apps={apps} />))
+    expect(screen.getByRole('searchbox', { name: en.roles.search })).toBeInTheDocument()
+  })
+
+  // bug-0226: the page-size select announced as a bare "combo box, 25" with no
+  // indication of what the number governs.
+  it('exposes the page-size select with an accessible name', () => {
+    render(withIntl(<RolesTable initial={initial} apps={apps} />))
+    expect(screen.getByRole('combobox', { name: en.common.itemsPerPage })).toBeInTheDocument()
+  })
+
 })

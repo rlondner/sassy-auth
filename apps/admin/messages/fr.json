@@ -16,7 +16,8 @@
     "save": "Save",
     "edit": "Edit",
     "delete": "Delete",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "itemsPerPage": "Éléments par page"
   },
   "apps": {
     "title": "Applications",
