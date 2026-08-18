@@ -30,6 +30,7 @@
  * entire run. CI retries share the same PID (same process), so the retry
  * for any test after enroll still sees the secret written by the original run.
  */
+import type { Page } from '@playwright/test'
 import { test, expect } from '../lib/fixtures'
 import { LoginPage } from '../pages/login.page'
 import { SecurityPage } from '../pages/security.page'
@@ -68,7 +69,11 @@ const TMP_BACKUP = `/tmp/sassy-e2e-2fa-backup-${process.pid}.txt`
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: sign in with password. Navigates to /login (with optional next).
 async function doPasswordSignIn(
-  page: Parameters<Parameters<typeof test>[1]>[0]['page'],
+  // Playwright 1.62 added the `test(title, details, body)` overload, so
+  // `Parameters<typeof test>[1]` now resolves to TestDetails rather than the
+  // test body — the old derived type silently became `never`. Import Page
+  // directly; it does not depend on the overload set.
+  page: Page,
   email: string,
   password: string,
   next = '',
