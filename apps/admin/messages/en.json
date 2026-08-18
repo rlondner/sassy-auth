@@ -17,7 +17,8 @@
     "edit": "Edit",
     "delete": "Delete",
     "confirm": "Confirm",
-    "itemsPerPage": "Items per page"
+    "itemsPerPage": "Items per page",
+    "copyFailed": "Failed to copy — clipboard access denied"
   },
   "apps": {
     "title": "Applications",

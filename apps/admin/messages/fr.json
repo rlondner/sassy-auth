@@ -17,7 +17,8 @@
     "edit": "Edit",
     "delete": "Delete",
     "confirm": "Confirm",
-    "itemsPerPage": "Éléments par page"
+    "itemsPerPage": "Éléments par page",
+    "copyFailed": "Échec de la copie — accès au presse-papiers refusé"
   },
   "apps": {
     "title": "Applications",

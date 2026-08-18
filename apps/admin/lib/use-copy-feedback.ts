@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { copyToClipboard } from './clipboard'
 
@@ -27,7 +28,26 @@ import { copyToClipboard } from './clipboard'
  *     <Icon name={copiedKey === row.publicId ? 'check' : 'copy'} />
  *   </button>
  */
-export function useCopyFeedback(resetMs = 2000) {
+interface CopyFeedbackOptions {
+  /** Milliseconds before the "copied" flag clears. Defaults to 2000. */
+  resetMs?: number
+  /** Overrides the localized clipboard-failure toast. */
+  errorMessage?: string
+}
+
+export function useCopyFeedback(options: number | CopyFeedbackOptions = {}) {
+  // The hook has 14 call sites, several passing the reset delay positionally.
+  // Accept both shapes so bug-0227 does not turn into a 14-file refactor.
+  const { resetMs = 2000, errorMessage } =
+    typeof options === 'number' ? { resetMs: options, errorMessage: undefined } : options
+
+  // bug-0227: the failure toast used to be a hardcoded English string — the
+  // only user-facing text in the admin app bypassing next-intl, so French
+  // users got English. Translating inside the hook (rather than threading a
+  // `t` through every caller) means a new call site cannot forget to localize
+  // it. Safe here: this is a client hook and every caller already renders
+  // under NextIntlClientProvider.
+  const t = useTranslations()
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -50,7 +70,7 @@ export function useCopyFeedback(resetMs = 2000) {
         // they thought the click didn't register. Surface a toast so
         // they know to try again (e.g. after granting the clipboard
         // permission on their browser).
-        toast.error('Failed to copy — clipboard access denied')
+        toast.error(errorMessage ?? t('common.copyFailed'))
         return false
       }
       if (timerRef.current !== null) clearTimeout(timerRef.current)
@@ -61,7 +81,7 @@ export function useCopyFeedback(resetMs = 2000) {
       }, resetMs)
       return true
     },
-    [resetMs],
+    [resetMs, errorMessage, t],
   )
 
   return { copiedKey, copy }
