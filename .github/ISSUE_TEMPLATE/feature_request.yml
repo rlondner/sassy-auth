@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest a capability or change
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please read [Scope and expectations](https://github.com/rlondner/sassy-auth/blob/master/CONTRIBUTING.md#scope-and-expectations)
+        first. SassyAuth is a small, spare-time project, and some things are out
+        of scope regardless of merit.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that you currently cannot? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you have in mind, if you have something specific.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Including whether an existing feature nearly does this already.
+
+  - type: checkboxes
+    id: security-surface
+    attributes:
+      label: Security surface
+      description: Changes touching these areas need a design discussion before code.
+      options:
+        - label: This would change the data model, a token's contents, or an existing HTTP contract
+        - label: This would affect authentication, session handling, or permission checks
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Are you offering to implement this?
+      options:
+        - label: I would be willing to open a pull request for this

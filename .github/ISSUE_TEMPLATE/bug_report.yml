@@ -1,0 +1,71 @@
+name: Bug report
+description: Something behaves differently than documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a report.
+
+        **If this is a security vulnerability, stop and read
+        [SECURITY.md](https://github.com/rlondner/sassy-auth/blob/master/SECURITY.md)
+        instead — please report it privately.**
+
+        Please also check [Known Limitations](https://github.com/rlondner/sassy-auth#known-limitations);
+        the gap you found may already be documented.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you observed, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Seed with `pnpm --filter @sassy-auth/auth-server seed`
+        2. Sign in to the admin console as s@sa.io
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - auth-server (NestJS)
+        - admin console (Next.js)
+        - packages/db (Prisma)
+        - packages/ui
+        - sample FastAPI resource server
+        - build / CI / tooling
+        - not sure
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA
+      description: Output of `git rev-parse --short HEAD`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, package manager version, OS, and how Postgres is running.
+      placeholder: "node 20.11.0, pnpm 9.0.0, Ubuntu 24.04, Postgres 16 via docker-compose.dev.yml"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or errors
+      description: Scrub tokens, cookies, and real email addresses before pasting.
+      render: shell

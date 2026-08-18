@@ -6,7 +6,9 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start --port 3001",
-    "test": "node ../../scripts/log-test.mjs admin jest"
+    "test": "node ../../scripts/log-test.mjs admin jest",
+    "typecheck": "tsc --noEmit",
+    "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json"
   },
   "dependencies": {
     "@sassy-auth/ui": "workspace:*",

@@ -1,0 +1,56 @@
+name: typecheck
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+concurrency:
+  group: typecheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # admin and ui import @sassy-auth/db and @sassy-auth/types through their
+      # built output, so the workspace libraries must exist before tsc can
+      # resolve them. `prisma generate` is what produces the db package's types.
+      - name: Generate Prisma client
+        run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
+
+      - name: Build shared packages
+        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
+
+      # The e2e workflow already gates auth-server (and, transitively, db and
+      # types) via `nest build`. admin and ui had no type coverage in CI at all
+      # until this job.
+      #
+      # Both use tsconfig.ci.json, which excludes __tests__. The test files
+      # currently fail to typecheck for a reason unrelated to the code under
+      # test: packages/ui is missing @types/jest, apps/admin is missing
+      # @jest/globals, and two admin fixtures predate `createdAt`/`lastLoginAt`
+      # being added to the User type. Production source is clean and gated here;
+      # drop the ci configs and switch to `typecheck` once the test-side type
+      # wiring is fixed.
+      - name: Typecheck admin console (production source)
+        run: pnpm --filter @sassy-auth/admin typecheck:ci
+
+      - name: Typecheck ui package (production source)
+        run: pnpm --filter @sassy-auth/ui typecheck:ci

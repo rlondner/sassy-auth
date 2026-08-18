@@ -55,6 +55,8 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
     - [Unit tests](#unit-tests)
     - [E2E tests](#e2e-tests)
   - [Known Limitations](#known-limitations)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ---
 
@@ -812,3 +814,17 @@ Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/m
 
 **LIKE wildcard characters not escaped in search.**
 The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.
+
+---
+
+## Contributing
+
+Contributions are welcome — the items under [Known Limitations](#known-limitations) are the most useful place to start, since the reasoning is already written down.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing, and scope, and please open an issue before starting anything large. Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+**Found a security vulnerability?** Please report it privately — see [SECURITY.md](SECURITY.md).
+
+## License
+
+[Apache License 2.0](LICENSE).

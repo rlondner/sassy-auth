@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/rlondner/sassy-auth/security/advisories/new
+    about: Please report vulnerabilities privately, never as a public issue. See SECURITY.md.
+  - name: Known limitations
+    url: https://github.com/rlondner/sassy-auth#known-limitations
+    about: Gaps we already know about, with the reasoning. Check here before filing.

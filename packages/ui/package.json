@@ -14,7 +14,8 @@
   ],
   "scripts": {
     "test": "node ../../scripts/log-test.mjs ui jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
