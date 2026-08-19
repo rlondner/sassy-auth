@@ -22,10 +22,17 @@ export function resolveSeedPassword(env: SeedEnv = process.env): string {
   const explicit = env.SEED_ADMIN_PASSWORD || env.E2E_ADMIN_PASSWORD;
   if (explicit) return explicit;
 
-  const nodeEnv = env.NODE_ENV ?? 'development';
-  if (!DEV_LIKE.has(nodeEnv)) {
+  // An unset NODE_ENV is treated as unsafe, not as a synonym for
+  // "development" — defaulting the unset case to the permissive branch would
+  // mean any deployment that simply forgets to set NODE_ENV (a common gap in
+  // bare `node`/container/PaaS invocations) silently provisions every
+  // platform admin, including the super admin, with the publicly documented
+  // password. Local development declares itself via NODE_ENV=development in
+  // .env.example/.env.local; anything else must be explicit too.
+  const nodeEnv = env.NODE_ENV;
+  if (!nodeEnv || !DEV_LIKE.has(nodeEnv)) {
     throw new Error(
-      `Refusing to seed with the built-in default password while NODE_ENV=${nodeEnv}. ` +
+      `Refusing to seed with the built-in default password while NODE_ENV=${nodeEnv ?? '(unset)'}. ` +
         'Set SEED_ADMIN_PASSWORD to the password the seeded admin accounts should use.',
     );
   }

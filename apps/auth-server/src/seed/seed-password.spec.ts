@@ -19,8 +19,12 @@ describe('resolveSeedPassword', () => {
     expect(resolveSeedPassword(env)).toBe('from-e2e-var');
   });
 
-  it('returns the documented dev default when NODE_ENV is unset', () => {
-    expect(resolveSeedPassword({})).toBe(DEV_SEED_PASSWORD);
+  it('refuses the dev default when NODE_ENV is unset (bug-0261: unset must not silently mean development)', () => {
+    expect(() => resolveSeedPassword({})).toThrow(/SEED_ADMIN_PASSWORD/);
+  });
+
+  it('seeds with an unset NODE_ENV when an explicit password is supplied', () => {
+    expect(resolveSeedPassword({ SEED_ADMIN_PASSWORD: 'a-real-one' })).toBe('a-real-one');
   });
 
   it('returns the documented dev default in development', () => {
