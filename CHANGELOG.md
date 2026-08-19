@@ -45,7 +45,7 @@ Infrastructure / release prep:
 - `docs`: correct setup instructions, close a `.gitignore` gap for `.env.local.bak-*` (`a36b153`)
 - `chore`: untrack an accidentally-committed `.env.local` backup (`7a56c4e`)
 
-### New bugs found (3)
+### New bugs found (4)
 
 See [BUGS_2026-08-19.md](docs/history/bugs/BUGS_2026-08-19.md) and
 [TODO_2026-08-19.md](docs/history/todo/TODO_2026-08-19.md).
@@ -58,6 +58,12 @@ See [BUGS_2026-08-19.md](docs/history/bugs/BUGS_2026-08-19.md) and
   (added by `3b6078f`, this very batch) silently no-ops when `NODE_ENV` is unset,
   defeating its own safety check and seeding platform admins — including the super
   admin — with the public default password. Fixed in PR #337.
+- 🔴 **[bug-0262](docs/history/bugs/bug-0262.md)** (Critical) — fixing bug-0259
+  turned that same CI run into the first `admin-e2e` run to reach the real test
+  suite since 2026-07-09; it surfaced **5 failing tests** across unrelated areas
+  (2FA enforcement, multitenant scoping, OTP sign-in, RS round-trip, admin-nav,
+  roles matrix). Leading hypothesis is CI-runner resource contention, not
+  confirmed. PR #339 (investigation, no code fix yet).
 - 🟠 **[bug-0260](docs/history/bugs/bug-0260.md)** (Medium) — PR #334 is a fourth
   duplicate of the row-action-tooltip/`common.moreActions` lineage
   (bug-0254/bug-0257), and now also conflicts with `master`'s own `5e1ade4`. PR #336.
