@@ -39,9 +39,11 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
   - [RSA Key Pair Generation](#rsa-key-pair-generation)
   - [Environment Variables](#environment-variables)
     - [Required](#required)
+    - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
     - [Admin console](#admin-console)
     - [Observability (optional)](#observability-optional)
     - [Social providers (optional)](#social-providers-optional)
+    - [Email (optional)](#email-optional)
   - [Auth Flows](#auth-flows)
     - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
     - [Flow B: Direct Login](#flow-b-direct-login)
@@ -247,7 +249,14 @@ Copy the two output lines directly into your `.env.local` file.
 | `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`. Also used as the JWT `iss` claim. |
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
 | `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
-| `SEED_ADMIN_PASSWORD` | Password given to every account created by the seed scripts. Falls back to `E2E_ADMIN_PASSWORD`, then to the documented dev default `Pass@word1234`. **Required when `NODE_ENV` is anything other than `development` or `test`** — the seed throws rather than provision admins with a publicly known password. |
+| `SEED_ADMIN_PASSWORD` | Password given to every account created by the seed scripts. Falls back to `E2E_ADMIN_PASSWORD`, then to the documented dev default `Pass@word1234`. **Required when `NODE_ENV` is anything other than `development` or `test` — including when `NODE_ENV` is unset.** The seed throws rather than provision admins with a publicly known password; `.env.example` sets `NODE_ENV=development` for this reason. |
+
+### Two-Factor Authentication (2FA)
+
+| Variable                | Description                                                    |
+|-------------------------|------------------------------------------------------------------|
+| `PLATFORM_REQUIRE_2FA`  | Set to exactly `"true"` to require 2FA for all operators of the platform admin app. Default: `false`. See [Two-Factor Authentication](#two-factor-authentication-2fa-1) below. |
+| `TWO_FACTOR_TRUST_DAYS` | Days between unsolicited 2FA-enrollment prompts for a user without 2FA enabled (the dismissible `/login/two-factor-prompt` interstitial). Any missing/non-positive-integer value falls back to `14`. |
 
 ### Admin console
 
@@ -289,6 +298,22 @@ Omit the client ID and secret for any provider you do not want to enable.
 | `GITHUB_CLIENT_ID`           | GitHub OAuth client ID     |
 | `GITHUB_CLIENT_SECRET`       | GitHub OAuth client secret |
 | `SQIDS_ALPHABET`             | Custom alphabet for Sqids encoding; leave blank for default |
+
+### Email (optional)
+
+Transport is chosen by priority: `RESEND_API_KEY` > `EMAIL_SMTP_HOST` > console
+(logs the message, sends nothing — the dev/CI default). See
+[Local email testing (Mailpit)](#local-email-testing-mailpit) for the SMTP path.
+
+| Variable            | Description                                                    |
+|---------------------|------------------------------------------------------------------|
+| `EMAIL_FROM`        | From address on outgoing emails. Default: `no-reply@sassy-auth.local` |
+| `RESEND_API_KEY`    | [Resend](https://resend.com) API key. Production HTTP transport; takes precedence over SMTP when set. |
+| `EMAIL_SMTP_HOST`   | SMTP host (e.g. `localhost` for Mailpit). Unset = console transport. |
+| `EMAIL_SMTP_PORT`   | SMTP port (e.g. `1025` for Mailpit).                              |
+| `EMAIL_SMTP_SECURE` | `true` to use implicit TLS. Default: `false`.                     |
+| `EMAIL_SMTP_USER`   | SMTP auth username, if required by the provider.                  |
+| `EMAIL_SMTP_PASS`   | SMTP auth password, if required by the provider.                  |
 
 ---
 

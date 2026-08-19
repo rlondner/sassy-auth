@@ -4,6 +4,82 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-19
+
+**The 34-day `master` freeze broke.** Since the last daily review (2026-08-17),
+`master` advanced from `a78d4a7` (2026-07-15) to `7a56c4e` — 17 commits, all pushed
+**directly to `master`** by an AI coding agent ("Kanna", `claude/opus`), with no PR
+and no branch protection in place to require one. The changes are well-reasoned and
+individually tested; see [TODO_2026-08-19.md](docs/history/todo/TODO_2026-08-19.md)
+for the process concern this raises.
+
+**Note on continuity:** this entry picks up directly from the 2026-07-08 entry
+below because none of the daily-review PRs opened between 2026-07-09 and
+2026-08-17 (each documenting real findings against the then-unmoving `master`)
+ever merged — they remain open as separate, unreconciled branches. This is not a
+day-by-day account of that period; see the individual `CR_<date>.md` /
+`BUGS_<date>.md` files under [docs/history/](docs/history/) for what each of those
+reviews found at the time.
+
+### `master` unfroze — 17 commits, 2026-08-13 through 2026-08-18
+
+Bug fixes (closing previously-catalogued bugs):
+
+- **bug-0232** — Rate-limit BetterAuth credential routes at the Express layer (`bbfef27`)
+- **bug-0234, bug-0221** — Stop leaking raw server errors from user actions (`bd24b46`)
+- **bug-0214, bug-0215** — Close the remaining `directLogin` timing oracles (`deaf3df`)
+- **bug-0233** — Rebase `UsersTable` drawer selection against refreshed props (`cb6819b`)
+- **bug-0243** — Update `app-create-drawer` test expectation for the 2FA fields (`fd01eca`)
+- **bug-0220** — Sweep expired `SaOauthCode` rows every 15 minutes (`2626106`)
+- **bug-0223** — Send HSTS from the admin console in production (`9fae2e1`)
+- **bug-0227** — Localize the clipboard-failure toast (`e87f3db`)
+- **bug-0225, bug-0226** — Accessible names on table search boxes and page-size selects (`5e1ade4`)
+- **(unnumbered)** — Disable sign-up auto sign-in; it could never pass the session gate — the correct, tested version of what bug-0256 flagged three open PRs for smuggling untested (`178d003`). Also reworks seed idempotency (bears on bug-0161 — see TODO item 7).
+
+Infrastructure / release prep:
+
+- `chore(e2e)`: upgrade Playwright to 1.62.1 (`30e1fd6`)
+- `chore`: prepare repository for public release — Apache-2.0 LICENSE, SECURITY.md, experimental-status README banner, seed-password hardening (`resolveSeedPassword`, throws outside dev/test without `SEED_ADMIN_PASSWORD`) (`3b6078f`)
+- `chore`: curate internal development artifacts into `docs/history/` — `bugs/`, `todo/`, `code_reviews/` and other process docs moved under `docs/history/`, with an index and ~40 rewritten CHANGELOG links (`02261fb`)
+- `chore`: contributor scaffolding (CONTRIBUTING.md, CODE_OF_CONDUCT.md, issue/PR templates) and a new CI typecheck gate for `apps/admin` + `packages/ui` (`4b48e45`)
+- `docs`: correct setup instructions, close a `.gitignore` gap for `.env.local.bak-*` (`a36b153`)
+- `chore`: untrack an accidentally-committed `.env.local` backup (`7a56c4e`)
+
+### New bugs found (3)
+
+See [BUGS_2026-08-19.md](docs/history/bugs/BUGS_2026-08-19.md) and
+[TODO_2026-08-19.md](docs/history/todo/TODO_2026-08-19.md).
+
+- 🔴 **[bug-0259](docs/history/bugs/bug-0259.md)** (Critical) — `master`'s e2e CI has
+  been red for **34 days**, since the 2FA feature merged at `a78d4a7` — the login
+  test helper never learned to dismiss the mandatory 2FA-enrollment interstitial.
+  Fixed in PR #335 (test-harness only).
+- 🔴 **[bug-0261](docs/history/bugs/bug-0261.md)** (Critical) — `resolveSeedPassword`
+  (added by `3b6078f`, this very batch) silently no-ops when `NODE_ENV` is unset,
+  defeating its own safety check and seeding platform admins — including the super
+  admin — with the public default password. Fixed in PR #337.
+- 🟠 **[bug-0260](docs/history/bugs/bug-0260.md)** (Medium) — PR #334 is a fourth
+  duplicate of the row-action-tooltip/`common.moreActions` lineage
+  (bug-0254/bug-0257), and now also conflicts with `master`'s own `5e1ade4`. PR #336.
+
+### README fixes bundled with this review
+
+Closes long-standing **bug-0240** (filed 2026-07-20, never merged): added
+`TWO_FACTOR_TRUST_DAYS` and `PLATFORM_REQUIRE_2FA` to the README Environment
+Variables reference (the latter was previously only documented in prose) and to
+`.env.example` where missing, plus the email-transport variables
+(`EMAIL_FROM`/`EMAIL_SMTP_*`/`RESEND_API_KEY`) that were only mentioned narratively.
+
+### Unchanged prior findings
+
+All still open, living in unmerged Jules Palette PRs, unaffected by today's
+`master` changes: bug-0250 (Critical — seed 2FA-prompt suppression), bug-0251,
+bug-0252, bug-0253 (PR #316); bug-0254, bug-0255 (PR #324); bug-0256, bug-0257,
+bug-0258 (PR #328/#329). See [BUGS_2026-08-19.md](docs/history/bugs/BUGS_2026-08-19.md)
+for the reconciliation of which of these now *also* conflict with `master` itself.
+
+---
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
