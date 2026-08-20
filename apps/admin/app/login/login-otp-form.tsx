@@ -44,7 +44,9 @@ export function LoginOtpForm({ next }: { next: string }) {
   )
 
   const errKey = (e?: string) =>
-    e === 'invalidCode' || e === 'inactive' || e === 'serverUnavailable' ? t(`error.${e}`) : e
+    e === 'invalidCode' || e === 'inactive' || e === 'serverUnavailable' || e === 'tooManyRequests'
+      ? t(`error.${e}`)
+      : e
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">

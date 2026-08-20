@@ -489,6 +489,7 @@
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
       "inactive": "Ce compte a été désactivé.",
       "serverUnavailable": "Le service de connexion est indisponible. Veuillez réessayer dans un instant.",
+      "tooManyRequests": "Trop de tentatives de connexion. Veuillez patienter une minute et réessayer.",
       "invalidCode": "Code invalide ou expiré."
     }
   },
@@ -572,7 +573,8 @@
     "trustDevice": "Faire confiance à cet appareil pendant {days} jours",
     "error": {
       "invalidCode": "Code invalide ou expiré. Veuillez réessayer.",
-      "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."
+      "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment.",
+      "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer."
     }
   },
   "twoFactorPrompt": {

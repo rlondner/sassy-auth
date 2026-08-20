@@ -24,7 +24,9 @@ export function TwoFactorForm({ next, trustDays = 14 }: { next: string; trustDay
   )
 
   const errMsg = (e?: string) =>
-    e === 'invalidCode' || e === 'serverUnavailable' ? t(`error.${e}`) : (e ?? '')
+    e === 'invalidCode' || e === 'serverUnavailable' || e === 'tooManyRequests'
+      ? t(`error.${e}`)
+      : (e ?? '')
 
   // FIX 4: only show the active mode's error; toggling clears the other mode's stale error.
   const totpError = mode === 'totp' ? totpState?.error : undefined

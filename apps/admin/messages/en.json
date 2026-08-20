@@ -489,6 +489,7 @@
       "invalidCredentials": "Invalid email or password.",
       "inactive": "This account has been deactivated.",
       "serverUnavailable": "Sign-in service is unavailable. Please try again in a moment.",
+      "tooManyRequests": "Too many sign-in attempts. Please wait a minute and try again.",
       "invalidCode": "Invalid or expired code."
     }
   },
@@ -572,7 +573,8 @@
     "trustDevice": "Trust this device for {days} days",
     "error": {
       "invalidCode": "Invalid or expired code. Please try again.",
-      "serverUnavailable": "Service is unavailable. Please try again in a moment."
+      "serverUnavailable": "Service is unavailable. Please try again in a moment.",
+      "tooManyRequests": "Too many attempts. Please wait a minute and try again."
     }
   },
   "twoFactorPrompt": {

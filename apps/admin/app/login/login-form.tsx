@@ -65,7 +65,8 @@ export function LoginForm({ next }: { next: string }) {
             <p data-testid="login-error" className="text-label-md text-[var(--destructive)]">
               {state.error === 'invalidCredentials' ||
               state.error === 'inactive' ||
-              state.error === 'serverUnavailable'
+              state.error === 'serverUnavailable' ||
+              state.error === 'tooManyRequests'
                 ? t(`error.${state.error}`)
                 : state.error}
             </p>

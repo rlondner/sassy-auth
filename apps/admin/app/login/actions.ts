@@ -155,6 +155,11 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
     Sentry.addBreadcrumb({ category: 'auth', message: 'Admin login failed', level: 'warning' })
     if (res.status === 401) return { error: 'invalidCredentials' }
     if (res.status === 403) return { error: 'inactive' }
+    // Rate-limited, not wrong. The auth server applies a 10/min/IP budget to
+    // credential-bearing paths; without this branch the catch-all below told a
+    // throttled operator their password was wrong, which is both untrue and
+    // actively misleading — it invites them to retry, which extends the window.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     return { error: 'invalidCredentials' }
   }
 
@@ -283,6 +288,9 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
     Sentry.addBreadcrumb({ category: 'auth', message: 'Admin OTP login failed', level: 'warning' })
     // The session-creation gate rejects non-active users with 403 → inactive.
     if (res.status === 403) return { error: 'inactive' }
+    // Same rate-limit budget as the password path — report it as throttling
+    // rather than as a bad code.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     return { error: 'invalidCode' }
   }
 
@@ -381,6 +389,9 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
 
   if (!res.ok) {
     Sentry.addBreadcrumb({ category: 'auth', message: 'TOTP verify failed', level: 'warning' })
+    // `/two-factor` is a sensitive prefix for the auth rate limiter, so a
+    // throttled challenge must not be reported as a bad code.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     return { error: 'invalidCode' }
   }
 
