@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-20
+
+No commits landed on `master` in the last 24 hours (last commit `7a56c4e`,
+2026-08-18 21:08 UTC — see the 2026-08-19 entry below). Only new activity
+repo-wide was one Jules PR: **#340** ("Palette: Standardize loading state in
+ConfirmDialog"), reviewed clean (see [CR_2026-08-20](./docs/history/code-reviews/CR_2026-08-20.md)) — a
+behavior-preserving swap of a manual `disabled`/`'…'` pattern for the
+already-existing `loading` prop on `AlertDialogAction`/`Button`, which also
+adds `aria-busy` and keeps the accessible label. No issues found.
+
+While re-checking the [bug-0262](./docs/history/bugs/bug-0262.md) e2e-investigation hypothesis
+against existing CI logs, found that **every sampled `admin-e2e` run in the
+last 48 hours fails to upload its Playwright report/traces** with `Artifact
+storage quota has been hit` — filed as **bug-0263** (fix: [PR #341](https://github.com/rlondner/sassy-auth/pull/341),
+shortens artifact retention from 14 to 3 days).
+
+`master`'s e2e workflow is still red for the same reason as the 2026-08-19
+entry (bug-0259's fix is in PR #335, unmerged) — confirmed again on the
+latest push (`7a56c4e`, run `32186112882`).
+
+**The open-PR backlog continues to grow, not shrink.** **70 PRs are open**
+(#265–#341), the oldest from 2026-07-10 (41 days); none have merged since the
+last review. See [TODO_2026-08-20.md](./docs/history/todo/TODO_2026-08-20.md)
+for the prioritized merge list.
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).

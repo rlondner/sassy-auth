@@ -39,6 +39,7 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
   - [RSA Key Pair Generation](#rsa-key-pair-generation)
   - [Environment Variables](#environment-variables)
     - [Required](#required)
+    - [Two-factor authentication](#two-factor-authentication)
     - [Admin console](#admin-console)
     - [Observability (optional)](#observability-optional)
     - [Social providers (optional)](#social-providers-optional)
@@ -248,6 +249,13 @@ Copy the two output lines directly into your `.env.local` file.
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
 | `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
 | `SEED_ADMIN_PASSWORD` | Password given to every account created by the seed scripts. Falls back to `E2E_ADMIN_PASSWORD`, then to the documented dev default `Pass@word1234`. **Required when `NODE_ENV` is anything other than `development` or `test`** — the seed throws rather than provision admins with a publicly known password. |
+
+### Two-factor authentication
+
+| Variable                | Description                                                                                                   | Default   |
+|--------------------------|-----------------------------------------------------------------------------------------------------------------|-----------|
+| `PLATFORM_REQUIRE_2FA`   | Forces 2FA for all operators of the platform admin app (see [Two-Factor Authentication](#two-factor-authentication-2fa)). Only the exact string `"true"` enables it. | `false` (unset) |
+| `TWO_FACTOR_TRUST_DAYS`  | System-wide default for how many days a "remember this device" trust cookie lasts, and how often the optional-2FA re-prompt reappears. An individual app can override this via its `twoFactorTrustDays` field. Ignored (falls back to the default) unless it's a positive integer. | `14`      |
 
 ### Admin console
 
