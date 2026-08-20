@@ -28,13 +28,16 @@ describe('ConfirmDialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
-  it('disables the confirm button while onConfirm is pending', async () => {
+  it('disables the confirm button and sets aria-busy while onConfirm is pending', async () => {
     let resolve!: () => void
     const onConfirm = jest.fn(() => new Promise<void>((r) => { resolve = r }))
     render(<Harness onConfirm={onConfirm} />)
     const confirm = screen.getByRole('button', { name: 'Delete' })
     fireEvent.click(confirm)
-    await waitFor(() => expect(confirm).toBeDisabled())
+    await waitFor(() => {
+      expect(confirm).toBeDisabled()
+      expect(confirm).toHaveAttribute('aria-busy', 'true')
+    })
     resolve()
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
   })
