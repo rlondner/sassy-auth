@@ -31,6 +31,8 @@
  * for any test after enroll still sees the secret written by the original run.
  */
 import type { Page } from '@playwright/test'
+import { request as apiRequest } from '@playwright/test'
+import path from 'path'
 import { test, expect } from '../lib/fixtures'
 import { LoginPage } from '../pages/login.page'
 import { SecurityPage } from '../pages/security.page'
@@ -183,14 +185,30 @@ test.describe('2FA — enroll', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('2FA — challenge through authorize', () => {
-  test('password login → TOTP → authorize code issued', async ({ page, request }) => {
+  test('password login → TOTP → authorize code issued', async ({ page }) => {
     // serial mode + workers:1 guarantees enroll ran first and wrote the file.
     const secret =
       readTempFile(TMP_SECRET) ?? process.env['TWO_FACTOR_TEST_SECRET']
     // Hard-assert: enroll must have succeeded in this same run.
     expect(secret, '2FA secret must be available — enroll test must run first').toBeTruthy()
 
-    const platformApp = await fetchPlatformApp(request)
+    // fetchPlatformApp needs an authenticated caller. The other callers live in
+    // tests/authed/ and run under the chromium-super project, whose storageState
+    // makes the built-in `request` fixture authenticated. This spec runs under
+    // plain `chromium`, which has no storageState, so `request` is anonymous and
+    // /api/apps answers 401 — and serial mode then skips the rest of the file.
+    // Borrow the super-admin session the setup project wrote, as the 2FA reset
+    // path above already does, and dispose it once the lookup is done.
+    const platformApp = await (async () => {
+      const apiCtx = await apiRequest.newContext({
+        storageState: path.join(__dirname, '..', '.auth', 'super-admin.json'),
+      })
+      try {
+        return await fetchPlatformApp(apiCtx)
+      } finally {
+        await apiCtx.dispose()
+      }
+    })()
     const { authorizeUrl, redirectUri } = buildValidAuthorizeFlow(platformApp, 'tf-challenge-state')
 
     // Stub the redirect_uri so the browser doesn't 404 when the auth-server
