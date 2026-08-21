@@ -162,7 +162,7 @@ export class TokenController {
       if (saUser.status !== 'active') {
         throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
       }
-      if (saUser.org.appId !== app.id) {
+      if (!saUser.org.isPlatform && saUser.org.appId !== app.id) {
         throw new ForbiddenException(TokenErrorCode.USER_ORG_MISMATCH);
       }
 
@@ -370,7 +370,7 @@ export class TokenController {
       publicId: string;
       betterAuthUserId: string;
       status: 'active' | 'pending' | 'inactive';
-      org: { publicId: string; appId: number };
+      org: { publicId: string; appId: number; isPlatform: boolean };
       betterAuthUser: { email: string };
     };
 
@@ -483,7 +483,7 @@ export class TokenController {
     // identifier belongs to; a caller who does know it gets the same opaque
     // INVALID_CREDENTIALS as any other rejection. The specific reason is
     // recorded server-side only.
-    if (saUser.org.appId !== app.id) {
+    if (!saUser.org.isPlatform && saUser.org.appId !== app.id) {
       this.logger.getWinstonLogger().warn('Direct login failed: user org does not match app', {
         context: 'TokenController',
         identifierType: detectIdentifierType(dto.identifier),

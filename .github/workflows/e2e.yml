@@ -122,6 +122,7 @@ jobs:
         env:
           RS_APP_URL: 'http://localhost:8010'
           SEED_DEMO: '1'
+          SEED_DEMO_MULTITENANT: '1'
           APP_NAME: resourceserver01
           OUT_FILE: /tmp/sassy-e2e-rs-client-id.txt
         run: |
