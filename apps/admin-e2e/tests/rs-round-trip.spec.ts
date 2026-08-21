@@ -21,7 +21,16 @@ import { TwoFactorPage } from '../pages/two-factor.page'
 import { computeTotp } from '../lib/totp'
 
 const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
-const SUPER_EMAIL = 's@sa.io'
+
+// A user scoped to the resource server's own app, not a platform admin.
+// /api/token/oauth/authorize rejects a caller whose org belongs to a different
+// app with USER_ORG_MISMATCH (token.controller.ts:165) — there is deliberately
+// no platform-admin bypass. s@sa.io lives in the Platform org under the
+// SassyAuth app, so authorizing it against resourceserver01 could only ever
+// render "Not authorized for this application". m@cpm.io is seeded into the
+// Citadel org under resourceserver01 by demo-resource-server.ts and is the
+// account the sample's own README documents for this round-trip.
+const RS_USER_EMAIL = process.env.E2E_RS_EMAIL ?? 'm@cpm.io'
 const SUPER_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 
 // tfa@sa.io is the dedicated 2FA test account (platform.users.manage grant).
@@ -51,7 +60,7 @@ test.describe('FastAPI RS round-trip', () => {
     await page.waitForURL(/\/login/, { timeout: 20_000 })
 
     const login = new LoginPage(page)
-    await login.signIn(SUPER_EMAIL, SUPER_PASSWORD)
+    await login.signIn(RS_USER_EMAIL, SUPER_PASSWORD)
 
     await page.waitForURL(
       /(\/login\/two-factor|\/login\/two-factor-prompt|\/auth\/callback)/,
