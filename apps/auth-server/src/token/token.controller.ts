@@ -324,6 +324,8 @@ export class TokenController {
       userPublicId: saUser.publicId,
       orgPublicId: saUser.org.publicId,
       appPublicId,
+      appId: app.id,
+      scope: '',
       amr: exchangedAmr,
     });
 
@@ -553,6 +555,8 @@ export class TokenController {
       userPublicId: saUser.publicId,
       orgPublicId: saUser.org.publicId,
       appPublicId: app.publicId,
+      appId: appNumericId,
+      scope: '',
       amr,
     });
 

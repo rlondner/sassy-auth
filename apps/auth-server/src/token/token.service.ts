@@ -10,6 +10,10 @@ interface IssueJwtParams {
   userPublicId: string;
   orgPublicId: string;
   appPublicId: string;
+  /** Numeric SaApp.id of the audience, used to scope permissions (bug-0157). */
+  appId: number;
+  /** Space-delimited OIDC scopes granted for this token. '' for non-OIDC flows. */
+  scope: string;
   amr?: string[];
 }
 
@@ -28,17 +32,13 @@ export class TokenService {
     this.kid = process.env.JWT_KEY_ID ?? 'sassy-auth-1';
   }
 
-  async resolvePermissions(saUserId: number): Promise<string[]> {
+  async resolvePermissions(saUserId: number, audienceAppId: number): Promise<string[]> {
     const user = await prisma.saUser.findUnique({
       where: { id: saUserId },
       include: {
         roles: {
           include: {
-            role: {
-              include: {
-                permissions: { include: { permission: true } },
-              },
-            },
+            role: { include: { permissions: { include: { permission: true } } } },
           },
         },
         directPermissions: { include: { permission: true } },
@@ -49,23 +49,30 @@ export class TokenService {
       throw new NotFoundException(TokenErrorCode.USER_NOT_FOUND);
     }
 
+    // bug-0157: a token's permissions must describe only what its audience can
+    // act on. Mirrors the predicate in common/permissions/resolve-app-scoped-ids.ts:
+    // system permissions (org.*) deliberately cross app boundaries, everything
+    // else must belong to the audience app.
+    const inAudience = (p: { appId: number; isSystem: boolean }): boolean =>
+      p.isSystem || p.appId === audienceAppId;
+
     const names = new Set<string>();
 
     for (const ur of user.roles) {
       for (const rp of ur.role.permissions) {
-        names.add(rp.permission.name);
+        if (inAudience(rp.permission)) names.add(rp.permission.name);
       }
     }
 
     for (const up of user.directPermissions) {
-      names.add(up.permission.name);
+      if (inAudience(up.permission)) names.add(up.permission.name);
     }
 
     return Array.from(names).sort();
   }
 
   async issueJwt(params: IssueJwtParams): Promise<string> {
-    const permissions = await this.resolvePermissions(params.saUserId);
+    const permissions = await this.resolvePermissions(params.saUserId, params.appId);
     // Share normalization with the RFC 8414 discovery doc so the advertised
     // `issuer` and the JWT `iss` claim cannot diverge on a trailing slash.
     const issuer = resolveIssuer();
@@ -78,7 +85,10 @@ export class TokenService {
       iss: issuer,
       iat: now,
       exp: now + 3600,
-      scope: permissions.join(' '),
+      // OAuth `scope` means granted scopes. Effective permissions moved to
+      // their own array claim in the OIDC compatibility work.
+      scope: params.scope,
+      permissions,
       ...(params.amr && params.amr.length ? { amr: params.amr } : {}),
     };
 

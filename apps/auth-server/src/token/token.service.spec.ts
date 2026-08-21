@@ -46,15 +46,15 @@ const saUserWithPermissions = {
     {
       role: {
         permissions: [
-          { permission: { name: 'invoices.create' } },
-          { permission: { name: 'reports.read' } },
+          { permission: { name: 'invoices.create', appId: 5, isSystem: false } },
+          { permission: { name: 'reports.read', appId: 5, isSystem: false } },
         ],
       },
     },
   ],
   directPermissions: [
-    { permission: { name: 'invoices.create' } }, // duplicate — must be deduped
-    { permission: { name: 'sales.manage' } },
+    { permission: { name: 'invoices.create', appId: 5, isSystem: false } }, // duplicate — must be deduped
+    { permission: { name: 'sales.manage', appId: 5, isSystem: false } },
   ],
 };
 
@@ -75,7 +75,7 @@ describe('TokenService', () => {
     it('returns sorted, deduplicated union of role and direct permissions', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
 
-      const result = await service.resolvePermissions(1);
+      const result = await service.resolvePermissions(1, 5);
 
       expect(result).toEqual([
         'invoices.create',
@@ -87,7 +87,7 @@ describe('TokenService', () => {
     it('throws USER_NOT_FOUND when sa_user does not exist', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(null);
 
-      await expect(service.resolvePermissions(999)).rejects.toMatchObject({
+      await expect(service.resolvePermissions(999, 5)).rejects.toMatchObject({
         message: expect.stringContaining('USER_NOT_FOUND'),
       });
     });
@@ -100,13 +100,13 @@ describe('TokenService', () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
       jest.spyOn(service as any, 'resolvePermissions').mockResolvedValue([]);
 
-      const withMfa = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', amr: ['pwd', 'otp', 'mfa'] })) as jwt.JwtPayload;
+      const withMfa = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', appId: 5, scope: '', amr: ['pwd', 'otp', 'mfa'] })) as jwt.JwtPayload;
       expect(withMfa.amr).toEqual(['pwd', 'otp', 'mfa']);
 
-      const none = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', amr: [] })) as jwt.JwtPayload;
+      const none = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', appId: 5, scope: '', amr: [] })) as jwt.JwtPayload;
       expect('amr' in none).toBe(false);
 
-      const undef = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a' })) as jwt.JwtPayload;
+      const undef = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', appId: 5, scope: '' })) as jwt.JwtPayload;
       expect('amr' in undef).toBe(false);
     });
 
@@ -118,6 +118,8 @@ describe('TokenService', () => {
         userPublicId: 'usr-1',
         orgPublicId: 'org-1',
         appPublicId: 'app-1',
+        appId: 5,
+        scope: 'openid profile',
       });
 
       const decoded = jwt.verify(token, publicPem, {
@@ -129,7 +131,8 @@ describe('TokenService', () => {
       expect(decoded.org).toBe('org-1');
       expect(decoded.iss).toBe('https://auth.example.com');
       expect(typeof decoded.scope).toBe('string');
-      expect(decoded.scope).toBe('invoices.create reports.read sales.manage');
+      expect(decoded.scope).toBe('openid profile');
+      expect(decoded.permissions).toEqual(['invoices.create', 'reports.read', 'sales.manage']);
       expect(decoded.exp! - decoded.iat!).toBe(3600);
 
       // The JWT header must carry the env-configured `kid` so JWKS-based
@@ -138,6 +141,82 @@ describe('TokenService', () => {
         header: { alg: string; kid?: string };
       };
       expect(completed.header.kid).toBe('test-kid-1');
+    });
+  });
+
+  describe('resolvePermissions — audience filtering (bug-0157)', () => {
+    it('excludes non-system permissions belonging to another app', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue({
+        id: 1,
+        roles: [
+          { role: { permissions: [
+            { permission: { name: 'rs.properties.read', appId: 7, isSystem: false } },
+            { permission: { name: 'other.secret.read', appId: 99, isSystem: false } },
+          ] } },
+        ],
+        directPermissions: [],
+      });
+
+      const result = await service.resolvePermissions(1, 7);
+
+      expect(result).toEqual(['rs.properties.read']);
+    });
+
+    it('keeps system permissions regardless of their owning app', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue({
+        id: 1,
+        roles: [],
+        directPermissions: [
+          { permission: { name: 'org.users.manage', appId: 99, isSystem: true } },
+          { permission: { name: 'other.secret.read', appId: 99, isSystem: false } },
+        ],
+      });
+
+      const result = await service.resolvePermissions(1, 7);
+
+      expect(result).toEqual(['org.users.manage']);
+    });
+  });
+
+  describe('issueJwt — claim shape', () => {
+    beforeEach(() => {
+      mockPrisma.saUser.findUnique.mockResolvedValue({
+        id: 1,
+        roles: [],
+        directPermissions: [
+          { permission: { name: 'rs.properties.read', appId: 7, isSystem: false } },
+        ],
+      });
+    });
+
+    it('puts granted scopes in `scope` and permissions in a `permissions` array', async () => {
+      const token = await service.issueJwt({
+        saUserId: 1,
+        userPublicId: 'u_1',
+        orgPublicId: 'o_1',
+        appPublicId: 'a_7',
+        appId: 7,
+        scope: 'openid profile',
+      });
+
+      const decoded = jwt.decode(token) as Record<string, unknown>;
+      expect(decoded.scope).toBe('openid profile');
+      expect(decoded.permissions).toEqual(['rs.properties.read']);
+    });
+
+    it('emits an empty scope string when no scopes were granted', async () => {
+      const token = await service.issueJwt({
+        saUserId: 1,
+        userPublicId: 'u_1',
+        orgPublicId: 'o_1',
+        appPublicId: 'a_7',
+        appId: 7,
+        scope: '',
+      });
+
+      const decoded = jwt.decode(token) as Record<string, unknown>;
+      expect(decoded.scope).toBe('');
+      expect(decoded.permissions).toEqual(['rs.properties.read']);
     });
   });
 
