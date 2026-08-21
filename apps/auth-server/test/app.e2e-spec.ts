@@ -170,6 +170,7 @@ describe('SassyAuth E2E', () => {
       expect(decoded.aud).toBe(platformAppPublicId);
       expect(decoded.iss).toBe('http://localhost:3000');
       expect(typeof decoded.scope).toBe('string');
+      expect(Array.isArray(decoded.permissions)).toBe(true);
     });
 
     it('returns 401 for wrong password', async () => {
@@ -283,12 +284,13 @@ describe('SassyAuth E2E', () => {
           .expect(201);
         expect(tokenRes.body.access_token).toBeTruthy();
 
-        // 5. Verify the JWT carries `scope` (string) and not `permissions`.
+        // 5. Verify the JWT carries `scope` (string, granted OIDC scopes) and
+        // `permissions` (array, effective permissions for the audience app).
         const decoded = jwt.verify(tokenRes.body.access_token, publicPem, {
           algorithms: ['RS256'],
         }) as Record<string, unknown>;
         expect(typeof decoded.scope).toBe('string');
-        expect('permissions' in decoded).toBe(false);
+        expect(Array.isArray(decoded.permissions)).toBe(true);
 
         // 6. The JWT header `kid` must match the JWKS key — JWKS-based
         // verifiers (e.g. FastAPI's PyJWKClient) look up the signing key by
