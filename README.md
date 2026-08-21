@@ -32,6 +32,33 @@ So SassyAuth is deliberately built around a different set of defaults:
 
 **Be clear-eyed about the trade.** Self-hosting means you carry the operational and security burden that a vendor would otherwise carry for you: patching, uptime, key rotation, and the consequences of getting it wrong. That is the actual price, and it is not zero. It is also why the status below matters, and why the [Known Limitations](#known-limitations) list is kept honest rather than short.
 
+## Permissions that reach the API, not just the UI
+
+Users now expect software that is personalized and feature-rich, and agentic features raise that bar again. That expectation has a structural cost: products grow tiers, plans, and personas, and each one sees a different subset of the application. What began as "logged in or not" becomes a matrix of who may see which screen and who may call which endpoint.
+
+Most of that complexity is usually handled twice — once in the frontend to decide what to render, and again in the backend to decide what to allow — from two different sources of truth that drift apart. The drift is rarely visible, because the UI hides the button that the API would have refused anyway. It becomes visible the first time something calls the API without going through the UI at all.
+
+**Which is exactly what agents do.** When a copilot, a background worker, or an MCP client acts on a user's behalf, it holds their token and calls your endpoints directly. There is no screen to hide a control on. Permission checks that live only in the frontend stop being a weak layer and start being no layer.
+
+SassyAuth carries the user's effective permissions in the token itself:
+
+```json
+{
+  "sub": "UkLW",
+  "aud": "qp31",
+  "org": "Xm4T",
+  "iss": "https://auth.example.com",
+  "scope": "reports.read reports.export billing.read",
+  "amr": ["pwd", "mfa"]
+}
+```
+
+(`sub`, `aud`, and `org` are Sqid public IDs; `iat` and `exp` omitted here for brevity.)
+
+One RS256 JWT, verified against a JWKS endpoint, answers both questions from the same source: your API rejects the call, and your UI hides the control, using the same `scope` claim. No second round-trip to an authorization service on every request, and no permission table duplicated into your frontend.
+
+> **Where this is honest today:** `scope` currently carries every permission the user holds, not only those belonging to the token's audience app. It is a superset, so an API that checks for the exact permission names it owns is correct — but a UI that renders from the raw claim will show entries meant for other apps. See [Known Limitations](#known-limitations) for the detail and the intended fix.
+
 > ### ⚠️ Project status
 >
 > **Experimental — not security-audited, and not recommended for production use
@@ -111,11 +138,17 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 | **Auth0 / Clerk / WorkOS** | Hosted, supported, and someone else's operational problem — a real advantage, and worth paying for if identity is not where you want to spend your attention. The trade is cost that scales with your user count, multitenant features that commonly sit in higher tiers, and a migration you would rather not have to do later. SassyAuth is yours to host and yours to patch: no per-MAU pricing, no data leaving your database, and no tier gating organisations or roles. |
 | **BetterAuth on its own** | BetterAuth is the session and credential layer *inside* SassyAuth. Use it directly for a single app. SassyAuth adds the multitenant model (apps ↔ orgs ↔ users), the permission/role system, RS256 JWT issuance for external resource servers, and the admin console on top. |
 
+## The name
+
+**Sassy** is a light pun on **SaaS** — as in SaaS Authentication and Authorization, which is what it is for. No deeper meaning, and no relation to anything else called Sassy.
+
 ---
 
 ## Table of Contents
 
 - [Who it's for](#who-its-for)
+- [Permissions that reach the API, not just the UI](#permissions-that-reach-the-api-not-just-the-ui)
+- [The name](#the-name)
 - [Screenshots](#screenshots)
 - [Quick Start](#quick-start)
 - [What SassyAuth is not](#what-sassyauth-is-not)
