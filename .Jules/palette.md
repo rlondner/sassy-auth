@@ -1,0 +1,3 @@
+## 2026-08-21 - Delete Modal Error Accessibility & Visual Feedback
+**Learning:** Adding `role="alert"` and `aria-live="assertive"` to inline error messages in deletion dialogs ensures screen readers immediately announce failure messages upon async rejection without requiring manual focus redirection. Adding an `AlertCircle` icon with `aria-hidden="true"` improves visual distinction without causing redundant text output for assistive tools.
+**Action:** Always include `role="alert"`, `aria-live="assertive"`, and `aria-hidden="true"` on decorative alert icons when rendering conditional error callouts in modal or dialog components.

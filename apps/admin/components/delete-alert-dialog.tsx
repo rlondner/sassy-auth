@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { AlertCircle } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -47,8 +48,13 @@ export function DeleteAlertDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error && (
-          <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
-            {error}
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="flex items-center gap-2 rounded border border-destructive/40 bg-destructive/5 p-2.5 text-sm text-destructive"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{error}</span>
           </div>
         )}
         <AlertDialogFooter>
