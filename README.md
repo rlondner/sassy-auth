@@ -806,8 +806,26 @@ A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright test
 **`deleteUser` does not remove BetterAuth identity.**
 Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
 
-**JWT `scope` claim returns all user permissions, not app-scoped.**
-The JWT includes all of the user's permissions (including `platform.*` ones), not just those relevant to the requesting app. Resource servers receive scope entries they cannot act on. Tracked as **bug-0157**.
+**JWT `scope` claim lists every permission the user holds, not just the ones for the app the token was issued to.**
+
+When a token is issued, `resolvePermissions()` collects the union of every permission the user has — from all their roles and all their direct grants — with no filter on which app those permissions belong to. That union becomes the `scope` claim, even though `aud` is set to the single app that requested the token.
+
+So a token minted for app A also spells out what the user can do in app B, app C, and — for a platform admin — every `platform.*` capability they hold.
+
+**Why this matters.** The impact is *disclosure*, not privilege escalation. A JWT is signed, not encrypted: anyone who holds one can base64-decode it and read the claim. That includes the operator of the resource server the token was sent to, plus anywhere the token subsequently lands — logs, browser storage, proxies, error reports. If app B is run by a different team or a third party, this hands them an inventory of that user's access everywhere else.
+
+Two things limit the blast radius today, and it is worth being precise about them rather than assuming the worst:
+
+- `aud` is set to the requesting app's `publicId`, and a resource server that validates it (the [sample FastAPI server](apps/resource-server-fastapi/README.md) does) will reject a token minted for someone else.
+- Permission names are globally unique (`name String @unique` on `SaPermission`), so two apps cannot both define `reports.read`. A resource server checking for *its own* permission names cannot be fooled into matching a grant that belongs to another app.
+
+The residual risk is a resource server that decides on patterns rather than exact names — `scope.includes('admin')`, or anything keying off the `platform.` prefix — since those will match entries the app has no business acting on. Nothing in this repository authorizes off this claim: the management API resolves permissions from the database against the caller's session.
+
+There is also a plain size cost. A platform super admin's token carries every permission in the system, and that travels on every request to the resource server.
+
+**If you are writing a resource server against SassyAuth today:** validate `aud`, and match on exact permission names you own. Do not treat the presence of an entry as proof it was granted for you.
+
+The fix is to filter by the requesting app when resolving permissions, so `scope` describes only what the audience can act on. Tracked as **bug-0157**.
 
 **Rate limiting uses in-memory store.**
 Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/min/IP on auth endpoints, 10 requests/hour/IP on registration). BetterAuth's routes are mounted on Express ahead of NestJS, so the Nest guard never sees them; they are covered separately by the Express-level limiter in `apps/auth-server/src/auth/auth-rate-limit.ts` (same 10/min/IP budget, credential-bearing paths only — `get-session` and `sign-out` are exempt). See **bug-0232**. Both limiters keep counters in-process, so in a horizontally-scaled deployment each instance maintains its own. For consistent enforcement across pods, replace both with a shared Redis backend.
