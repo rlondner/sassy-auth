@@ -52,6 +52,21 @@ const USERS = [
     lastName: 'Inspector',
     role: ROLE_INSPECTORS,
   },
+  // Dedicated 2FA account, mirroring why tfa@sa.io exists for the platform app:
+  // enrolling any of the other demo users would leave them enrolled for every
+  // later spec in the same run, and the e2e suite signs in as m@cpm.io expecting
+  // no TOTP challenge. Kept in this org because /api/token/oauth/authorize
+  // refuses a caller whose org belongs to a different app, so the 2FA
+  // round-trip needs an enrolled user scoped to *this* app.
+  //
+  // Property Managers so its JWT carries rs.properties.create — the amr test
+  // asserts on the token it gets back, not just on reaching the callback.
+  {
+    email: 'tfa@cpm.io',
+    firstName: 'Citadel',
+    lastName: 'TwoFactor',
+    role: ROLE_PROPERTY_MANAGERS,
+  },
 ] as const;
 
 const PASSWORD = resolveSeedPassword();

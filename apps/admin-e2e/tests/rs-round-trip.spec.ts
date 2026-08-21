@@ -33,10 +33,12 @@ const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
 const RS_USER_EMAIL = process.env.E2E_RS_EMAIL ?? 'm@cpm.io'
 const SUPER_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 
-// tfa@sa.io is the dedicated 2FA test account (platform.users.manage grant).
-// Used for the 2FA RS round-trip test so that a@sa.io (seeded matrix admin)
-// is never enrolled and the matrix tests stay clean.
-const TFA_EMAIL = process.env.E2E_TFA_EMAIL ?? 'tfa@sa.io'
+// Dedicated 2FA account, for the same reason tfa@sa.io exists on the platform
+// side: enrolling a demo user would leave it enrolled for every later spec, and
+// the password round-trip above signs in as m@cpm.io expecting no challenge.
+// It must also be scoped to the RS app — authorize refuses a caller whose org
+// belongs to a different app — so this is the Citadel one, not tfa@sa.io.
+const TFA_EMAIL = process.env.E2E_RS_TFA_EMAIL ?? 'tfa@cpm.io'
 const TFA_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 
 function rsIsConfigured(): boolean {
@@ -74,10 +76,11 @@ test.describe('FastAPI RS round-trip', () => {
       await page.getByRole('button', { name: /skip/i }).click()
       await page.waitForURL(/\/auth\/callback/, { timeout: 20_000 })
     } else if (/\/login\/two-factor(\?|$)/.test(page.url())) {
-      // s@sa.io is not enrolled in 2FA at rs-round-trip time (two-factor.spec.ts
-      // runs later alphabetically). If we hit the actual challenge something
-      // unexpected changed; skip rather than fail with a confusing error.
-      test.skip(true, '2FA challenge unexpectedly presented for s@sa.io (baseline test).')
+      // The baseline account is never enrolled — the 2FA tests use the separate
+      // tfa@cpm.io account precisely so this one stays unenrolled. If we hit the
+      // actual challenge something unexpected changed; skip rather than fail with
+      // a confusing error.
+      test.skip(true, `2FA challenge unexpectedly presented for ${RS_USER_EMAIL} (baseline test).`)
       return
     }
 
@@ -88,14 +91,15 @@ test.describe('FastAPI RS round-trip', () => {
   })
 
   test('RS round-trip with 2FA enrolled — TOTP challenge → "Signed in"', async ({ page }) => {
-    // ── Phase 1: enroll tfa@sa.io in 2FA (self-contained; no /tmp dependency) ──
+    // ── Phase 1: enroll tfa@cpm.io in 2FA (self-contained; no /tmp dependency) ──
     //
-    // tfa@sa.io is the dedicated 2FA test account (platform.users.manage grant).
-    // It is used here instead of a@sa.io so that the seeded matrix admin (a@sa.io)
-    // is never enrolled and the matrix tests remain clean.
+    // tfa@cpm.io is the dedicated 2FA test account in the Citadel org, holding
+    // the Property Managers role so its JWT carries rs.properties.create. It is
+    // used here instead of m@cpm.io so the baseline round-trip above keeps an
+    // unenrolled account to sign in with.
     const login = new LoginPage(page)
 
-    // Sign in as tfa@sa.io via the admin app (baseURL = ADMIN_URL).
+    // Sign in as tfa@cpm.io via the admin app (baseURL = ADMIN_URL).
     await page.goto('/login')
     await login.signIn(TFA_EMAIL, TFA_PASSWORD)
 
@@ -111,12 +115,12 @@ test.describe('FastAPI RS round-trip', () => {
       await page.getByRole('button', { name: /skip/i }).click()
       await page.waitForURL(/\/users/, { timeout: 15_000 })
     } else if (/\/login\/two-factor(\?|$)/.test(page.url())) {
-      // tfa@sa.io already has 2FA enrolled from a previous run. Reset and re-enroll
+      // tfa@cpm.io already has 2FA enrolled from a previous run. Reset and re-enroll
       // so this test is self-contained. We skip here because resetting requires a
       // super-admin session that is not available to the unauthenticated chromium
-      // project. The dedicated tfa@sa.io account means this only affects retries
+      // project. The dedicated tfa@cpm.io account means this only affects retries
       // on a non-clean local DB. Document: run `pnpm db:seed` to reset.
-      test.skip(true, 'tfa@sa.io already has 2FA enrolled. Reset the DB or run the admin-reset test first.')
+      test.skip(true, 'tfa@cpm.io already has 2FA enrolled. Reset the DB or run the admin-reset test first.')
       return
     }
 
@@ -127,7 +131,7 @@ test.describe('FastAPI RS round-trip', () => {
     const { secret } = await secPage.enable(TFA_PASSWORD)
     await secPage.confirmEnable(computeTotp(secret))
 
-    // ── Phase 2: RS round-trip for tfa@sa.io WITH 2FA challenge ──
+    // ── Phase 2: RS round-trip for tfa@cpm.io WITH 2FA challenge ──
     await page.goto(`${RS_BASE_URL}/auth/login`)
     await page.waitForURL(/\/login/, { timeout: 20_000 })
 
@@ -137,7 +141,7 @@ test.describe('FastAPI RS round-trip', () => {
       { timeout: 25_000 },
     )
 
-    // tfa@sa.io is enrolled — the actual TOTP challenge must appear.
+    // tfa@cpm.io is enrolled — the actual TOTP challenge must appear.
     // Check interstitial first (more specific), then exact-match the challenge.
     if (page.url().includes('/login/two-factor-prompt')) {
       // Interstitial should not appear for an enrolled account, but handle defensively.
@@ -146,7 +150,7 @@ test.describe('FastAPI RS round-trip', () => {
     }
 
     if (!/\/login\/two-factor(\?|$)/.test(page.url())) {
-      test.skip(true, '2FA challenge was not presented after enrollment for tfa@sa.io. Unexpected state.')
+      test.skip(true, '2FA challenge was not presented after enrollment for tfa@cpm.io. Unexpected state.')
       return
     }
 

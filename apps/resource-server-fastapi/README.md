@@ -75,9 +75,10 @@ The seed creates:
 - Two roles:
   - **`Citadel Property Managers`** — granted all 8 permissions.
   - **`Citadel Inspectors`** — granted `rs.inspections.{create,read,update}` and `rs.properties.{read,update}` (no `create` / `delete`).
-- Two BetterAuth users (both with password `Pass@word1234`), each linked to a `sa_user` in the `Citadel` org:
+- Three BetterAuth users (all with password `Pass@word1234`), each linked to a `sa_user` in the `Citadel` org:
   - **`m@cpm.io`** ("Citadel Manager") — assigned the **Property Managers** role → JWT scope includes `rs.properties.create`.
   - **`i@cpm.io`** ("Citadel Inspector") — assigned the **Inspectors** role → JWT scope does **not** include `rs.properties.create`.
+  - **`tfa@cpm.io`** ("Citadel TwoFactor") — same role as `m@cpm.io`, reserved for the end-to-end suite's two-factor tests. It exists so those tests can enrol an account in TOTP without leaving one of the two accounts above enrolled for every subsequent test. Ignore it when working through this walkthrough by hand.
 
 The seed is idempotent: re-running it after the rows exist is a no-op.
 

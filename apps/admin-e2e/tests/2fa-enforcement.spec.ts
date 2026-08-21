@@ -13,7 +13,7 @@
  * skip pattern of rs-round-trip.spec.ts.
  *
  * Coverage:
- *   1. amr on RS round-trip: enrolled tfa@sa.io completes the TOTP challenge
+ *   1. amr on RS round-trip: enrolled tfa@cpm.io completes the TOTP challenge
  *      → RS /auth/callback renders authorized.html → extract the embedded JWT
  *      → assert amr contains 'mfa'. (LIVE)
  *
@@ -39,11 +39,22 @@ test.describe.configure({ mode: 'serial' })
 // ── Constants ─────────────────────────────────────────────────────────────────
 const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
 
-const TFA_EMAIL    = process.env.E2E_TFA_EMAIL    ?? 'tfa@sa.io'
+// Every test in this file authorizes against the FastAPI RS app, so the account
+// has to be scoped to *that* app: /api/token/oauth/authorize rejects a caller
+// whose org belongs to a different app (token.controller.ts:165) and has no
+// platform-admin bypass. tfa@sa.io lives in the Platform org under the SassyAuth
+// app, so it could only ever be refused here — which is what these tests were
+// doing. tfa@cpm.io is the dedicated 2FA account in the Citadel org under the RS
+// app, seeded by demo-resource-server.ts.
+//
+// Its own env var rather than E2E_TFA_EMAIL: that one names the *platform* 2FA
+// account used by two-factor.spec.ts, and the two are deliberately different
+// accounts in different orgs.
+const TFA_EMAIL    = process.env.E2E_RS_TFA_EMAIL ?? 'tfa@cpm.io'
 const TFA_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 
 // RS_CLIENT_ID is the client_id for the FastAPI RS app (set by CI seed / playwright.config.ts).
-// tfa@sa.io's org is a member of this app's tenant, so direct/login uses the same appId.
+// tfa@cpm.io's org is a member of this app's tenant, so direct/login uses the same appId.
 function rsIsConfigured(): boolean {
   return !!(process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID)
 }
@@ -82,13 +93,13 @@ test.describe('2FA enforcement — RS-dependent', () => {
     }
   })
 
-  // ── Step 0: Enroll tfa@sa.io (shared setup for tests 1 + 2) ─────────────
+  // ── Step 0: Enroll tfa@cpm.io (shared setup for tests 1 + 2) ─────────────
   //
   // This test mirrors the enroll phase from rs-round-trip.spec.ts.  It signs in
-  // as tfa@sa.io, resets 2FA if already enrolled (idempotent), navigates to
+  // as tfa@cpm.io, resets 2FA if already enrolled (idempotent), navigates to
   // /account/security, enables TOTP, and stores the base32 secret in the
   // module-level `enrolledSecret` variable for use by the subsequent tests.
-  test('enroll tfa@sa.io (shared setup for amr + direct/login tests)', async ({ page }) => {
+  test('enroll tfa@cpm.io (shared setup for amr + direct/login tests)', async ({ page }) => {
     const login = new LoginPage(page)
 
     await page.goto('/login')
@@ -104,7 +115,7 @@ test.describe('2FA enforcement — RS-dependent', () => {
       await page.getByRole('button', { name: /skip/i }).click()
       await page.waitForURL(/\/users/, { timeout: 15_000 })
     } else if (/\/login\/two-factor(\?|$)/.test(page.url())) {
-      // tfa@sa.io already enrolled from a previous run.  Reset via super-admin API.
+      // tfa@cpm.io already enrolled from a previous run.  Reset via super-admin API.
       const superCtx = await page.context().browser()!.newContext({
         storageState: '.auth/super-admin.json',
       })
@@ -152,11 +163,11 @@ test.describe('2FA enforcement — RS-dependent', () => {
 
   // ── Test 1: amr on RS round-trip ──────────────────────────────────────────
   //
-  // Performs the full RS authorize round-trip for tfa@sa.io (already enrolled
+  // Performs the full RS authorize round-trip for tfa@cpm.io (already enrolled
   // by the setup test above).  After the TOTP challenge the RS exchanges the
   // code for a JWT and renders it in authorized.html's #token-data <script>.
   // We extract the raw JWT, decode the payload, and assert amr contains 'mfa'.
-  test('RS round-trip with enrolled tfa@sa.io → JWT amr contains mfa', async ({ page }) => {
+  test('RS round-trip with enrolled tfa@cpm.io → JWT amr contains mfa', async ({ page }) => {
     expect(
       enrolledSecret,
       'enrolledSecret must be set — enroll test must run first in serial mode',
@@ -223,7 +234,7 @@ test.describe('2FA enforcement — RS-dependent', () => {
   //   - With a live computeTotp(enrolledSecret) → must return 201 and the
   //     returned access_token's amr must contain 'mfa'.
   //
-  // Uses RS_CLIENT_ID / SASSY_CLIENT_ID as the appId because tfa@sa.io's org
+  // Uses RS_CLIENT_ID / SASSY_CLIENT_ID as the appId because tfa@cpm.io's org
   // belongs to the RS app's tenant (same account used for the RS round-trip).
   test('direct/login enforces 2FA: 403 without code, 201 + mfa amr with valid code', async ({ request }) => {
     expect(
