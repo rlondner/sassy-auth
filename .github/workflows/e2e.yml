@@ -141,13 +141,18 @@ jobs:
           export RS_CLIENT_ID
           pnpm --filter @sassy-auth/admin-e2e test:e2e
 
+      # Only on failure, and only briefly. Uploading a ~15-30MB report for every
+      # run — including green ones nobody opens — is what exhausted the account's
+      # artifact storage, and a quota rejection here then failed the whole
+      # workflow even when every test had passed. A red badge caused by storage
+      # accounting is worse than having no report for a run that succeeded.
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ failure() && steps.run-e2e.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: apps/admin-e2e/playwright-report/
-          retention-days: 14
+          retention-days: 3
 
       - name: Upload test results (traces, videos, attachments)
         if: ${{ failure() && steps.run-e2e.outcome == 'failure' }}
@@ -155,4 +160,4 @@ jobs:
         with:
           name: playwright-test-results
           path: apps/admin-e2e/test-results/
-          retention-days: 14
+          retention-days: 3
