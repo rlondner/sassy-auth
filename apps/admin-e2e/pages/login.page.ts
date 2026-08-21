@@ -44,7 +44,11 @@ export class LoginPage {
 
   async fetchOtp(email: string): Promise<string> {
     const res = await this.page.request.get(
-      `${AUTH_SERVER}/test/last-otp?email=${encodeURIComponent(email)}`,
+      // The auth server mounts everything except the RFC 8414 metadata doc under
+      // the `/api` global prefix (configure-nest-app.ts), so the controller is
+      // reachable at /api/test/last-otp — as `Mapped {/api/test/last-otp, GET}`
+      // in its startup log confirms. Without the prefix this is a plain 404.
+      `${AUTH_SERVER}/api/test/last-otp?email=${encodeURIComponent(email)}`,
     )
     expect(res.ok(), 'test-only OTP endpoint should return the stored code').toBeTruthy()
     return ((await res.json()) as { otp: string }).otp
