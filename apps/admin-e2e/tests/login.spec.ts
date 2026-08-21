@@ -18,8 +18,12 @@ test.describe('Login', () => {
       .waitFor({ state: 'visible', timeout: RACE_TIMEOUT_MS })
       .then(() => 'error' as const)
       .catch(() => null)
+    // A successful sign-in on a freshly seeded database lands on the optional
+    // 2FA interstitial before the destination, so accept either here — racing
+    // only on /users would treat the prompt as "no outcome" and fall through to
+    // a bare toHaveURL failure that says nothing about why.
     const successPromise = page
-      .waitForURL(/\/users$/, { timeout: RACE_TIMEOUT_MS })
+      .waitForURL(/(\/users$|\/login\/two-factor-prompt)/, { timeout: RACE_TIMEOUT_MS })
       .then(() => 'success' as const)
       .catch(() => null)
 
@@ -32,6 +36,13 @@ test.describe('Login', () => {
         `Login flow rendered an error to the user instead of redirecting: "${renderedErrorText}". ` +
           `See attached console.log, page-errors.log, network.log, page-snapshot.html, and visible-page-text.txt for full context.`,
       )
+    }
+
+    // "Skip for now" is the path a real operator takes; it records the prompt so
+    // it does not recur. Safe to consume here — the only spec that depends on an
+    // un-prompted account (two-factor.spec.ts:388) uses o@sa.io, not s@sa.io.
+    if (page.url().includes('/login/two-factor-prompt')) {
+      await page.getByRole('button', { name: /skip for now/i }).click()
     }
 
     await expect(page).toHaveURL(/\/users$/)
