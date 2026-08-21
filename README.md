@@ -2,10 +2,15 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Status: experimental](https://img.shields.io/badge/Status-experimental-orange.svg)](SECURITY.md)
+[![e2e](https://github.com/rlondner/sassy-auth/actions/workflows/e2e.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/e2e.yml)
+[![typecheck](https://github.com/rlondner/sassy-auth/actions/workflows/typecheck.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/typecheck.yml)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 
-A multitenant authentication and authorization server with an admin console. Resource servers delegate all login, session, and token concerns to SassyAuth and verify the resulting RS256 JWTs independently.
+**A self-hosted, multitenant authentication and authorization server with a batteries-included admin console.** Your apps stop shipping their own login pages, session stores, and permission tables: they redirect to SassyAuth, receive an RS256 JWT carrying the user's org and effective permissions, and verify it independently against a JWKS endpoint.
 
-Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000) and `admin` (Next.js, port 3001). Three shared packages: `db` (Prisma), `types`, and `ui` (Tailwind + Radix design system).
+It models four things — **apps**, **orgs**, **users**, and **permissions/roles** — so one deployment can serve several products, each with its own tenants, without any of them sharing a permission namespace or an admin UI.
 
 > ### ⚠️ Project status
 >
@@ -23,40 +28,95 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
 
 ---
 
+## Screenshots
+
+The admin console (Next.js 15 + Tailwind + Radix), light and dark:
+
+| Light | Dark |
+|-------|------|
+| ![Users list, light theme](screenshots/shadcn-reskin/01-users-light.png) | ![Users list, dark theme](screenshots/shadcn-reskin/04-users-dark.png) |
+
+---
+
+## Quick Start
+
+If you have [Flox](https://flox.dev) installed, this is the whole thing — it provisions Node.js, pnpm, PostgreSQL, Python, and uv, writes a `.env.local` with freshly generated RSA keys, migrates the database, and seeds platform data:
+
+```bash
+git clone https://github.com/rlondner/sassy-auth.git
+cd sassy-auth
+flox activate
+pnpm install
+pnpm dev
+```
+
+Then open <http://localhost:3001/login> and sign in as `s@sa.io` / `Pass@word1234` (local dev default — see the [warning below](#5-seed-platform-data)).
+
+Without Flox, follow [Getting Started](#getting-started) instead.
+
+**Mint your first token**, once an app and a user exist:
+
+```bash
+curl -X POST http://localhost:3000/api/token/direct/login \
+  -H "Content-Type: application/json" \
+  -d '{"identifier":"user@example.com","password":"s3cr3t","appId":"<appPublicId>"}'
+```
+
+```json
+{ "access_token": "<RS256 JWT>", "token_type": "Bearer", "expires_in": 3600 }
+```
+
+Verify it in your resource server against `http://localhost:3000/api/token/jwks` — see [JWKS and Token Verification](#jwks-and-token-verification), or run the [FastAPI sample](#sample-resource-server-fastapi) for a complete working consumer.
+
+---
+
+## What SassyAuth is not
+
+Knowing the boundaries up front will save you an afternoon:
+
+- **Not a certified OpenID Connect provider.** It is an OAuth 2.0 authorization server (it publishes RFC 8414 metadata), but there is no `id_token`, no `/userinfo` endpoint, and no OIDC certification. Consumers read identity from the JWT's `sub` / `org` / `aud` claims, or call `/api/me`.
+- **No refresh tokens.** Access tokens live one hour and there is no refresh grant, no token introspection, and no revocation endpoint. Re-run the flow when a token expires.
+- **No SAML, LDAP, or SCIM.** Social login is limited to the providers BetterAuth supports (Google, Microsoft, Apple, GitHub).
+- **Not horizontally scalable as shipped.** Rate limiting keeps its counters in process, so each pod enforces its own budget. See [Known Limitations](#known-limitations).
+- **Not a user-facing identity product.** There is no end-user self-service portal beyond `/account/security`; the console is built for operators and tenant admins.
+- **Not audited.** See the project-status callout above.
+
+## How it compares
+
+Rough orientation, not a benchmark — pick the one whose trade-offs you want:
+
+| | Trade-off |
+|---|---|
+| **Keycloak / Ory** | Far more complete and battle-tested (full OIDC, federation, SAML). Also far more surface area to run and reason about. SassyAuth is a few thousand lines you can read in an afternoon. |
+| **Auth0 / Clerk / WorkOS** | Hosted, supported, and someone else's operational problem. SassyAuth is yours to host, with no per-MAU pricing and no data leaving your database. |
+| **BetterAuth on its own** | BetterAuth is the session and credential layer *inside* SassyAuth. Use it directly for a single app. SassyAuth adds the multitenant model (apps ↔ orgs ↔ users), the permission/role system, RS256 JWT issuance for external resource servers, and the admin console on top. |
+
+---
+
 ## Table of Contents
 
-- [SassyAuth](#sassyauth)
-  - [Table of Contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-  - [Project Structure](#project-structure)
-  - [Getting Started](#getting-started)
-    - [1. Clone and install dependencies](#1-clone-and-install-dependencies)
-    - [2. Configure environment variables](#2-configure-environment-variables)
-    - [3. Set up the database](#3-set-up-the-database)
-    - [4. Generate the Prisma client](#4-generate-the-prisma-client)
-    - [5. Seed platform data](#5-seed-platform-data)
-    - [6. Start the development servers](#6-start-the-development-servers)
-  - [RSA Key Pair Generation](#rsa-key-pair-generation)
-  - [Environment Variables](#environment-variables)
-    - [Required](#required)
-    - [Admin console](#admin-console)
-    - [Observability (optional)](#observability-optional)
-    - [Social providers (optional)](#social-providers-optional)
-  - [Auth Flows](#auth-flows)
-    - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
-    - [Flow B: Direct Login](#flow-b-direct-login)
-    - [Flow C: Invite + Accept](#flow-c-invite--accept)
-  - [JWKS and Token Verification](#jwks-and-token-verification)
-  - [API Reference](#api-reference)
-  - [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
-  - [Admin Console](#admin-console-1)
-  - [Observability](#observability)
-  - [Running Tests](#running-tests)
-    - [Unit tests](#unit-tests)
-    - [E2E tests](#e2e-tests)
-  - [Known Limitations](#known-limitations)
-  - [Contributing](#contributing)
-  - [License](#license)
+- [Screenshots](#screenshots)
+- [Quick Start](#quick-start)
+- [What SassyAuth is not](#what-sassyauth-is-not)
+- [How it compares](#how-it-compares)
+- [Prerequisites](#prerequisites)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [RSA Key Pair Generation](#rsa-key-pair-generation)
+- [Environment Variables](#environment-variables)
+- [Auth Flows](#auth-flows)
+- [JWKS and Token Verification](#jwks-and-token-verification)
+- [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
+- [API Reference](#api-reference)
+- [Self-serve Registration](#self-serve-registration-post-apiregister)
+- [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
+- [Admin Console](#admin-console)
+- [Observability](#observability)
+- [Running Tests](#running-tests)
+- [Local email testing (Mailpit)](#local-email-testing-mailpit)
+- [Known Limitations](#known-limitations)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -71,6 +131,11 @@ Built as a Turborepo + pnpm monorepo. Two apps: `auth-server` (NestJS, port 3000
 ---
 
 ## Project Structure
+
+Built as a Turborepo + pnpm monorepo. Two apps — `auth-server` (NestJS, port 3000) and `admin` (Next.js, port 3001) — plus a Python reference consumer, over three shared packages: `db` (Prisma), `types`, and `ui` (Tailwind + Radix design system).
+
+<details>
+<summary><strong>Full directory tree</strong></summary>
 
 ```
 sassy-auth/
@@ -119,6 +184,8 @@ sassy-auth/
   docs/                      # Design specs and plans
   designs/                   # Mockups
 ```
+
+</details>
 
 **Database tables:**
 
@@ -178,18 +245,17 @@ pnpm --filter @sassy-auth/db db:generate
 
 ### 5. Seed platform data
 
+```bash
+pnpm --filter @sassy-auth/db db:seed
+```
+
 The seed script is idempotent — safe to run multiple times. It creates:
 
 - The platform app (`isPlatform: true`, name "SassyAuth")
 - The platform org (`isPlatform: true`, name "Platform")
 - Platform permissions: `platform.orgs.manage`, `platform.apps.manage`, `platform.users.manage`, `platform.permissions.manage`, `platform.roles.manage`, `org.users.manage`, `org.roles.manage`
 - System permissions (`isSystem: true`): `org.users.manage`, `org.roles.manage` — these bypass app-scope checks
-
-```bash
-pnpm --filter @sassy-auth/db db:seed
-```
-
-The seed also creates 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `p@sa.io`, `s@sa.io`), each with password `Pass@word1234`. `s@sa.io` is the super admin and is the recommended account for first sign-in.
+- 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `p@sa.io`, `s@sa.io`), each with password `Pass@word1234`. `s@sa.io` is the super admin and is the recommended account for first sign-in.
 
 > **The default password is for local development only.** It applies when
 > `NODE_ENV` is `development` or `test`; anywhere else the seed refuses to run
@@ -199,8 +265,6 @@ The seed also creates 5 platform admin users (`u@sa.io`, `o@sa.io`, `a@sa.io`, `
 **Optional — demo resource server data.** Set `SEED_DEMO=1` to additionally create a sample app (`resourceserver01`), an org (`Citadel`), 8 `rs.*` permissions, 2 roles, and 2 demo users (`m@cpm.io`, `i@cpm.io`) used by the [FastAPI sample resource server](apps/resource-server-fastapi/README.md).
 
 **Optional — multi-tenant demo data.** Set `SEED_DEMO_MULTITENANT=1` to create a second sample app (`app01`) with two orgs (Acme, Globex), 3 users each, and org-scoped permissions (`contracts.read`, `contracts.create`, `org.users.manage`, `org.roles.manage`). Useful for testing the org-scoped admin experience.
-
-
 
 ### 6. Start the development servers
 
@@ -217,7 +281,7 @@ pnpm --filter @sassy-auth/auth-server dev      # port 3000
 pnpm --filter @sassy-auth/admin dev            # port 3001
 ```
 
-Open `http://localhost:3001/login` to access the admin console.
+Open <http://localhost:3001/login> to access the admin console.
 
 ---
 
@@ -249,6 +313,9 @@ Copy the two output lines directly into your `.env.local` file.
 | `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
 | `SEED_ADMIN_PASSWORD` | Password given to every account created by the seed scripts. Falls back to `E2E_ADMIN_PASSWORD`, then to the documented dev default `Pass@word1234`. **Required when `NODE_ENV` is anything other than `development` or `test`** — the seed throws rather than provision admins with a publicly known password. |
 
+<details>
+<summary><strong>Admin console, observability, and social provider variables</strong></summary>
+
 ### Admin console
 
 | Variable              | Description                                                                                |
@@ -259,6 +326,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
 | `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
 | `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
+| `PLATFORM_REQUIRE_2FA` | Set to exactly `true` to require 2FA for all platform operators. See [Two-Factor Authentication](#two-factor-authentication-2fa). Default: unset |
 
 ### Observability (optional)
 
@@ -290,33 +358,24 @@ Omit the client ID and secret for any provider you do not want to enable.
 | `GITHUB_CLIENT_SECRET`       | GitHub OAuth client secret |
 | `SQIDS_ALPHABET`             | Custom alphabet for Sqids encoding; leave blank for default |
 
+</details>
+
 ---
 
 ## Auth Flows
 
 ### Flow A: OAuth2 Authorization Code with PKCE (S256)
 
-Use this flow for third-party or external resource servers that redirect users to SassyAuth for login. PKCE is **required** — only the `S256` method is accepted and the server rejects authorize requests without a code chal
+Use this flow for third-party or external resource servers that redirect users to SassyAuth for login. PKCE is **required** — only the `S256` method is accepted, and the server rejects authorize requests that arrive without a code challenge.
 
-**Step 0 — Generate a PKCE pair (client-side)**
+**Step 1 — Generate a PKCE verifier and challenge (client-side)**
 
 ```javascript
 const crypto = require('crypto');
-const code_verifier = crypto.randomBytes(64).toString('base64url');
-const code_challenge = crypto
-  .createHash('sha256').update(code_verifier).digest('base64')
-  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-// Keep `code_verifier` server-side. Send `code_challenge` on the authorize call.
-```
 
-**Step 1 — Generate PKCE verifier and challenge**
-
-```javascript
 const verifier = crypto.randomBytes(64).toString('base64url'); // 43-128 chars
-const challenge = crypto
-  .createHash('sha256')
-  .update(verifier)
-  .digest('base64url');
+const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+// Keep `verifier` server-side. Send `challenge` on the authorize call.
 ```
 
 **Step 2 — Redirect the user to the authorization endpoint**
@@ -347,7 +406,6 @@ How the `redirect_uri` is validated depends on the app's `sa_app` row:
 
 A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_redirect_uri`. Note that registering an app whose `url` or `callbackUrl` uses `http` or a `localhost`/loopback host requires the auth server to run with `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true`; by default both must be `https` with a public host (see [Environment Variables](#environment-variables)).
 
-
 **Step 4 — Exchange the code + verifier for a JWT**
 
 ```bash
@@ -372,7 +430,8 @@ Response:
 ```
 
 > **Note:** The `redirect_uri` sent here must match the one validated at the authorize step — by origin against the app's `url`, or exactly against the app's `callbackUrl` when one is configured.
-Authorization codes are single-use and stored in the database (`SaOauthCode` table). The verifier must match the challenge sent on Step 1 byte-for-byte after S256 hashing.
+
+Authorization codes are single-use and stored in the database (`SaOauthCode` table). The verifier must match the challenge sent in Step 2 byte-for-byte after S256 hashing.
 
 ### Flow B: Direct Login
 
@@ -463,6 +522,7 @@ curl http://localhost:3000/api/token/jwks
 | `org`          | Org public ID (Sqid)                                                          |
 | `iss`          | Value of `BETTER_AUTH_URL` at issuance time                                   |
 | `scope`        | Space-separated list of effective permission names (OAuth 2.0 `scope` claim)  |
+| `amr`          | Authentication methods — see [2FA](#two-factor-authentication-2fa)             |
 | `iat`          | Issued at (Unix timestamp)                                                    |
 | `exp`          | Expiry — 1 hour after issuance                                                |
 
@@ -506,7 +566,11 @@ A Python/FastAPI example using `pyjwt[crypto]` and `PyJWKClient` is in [`apps/re
 
 Cache the JWKS document locally and refresh it only when you encounter a `kid` you do not recognise. Do not fetch it on every request.
 
-### Two-Factor Authentication (2FA)
+> ⚠️ Read the [`scope` claim limitation](#known-limitations) before you write authorization logic against it: today it lists *every* permission the user holds, not only those belonging to the token's audience.
+
+---
+
+## Two-Factor Authentication (2FA)
 
 SassyAuth supports optional two-factor authentication on a per-app basis. Users can enable 2FA for their account via the admin console (`/account/security`), and each application can require it for its users.
 
@@ -515,6 +579,7 @@ SassyAuth supports optional two-factor authentication on a per-app basis. Users 
 **Platform app enforcement:** The platform admin app (immutable via UI) requires 2FA via the `PLATFORM_REQUIRE_2FA` environment variable. Set it to exactly `"true"` to enforce 2FA for all platform operators. If enforcement locks you out, use the admin "Reset 2FA" action to recover.
 
 **JWT authentication methods:** When a JWT is issued, it includes an `amr` (Authentication Methods) claim:
+
 - `["pwd"]` — password authentication only (2FA not satisfied)
 - `["pwd","otp","mfa"]` — password + TOTP one-time password (2FA satisfied)
 
@@ -524,6 +589,8 @@ Resource servers can inspect the `amr` claim to gate sensitive operations.
 
 ## API Reference
 
+The endpoints you will use from a resource server:
+
 | Method | Path                                          | Description                                      |
 |--------|-----------------------------------------------|--------------------------------------------------|
 | GET    | `/.well-known/oauth-authorization-server`     | RFC 8414 OAuth AS metadata (issuer, endpoints, supported methods) |
@@ -532,8 +599,14 @@ Resource servers can inspect the `amr` claim to gate sensitive operations.
 | POST   | `/api/token/oauth/token`                      | Exchange authorization code for JWT              |
 | POST   | `/api/token/direct/login`                     | Direct credential login — returns JWT            |
 | GET    | `/api/me`                                     | Caller's profile: org, app context, effective permissions |
+| POST   | `/api/register`                               | **Self-serve signup** — atomically create org + user + org↔app association ([details](#self-serve-registration-post-apiregister)) |
 | ALL    | `/api/auth/*`                                 | BetterAuth: sign-up, sign-in, magic link, OTP, social login |
-| POST   | `/api/register`                               | **Self-serve signup** — atomically create org + user + org↔app association (see below) |
+
+<details>
+<summary><strong>Full management API (users, orgs, apps, roles, permissions, invitations)</strong></summary>
+
+| Method | Path                                          | Description                                      |
+|--------|-----------------------------------------------|--------------------------------------------------|
 | GET    | `/api/users`                                  | List users (filter by `orgId`, `appId`)          |
 | GET    | `/api/users/:id`                              | Get user                                         |
 | POST   | `/api/users`                                  | Create user + invitation                         |
@@ -569,6 +642,8 @@ Resource servers can inspect the `amr` claim to gate sensitive operations.
 | POST   | `/api/permissions`                            | Create permission                                |
 | PATCH  | `/api/permissions/:id`                        | Update permission name/description               |
 | DELETE | `/api/permissions/:id`                        | Delete permission (blocked if roles/users assigned) |
+
+</details>
 
 BetterAuth mounts on Express before NestJS and intercepts all `/api/auth/*` routes directly. NestJS handles all other routes.
 
@@ -630,6 +705,34 @@ A runnable Python/FastAPI sample lives at [`apps/resource-server-fastapi/`](apps
 
 The sample relies on the `SEED_DEMO=1` data (`resourceserver01` app, `Citadel` org, demo users `m@cpm.io` / `i@cpm.io`). The RS app's own README walks through both the seed-driven setup and a manual admin-UI alternative for users who want to provision everything from scratch.
 
+**Prerequisites:** Python 3.11+, pip or uv.
+
+```bash
+cd apps/resource-server-fastapi
+python -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+pip install -e ".[dev]"
+cp .env.example .env
+# Edit .env — set SASSY_CLIENT_ID to the app's publicId from the seed
+uvicorn app.main:app --port 8010 --reload
+```
+
+| Variable              | Description                                                   |
+|-----------------------|---------------------------------------------------------------|
+| `AUTH_SERVER_URL`     | SassyAuth base URL (default `http://localhost:3000`)          |
+| `ADMIN_URL`           | Admin console URL for login redirect (default `http://localhost:3001`) |
+| `SASSY_CLIENT_ID`     | `sa_app.publicId` for this resource server (from seed output) |
+| `RS_BASE_URL`         | Public URL of this server (e.g. `http://localhost:8010`)      |
+| `REDIRECT_URI`        | OAuth callback URL (e.g. `http://localhost:8010/auth/callback`) |
+
+Routes:
+
+- `/` — landing page with login button
+- `/auth/login` — initiates PKCE flow → redirects to SassyAuth
+- `/auth/callback` — receives authorization code, exchanges for JWT
+- `/api/properties` — protected endpoint; requires Bearer token with `rs.properties.read` scope
+
+Run its test suite with `pytest`.
+
 ---
 
 ## Admin Console
@@ -641,6 +744,7 @@ pnpm --filter @sassy-auth/admin dev
 ```
 
 Routes:
+
 - `/login` — credential login (proxies BetterAuth via Server Action)
 - `/accept-invite?token=...` — invitation landing
 - `/oauth-error` — OAuth error page (shown when the authorize flow fails; optionally links to `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`)
@@ -649,6 +753,7 @@ Routes:
 - `/apps` — app management
 - `/roles` — role management with inline permission assignment
 - `/permissions` — permission management with role/user detail view
+- `/account/security` — per-user 2FA enrolment
 
 All CRUD operations (create, update, delete) show success toast notifications via [Sonner](https://sonner.emilkowal.dev/). The `<Toaster />` is mounted in the root layout and respects the user's light/dark theme preference.
 
@@ -660,58 +765,15 @@ The login page supports a `next=<url>` query parameter for post-login redirect (
 
 ---
 
-## Resource Server (FastAPI)
-
-A reference resource server is at `apps/resource-server-fastapi/`. It demonstrates how a third-party application integrates with SassyAuth using OAuth2 PKCE.
-
-**Prerequisites:** Python 3.11+, pip or uv.
-
-```bash
-cd apps/resource-server-fastapi
-python -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -e ".[dev]"
-```
-
-**Configure:**
-
-```bash
-cp .env.example .env
-# Edit .env — set SASSY_CLIENT_ID to the app's publicId from the seed
-```
-
-| Variable              | Description                                                   |
-|-----------------------|---------------------------------------------------------------|
-| `AUTH_SERVER_URL`     | SassyAuth base URL (default `http://localhost:3000`)          |
-| `ADMIN_URL`           | Admin console URL for login redirect (default `http://localhost:3001`) |
-| `SASSY_CLIENT_ID`    | `sa_app.publicId` for this resource server (from seed output) |
-| `RS_BASE_URL`        | Public URL of this server (e.g. `http://localhost:8010`)      |
-| `REDIRECT_URI`       | OAuth callback URL (e.g. `http://localhost:8010/auth/callback`) |
-
-**Run:**
-
-```bash
-uvicorn app.main:app --port 8010 --reload
-```
-
-**Test:**
-
-```bash
-pytest
-```
-
-Routes:
-- `/` — landing page with login button
-- `/auth/login` — initiates PKCE flow → redirects to SassyAuth
-- `/auth/callback` — receives authorization code, exchanges for JWT
-- `/api/properties` — protected endpoint; requires Bearer token with `rs.properties.read` scope
-
----
-
 ## Observability
 
-Both apps integrate **Winston** (structured logging) and **Sentry** (error tracking).
+Both apps integrate **Winston** (structured logging) and **Sentry** (error tracking). To enable Sentry, set the `SENTRY_*` env vars (see [Observability env vars](#environment-variables)). With `SENTRY_DSN` blank, both apps skip Sentry init and continue running.
+
+<details>
+<summary><strong>How it is wired</strong></summary>
 
 **Auth server (`apps/auth-server`):**
+
 - `instrument.ts` initializes Sentry **before** Nest bootstraps so OTel auto-instrumentation can attach.
 - `LoggerService` wraps Winston with NestJS's `LoggerService` interface; console transport in all envs; dev adds a file transport.
 - `RequestIdMiddleware` propagates or generates `X-Request-Id` per request.
@@ -719,13 +781,14 @@ Both apps integrate **Winston** (structured logging) and **Sentry** (error track
 - `SentryExceptionFilter` forwards 5xx errors to Sentry; 4xx are logged but not reported.
 
 **Admin (`apps/admin`):**
+
 - `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts` — runtime SDK setup.
 - `instrumentation.ts` — Next.js instrumentation hook.
 - `app/global-error.tsx` — top-level error boundary that calls `Sentry.captureException`.
 - `app/(admin)/error.tsx` — admin route group error boundary.
 - Breadcrumbs are added on login attempts (success/failure) and on critical admin actions.
 
-To enable Sentry, set the four `SENTRY_*` env vars (see [Observability env vars](#observability-optional)). With `SENTRY_DSN` blank, both apps skip Sentry init and continue running.
+</details>
 
 > ⚠️ **Known issue (bug-0002):** invitation tokens currently appear verbatim in `RequestLoggingMiddleware` log lines (they are path segments). Do not point a production log shipper at this code until the request-URL scrubber is in place. See `BUGs.md`.
 
@@ -779,14 +842,18 @@ By default the auth-server uses a **console** email transport (logs the message,
 
 To view real emails locally, run [Mailpit](https://mailpit.axllent.org/):
 
-    docker compose -f docker-compose.dev.yml up -d
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
 
 Then in `.env.local` set:
 
-    EMAIL_SMTP_HOST=localhost
-    EMAIL_SMTP_PORT=1025
+```bash
+EMAIL_SMTP_HOST=localhost
+EMAIL_SMTP_PORT=1025
+```
 
-Sent emails appear at http://localhost:8025. For production, set `RESEND_API_KEY` instead (takes precedence over SMTP).
+Sent emails appear at <http://localhost:8025>. For production, set `RESEND_API_KEY` instead (takes precedence over SMTP).
 
 ---
 
@@ -794,25 +861,16 @@ Sent emails appear at http://localhost:8025. For production, set `RESEND_API_KEY
 
 The following items are deferred to later sub-projects and are not yet production-ready. See [`docs/history/`](docs/history/) for the full bug catalog, daily follow-up lists, and the design docs behind each feature.
 
-**`redirect_uri` validation granularity.**
-By default `redirect_uri` is validated against the app's registered `url` origin (scheme + host + port), and any path under that origin is accepted. Apps that need tighter control can now set an optional `callbackUrl` on the `SaApp` row, which forces an exact `redirect_uri` match (trailing-slash tolerant). A full allowlist of multiple distinct redirect paths per app is still not supported. Partially addresses **bug-0047**.
-
-**PKCE `code_verifier` format not validated.**
-The `code_verifier` field is checked for presence but not for RFC 7636 format (43-128 chars of unreserved characters). Tracked as **bug-0041**.
-
-**CI — no lint, single-package typecheck.**
-A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
-
-**`deleteUser` does not remove BetterAuth identity.**
-Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
-
 **JWT `scope` claim lists every permission the user holds, not just the ones for the app the token was issued to.**
 
 When a token is issued, `resolvePermissions()` collects the union of every permission the user has — from all their roles and all their direct grants — with no filter on which app those permissions belong to. That union becomes the `scope` claim, even though `aud` is set to the single app that requested the token.
 
 So a token minted for app A also spells out what the user can do in app B, app C, and — for a platform admin — every `platform.*` capability they hold.
 
-**Why this matters.** The impact is *disclosure*, not privilege escalation. A JWT is signed, not encrypted: anyone who holds one can base64-decode it and read the claim. That includes the operator of the resource server the token was sent to, plus anywhere the token subsequently lands — logs, browser storage, proxies, error reports. If app B is run by a different team or a third party, this hands them an inventory of that user's access everywhere else.
+<details>
+<summary><strong>Why this matters, and what limits the blast radius</strong></summary>
+
+The impact is *disclosure*, not privilege escalation. A JWT is signed, not encrypted: anyone who holds one can base64-decode it and read the claim. That includes the operator of the resource server the token was sent to, plus anywhere the token subsequently lands — logs, browser storage, proxies, error reports. If app B is run by a different team or a third party, this hands them an inventory of that user's access everywhere else.
 
 Two things limit the blast radius today, and it is worth being precise about them rather than assuming the worst:
 
@@ -823,15 +881,34 @@ The residual risk is a resource server that decides on patterns rather than exac
 
 There is also a plain size cost. A platform super admin's token carries every permission in the system, and that travels on every request to the resource server.
 
+</details>
+
 **If you are writing a resource server against SassyAuth today:** validate `aud`, and match on exact permission names you own. Do not treat the presence of an entry as proof it was granted for you.
 
 The fix is to filter by the requesting app when resolving permissions, so `scope` describes only what the audience can act on. Tracked as **bug-0157**.
 
+<details>
+<summary><strong>Other known gaps (redirect URIs, PKCE validation, rate limiting, CI, search, user deletion)</strong></summary>
+
+**`redirect_uri` validation granularity.**
+By default `redirect_uri` is validated against the app's registered `url` origin (scheme + host + port), and any path under that origin is accepted. Apps that need tighter control can now set an optional `callbackUrl` on the `SaApp` row, which forces an exact `redirect_uri` match (trailing-slash tolerant). A full allowlist of multiple distinct redirect paths per app is still not supported. Partially addresses **bug-0047**.
+
+**PKCE `code_verifier` format not validated.**
+The `code_verifier` field is checked for presence but not for RFC 7636 format (43-128 chars of unreserved characters). Tracked as **bug-0041**.
+
 **Rate limiting uses in-memory store.**
 Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/min/IP on auth endpoints, 10 requests/hour/IP on registration). BetterAuth's routes are mounted on Express ahead of NestJS, so the Nest guard never sees them; they are covered separately by the Express-level limiter in `apps/auth-server/src/auth/auth-rate-limit.ts` (same 10/min/IP budget, credential-bearing paths only — `get-session` and `sign-out` are exempt). See **bug-0232**. Both limiters keep counters in-process, so in a horizontally-scaled deployment each instance maintains its own. For consistent enforcement across pods, replace both with a shared Redis backend.
 
+**CI — no lint, single-package typecheck.**
+A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
+
+**`deleteUser` does not remove BetterAuth identity.**
+Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
+
 **LIKE wildcard characters not escaped in search.**
 The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.
+
+</details>
 
 ---
 
