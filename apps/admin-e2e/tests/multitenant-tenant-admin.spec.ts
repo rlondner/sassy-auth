@@ -23,6 +23,15 @@ test.describe('Tenant admin (acme-admin) sees only their own scope', () => {
     await login.goto()
     await login.signIn(DEMO_TENANT_USERS.acmeAdmin.email, DEMO_TENANT_USERS.acmeAdmin.password)
 
+    // acme-admin has never been prompted to enrol in 2FA, so the first sign-in
+    // lands on the optional interstitial rather than the destination — the same
+    // thing that broke auth-state.setup.ts. Dismiss it; "Skip for now" records
+    // the prompt so it does not recur.
+    await page.waitForURL(/(\/users$|\/login\/two-factor-prompt)/, { timeout: RACE_TIMEOUT_MS })
+    if (page.url().includes('/login/two-factor-prompt')) {
+      await page.getByRole('button', { name: /skip/i }).click()
+    }
+
     // acme-admin holds `org.users.manage`, so /users is the only nav target
     // they can reach. The default post-login redirect happens to also be
     // /users — assert we landed there.

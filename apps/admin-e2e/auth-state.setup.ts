@@ -15,9 +15,15 @@ for (const admin of SEED_ADMINS) {
     // Since d00fc82 the first sign-in on a freshly seeded database lands on the
     // optional 2FA interstitial instead of the landing page: shouldPromptTwoFactor
     // returns true whenever twoFactorPromptedAt is null, and the seed never sets
-    // it. CI seeds a new database every run, so every admin hits this. Dismiss it
-    // the way the 2FA specs already do — "Skip for now" records the prompt, so it
-    // does not reappear within TWO_FACTOR_TRUST_DAYS.
+    // it. CI seeds a new database every run, so every admin hits this.
+    //
+    // Navigate past it rather than clicking "Skip for now". Skip calls
+    // recordPrompt(), which persists twoFactorPromptedAt — shared state that
+    // two-factor.spec.ts:388 asserts on when it checks that an un-prompted admin
+    // (o@sa.io) still sees the interstitial. Setup only needs the session cookie,
+    // and that is already set before this redirect happens (forwardSessionCookie
+    // runs ahead of the prompt branch in login/actions.ts), so leaving the prompt
+    // unanswered costs nothing here.
     //
     // Allow extra time for the cold-start /login compile+hydrate on the first
     // admin; do NOT re-submit (rapid re-submits trip the auth rate limiter).
@@ -26,7 +32,7 @@ for (const admin of SEED_ADMINS) {
       { timeout: 20_000 },
     )
     if (page.url().includes('/login/two-factor-prompt')) {
-      await page.getByRole('button', { name: /skip/i }).click()
+      await page.goto('/users')
     }
     await expect(page).toHaveURL(/\/(users|apps|orgs|permissions|roles)$/, { timeout: 20_000 })
     const out = path.join(__dirname, admin.storageStatePath)
