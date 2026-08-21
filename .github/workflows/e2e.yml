@@ -80,6 +80,18 @@ jobs:
       - name: Build auth-server (typecheck gate)
         run: pnpm --filter @sassy-auth/auth-server build
 
+      # Playwright serves the admin console with `next start` (see the webServer
+      # block in playwright.config.ts), so it has to be built first. Building
+      # here rather than inside webServer keeps the build a visible, separately
+      # attributable step instead of a 120s server-start timeout.
+      #
+      # NODE_ENV is `test` for the whole job and deliberately stays that way
+      # through the build: a production build makes the admin mark session
+      # cookies `secure`, which the browser then never sends back over the
+      # plain-http localhost origin the suite uses.
+      - name: Build admin console
+        run: pnpm --filter @sassy-auth/admin build
+
       - name: Generate RSA keypair for auth-server
         run: |
           mkdir -p ./keys

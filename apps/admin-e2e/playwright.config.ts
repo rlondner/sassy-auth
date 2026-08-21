@@ -94,7 +94,22 @@ export default defineConfig({
           stderr: 'pipe',
         },
         {
-          command: 'pnpm --filter @sassy-auth/admin dev',
+          // `next start`, not `next dev`. In dev mode Next compiles each route
+          // on first hit, and that compile happens inside the 30s test timeout —
+          // which is what made whole groups of specs fail on `page.goto` or on a
+          // row-action click, differently on each run. Serving a prebuilt app
+          // took the same specs from ~32s timeouts to sub-second.
+          //
+          // The workflow builds the app in a prior step; `next start` refuses to
+          // run without .next, so a missing build fails loudly here rather than
+          // silently falling back to dev.
+          //
+          // NODE_ENV stays `test` (set at the job level) rather than production:
+          // the admin sets session cookies `secure` when NODE_ENV is production
+          // (login/actions.ts, (admin)/actions.ts) and adds HSTS, and a Secure
+          // cookie is never returned over the plain-http localhost origin the
+          // suite runs against.
+          command: 'pnpm --filter @sassy-auth/admin start',
           url: ADMIN_URL,
           reuseExistingServer: false,
           timeout: 120_000,
