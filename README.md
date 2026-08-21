@@ -12,6 +12,26 @@
 
 It models four things — **apps**, **orgs**, **users**, and **permissions/roles** — so one deployment can serve several products, each with its own tenants, without any of them sharing a permission namespace or an admin UI.
 
+## Who it's for
+
+SassyAuth is built for **solo founders and small teams shipping SaaS** who have decided that identity is one part of the stack they would rather own than rent.
+
+The hosted identity products are good, and renting is often the right call — this is not an argument that they are bad. It is an argument that the decision is worth making deliberately, because of three things that are easy to discover late:
+
+- **The price follows your growth.** Per-MAU and per-tenant pricing means the bill arrives precisely when the business starts working. The terms you sign up under are also not the terms you are guaranteed to keep; pricing pages get rewritten, free tiers get narrowed, and you find out after you are already dependent.
+- **The features multitenant SaaS actually needs tend to sit a tier up.** Organisations, SSO, and role management are common upgrade triggers — which means the moment your product grows into B2B is the moment your identity bill changes shape.
+- **Leaving is the expensive part.** Identity is among the hardest dependencies to migrate off: password hashes you may not be able to export, live sessions, social account links, and every service that trusts the current token issuer. The switching cost is what makes the pricing power real.
+
+So SassyAuth is deliberately built around a different set of defaults:
+
+- **Self-hosted, on your Postgres.** User records, credentials, and sessions stay in a database you control. Nothing leaves it.
+- **Apache-2.0, no paid tier, no per-user pricing.** There is no upgrade path to unlock organisations or roles, because they are the data model.
+- **Nothing proprietary in the contract.** Tokens are ordinary RS256 JWTs verified against a standard JWKS endpoint, and the metadata is RFC 8414. Anything that speaks OAuth 2.0 can consume them, and a resource server written against SassyAuth is not written against SassyAuth specifically.
+- **Small enough to own.** A few thousand readable lines. Owning infrastructure only beats renting it if you can actually read and fix the thing you own.
+- **Batteries included.** Login, 2FA, invitations, password reset, email OTP, org-scoped RBAC, and an admin console to run it all — so "own your identity layer" does not turn into a quarter of building screens.
+
+**Be clear-eyed about the trade.** Self-hosting means you carry the operational and security burden that a vendor would otherwise carry for you: patching, uptime, key rotation, and the consequences of getting it wrong. That is the actual price, and it is not zero. It is also why the status below matters, and why the [Known Limitations](#known-limitations) list is kept honest rather than short.
+
 > ### ⚠️ Project status
 >
 > **Experimental — not security-audited, and not recommended for production use
@@ -88,13 +108,14 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 | | Trade-off |
 |---|---|
 | **Keycloak / Ory** | Far more complete and battle-tested (full OIDC, federation, SAML). Also far more surface area to run and reason about. SassyAuth is a few thousand lines you can read in an afternoon. |
-| **Auth0 / Clerk / WorkOS** | Hosted, supported, and someone else's operational problem. SassyAuth is yours to host, with no per-MAU pricing and no data leaving your database. |
+| **Auth0 / Clerk / WorkOS** | Hosted, supported, and someone else's operational problem — a real advantage, and worth paying for if identity is not where you want to spend your attention. The trade is cost that scales with your user count, multitenant features that commonly sit in higher tiers, and a migration you would rather not have to do later. SassyAuth is yours to host and yours to patch: no per-MAU pricing, no data leaving your database, and no tier gating organisations or roles. |
 | **BetterAuth on its own** | BetterAuth is the session and credential layer *inside* SassyAuth. Use it directly for a single app. SassyAuth adds the multitenant model (apps ↔ orgs ↔ users), the permission/role system, RS256 JWT issuance for external resource servers, and the admin console on top. |
 
 ---
 
 ## Table of Contents
 
+- [Who it's for](#who-its-for)
 - [Screenshots](#screenshots)
 - [Quick Start](#quick-start)
 - [What SassyAuth is not](#what-sassyauth-is-not)
