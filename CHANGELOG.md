@@ -4,6 +4,63 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-21
+
+_This entry stacks above the 2026-08-20 entry below, which is itself still
+unmerged (PR [#342](https://github.com/rlondner/sassy-auth/pull/342)) — `master`'s
+`CHANGELOG.md` currently jumps straight from this header to 2026-07-08._
+
+**`master` finally moved again — 10 commits, all e2e/auth-flow fixes — and the
+e2e suite is genuinely green for the first time since the 34-day freeze
+broke.** Nine of the ten were pushed directly to `master` (no PR, same
+"Kanna" agent pattern as 2026-08-19); the tenth (`b5ad862`) followed the
+same convention the day before. Highlights:
+
+- **`1ec336e`/`6f3b631`/`12b940f`/`58f1dfc`/`4c3729b`** — a chain of e2e fixes
+  that finish what bug-0259's fix started: handle the `/login/two-factor-prompt`
+  interstitial in the login spec and the auth-state setup, scope the RS
+  round-trip test's user and 2FA seed data to the resource server's own org,
+  and stop the login setup from consuming the one-time 2FA prompt needed by
+  a later spec.
+- **`e253d81`** — fixes the "Trust this device" checkbox, which had no effect
+  since it shipped: the sign-in server action never forwarded the
+  `better-auth.trust_device` cookie to the auth server, so every sign-in was
+  challenged regardless of the checkbox. Deliberately forwards only that one
+  cookie, not the full jar, to avoid leaking an existing session into a
+  password sign-in.
+- **`b5ad862`** — the auth server's 10/min/IP rate limiter was previously
+  indistinguishable from bad credentials on the admin login/OTP/TOTP forms
+  (a 429 rendered as "Invalid email or password"). Now surfaces a dedicated
+  `tooManyRequests` message (en/fr) instead.
+- **`748a6a5`, `c154f18`** — e2e infra fixes (OTP test endpoint prefix,
+  serving the admin console via `next start` instead of `next dev` in CI).
+
+**Verified via `gh run view` on the latest master run (`32479175165`,
+commit `1ec336e`): `124 passed (3.7m)` — the e2e suite itself is fully
+green.** The job still reports `failure` only because the "Upload Playwright
+report" step hits `Failed to CreateArtifact: Artifact storage quota has been
+hit` — the exact bug-0263 symptom, whose fix ([PR #341](https://github.com/rlondner/sassy-auth/pull/341))
+is still unmerged. Merging #341 should turn CI green with no further code
+changes needed.
+
+**Reviewed the one new PR, #343** ("Palette: Enhance DeleteAlertDialog error
+accessibility and visual feedback") and found it repeats the established
+pattern of bundling an untested `apps/auth-server` change under a cosmetic
+UI title: a commit titled "fix e2e authorize check" quietly changes
+`TokenController`'s org/app match check to skip validation for users in the
+platform org, with no new or updated tests. It also appears to be a stale,
+riskier alternative to the proper fix `master` already merged in
+`6f3b631`/`1ec336e` (the branch forked from `c154f18`, before those
+commits). Filed **bug-0264** (docs-only — the change is not on `master`;
+recommend closing PR #343's auth commit rather than merging it — [PR #344](https://github.com/rlondner/sassy-auth/pull/344),
+see [bug-0264](./docs/history/bugs/bug-0264.md)). Independently corroborated
+by an earlier same-day review pass that had no `gh`/API access, recovered
+and folded into [CR_2026-08-21](./docs/history/code-reviews/CR_2026-08-21.md).
+
+**The open-PR backlog is now 72+ PRs** (oldest 2026-07-10, 42 days) — still
+growing despite `master` unfreezing. See
+[TODO_2026-08-21.md](./docs/history/todo/TODO_2026-08-21.md).
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
