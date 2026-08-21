@@ -100,13 +100,29 @@ model SaApp {
   publicId    String         @unique
   name        String         @unique
   url         String
-  callbackUrl        String?
   twoFactorTrustDays Int?
   requireTwoFactor   Boolean        @default(false)
   isPlatform         Boolean        @default(false)
+  // Presence of a secret hash is what makes a client confidential. There is no
+  // separate client-type flag, so the two cannot contradict each other.
+  clientSecretHash      String?
+  clientSecretUpdatedAt DateTime?
   orgs        SaOrg[]
   permissions SaPermission[]
   roles       SaRole[]
+  redirectUris SaAppRedirectUri[]
+}
+
+model SaAppRedirectUri {
+  id    Int    @id @default(autoincrement())
+  appId Int
+  uri   String
+  /// 'login' | 'post_logout'
+  kind  String
+  app   SaApp  @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, uri, kind])
+  @@index([appId, kind])
 }
 
 model SaOrg {
@@ -254,8 +270,14 @@ model SaOauthCode {
   userId              String
   appPublicId         String
   redirectUri         String
-  codeChallenge       String
-  codeChallengeMethod String
+  // Nullable so confidential clients may omit PKCE. A code with no challenge is
+  // only exchangeable by a request that authenticates with a client secret —
+  // enforced at /authorize and again at /token.
+  codeChallenge       String?
+  codeChallengeMethod String?
+  nonce               String?
+  scope               String   @default("")
+  authTime            DateTime @default(now())
   amr                 String   @default("[\"pwd\"]")
   expiresAt           DateTime
   createdAt           DateTime @default(now())
