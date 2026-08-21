@@ -133,6 +133,17 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
 
   const origin = await getForwardedOrigin()
 
+  // Forward the trust-device cookie, and only that one. BetterAuth decides
+  // whether to raise a TOTP challenge while handling sign-in, and it reads that
+  // decision from this cookie — which lives in the browser, not here. Without
+  // forwarding it the server cannot see it, so a trusted device was challenged
+  // every time and the "Trust this device" checkbox had no effect at all.
+  //
+  // Deliberately not `cookieStore.toString()`: that would also hand the auth
+  // server the caller's existing session token, letting an active session
+  // influence the outcome of a password sign-in.
+  const trustCookie = (await cookies()).get('better-auth.trust_device')
+
   let res: Response
   try {
     res = await fetch(`${AUTH_SERVER_URL}/api/auth/sign-in/email`, {
@@ -140,6 +151,9 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
       headers: {
         'Content-Type': 'application/json',
         ...(origin && { Origin: origin }),
+        ...(trustCookie && {
+          Cookie: `better-auth.trust_device=${trustCookie.value}`,
+        }),
       },
       body: JSON.stringify({ email, password }),
     })
