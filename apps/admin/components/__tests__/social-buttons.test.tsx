@@ -35,7 +35,16 @@ describe('SocialButtons', () => {
     expect(screen.getByText(messages.login.socialDivider)).toBeInTheDocument()
   })
 
-  it('builds the sign-in redirect from the passed-in authServerUrl, not a hardcoded origin', () => {
+  // task-13: BetterAuth's /sign-in/social endpoint is POST-only (verified
+  // live against a real auth-server: a GET 404s, a POST returns
+  // `{ url, redirect: true }`). This test used to assert a synchronous GET
+  // navigation, which is exactly the shape of the bug the e2e acceptance
+  // gate caught — jsdom's window.location.href setter only ever *records*
+  // an assignment, it never performs a real request, so a wrong HTTP
+  // method/verb was invisible here. It now mocks `fetch` to return that
+  // same response shape and asserts the button POSTs the right body to the
+  // right origin, then navigates to the URL the response provides.
+  it('POSTs to sign-in/social with the passed-in authServerUrl, not a hardcoded origin, then navigates to the returned url', async () => {
     const originalLocation = window.location
     // jsdom's window.location.href setter doesn't actually navigate, but it
     // does record the assignment, which is all we need to assert on.
@@ -44,14 +53,57 @@ describe('SocialButtons', () => {
       value: { ...originalLocation, href: originalLocation.href },
     })
 
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ url: 'https://accounts.example.com/o/oauth2/authorize?...', redirect: true }),
+    })
+    const originalFetch = global.fetch
+    global.fetch = fetchMock as unknown as typeof fetch
+
     renderWith(['google'], 'https://auth.example.com')
     screen.getByRole('button', { name: /google/i }).click()
 
-    expect(window.location.href).toBe(
-      'https://auth.example.com/api/auth/sign-in/social?provider=google&callbackURL=%2Fapi%2Ftoken%2Foauth%2Fauthorize%3Fclient_id%3Dqp31&errorCallbackURL=%2Foauth-error',
-    )
-    expect(window.location.href).not.toContain('localhost:3000')
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://auth.example.com/api/auth/sign-in/social',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({
+          provider: 'google',
+          callbackURL: '/api/token/oauth/authorize?client_id=qp31',
+          errorCallbackURL: '/oauth-error',
+        }),
+      }),
+    )
+    expect(window.location.href).toBe('https://accounts.example.com/o/oauth2/authorize?...')
+
+    global.fetch = originalFetch
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    })
+  })
+
+  it('sends the browser to /oauth-error when sign-in/social fails', async () => {
+    const originalLocation = window.location
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, href: originalLocation.href },
+    })
+
+    const originalFetch = global.fetch
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, json: async () => ({}) }) as unknown as typeof fetch
+
+    renderWith(['google'], 'https://auth.example.com')
+    screen.getByRole('button', { name: /google/i }).click()
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(window.location.href).toBe('/oauth-error')
+
+    global.fetch = originalFetch
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: originalLocation,

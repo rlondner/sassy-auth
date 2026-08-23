@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 import { availableSocialProviders } from './build-social-providers';
 import { resolveEnabledProviders, type SocialProviderId } from './resolve-enabled-providers';
@@ -13,9 +13,31 @@ type Db = {
 
 @Injectable()
 export class SocialService {
+  // task-13 fix (found by the e2e acceptance gate, not by any prior unit
+  // test): `Db` and `NodeJS.ProcessEnv` are plain TS interfaces, not
+  // classes, so they don't exist at runtime — TypeScript's emitted
+  // `design:paramtypes` metadata erases both to the bare `Object`
+  // constructor. NestJS's real DI container (only ever exercised via an
+  // actual `nest start`/`nest build` bootstrap — every existing SocialService
+  // unit test calls `new SocialService(mockDb, mockEnv)` directly, bypassing
+  // Nest entirely) then tries to resolve a provider for token `Object`,
+  // finds none registered in SocialModule, and throws
+  // "Nest can't resolve dependencies of the SocialService" — the auth-server
+  // fails to boot at all, not just this module. `@Optional() @Inject(...)`
+  // with an explicit string token tells Nest "resolve this token if a
+  // provider exists, else pass `undefined`" instead of trying (and failing)
+  // to infer a token from the erased type; no provider named
+  // 'SOCIAL_SERVICE_DB' / 'SOCIAL_SERVICE_ENV' is registered anywhere, so
+  // Nest always injects `undefined` for both, and the parameter defaults
+  // below (`prisma`, `process.env`) apply exactly as before — per ordinary
+  // JS default-parameter semantics, a default fires precisely when the
+  // passed argument is `undefined`. Unit tests are unaffected: `new
+  // SocialService(mockDb, mockEnv)` passes explicit values, so the defaults
+  // (and these decorators, which only affect Nest's own instantiation path)
+  // never come into play there.
   constructor(
-    private readonly db: Db = prisma as unknown as Db,
-    private readonly env: NodeJS.ProcessEnv = process.env,
+    @Optional() @Inject('SOCIAL_SERVICE_DB') private readonly db: Db = prisma as unknown as Db,
+    @Optional() @Inject('SOCIAL_SERVICE_ENV') private readonly env: NodeJS.ProcessEnv = process.env,
   ) {}
 
   /**

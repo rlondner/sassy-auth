@@ -36,15 +36,54 @@ export function SocialButtons({
   const known = providers.filter((provider) => provider in LABEL_KEY)
   if (known.length === 0) return null
 
-  function start(provider: string) {
+  // task-13 fix (found by the e2e acceptance gate — a real click on this
+  // button had never been exercised against a real auth-server before):
+  // BetterAuth's `/sign-in/social` endpoint is POST-only
+  // (better-auth/dist/api/routes/sign-in.mjs:
+  // `createAuthEndpoint("/sign-in/social", { method: "POST", ... })`). The
+  // previous implementation did `window.location.href =
+  // \`${authServerUrl}/api/auth/sign-in/social?${params}\`` — a plain
+  // browser GET navigation — which 404s against a POST-only route (verified
+  // live: `curl <authServerUrl>/api/auth/sign-in/social?provider=stub&...`
+  // returns 404; the equivalent POST returns 200 with a JSON body
+  // `{ url, redirect: true }`). The federated sign-in button could
+  // therefore never have worked, for any provider, including
+  // google/microsoft/apple — this was invisible to `social-buttons.test.tsx`
+  // because jsdom's `window.location.href` setter only *records* the
+  // assignment, it never performs a real navigation against a real server.
+  // The fix: POST with `credentials: 'include'` (BetterAuth's response sets
+  // a `better-auth.state` cookie the provider callback later reads back —
+  // requires TRUSTED_ORIGINS on the auth-server to include this origin,
+  // already true for the admin's own configured origin in every real
+  // deployment), then navigate the browser to the `url` the response body
+  // returns.
+  async function start(provider: string) {
     // callbackURL returns the browser to whatever started the flow (usually
     // the /authorize URL); errorCallbackURL carries our classified code.
-    const params = new URLSearchParams({
-      provider,
-      callbackURL: next || '/',
-      errorCallbackURL: '/oauth-error',
-    })
-    window.location.href = `${authServerUrl}/api/auth/sign-in/social?${params.toString()}`
+    try {
+      const res = await fetch(`${authServerUrl}/api/auth/sign-in/social`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          provider,
+          callbackURL: next || '/',
+          errorCallbackURL: '/oauth-error',
+        }),
+      })
+      if (!res.ok) {
+        window.location.href = '/oauth-error'
+        return
+      }
+      const body = (await res.json()) as { url?: string }
+      if (!body.url) {
+        window.location.href = '/oauth-error'
+        return
+      }
+      window.location.href = body.url
+    } catch {
+      window.location.href = '/oauth-error'
+    }
   }
 
   return (
