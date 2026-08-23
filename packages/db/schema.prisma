@@ -107,6 +107,7 @@ model SaApp {
   orgs        SaOrg[]
   permissions SaPermission[]
   roles       SaRole[]
+  socialProviders SaSocialProvider[]
 }
 
 model SaOrg {
@@ -261,4 +262,26 @@ model SaOauthCode {
   createdAt           DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+// Which social login providers a deployment has, and which apps show them.
+// A row with appId = null is the deployment-global row: it declares that
+// credentials exist for this provider and supplies the default enablement.
+// A row with an appId is that app's explicit opt-in/opt-out.
+//
+// Credentials deliberately live in env vars, not here: per-app credentials
+// would need encryption at rest and rotation, for a capability nothing can
+// use yet. Adding `clientId` + encrypted secret columns later is one
+// migration plus resolve-enabled-providers.ts.
+model SaSocialProvider {
+  id        Int      @id @default(autoincrement())
+  appId     Int?
+  app       SaApp?   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  provider  String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([appId, provider])
+  @@index([appId])
 }
