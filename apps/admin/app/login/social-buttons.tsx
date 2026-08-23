@@ -3,8 +3,6 @@
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
 
-const AUTH_SERVER = process.env.NEXT_PUBLIC_AUTH_SERVER_URL ?? 'http://localhost:3000'
-
 const LABEL_KEY: Record<string, string> = {
   google: 'socialGoogle',
   microsoft: 'socialMicrosoft',
@@ -16,10 +14,27 @@ const LABEL_KEY: Record<string, string> = {
  * Renders one button per provider the app has enabled. Empty list renders
  * nothing at all, so deployments with no providers configured see exactly
  * today's login page.
+ *
+ * `authServerUrl` is resolved server-side (see `app/login/page.tsx`) and
+ * passed in as a prop rather than read from `NEXT_PUBLIC_*` here: a
+ * `NEXT_PUBLIC_` value gets inlined into the JS bundle at BUILD time, so a
+ * single build could never be deployed to more than one auth-server origin,
+ * and any deployment that forgot to set it at build time would silently
+ * point every social button at `http://localhost:3000`. Reading it at
+ * request time on the server keeps it runtime-configurable.
  */
-export function SocialButtons({ providers, next }: { providers: string[]; next: string }) {
+export function SocialButtons({
+  providers,
+  next,
+  authServerUrl,
+}: {
+  providers: string[]
+  next: string
+  authServerUrl: string
+}) {
   const t = useTranslations('login')
-  if (providers.length === 0) return null
+  const known = providers.filter((provider) => provider in LABEL_KEY)
+  if (known.length === 0) return null
 
   function start(provider: string) {
     // callbackURL returns the browser to whatever started the flow (usually
@@ -29,13 +44,13 @@ export function SocialButtons({ providers, next }: { providers: string[]; next: 
       callbackURL: next || '/',
       errorCallbackURL: '/oauth-error',
     })
-    window.location.href = `${AUTH_SERVER}/api/auth/sign-in/social?${params.toString()}`
+    window.location.href = `${authServerUrl}/api/auth/sign-in/social?${params.toString()}`
   }
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
-        {providers.map((provider) => (
+        {known.map((provider) => (
           <Button
             key={provider}
             type="button"

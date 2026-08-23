@@ -1683,13 +1683,22 @@ Add the French equivalents to `apps/admin/messages/fr.json` under the same keys:
 
 Create `apps/admin/app/login/social-buttons.tsx`:
 
+> **Superseded (Fix round 1, task-9-report.md):** the snippet below reads a
+> `NEXT_PUBLIC_*` env var client-side, which Next.js inlines at BUILD time —
+> that variable was never wired up anywhere in the repo, so every real
+> deployment would silently point social buttons at `localhost:3000`. The
+> shipped implementation instead resolves the origin server-side in
+> `app/login/page.tsx` (`PUBLIC_AUTH_SERVER_URL ?? AUTH_SERVER_URL`) and
+> passes it down as an `authServerUrl` prop. See `task-9-report.md` for the
+> corrected code.
+
 ```tsx
 'use client'
 
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
 
-const AUTH_SERVER = process.env.NEXT_PUBLIC_AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.SUPERSEDED_ENV_VAR_SEE_NOTE_ABOVE ?? 'http://localhost:3000'
 
 const LABEL_KEY: Record<string, string> = {
   google: 'socialGoogle',

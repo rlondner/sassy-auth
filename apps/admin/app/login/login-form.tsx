@@ -8,7 +8,15 @@ import { Button } from '@sassy-auth/ui'
 import { signIn } from './actions'
 import { SocialButtons } from './social-buttons'
 
-export function LoginForm({ next, providers = [] }: { next: string; providers?: string[] }) {
+export function LoginForm({
+  next,
+  providers = [],
+  authServerUrl,
+}: {
+  next: string
+  providers?: string[]
+  authServerUrl: string
+}) {
   const t = useTranslations('login')
   const router = useRouter()
 
@@ -35,7 +43,7 @@ export function LoginForm({ next, providers = [] }: { next: string; providers?: 
           <p className="mt-1 text-body-sm text-[var(--muted-foreground)]">{t('subtitle')}</p>
         </div>
 
-        <SocialButtons providers={providers} next={next} />
+        <SocialButtons providers={providers} next={next} authServerUrl={authServerUrl} />
 
         <form action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="next" value={next} />
