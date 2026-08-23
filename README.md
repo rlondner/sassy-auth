@@ -85,7 +85,46 @@ The admin console (Next.js 15 + Tailwind + Radix), light and dark:
 
 ---
 
-## Quick Start
+## Quick Start (Docker)
+
+Nothing to install but Docker:
+
+```bash
+git clone https://github.com/rlondner/sassy-auth.git
+cd sassy-auth
+docker compose up
+```
+
+First run takes a few minutes (it installs dependencies and builds the workspace). It generates an RS256 key pair and a BetterAuth secret onto a named volume, brings up PostgreSQL, applies migrations, and seeds platform data.
+
+When it settles, open <http://localhost:3001/login> and sign in as `s@sa.io` / `Pass@word1234`.
+
+| | |
+|---|---|
+| Admin console | <http://localhost:3001/login> |
+| Auth server | <http://localhost:3000> |
+| API docs (Swagger) | <http://localhost:3000/api/docs> |
+| Mailpit — invitation + reset emails | <http://localhost:8025> |
+
+Uncomment `SEED_DEMO` in `docker-compose.yml` to also seed the app, org, roles, and users the [FastAPI sample resource server](#sample-resource-server-fastapi) expects.
+
+To rotate the generated keys, or start completely clean:
+
+```bash
+docker compose down -v      # -v also drops the database and the signing keys
+```
+
+> **This is a preview image, not a deployment artifact.** It runs the dev
+> servers, runs both apps in one container, and runs with `NODE_ENV` unset —
+> which is load-bearing rather than lazy: the session cookie's `Secure` flag is
+> set from `NODE_ENV === 'production'`, and browsers do not store a Secure
+> cookie sent over plain `http://localhost`, so a "production" container served
+> over http could not be signed into at all. A real deployment needs compiled
+> builds, TLS termination, separately scaled processes, a managed Postgres, and
+> secrets that come from somewhere other than a volume on the host. No hardened
+> image is provided — see [Known Limitations](#known-limitations).
+
+## Quick Start (Flox)
 
 If you have [Flox](https://flox.dev) installed, this is the whole thing — it provisions Node.js, pnpm, PostgreSQL, Python, and uv, writes a `.env.local` with freshly generated RSA keys, migrates the database, and seeds platform data:
 
@@ -150,7 +189,8 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 - [Permissions that reach the API, not just the UI](#permissions-that-reach-the-api-not-just-the-ui)
 - [The name](#the-name)
 - [Screenshots](#screenshots)
-- [Quick Start](#quick-start)
+- [Quick Start (Docker)](#quick-start-docker)
+- [Quick Start (Flox)](#quick-start-flox)
 - [What SassyAuth is not](#what-sassyauth-is-not)
 - [How it compares](#how-it-compares)
 - [Prerequisites](#prerequisites)
@@ -955,6 +995,9 @@ Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/m
 
 **CI — no lint, single-package typecheck.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
+
+**No production container image.**
+The [Docker quickstart](#quick-start-docker) is an evaluation preview: dev servers, both apps in one container, `NODE_ENV` unset so the session cookie works over plain http. There is no hardened image, no published image on a registry, and no Helm chart or deployment manifest. Deploying this seriously means building your own image from compiled output (`pnpm build`) and terminating TLS in front of it.
 
 **`deleteUser` does not remove BetterAuth identity.**
 Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
