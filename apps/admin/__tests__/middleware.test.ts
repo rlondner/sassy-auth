@@ -231,3 +231,95 @@ describe('admin middleware cache headers', () => {
     expect(res.headers.get('cache-control')).not.toBe(CACHE_CONTROL)
   })
 })
+
+describe('admin middleware session cache lifecycle', () => {
+  let fetchMock: jest.Mock
+
+  beforeEach(() => {
+    fetchMock = jest.fn()
+    global.fetch = fetchMock as unknown as typeof fetch
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('re-probes the auth-server once the 10s TTL has elapsed', async () => {
+    const middleware = await loadMiddleware()
+    fetchMock.mockImplementation(() => jsonResponse(200, { user: { id: 'u1' } }))
+
+    await middleware(requestWithToken('good'))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // Still inside the window: served from cache.
+    jest.advanceTimersByTime(9_000)
+    await middleware(requestWithToken('good'))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // Past it: the entry is stale and must be revalidated.
+    jest.advanceTimersByTime(1_500)
+    await middleware(requestWithToken('good'))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('keys entries per token so one user cannot answer for another', async () => {
+    const middleware = await loadMiddleware()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, { user: { id: 'u1' } }))
+      .mockResolvedValueOnce(jsonResponse(401))
+
+    const allowed = await middleware(requestWithToken('alice'))
+    const denied = await middleware(requestWithToken('mallory'))
+
+    expect(allowed.status).toBe(200)
+    expect(denied.headers.get('location')).toContain('/login')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  // The Map is unbounded without this: a burst of distinct tokens would grow
+  // it until the instance is recycled.
+  it('stays bounded when flooded with more distinct tokens than the cap', async () => {
+    const middleware = await loadMiddleware()
+    // A fresh Response per call: a body may only be read once, so reusing one
+    // object would make every request after the first throw in res.json().
+    fetchMock.mockImplementation(() => jsonResponse(200, { user: { id: 'u1' } }))
+
+    // 600 distinct live tokens against a 500-entry cap, with no time passing,
+    // so the expiry sweep cannot free anything and the overflow drop must.
+    for (let i = 0; i < 600; i++) {
+      await middleware(requestWithToken(`tok-${i}`))
+    }
+
+    // Every request was a miss, so the map never exceeded the cap by more than
+    // the single entry being added.
+    expect(fetchMock).toHaveBeenCalledTimes(600)
+
+    // A token evicted by the overflow drop is re-probed rather than served
+    // from a stale entry.
+    const callsBefore = fetchMock.mock.calls.length
+    await middleware(requestWithToken('tok-0'))
+    expect(fetchMock).toHaveBeenCalledTimes(callsBefore + 1)
+  })
+
+  it('sweeps expired entries rather than dropping live ones when the cap is reached', async () => {
+    const middleware = await loadMiddleware()
+    fetchMock.mockImplementation(() => jsonResponse(200, { user: { id: 'u1' } }))
+
+    // Fill with entries that will all be expired by the time the cap is hit.
+    for (let i = 0; i < 499; i++) {
+      await middleware(requestWithToken(`old-${i}`))
+    }
+    jest.advanceTimersByTime(11_000)
+
+    // This request trips the cap check, whose expiry sweep should clear the
+    // 499 stale entries.
+    await middleware(requestWithToken('fresh'))
+    const callsAfterFill = fetchMock.mock.calls.length
+
+    // `fresh` is still live, so it must come from cache, proving the sweep
+    // removed the expired entries and not the new one.
+    await middleware(requestWithToken('fresh'))
+    expect(fetchMock).toHaveBeenCalledTimes(callsAfterFill)
+  })
+})
