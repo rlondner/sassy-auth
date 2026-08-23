@@ -263,6 +263,7 @@ model SaOauthCode {
   codeChallenge       String
   codeChallengeMethod String
   amr                 String   @default("[\"pwd\"]")
+  idp                 String?
   expiresAt           DateTime
   createdAt           DateTime @default(now())
 

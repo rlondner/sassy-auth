@@ -24,6 +24,7 @@ import { fromNodeHeaders } from 'better-auth/node';
 // not bcrypt — use its own verifier so direct-login stays compatible with any
 // account created via BetterAuth (sign-up, seed, admin invite, etc.).
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
+import { deriveAuthMethods } from './derive-auth-methods';
 
 // bug-0209: pre-compute a dummy scrypt hash lazily so the user-not-found
 // path can spend equivalent CPU time as the user-found path. Without this,
@@ -192,7 +193,10 @@ export class TokenController {
         throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
       }
 
-      const amr = (session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled ? ['pwd', 'otp', 'mfa'] : ['pwd'];
+      const { amr, idp } = deriveAuthMethods({
+        signInMethod: (session.session as { signInMethod?: string | null }).signInMethod ?? null,
+        twoFactorEnabled: Boolean((session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
+      });
       const code = await this.oauthService.generateCode(
         saUser.publicId,
         app.publicId,
@@ -200,6 +204,7 @@ export class TokenController {
         codeChallenge,
         'S256',
         amr,
+        idp,
       );
       const url = new URL(redirectUri);
       url.searchParams.set('code', code);
@@ -286,6 +291,7 @@ export class TokenController {
     let userPublicId: string;
     let appPublicId: string;
     let exchangedAmr: string[] = ['pwd'];
+    let exchangedIdp: string | undefined;
     try {
       const exchanged = await this.oauthService.exchangeCode(
         dto.code,
@@ -296,6 +302,7 @@ export class TokenController {
       userPublicId = exchanged.userId;
       appPublicId = exchanged.appPublicId;
       exchangedAmr = exchanged.amr ?? ['pwd'];
+      exchangedIdp = exchanged.idp;
     } catch (err) {
       this.logger.getWinstonLogger().warn('oauth.pkce.verify_failed', {
         context: 'TokenController',
@@ -325,6 +332,7 @@ export class TokenController {
       orgPublicId: saUser.org.publicId,
       appPublicId,
       amr: exchangedAmr,
+      idp: exchangedIdp,
     });
 
     this.logger.getWinstonLogger().info('OAuth code exchanged, JWT issued', {
