@@ -468,6 +468,8 @@
     "submit": "Réinitialiser le mot de passe",
     "success": "Mot de passe mis à jour. Vous pouvez maintenant vous connecter.",
     "invalidToken": "Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.",
+    "serverUnavailable": "Impossible de joindre le serveur. Veuillez réessayer dans un instant.",
+    "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
     "mismatch": "Les mots de passe ne correspondent pas.",
     "tooShort": "Le mot de passe doit comporter au moins 12 caractères.",
     "complexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",

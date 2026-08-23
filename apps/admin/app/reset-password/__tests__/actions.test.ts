@@ -95,19 +95,18 @@ describe('resetPasswordSubmitAction', () => {
     expect(captureException).toHaveBeenCalled()
   })
 
-  // KNOWN GAP - grove W-58. /reset-password is in the auth server's
-  // SENSITIVE_PREFIXES (apps/auth-server/src/auth/auth-rate-limit.ts:28), so a
-  // 429 is reachable here, but the action has no 429 branch and reports
-  // throttling as a bad link. D-01 says every credential-bearing admin action
-  // maps 429 to its own result.
-  it('currently reports an upstream 429 as invalidToken', async () => {
+  // D-01. /reset-password is in the auth server's SENSITIVE_PREFIXES
+  // (apps/auth-server/src/auth/auth-rate-limit.ts:28), so a 429 is reachable
+  // here. Reporting it as a bad link sends the user to request a new one,
+  // which is also rate-limited.
+  it('maps an upstream 429 to tooManyRequests, not invalidToken', async () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
       upstream(429),
     )
 
     const result = await resetPasswordSubmitAction('tok', 'Str0ngPassw0rd!')
 
-    expect(result).toEqual({ error: 'invalidToken' })
+    expect(result).toEqual({ error: 'tooManyRequests' })
   })
 })
 

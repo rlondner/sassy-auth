@@ -468,6 +468,8 @@
     "submit": "Reset password",
     "success": "Password updated. You can now sign in.",
     "invalidToken": "This reset link is invalid or has expired. Request a new one.",
+    "serverUnavailable": "We could not reach the server. Please try again in a moment.",
+    "tooManyRequests": "Too many attempts. Please wait a minute and try again.",
     "mismatch": "Passwords do not match.",
     "tooShort": "Password must be at least 12 characters.",
     "complexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
