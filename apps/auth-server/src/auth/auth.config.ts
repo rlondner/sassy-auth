@@ -11,6 +11,7 @@ import { createAppLogger } from '../common/logger/winston.config';
 import { sendSignInOtp } from './otp-sender';
 import { otpTestStore } from './otp-test-store';
 import { buildSocialProviders } from '../social/build-social-providers';
+import { signInMethodFromPath } from '../social/sign-in-method';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -48,6 +49,40 @@ const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;          // extend if used with
 // rationale as the bug-0186 after-hook).
 const authLogger = createAppLogger();
 
+// task-4: BetterAuth's databaseHooks context does NOT carry the literal
+// request path. `ctx.path` here is `endpoint.path` — the *route template*
+// registered with better-call (e.g. "/callback/:id" or
+// "/oauth2/callback/:providerId") — not the resolved URL. Confirmed by
+// reading better-auth 1.6.11's own to-auth-endpoints.mjs, where
+// `internalContext = { ...context, path: endpoint.path, ... }` overwrites the
+// router's literal `context.path` with the template before storing it in
+// AsyncLocalStorage; databaseHooks read that same stored context. The
+// provider name therefore only exists in `ctx.params` (populated by
+// better-call's router from the actual URL and left untouched by that
+// spread). BetterAuth's own bundled `last-login-method` plugin
+// (dist/plugins/last-login-method/index.mjs) hits the same wall and works
+// around it the same way: `ctx.params?.id || ctx.params?.providerId`.
+// This helper reconstructs a signInMethodFromPath-shaped literal path from
+// the template + params so the pure function's regex still matches.
+function resolveHookRoutePath(
+  ctx: { path?: string; params?: Record<string, string> } | null | undefined,
+): string | undefined {
+  if (!ctx) return undefined;
+  const template = ctx.path;
+  if (!template) return undefined;
+  if (template.startsWith('/callback/')) {
+    const id = ctx.params?.id;
+    return id ? `/callback/${id}` : undefined;
+  }
+  if (template.startsWith('/oauth2/callback/')) {
+    const id = ctx.params?.providerId;
+    return id ? `/oauth2/callback/${id}` : undefined;
+  }
+  // Un-templated routes (e.g. "/sign-in/email") have no params to substitute;
+  // the template *is* the literal path.
+  return template;
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
   secret: process.env.BETTER_AUTH_SECRET!,
@@ -63,6 +98,12 @@ export const auth = betterAuth({
     // cached session on replica B" hazard that isn't worth the
     // few ms saved.
     cookieCache: { enabled: false },
+    // task-4: persisted by the databaseHooks.session.create.before hook
+    // below. `input: false` — this is derived server-side from the request
+    // route, never client-supplied.
+    additionalFields: {
+      signInMethod: { type: 'string', required: false, input: false },
+    },
   },
   advanced: {
     // bug-0158: explicit cookie attributes. `sameSite: 'lax'`
@@ -104,7 +145,10 @@ export const auth = betterAuth({
   databaseHooks: {
     session: {
       create: {
-        before: async (session: { userId: string }) => {
+        before: async (
+          session: { userId: string },
+          ctx?: { path?: string; params?: Record<string, string> } | null,
+        ) => {
           const gate = await evaluateSessionGate(prisma, session.userId);
           if (!gate.allowed) {
             // bug-0163-adjacent: no credential here, safe to log. This is the
@@ -119,6 +163,11 @@ export const auth = betterAuth({
               message: 'This account is not active.',
             });
           }
+          // task-4: gate runs first — a blocked user never reaches here. Only
+          // once the session is allowed do we record how it was created.
+          const signInMethod = signInMethodFromPath(resolveHookRoutePath(ctx));
+          if (!signInMethod) return;
+          return { data: { ...session, signInMethod } };
         },
         after: async (session: { userId: string }) => {
           try {

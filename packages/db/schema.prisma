@@ -35,6 +35,11 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // How this session was created: 'pwd', or 'ext:<provider>' for federated
+  // sign-in. Null for sessions predating this column and for routes we do not
+  // classify — readers fall back to legacy behaviour.
+  signInMethod String?
+
   // bug-0179: BetterAuth's session middleware runs
   // `Session.findFirst({ where: { userId } })` on every authenticated
   // request. Without this index the DB falls back to a sequential
