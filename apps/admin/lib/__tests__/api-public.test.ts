@@ -20,6 +20,17 @@ beforeEach(async () => {
 })
 
 describe('validateInvitation', () => {
+  it('returns the parsed invitation info on a 200 response', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    const info = { email: 'a@example.com', orgName: 'Acme' }
+    fetchMock.mockResolvedValue(jsonResponse(200, info))
+
+    const result = await validateInvitation('plain-token')
+
+    expect(result).toEqual(info)
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3000/api/invitations/plain-token')
+  })
+
   it('percent-encodes a token containing a slash so the request cannot traverse to a different endpoint', async () => {
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     fetchMock.mockResolvedValue(jsonResponse(200, { email: 'a@example.com' }))
@@ -48,6 +59,22 @@ describe('validateInvitation', () => {
 })
 
 describe('acceptInvitation', () => {
+  it('POSTs the password as JSON to the expected URL on success', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock.mockResolvedValue(jsonResponse(200))
+
+    await expect(acceptInvitation('plain-token', 'hunter2')).resolves.toBeUndefined()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3000/api/invitations/plain-token/accept',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: 'hunter2' }),
+      },
+    )
+  })
+
   it('percent-encodes a token containing a slash so the request cannot traverse to a different endpoint', async () => {
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     fetchMock.mockResolvedValue(jsonResponse(200))
