@@ -10,11 +10,17 @@ async function loadMiddleware() {
   return (await import('../middleware')).middleware
 }
 
-function requestWithToken(token: string) {
-  return new NextRequest('http://admin.test/users', {
+function requestWithToken(token: string, path = '/users') {
+  return new NextRequest(`http://admin.test${path}`, {
     headers: { cookie: `better-auth.session_token=${token}` },
   })
 }
+
+function requestWithoutCookie(path: string) {
+  return new NextRequest(`http://admin.test${path}`)
+}
+
+const CACHE_CONTROL = 'no-store, no-cache, must-revalidate, private'
 
 function jsonResponse(status: number, body: unknown = {}) {
   return new Response(JSON.stringify(body), {
@@ -106,5 +112,122 @@ describe('admin middleware session cache', () => {
     expect(first.headers.get('location')).toContain('/login')
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(second.status).toBe(200)
+  })
+})
+
+describe('admin middleware routing', () => {
+  let fetchMock: jest.Mock
+
+  beforeEach(() => {
+    fetchMock = jest.fn()
+    global.fetch = fetchMock as unknown as typeof fetch
+  })
+
+  it.each(['/login', '/accept-invite', '/oauth-error', '/forgot-password', '/reset-password'])(
+    'lets %s through without validating a session',
+    async (path) => {
+      const middleware = await loadMiddleware()
+
+      const res = await middleware(requestWithoutCookie(path))
+
+      expect(res.status).toBe(200)
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
+
+  // Genuine children of a public prefix are part of the same public flow and
+  // must stay public.
+  it.each(['/login/two-factor', '/login/two-factor-prompt', '/login/code'])(
+    'lets the public child route %s through',
+    async (path) => {
+      const middleware = await loadMiddleware()
+
+      const res = await middleware(requestWithoutCookie(path))
+
+      expect(res.status).toBe(200)
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
+
+  // A path that merely shares a prefix is a different route. Treating it as
+  // public skips both session validation and the Cache-Control header, so a
+  // future route named this way would silently become unauthenticated.
+  it.each(['/loginaudit', '/login-audit', '/reset-passwords', '/oauth-errors'])(
+    'requires a session for %s, which only shares a prefix with a public path',
+    async (path) => {
+      const middleware = await loadMiddleware()
+
+      const res = await middleware(requestWithoutCookie(path))
+
+      expect(res.headers.get('location')).toContain('/login')
+    },
+  )
+
+  it('lets _next assets through without validating a session', async () => {
+    const middleware = await loadMiddleware()
+
+    const res = await middleware(requestWithoutCookie('/_next/static/chunk.js'))
+
+    expect(res.status).toBe(200)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('redirects to /login when no session cookie is present at all', async () => {
+    const middleware = await loadMiddleware()
+
+    const res = await middleware(requestWithoutCookie('/users'))
+
+    expect(res.headers.get('location')).toContain('/login')
+    // No token means no question to ask the auth server.
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves the attempted path as the next query parameter', async () => {
+    const middleware = await loadMiddleware()
+    fetchMock.mockResolvedValue(jsonResponse(401))
+
+    const res = await middleware(requestWithToken('bad', '/orgs'))
+
+    const location = new URL(res.headers.get('location') as string)
+    expect(location.pathname).toBe('/login')
+    expect(location.searchParams.get('next')).toBe('/orgs')
+  })
+
+  it('omits the next parameter when the attempted path is the root', async () => {
+    const middleware = await loadMiddleware()
+    fetchMock.mockResolvedValue(jsonResponse(401))
+
+    const res = await middleware(requestWithToken('bad', '/'))
+
+    const location = new URL(res.headers.get('location') as string)
+    expect(location.searchParams.has('next')).toBe(false)
+  })
+})
+
+describe('admin middleware cache headers', () => {
+  let fetchMock: jest.Mock
+
+  beforeEach(() => {
+    fetchMock = jest.fn()
+    global.fetch = fetchMock as unknown as typeof fetch
+  })
+
+  // Authenticated admin pages carry tenant data, so no shared cache or bfcache
+  // may retain them after sign-out.
+  it('sets no-store on an authenticated response', async () => {
+    const middleware = await loadMiddleware()
+    fetchMock.mockResolvedValue(jsonResponse(200, { user: { id: 'u1' } }))
+
+    const res = await middleware(requestWithToken('good'))
+
+    expect(res.headers.get('cache-control')).toBe(CACHE_CONTROL)
+  })
+
+  it('does not set the header on a public page', async () => {
+    const middleware = await loadMiddleware()
+
+    const res = await middleware(requestWithoutCookie('/login'))
+
+    expect(res.headers.get('cache-control')).not.toBe(CACHE_CONTROL)
   })
 })
