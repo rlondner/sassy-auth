@@ -10,6 +10,7 @@ import { evaluateSessionGate } from './session-gate';
 import { createAppLogger } from '../common/logger/winston.config';
 import { sendSignInOtp } from './otp-sender';
 import { otpTestStore } from './otp-test-store';
+import { buildSocialProviders } from '../social/build-social-providers';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -168,38 +169,11 @@ export const auth = betterAuth({
       await getEmailer().send({ to: user.email, ...passwordResetEmail({ firstName, resetUrl }) });
     },
   },
-  // bug-0175: gate each social provider on BOTH the id AND the secret.
-  // Previously the truthy check on the id was paired with a non-null
-  // assertion (`!`) on the secret — an operator who set the id but
-  // forgot the secret got an `undefined` cast to string, which crashed
-  // deep inside BetterAuth's OAuth flow or silently misbehaved. The
-  // symmetric guard falls back to "provider disabled" instead.
-  socialProviders: {
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && {
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && {
-      microsoft: {
-        clientId: process.env.MICROSOFT_CLIENT_ID,
-        clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET && {
-      apple: {
-        clientId: process.env.APPLE_CLIENT_ID,
-        clientSecret: process.env.APPLE_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET && {
-      github: {
-        clientId: process.env.GITHUB_CLIENT_ID,
-        clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      },
-    }),
-  },
+  // Social providers are built from env by build-social-providers.ts, which
+  // keeps the bug-0175 both-halves guard, sets disableSignUp (invite-only),
+  // and deliberately does NOT trust any provider. GitHub is intentionally
+  // dropped here: it was never surfaced in any UI and is out of scope.
+  socialProviders: buildSocialProviders(process.env),
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
