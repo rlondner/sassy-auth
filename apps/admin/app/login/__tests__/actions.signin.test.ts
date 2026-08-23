@@ -308,14 +308,11 @@ describe('signIn optional two-factor interstitial', () => {
     expect(target).toBe('/users')
   })
 
-  // KNOWN BUG - grove W-55. actions.ts:227 comments the catch as "fail open —
-  // no prompt on error", but twoFactorEnabled/twoFactorPromptedAt keep their
-  // false/null defaults, which is exactly the input that makes
-  // shouldPromptTwoFactor return true. So a status-lookup outage diverts every
-  // login to the setup interstitial, including already-enrolled users. This
-  // case pins the current behaviour so the suite is honest; W-55 flips it to
-  // the documented expectation.
-  it('currently prompts when the status lookups reject, contrary to the fail-open comment', async () => {
+  // The interstitial is a nudge, not a gate. If we could not read the user's
+  // real 2FA state we must not guess: guessing "unenrolled, never prompted"
+  // is what turned a status-lookup outage into a setup prompt for every
+  // login, enrolled users included.
+  it('fails open and does not prompt when the status lookups reject', async () => {
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     fetchMock
       .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
@@ -326,12 +323,10 @@ describe('signIn optional two-factor interstitial', () => {
       formData({ email: 'a@b.io', password: 'pw' }),
     )
 
-    expect(target).toBe('/login/two-factor-prompt')
+    expect(target).toBe('/users')
   })
 
-  // Same defect surface as W-55, reached through a non-ok status rather than a
-  // rejection: an enrolled user is told to enrol again.
-  it('currently prompts an enrolled user when get-session returns non-ok', async () => {
+  it('fails open and does not prompt when get-session returns non-ok', async () => {
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     fetchMock
       .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
@@ -342,6 +337,22 @@ describe('signIn optional two-factor interstitial', () => {
       formData({ email: 'a@b.io', password: 'pw' }),
     )
 
-    expect(target).toBe('/login/two-factor-prompt')
+    expect(target).toBe('/users')
+  })
+
+  it('still fails open when only the two-factor-status lookup is unavailable', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      .mockResolvedValueOnce(
+        upstream(200, { user: { twoFactorEnabled: false } }),
+      )
+      .mockResolvedValueOnce(upstream(503))
+
+    const target = await callExpectingRedirect(
+      formData({ email: 'a@b.io', password: 'pw' }),
+    )
+
+    expect(target).toBe('/users')
   })
 })

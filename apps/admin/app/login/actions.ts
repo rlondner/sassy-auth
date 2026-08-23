@@ -205,6 +205,13 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
   const cookieStore2 = await cookies()
   let twoFactorEnabled = false
   let twoFactorPromptedAt: string | null = null
+  // Fail open means "do not prompt when we could not read the user's real 2FA
+  // state". The defaults above (unenrolled, never prompted) are exactly the
+  // input that makes shouldPromptTwoFactor return true, so leaving them in
+  // place on failure produced the opposite: a status-lookup outage sent every
+  // successful login to the setup interstitial, enrolled users included.
+  // Only consult the interstitial when BOTH lookups actually answered.
+  let twoFactorStateKnown = false
   try {
     const [sessRes, statusRes] = await Promise.all([
       fetch(`${AUTH_SERVER_URL}/api/auth/get-session`, {
@@ -216,13 +223,12 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
         cache: 'no-store',
       }),
     ])
-    if (sessRes.ok) {
+    if (sessRes.ok && statusRes.ok) {
       const sess = (await sessRes.json()) as { user?: { twoFactorEnabled?: boolean } } | null
       twoFactorEnabled = sess?.user?.twoFactorEnabled ?? false
-    }
-    if (statusRes.ok) {
       const statusData = (await statusRes.json()) as { twoFactorPromptedAt: string | null }
       twoFactorPromptedAt = statusData.twoFactorPromptedAt
+      twoFactorStateKnown = true
     }
   } catch { /* fail open — no prompt on error */ }
 
@@ -250,7 +256,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
     } catch { /* use system default */ }
   }
 
-  if (shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
+  if (twoFactorStateKnown && shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
     const encodedNext = nextSafe ? encodeURIComponent(nextSafe) : ''
     redirect(`/login/two-factor-prompt${encodedNext ? `?next=${encodedNext}` : ''}`)
   }
