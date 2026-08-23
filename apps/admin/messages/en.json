@@ -473,6 +473,11 @@
     "submit": "Sign In",
     "forgotPassword": "Forgot password?",
     "useCode": "Sign in with a code instead",
+    "socialDivider": "or continue with",
+    "socialGoogle": "Continue with Google",
+    "socialMicrosoft": "Continue with Microsoft",
+    "socialApple": "Continue with Apple",
+    "socialStub": "Continue with Test IdP",
     "otp": {
       "title": "Sign in with a code",
       "subtitle": "We'll email you a one-time code",
@@ -618,6 +623,21 @@
         "heading": "Not authorized for this application",
         "body": "Your account is provisioned in SassyAuth but isn't scoped to the application you tried to access.",
         "hint": "Ask a platform admin to add you to an org associated with this application."
+      },
+      "social_no_account": {
+        "heading": "We couldn't sign you in",
+        "body": "That account isn't set up for this application.",
+        "hint": "If you were invited, sign in with the email address the invitation was sent to, or ask an administrator to invite you."
+      },
+      "social_email_unverified": {
+        "heading": "Email address not verified",
+        "body": "Your identity provider did not confirm that this email address belongs to you.",
+        "hint": "Verify the address with your provider, then try again."
+      },
+      "social_private_relay": {
+        "heading": "Hidden email addresses aren't supported",
+        "body": "You chose Apple's Hide My Email, so we received a relay address that doesn't match any invitation.",
+        "hint": "Sign in with Apple again and choose \"Share My Email\"."
       }
     }
   }

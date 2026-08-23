@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { validateNextUrl } from '@/lib/safe-next'
+import { fetchSocialProviders } from '@/lib/social-providers'
 import { LoginForm } from './login-form'
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
@@ -44,5 +45,7 @@ export default async function LoginPage({
     redirect(nextSafe)
   }
 
-  return <LoginForm next={nextSafe ?? ''} />
+  const providers = await fetchSocialProviders(nextSafe ?? '')
+
+  return <LoginForm next={nextSafe ?? ''} providers={providers} />
 }
