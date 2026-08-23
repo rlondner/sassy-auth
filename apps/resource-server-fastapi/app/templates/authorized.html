@@ -11,6 +11,12 @@
     <script type="application/json" id="token-data">{{ access_token | tojson }}</script>
     <p>Calling <code>GET /api/properties</code> (requires <code>rs.properties.create</code>)…</p>
     <h2 id="result" data-pending>…</h2>
+    <dl>
+      <dt>amr</dt>
+      <dd data-testid="claim-amr">{{ claims.get("amr") | join(", ") if claims.get("amr") else "—" }}</dd>
+      <dt>idp</dt>
+      <dd data-testid="claim-idp">{{ claims.get("idp", "—") }}</dd>
+    </dl>
     <details>
       <summary>Decoded token</summary>
       <pre id="claims"></pre>

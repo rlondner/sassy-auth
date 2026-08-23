@@ -67,6 +67,15 @@ const USERS = [
     lastName: 'TwoFactor',
     role: ROLE_PROPERTY_MANAGERS,
   },
+  // Link target for the federated round-trip. Deliberately separate from
+  // m@cpm.io: linking a provider account to that user would persist across
+  // specs and change what the password round-trip exercises.
+  {
+    email: 'social@cpm.io',
+    firstName: 'Citadel',
+    lastName: 'Social',
+    role: ROLE_PROPERTY_MANAGERS,
+  },
 ] as const;
 
 const PASSWORD = resolveSeedPassword();
@@ -216,5 +225,19 @@ export async function seedDemoResourceServer() {
   for (const u of USERS) {
     await ensureUser(u.email, u.firstName, u.lastName, org.id, rolesByName[u.role]);
   }
+
+  // Enable the e2e stub provider for this app. Google/Microsoft/Apple inherit
+  // the deployment-global rows, so nothing app-specific is needed for them.
+  // The stub is only ever *available* when E2E_STUB_IDP_URL is set (and
+  // NODE_ENV is 'test' or 'development'), so this row is inert everywhere
+  // else — seeding it only under the same condition keeps that intent explicit.
+  if (process.env.E2E_STUB_IDP_URL) {
+    await prisma.saSocialProvider.upsert({
+      where: { appId_provider: { appId: app.id, provider: 'stub' } },
+      create: { appId: app.id, provider: 'stub', enabled: true },
+      update: { enabled: true },
+    });
+  }
+
   console.log('[demo] Done.');
 }
