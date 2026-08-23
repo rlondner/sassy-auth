@@ -291,3 +291,27 @@ model SaSocialProvider {
   @@unique([appId, provider])
   @@index([appId])
 }
+
+// Durable record of federated-authentication outcomes. This is the record of
+// truth: OpenTelemetry is sampled and its backends have short retention, so
+// spans alone cannot answer "who linked this Google account to alice@acme.com,
+// and when" a year later. `reason` holds the REAL cause even where the user
+// was shown a deliberately generic message.
+model SaAuditEvent {
+  id               Int      @id @default(autoincrement())
+  publicId         String   @unique
+  type             String
+  provider         String?
+  saUserId         Int?
+  betterAuthUserId String?
+  appPublicId      String?
+  email            String?
+  providerSub      String?
+  reason           String?
+  ip               String?
+  userAgent        String?
+  createdAt        DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([saUserId])
+}
