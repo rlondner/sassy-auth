@@ -99,4 +99,23 @@ describe('buildSocialProviders', () => {
   it('omits providers whose credentials are incomplete', () => {
     expect(Object.keys(buildSocialProviders({ GOOGLE_CLIENT_ID: 'gid' }))).toEqual([]);
   });
+
+  it('exposes the Apple client secret as a freshly-read getter', () => {
+    const crypto = require('node:crypto') as typeof import('node:crypto');
+    const { privateKey } = crypto.generateKeyPairSync('ec', {
+      namedCurve: 'prime256v1',
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    });
+    const built = buildSocialProviders({
+      APPLE_CLIENT_ID: 'com.example.service',
+      APPLE_TEAM_ID: 'TEAM123456',
+      APPLE_KEY_ID: 'KEY7890',
+      APPLE_PRIVATE_KEY: privateKey,
+    }) as Record<string, { clientSecret: string; disableSignUp: boolean }>;
+
+    expect(typeof built.apple.clientSecret).toBe('string');
+    expect(built.apple.clientSecret.split('.')).toHaveLength(3);
+    expect(built.apple.disableSignUp).toBe(true);
+  });
 });

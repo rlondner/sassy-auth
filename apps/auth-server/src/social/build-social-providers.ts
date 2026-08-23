@@ -1,4 +1,5 @@
 import type { SocialProviderId } from './resolve-enabled-providers';
+import { createAppleClientSecretFactory } from './apple-client-secret';
 
 /**
  * bug-0175 kept: a provider is configured only when BOTH halves of its
@@ -75,8 +76,20 @@ export function buildSocialProviders(env: NodeJS.ProcessEnv): Record<string, unk
     };
   }
 
-  // Apple is intentionally absent here — Task 3 adds it, because its
-  // secret must be generated (an ES256 JWT), not merely read from env.
+  if (available.includes('apple')) {
+    const appleSecret = createAppleClientSecretFactory(env);
+    providers.apple = {
+      clientId: env.APPLE_CLIENT_ID!,
+      // A getter, not a value: BetterAuth reads this when it exchanges the
+      // code, so a long-running process always gets a live secret rather than
+      // one frozen at module load.
+      get clientSecret() {
+        return appleSecret();
+      },
+      disableSignUp: true,
+    };
+  }
+
   // `stub` is intentionally absent here — it is not a BetterAuth social
   // provider; see availableSocialProviders above.
 
