@@ -49,11 +49,22 @@ SassyAuth carries the user's effective permissions in the token itself:
   "org": "Xm4T",
   "iss": "https://auth.example.com",
   "scope": "reports.read reports.export billing.read",
-  "amr": ["pwd", "mfa"]
+  "amr": ["ext"],
+  "idp": "google"
 }
 ```
 
 (`sub`, `aud`, and `org` are Sqid public IDs; `iat` and `exp` omitted here for brevity.)
+
+The token has two shapes depending on how the user signed in. Password
+sign-in carries `amr: ["pwd"]` and no `idp` claim at all. Federated (social)
+sign-in carries `amr: ["ext"]` plus `idp` set to `"google"`, `"microsoft"`, or
+`"apple"` — `ext` is a naming convention, not an RFC 8176 registered value
+(the registry has no value meaning "federated"), and the provider name is
+kept out of `amr` and given its own `idp` claim so a resource server can match
+`amr` against one bounded, provider-independent set of values. Either shape
+gets `otp` and `mfa` appended to `amr` when the user also completed
+SassyAuth's own TOTP (see [Two-Factor Authentication](#two-factor-authentication-2fa)).
 
 One RS256 JWT, verified against a JWKS endpoint, answers both questions from the same source: your API rejects the call, and your UI hides the control, using the same `scope` claim. No second round-trip to an authorization service on every request, and no permission table duplicated into your frontend.
 
@@ -161,6 +172,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 - [Auth Flows](#auth-flows)
 - [JWKS and Token Verification](#jwks-and-token-verification)
 - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
+- [Social Sign-In](#social-sign-in)
 - [API Reference](#api-reference)
 - [Self-serve Registration](#self-serve-registration-post-apiregister)
 - [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
@@ -399,18 +411,28 @@ Leave blank to disable. See [Observability](#observability) for behavior.
 
 ### Social providers (optional)
 
-Omit the client ID and secret for any provider you do not want to enable.
+Omit the vars for any provider you do not want to enable — a provider is only
+registered when every one of its required vars is set. Full setup steps
+(provider console configuration, redirect URIs, Apple's paid-membership and
+domain-verification requirements) are in
+[`docs/social-auth-setup.md`](docs/social-auth-setup.md). See also
+[Social Sign-In](#social-sign-in) for the invite-only behavior these
+credentials gate.
 
 | Variable                     | Description                |
 |------------------------------|----------------------------|
 | `GOOGLE_CLIENT_ID`           | Google OAuth client ID     |
 | `GOOGLE_CLIENT_SECRET`       | Google OAuth client secret |
-| `MICROSOFT_CLIENT_ID`        | Microsoft OAuth client ID  |
-| `MICROSOFT_CLIENT_SECRET`    | Microsoft OAuth client secret |
-| `APPLE_CLIENT_ID`            | Apple OAuth client ID      |
-| `APPLE_CLIENT_SECRET`        | Apple OAuth client secret  |
+| `MICROSOFT_CLIENT_ID`        | Microsoft (Entra ID) OAuth client ID |
+| `MICROSOFT_CLIENT_SECRET`    | Microsoft (Entra ID) OAuth client secret |
+| `MICROSOFT_TENANT_ID`        | Optional. Pins Microsoft sign-in to a single Entra directory instead of `common`. See [`docs/social-auth-setup.md`](docs/social-auth-setup.md) for why this matters for email verification. |
+| `APPLE_CLIENT_ID`            | Apple Services ID (Apple's OAuth `client_id` — not the App ID) |
+| `APPLE_TEAM_ID`               | Apple Developer Team ID    |
+| `APPLE_KEY_ID`                | Key ID of the Sign in with Apple `.p8` key |
+| `APPLE_PRIVATE_KEY`           | Contents of the `.p8` private key. There is no `APPLE_CLIENT_SECRET`: Apple's client secret is a short-lived JWT generated at runtime from these three vars, not a static value. |
 | `GITHUB_CLIENT_ID`           | GitHub OAuth client ID     |
 | `GITHUB_CLIENT_SECRET`       | GitHub OAuth client secret |
+| `E2E_STUB_IDP_URL`            | **Non-production only.** URL of the stub OIDC provider used by the e2e suite. Only registers when `NODE_ENV` is exactly `test` or `development` — never set this in production, the stub is a full authentication bypass if reachable. |
 | `SQIDS_ALPHABET`             | Custom alphabet for Sqids encoding; leave blank for default |
 
 </details>
@@ -578,6 +600,7 @@ curl http://localhost:3000/api/token/jwks
 | `iss`          | Value of `BETTER_AUTH_URL` at issuance time                                   |
 | `scope`        | Space-separated list of effective permission names (OAuth 2.0 `scope` claim)  |
 | `amr`          | Authentication methods — see [2FA](#two-factor-authentication-2fa)             |
+| `idp`          | Identity provider for a federated sign-in — `google`, `microsoft`, or `apple`. Present only when `amr` includes `ext`; absent for password sign-in. See [Social Sign-In](#social-sign-in). |
 | `iat`          | Issued at (Unix timestamp)                                                    |
 | `exp`          | Expiry — 1 hour after issuance                                                |
 
@@ -642,6 +665,60 @@ Resource servers can inspect the `amr` claim to gate sensitive operations.
 
 ---
 
+## Social Sign-In
+
+Users can sign in with Google, Microsoft, or Apple in addition to a password.
+Setup steps (provider console configuration, env vars) are in
+[`docs/social-auth-setup.md`](docs/social-auth-setup.md); this section covers
+the behavior.
+
+**Invite-only — not a signup method.** Social sign-in only ever *links* to an
+existing, active `SaUser`; it never creates one. A user must already have been
+provisioned (by an admin, or via an accepted invitation) before their first
+"Sign in with Google/Microsoft/Apple" click will work. An unrecognised
+identity is refused, with no `User`, `SaUser`, or org row created as a side
+effect. First sign-in matches on `(providerId, sub)` if a link already exists,
+and otherwise on an email address the provider asserts is verified.
+Just-in-time provisioning and domain-claimed orgs (an org auto-admitting users
+whose email domain matches) are both deliberately out of scope — see
+[Known Limitations](#known-limitations).
+
+**Credentials are deployment-global.** One `clientId`/`clientSecret` pair per
+provider is configured for the whole deployment via environment variables;
+individual apps opt a configured provider's button in or out, but cannot
+bring their own OAuth client. See
+[`docs/social-auth-setup.md`](docs/social-auth-setup.md).
+
+**Token contract.** A federated sign-in's JWT carries `amr: ["ext"]` and an
+`idp` claim naming the provider (`"google"` | `"microsoft"` | `"apple"`);
+`otp`/`mfa` are appended to `amr` exactly as with password sign-in when the
+user also completes SassyAuth's own TOTP. See
+[JWKS and Token Verification](#jwks-and-token-verification) for the full
+claim table. Social sign-in never satisfies or bypasses an app's
+`requireTwoFactor` setting — a federated user with a 2FA-required app still
+has to enroll in and complete SassyAuth's own TOTP.
+
+**Two things worth knowing before you rely on this:**
+
+- A user whose `SaUser` exists but is not `active` gets a bare `403` response
+  instead of the friendly `/oauth-error` page. BetterAuth's session-creation
+  gate freezes the response status before the hook that would redirect to
+  `/oauth-error` can run. The refusal is still recorded in the audit trail
+  (`SaAuditEvent`); only the user-facing presentation is affected.
+- Apple's "Hide My Email" relay addresses (`@privaterelay.appleid.com`) *are*
+  detected — via Apple's own `is_private_email` claim, not domain
+  pattern-matching — and the user is shown a specific message telling them to
+  choose "Share My Email" on Apple's consent screen instead. This works
+  correctly; it is not a limitation.
+
+**Provider discovery.** `GET /api/social-providers?client_id=<appPublicId>`
+returns the list of provider buttons that app's login page should render.
+It is public and unauthenticated by design — it discloses only which buttons
+to show, never credentials — and returns an empty list (not a 404) for an
+unknown `client_id`, so it cannot be used to enumerate registered apps.
+
+---
+
 ## API Reference
 
 The endpoints you will use from a resource server:
@@ -655,6 +732,8 @@ The endpoints you will use from a resource server:
 | POST   | `/api/token/direct/login`                     | Direct credential login — returns JWT            |
 | GET    | `/api/me`                                     | Caller's profile: org, app context, effective permissions |
 | POST   | `/api/register`                               | **Self-serve signup** — atomically create org + user + org↔app association ([details](#self-serve-registration-post-apiregister)) |
+| GET    | `/api/social-providers`                       | **Public.** Which social sign-in buttons an app's login page should render ([details](#social-sign-in)) |
+| PUT    | `/api/social-providers/{clientId}`            | Set an app's enabled social providers (`platform.apps.manage`)  |
 | ALL    | `/api/auth/*`                                 | BetterAuth: sign-up, sign-in, magic link, OTP, social login |
 
 <details>
@@ -962,6 +1041,15 @@ Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Accoun
 
 **LIKE wildcard characters not escaped in search.**
 The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.
+
+**Social sign-in is invite-only, with no self-service alternative.**
+Google/Microsoft/Apple sign-in only links to an existing, active `SaUser` — there is no just-in-time provisioning of a new user or org, and no domain-claimed orgs (an org auto-admitting users whose email matches a verified domain). A user who has not been provisioned by an admin or an invitation cannot get in via a social button, no matter how legitimate their identity. Both are deliberately deferred; the linking logic is centralized so they can be added later without rework. See [`docs/social-auth-setup.md`](docs/social-auth-setup.md) and the [Social Sign-In](#social-sign-in) section.
+
+**Social provider credentials are deployment-global, not per-app.**
+Each of Google/Microsoft/Apple has one `clientId`/`clientSecret` pair for the whole deployment. Individual apps can opt a configured provider in or out, but cannot register their own OAuth client. Per-app credentials (with the encryption-at-rest and key-rotation work that requires) are deferred; the data model is shaped to add them later.
+
+**Apple sign-in is documented but not covered by automated tests.**
+Apple rejects `localhost` return URLs and uses a `form_post` callback, so it cannot be exercised locally or in CI — only Google and Microsoft (plus a stub OIDC provider) are covered by the e2e suite. Apple's integration is implemented and its setup is documented in [`docs/social-auth-setup.md`](docs/social-auth-setup.md), but validating it requires manual testing against a real, publicly reachable HTTPS deployment.
 
 </details>
 

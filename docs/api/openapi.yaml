@@ -25,6 +25,11 @@ servers:
 tags:
   - name: Token
     description: JWT issuance for resource servers (OAuth2 + direct login)
+  - name: Social Providers
+    description: >
+      Which social sign-in buttons an app's login page renders, and per-app
+      opt-in/opt-out. Sign-in itself is invite-only and handled by BetterAuth
+      under `/api/auth/*` — see docs/social-auth-setup.md.
   - name: Apps
     description: Manage resource server registrations
   - name: Orgs
@@ -181,7 +186,16 @@ components:
       properties:
         token:
           type: string
-          description: RS256-signed JWT for use with resource servers
+          description: |
+            RS256-signed JWT for use with resource servers. Notable payload claims:
+            - `amr` — authentication methods. `["pwd"]` for password sign-in
+              (`["pwd","otp","mfa"]` with TOTP completed); `["ext"]` for a
+              federated (social) sign-in (`["ext","otp","mfa"]` with TOTP
+              completed). `ext` is a naming convention, not an RFC 8176
+              registered value.
+            - `idp` — present only when `amr` includes `ext`. Names the
+              identity provider: `"google"`, `"microsoft"`, or `"apple"`.
+              Absent for password sign-in.
           example: "eyJhbGciOiJSUzI1NiJ9..."
         expiresIn:
           type: integer
@@ -357,6 +371,35 @@ components:
           description: Public ID of the app to authenticate against
           example: "Uk3mB9"
       required: [identifier, password, appId]
+
+    SocialProvidersResponse:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            type: string
+            enum: [google, microsoft, apple]
+          description: >
+            Provider ids to render as sign-in buttons, in stable display
+            order. Empty for an unknown `client_id` or an app with no
+            providers enabled — never a 404, so this endpoint cannot be used
+            to enumerate registered apps.
+          example: ["google", "microsoft"]
+      required: [providers]
+
+    SetSocialProvidersRequest:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            type: string
+          description: >
+            Provider ids to enable for this app. Any provider the deployment
+            has credentials for but that is omitted here is explicitly
+            disabled for this app (an empty array disables all of them).
+          example: ["google"]
 
     OAuthTokenRequest:
       type: object
@@ -562,6 +605,110 @@ paths:
               examples:
                 twoFactorRequired:
                   value: { statusCode: 403, message: "TWO_FACTOR_REQUIRED", error: "Forbidden" }
+
+  # ── Social Providers ─────────────────────────────────────────────────────────
+
+  /api/social-providers:
+    get:
+      tags: [Social Providers]
+      summary: Which social sign-in buttons an app's login page should render
+      description: |
+        Public and unauthenticated: the admin console's `/login` page calls this
+        before anyone has a session. Exposes only which buttons to render — never
+        credentials. An unknown `client_id` returns an empty list rather than
+        404, so it cannot be used to enumerate registered apps.
+      security: []
+      parameters:
+        - name: client_id
+          in: query
+          required: false
+          schema: { type: string }
+          description: App public ID (Sqid). Omitted or unknown → global defaults / empty list.
+      responses:
+        '200':
+          description: Providers to render, in stable display order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SocialProvidersResponse' }
+
+  /api/social-providers/{clientId}/settings:
+    get:
+      tags: [Social Providers]
+      summary: Admin-console backing data for an app's social provider checkboxes
+      description: |
+        Authenticated and authorised like the PUT below (`platform.apps.manage`).
+        Returns `available` (every provider this deployment has credentials for,
+        regardless of whether this app currently shows it) and `enabled` (the
+        subset currently shown for this app) — the public GET above only ever
+        returns `enabled`, so this endpoint is what lets an admin opt a
+        previously-disabled provider back on. An unknown `clientId` 404s here
+        (unlike the public GET's empty-list behaviour), since enumeration is not
+        a concern once the caller already holds `platform.apps.manage`.
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema: { type: string }
+          description: App public ID (Sqid)
+      responses:
+        '200':
+          description: Available and currently-enabled providers for this app
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available:
+                    type: array
+                    items: { type: string, enum: [google, microsoft, apple] }
+                  enabled:
+                    type: array
+                    items: { type: string, enum: [google, microsoft, apple] }
+                required: [available, enabled]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/social-providers/{clientId}:
+    put:
+      tags: [Social Providers]
+      summary: Set an app's enabled social providers
+      description: |
+        Replaces this app's provider opt-ins. Authenticated and authorised
+        exactly like the other app-administration routes: `platform.apps.manage`.
+        Writes an explicit row for every provider the deployment has
+        credentials for — enabled or disabled — so an explicit "off" survives a
+        later change to the deployment-wide default. The platform app cannot be
+        modified through this endpoint (mirrors AppsService.updateApp/deleteApp).
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema: { type: string }
+          description: App public ID (Sqid)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetSocialProvidersRequest' }
+      responses:
+        '200':
+          description: Providers now enabled for this app, in stable display order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SocialProvidersResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions, or the target app is the immutable platform app
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ── Apps ─────────────────────────────────────────────────────────────────────
 
