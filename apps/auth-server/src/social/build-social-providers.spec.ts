@@ -39,6 +39,34 @@ describe('availableSocialProviders', () => {
       }),
     ).toEqual([]);
   });
+
+  it("returns ['stub'] when E2E_STUB_IDP_URL is set and NODE_ENV is 'development'", () => {
+    expect(
+      availableSocialProviders({
+        E2E_STUB_IDP_URL: 'http://localhost:9999',
+        NODE_ENV: 'development',
+      }),
+    ).toEqual(['stub']);
+  });
+
+  it('returns [] when E2E_STUB_IDP_URL is set and NODE_ENV is absent from the env object', () => {
+    expect(availableSocialProviders({ E2E_STUB_IDP_URL: 'http://localhost:9999' })).toEqual([]);
+  });
+
+  it('returns [] when E2E_STUB_IDP_URL is set and NODE_ENV is mis-cased (\'Production\')', () => {
+    expect(
+      availableSocialProviders({
+        E2E_STUB_IDP_URL: 'http://localhost:9999',
+        NODE_ENV: 'Production',
+      }),
+    ).toEqual([]);
+  });
+
+  it('returns [] when E2E_STUB_IDP_URL is set and NODE_ENV is an empty string', () => {
+    expect(
+      availableSocialProviders({ E2E_STUB_IDP_URL: 'http://localhost:9999', NODE_ENV: '' }),
+    ).toEqual([]);
+  });
 });
 
 describe('buildSocialProviders', () => {

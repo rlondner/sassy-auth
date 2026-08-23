@@ -24,12 +24,16 @@ export function availableSocialProviders(env: NodeJS.ProcessEnv): SocialProvider
   // (not in buildSocialProviders) purely so resolve-enabled-providers'
   // database-row intersection doesn't filter it out.
   //
-  // Guarded on NODE_ENV !== 'production': a stub identity provider that
-  // mints arbitrary identities on demand is a complete authentication
-  // bypass if it is ever reachable in production, so it must be
-  // impossible to enable there even if E2E_STUB_IDP_URL leaks into a
-  // prod environment by mistake.
-  if (env.E2E_STUB_IDP_URL && env.NODE_ENV !== 'production') out.push('stub');
+  // Allowlisted on NODE_ENV, not blocklisted: admitting the stub is a
+  // complete authentication bypass, since anyone who can reach it can mint
+  // any identity. A `!== 'production'` check fails OPEN — an unset
+  // NODE_ENV, a mis-cased 'Production', or an empty string would all count
+  // as "not production" and let the stub through. Listing exactly the
+  // values that should enable it means every unexpected or absent value
+  // excludes it instead.
+  if (env.E2E_STUB_IDP_URL && (env.NODE_ENV === 'test' || env.NODE_ENV === 'development')) {
+    out.push('stub');
+  }
   return out;
 }
 
