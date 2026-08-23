@@ -44,6 +44,38 @@ describe('shouldPromptTwoFactor', () => {
 
     expect(result).toBe(true)
   })
+
+  it('returns false at the exact interval boundary, not true', () => {
+    const promptedAt = new Date('2026-08-09T00:00:00Z')
+    const now = new Date(promptedAt.getTime() + 14 * 24 * 60 * 60 * 1000)
+
+    const result = shouldPromptTwoFactor({
+      twoFactorEnabled: false,
+      promptedAt,
+      now,
+      intervalDays: 14,
+    })
+
+    expect(result).toBe(false)
+  })
+
+  // Guards the `!promptedAt` shorthand at two-factor-prompt.ts:14 against the
+  // canonical `promptedAt === null` in
+  // apps/auth-server/src/auth/should-prompt-two-factor.ts. A Date is an object
+  // and therefore always truthy — including the epoch — so the two forms agree
+  // on every Date | null input. This case fails if the parameter is ever
+  // widened to a nullable timestamp number, where 0 would become falsy and the
+  // shorthand would silently start re-prompting.
+  it('treats an epoch promptedAt as a real timestamp, not as never-prompted', () => {
+    const result = shouldPromptTwoFactor({
+      twoFactorEnabled: false,
+      promptedAt: new Date(0),
+      now: new Date(1000),
+      intervalDays: 14,
+    })
+
+    expect(result).toBe(false)
+  })
 })
 
 describe('getSystemTrustDaysClient', () => {
