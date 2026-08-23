@@ -308,34 +308,38 @@ describe('applyPerAppTrustCookie via trustDevice', () => {
     )
   })
 
-  // applyPerAppTrustCookie is handed the RAW next (actions.ts:419, :467), not
-  // the validateNextUrl-checked value used for the redirect. An off-origin next
-  // is therefore still parsed for its client_id and drives a request to the
-  // auth server, even though the same value is rejected for redirection.
-  it('reads client_id out of an off-origin next that the redirect itself rejects', async () => {
-    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
-    fetchMock
-      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
-      .mockResolvedValueOnce(upstream(200, { effectiveTrustDays: 30 }))
+  // An off-origin next is refused for redirection, so it must not be trusted to
+  // name an app either: otherwise an attacker-supplied client_id selects the
+  // trust interval and can extend how long the victim's device skips the TOTP
+  // challenge. The validated value is the only input allowed to reach here.
+  it.each([
+    ['verifyTotp', () => verifyTotp],
+    ['verifyBackupCode', () => verifyBackupCode],
+  ])(
+    '%s ignores client_id from an off-origin next and uses the system default',
+    async (_name, getFn) => {
+      const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+      fetchMock
+        .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+        .mockResolvedValueOnce(upstream(200, { effectiveTrustDays: 30 }))
 
-    const target = await callExpectingRedirect(
-      verifyTotp,
-      formData({
-        code: '123456',
-        trustDevice: 'true',
-        next: 'https://evil.example.com/x?client_id=attacker_app',
-      }),
-    )
+      const target = await callExpectingRedirect(
+        getFn(),
+        formData({
+          code: '123456',
+          trustDevice: 'true',
+          next: 'https://evil.example.com/x?client_id=attacker_app',
+        }),
+      )
 
-    // The redirect correctly refuses the off-origin value...
-    expect(target).toBe('/users')
-    // ...but the trust-days lookup was still driven by its client_id.
-    const trustCall = fetchMock.mock.calls[1][0] as string
-    expect(trustCall).toContain('client_id=attacker_app')
-    expect(mockForwardNamedCookieWithMaxAge).toHaveBeenCalledWith(
-      expect.anything(),
-      'better-auth.trust_device',
-      30 * DAY_SECONDS,
-    )
-  })
+      expect(target).toBe('/users')
+      // No trust-days lookup at all: the verify call is the only request.
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(mockForwardNamedCookieWithMaxAge).toHaveBeenCalledWith(
+        expect.anything(),
+        'better-auth.trust_device',
+        14 * DAY_SECONDS,
+      )
+    },
+  )
 })

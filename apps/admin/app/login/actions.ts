@@ -347,8 +347,8 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
 }
 
 /**
- * Resolve the effective per-app trust-device duration from the `next` form
- * field (which may carry a client_id query param for per-app overrides) and
+ * Resolve the effective per-app trust-device duration from the `next` value
+ * (which may carry a client_id query param for per-app overrides) and
  * re-set the better-auth.trust_device cookie Max-Age accordingly.
  *
  * BetterAuth uses its plugin DEFAULT trust-device duration (no
@@ -358,6 +358,12 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
  *
  * We override the browser cookie's Max-Age here to honour per-app
  * twoFactorTrustDays.
+ *
+ * `nextStr` MUST be a validateNextUrl-checked value. A `next` we refuse to
+ * redirect to must not be trusted to name an app either: the client_id it
+ * carries selects the trust interval, so an attacker-supplied off-origin
+ * `next` could otherwise point at an app with a long twoFactorTrustDays and
+ * extend how long the victim's device skips the TOTP challenge.
  */
 async function applyPerAppTrustCookie(
   res: Response,
@@ -430,8 +436,7 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
   await forwardNamedCookie(res, 'better-auth.two_factor')
 
   if (trustDevice) {
-    const nextStr = typeof nextRaw === 'string' ? nextRaw : null
-    await applyPerAppTrustCookie(res, nextStr)
+    await applyPerAppTrustCookie(res, nextSafe)
   }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'TOTP verify success', level: 'info' })
@@ -482,8 +487,7 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
   await forwardNamedCookie(res, 'better-auth.two_factor')
 
   if (trustDevice) {
-    const nextStr = typeof nextRaw === 'string' ? nextRaw : null
-    await applyPerAppTrustCookie(res, nextStr)
+    await applyPerAppTrustCookie(res, nextSafe)
   }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Backup code verify success', level: 'info' })
