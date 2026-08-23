@@ -460,6 +460,10 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
 
   if (!res.ok) {
     Sentry.addBreadcrumb({ category: 'auth', message: 'Backup code verify failed', level: 'warning' })
+    // Same budget as the TOTP path: a throttled challenge must not be reported
+    // as a bad code, which is untrue and invites the retry that extends the
+    // lockout window.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     return { error: 'invalidCode' }
   }
 

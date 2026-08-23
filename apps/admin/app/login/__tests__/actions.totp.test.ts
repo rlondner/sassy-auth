@@ -196,13 +196,19 @@ describe.each([
   })
 })
 
-describe('verifyTotp rate limiting', () => {
+// D-01: every credential-bearing admin action reports upstream throttling as
+// its own result. Telling a throttled user their code is wrong is untrue and
+// invites the retry that extends the lockout window.
+describe.each([
+  ['verifyTotp', () => verifyTotp],
+  ['verifyBackupCode', () => verifyBackupCode],
+])('%s rate limiting', (_name, getFn) => {
   it('maps a 429 to tooManyRequests rather than a bad code', async () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
       upstream(429),
     )
 
-    const result = await verifyTotp(formData({ code: '123456' }))
+    const result = await getFn()(formData({ code: '123456' }))
 
     expect(result).toEqual({ error: 'tooManyRequests' })
   })
