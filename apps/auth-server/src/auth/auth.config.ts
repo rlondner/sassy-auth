@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { magicLink, emailOTP, openAPI, twoFactor } from 'better-auth/plugins';
+import { magicLink, emailOTP, openAPI, twoFactor, genericOAuth } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { getEmailer } from '../email/email.singleton';
@@ -11,6 +11,7 @@ import { createAppLogger } from '../common/logger/winston.config';
 import { sendSignInOtp } from './otp-sender';
 import { otpTestStore } from './otp-test-store';
 import { buildSocialProviders } from '../social/build-social-providers';
+import { stubProviderConfig } from '../social/stub-provider';
 import { signInMethodFromPath } from '../social/sign-in-method';
 import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
 import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
@@ -315,5 +316,12 @@ export const auth = betterAuth({
       // from a mis-scanned QR.
     }),
     openAPI({ disableDefaultReference: true }),
+    // task-11: registers no routes at all unless E2E_STUB_IDP_URL is set AND
+    // NODE_ENV is exactly 'test' or 'development' — see stub-provider.ts.
+    // Empty in production, and empty on every ambiguous NODE_ENV a
+    // blocklist would fail open on (unset, 'Production', '').
+    ...(stubProviderConfig(process.env).length
+      ? [genericOAuth({ config: stubProviderConfig(process.env) as never })]
+      : []),
   ],
 });

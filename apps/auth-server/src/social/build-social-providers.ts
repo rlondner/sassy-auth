@@ -17,6 +17,25 @@ const MICROSOFT_KEYS = ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET'];
 // Apple has no static secret: it is an ES256 JWT minted from the .p8 key.
 const APPLE_KEYS = ['APPLE_CLIENT_ID', 'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY'];
 
+/**
+ * SAFETY: admitting the stub IdP is a complete authentication bypass — anyone
+ * who can reach it can mint any identity. Allowlisted on NODE_ENV, not
+ * blocklisted: a `!== 'production'` check fails OPEN (an unset NODE_ENV, a
+ * mis-cased 'Production', or an empty string would all count as "not
+ * production" and let the stub through). Listing exactly the values that
+ * should enable it means every unexpected or absent value excludes it
+ * instead.
+ *
+ * Shared by `availableSocialProviders` (governs whether resolve-enabled-
+ * providers' database-row intersection admits 'stub') and
+ * `stubProviderConfig` in ./stub-provider.ts (governs whether the stub is
+ * actually registered with BetterAuth's genericOAuth plugin) so the two
+ * questions can never drift apart.
+ */
+export function isStubIdpAllowed(env: NodeJS.ProcessEnv): boolean {
+  return Boolean(env.E2E_STUB_IDP_URL) && (env.NODE_ENV === 'test' || env.NODE_ENV === 'development');
+}
+
 export function availableSocialProviders(env: NodeJS.ProcessEnv): SocialProviderId[] {
   const out: SocialProviderId[] = [];
   if (hasAll(env, GOOGLE_KEYS)) out.push('google');
@@ -26,15 +45,7 @@ export function availableSocialProviders(env: NodeJS.ProcessEnv): SocialProvider
   // through a separate plugin for the e2e suite only. It is listed here
   // (not in buildSocialProviders) purely so resolve-enabled-providers'
   // database-row intersection doesn't filter it out.
-  //
-  // Allowlisted on NODE_ENV, not blocklisted: admitting the stub is a
-  // complete authentication bypass, since anyone who can reach it can mint
-  // any identity. A `!== 'production'` check fails OPEN — an unset
-  // NODE_ENV, a mis-cased 'Production', or an empty string would all count
-  // as "not production" and let the stub through. Listing exactly the
-  // values that should enable it means every unexpected or absent value
-  // excludes it instead.
-  if (env.E2E_STUB_IDP_URL && (env.NODE_ENV === 'test' || env.NODE_ENV === 'development')) {
+  if (isStubIdpAllowed(env)) {
     out.push('stub');
   }
   return out;

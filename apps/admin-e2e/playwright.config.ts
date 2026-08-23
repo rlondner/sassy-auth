@@ -6,6 +6,7 @@ const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
+const STUB_IDP_URL = process.env.E2E_STUB_IDP_URL ?? 'http://localhost:9099'
 
 let RS_CLIENT_ID = process.env.RS_CLIENT_ID ?? ''
 if (!RS_CLIENT_ID) {
@@ -86,12 +87,41 @@ export default defineConfig({
   webServer: CI_TESTS
     ? [
         {
+          // task-11: stubProviderConfig (auth-server/src/social/stub-provider.ts)
+          // registers the stub OIDC provider ONLY when E2E_STUB_IDP_URL is set
+          // AND NODE_ENV is exactly 'test' or 'development' — a positive
+          // allowlist, not a `!== 'production'` blocklist, because the stub is a
+          // complete auth bypass if it's ever reachable outside test. NODE_ENV is
+          // therefore set explicitly here rather than inherited: an unset value
+          // would make the allowlist refuse the stub and the federated specs
+          // below would fail with "provider not found".
           command: 'pnpm --filter @sassy-auth/auth-server dev',
           url: `${AUTH_SERVER_URL}/api/token/jwks`,
           reuseExistingServer: false,
           timeout: 120_000,
           stdout: 'pipe',
           stderr: 'pipe',
+          env: {
+            NODE_ENV: 'test',
+            E2E_STUB_IDP_URL: STUB_IDP_URL,
+          },
+        },
+        {
+          // task-11: the stub identity provider itself. Must be up before the
+          // auth-server's discovery-document fetch on first sign-in attempt, so
+          // it's an independent webServer entry rather than something the
+          // auth-server spawns; Playwright starts all entries concurrently and
+          // waits on each `url` before running tests.
+          command: 'node fixtures/stub-idp/server.mjs',
+          url: `${STUB_IDP_URL}/.well-known/openid-configuration`,
+          reuseExistingServer: false,
+          timeout: 30_000,
+          stdout: 'pipe',
+          stderr: 'pipe',
+          env: {
+            STUB_IDP_PORT: new URL(STUB_IDP_URL).port || '9099',
+            STUB_IDP_ISSUER: STUB_IDP_URL,
+          },
         },
         {
           // `next start`, not `next dev`. In dev mode Next compiles each route
