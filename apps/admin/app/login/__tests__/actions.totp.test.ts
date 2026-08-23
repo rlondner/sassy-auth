@@ -2,7 +2,6 @@
  * Covers verifyTotp, verifyBackupCode and the applyPerAppTrustCookie helper
  * they share, in apps/admin/app/login/actions.ts.
  */
-import { jest } from '@jest/globals'
 
 jest.mock('next/headers', () => ({ cookies: jest.fn() }))
 jest.mock('next/navigation', () => ({

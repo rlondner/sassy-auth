@@ -5,7 +5,6 @@
  * whether an account exists: every upstream status must produce the same
  * neutral result, and only a transport failure may surface an error.
  */
-import { jest } from '@jest/globals'
 
 jest.mock('next/headers', () => ({ cookies: jest.fn() }))
 jest.mock('next/navigation', () => ({

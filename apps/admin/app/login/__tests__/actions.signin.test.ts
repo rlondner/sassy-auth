@@ -3,7 +3,6 @@
  * upstream status mapping, transport failure, the twoFactorRedirect branch,
  * and which cookies are forwarded on each path.
  */
-import { jest } from '@jest/globals'
 
 jest.mock('next/headers', () => ({ cookies: jest.fn() }))
 jest.mock('next/navigation', () => ({

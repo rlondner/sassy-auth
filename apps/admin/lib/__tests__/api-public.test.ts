@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals'
 
 function jsonResponse(status: number, body: unknown = {}) {
   return {
