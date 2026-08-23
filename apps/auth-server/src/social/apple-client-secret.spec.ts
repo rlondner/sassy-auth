@@ -59,6 +59,32 @@ describe('createAppleClientSecretFactory', () => {
     expect(factory()).not.toBe(first);
   });
 
+  it('serves the cached secret while well inside the refresh margin', () => {
+    let clock = 1_700_000_000_000;
+    const factory = createAppleClientSecretFactory(env, () => clock);
+    const first = factory();
+    clock += 30 * 24 * 60 * 60 * 1000; // 30 days later
+    expect(factory()).toBe(first);
+  });
+
+  it('regenerates once inside the refresh margin but before expiry', () => {
+    let clock = 1_700_000_000_000;
+    const factory = createAppleClientSecretFactory(env, () => clock);
+    const first = factory();
+    clock += 85 * 24 * 60 * 60 * 1000; // 85 days later
+    expect(factory()).not.toBe(first);
+  });
+
+  it('never serves an expired secret', () => {
+    let clock = 1_700_000_000_000;
+    const factory = createAppleClientSecretFactory(env, () => clock);
+    factory(); // Prime the cache
+    clock += 95 * 24 * 60 * 60 * 1000; // 95 days later, past the 90-day lifetime
+    const secret = factory();
+    const decoded = jwt.decode(secret) as jwt.JwtPayload;
+    expect(decoded.exp!).toBeGreaterThan(Math.floor(clock / 1000));
+  });
+
   it('throws a clear error when the key material is incomplete', () => {
     expect(() => createAppleClientSecretFactory({ APPLE_TEAM_ID: 'T' })()).toThrow(
       /APPLE_CLIENT_ID/,
