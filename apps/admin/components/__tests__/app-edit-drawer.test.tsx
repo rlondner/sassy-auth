@@ -7,7 +7,7 @@ import * as actions from '@/app/(admin)/apps/actions'
 
 jest.mock('@/app/(admin)/apps/actions', () => ({
   updateAppAction: jest.fn(),
-  getSocialProvidersAction: jest.fn(),
+  getSocialProviderSettingsAction: jest.fn(),
   updateSocialProvidersAction: jest.fn(),
 }))
 Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } })
@@ -25,7 +25,7 @@ function withIntl(node: React.ReactNode) {
 describe('AppEditDrawer', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(actions.getSocialProvidersAction as jest.Mock).mockResolvedValue({ providers: [] })
+    ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({ available: [], enabled: [] })
   })
 
   it('renders the publicId as read-only and copies on click', async () => {
@@ -60,12 +60,13 @@ describe('AppEditDrawer', () => {
   })
 
   it('renders social sign-in checkboxes from the fetched list, checked by default', async () => {
-    ;(actions.getSocialProvidersAction as jest.Mock).mockResolvedValue({
-      providers: ['google', 'microsoft'],
+    ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({
+      available: ['google', 'microsoft'],
+      enabled: ['google', 'microsoft'],
     })
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
     await waitFor(() =>
-      expect(actions.getSocialProvidersAction).toHaveBeenCalledWith('sq_1'),
+      expect(actions.getSocialProviderSettingsAction).toHaveBeenCalledWith('sq_1'),
     )
     const google = (await screen.findByLabelText(en.apps.fields.socialProviderNames.google)) as HTMLInputElement
     const microsoft = screen.getByLabelText(en.apps.fields.socialProviderNames.microsoft) as HTMLInputElement
@@ -73,9 +74,41 @@ describe('AppEditDrawer', () => {
     expect(microsoft.checked).toBe(true)
   })
 
-  it('unchecking a provider submits a providers array without it', async () => {
-    ;(actions.getSocialProvidersAction as jest.Mock).mockResolvedValue({
+  // Finding 1: `available` can include providers the app currently has
+  // OFF (not present in `enabled`) — that's the opt-in case the public GET
+  // /api/social-providers can never support, since it only ever returns
+  // the currently-enabled subset. The checkbox must still render, unchecked.
+  it('renders an unchecked checkbox for a provider the app has not enabled, allowing opt-in', async () => {
+    ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({
+      available: ['google', 'microsoft'],
+      enabled: ['google'],
+    })
+    ;(actions.updateSocialProvidersAction as jest.Mock).mockResolvedValue({
       providers: ['google', 'microsoft'],
+    })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    const microsoft = (await screen.findByLabelText(en.apps.fields.socialProviderNames.microsoft)) as HTMLInputElement
+    expect(microsoft.checked).toBe(false)
+
+    fireEvent.click(microsoft)
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    expect(save).toBeEnabled()
+    fireEvent.click(save)
+
+    await waitFor(() =>
+      expect(actions.updateSocialProvidersAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.arrayContaining(['google', 'microsoft']),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  it('unchecking a provider submits a providers array without it', async () => {
+    ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({
+      available: ['google', 'microsoft'],
+      enabled: ['google', 'microsoft'],
     })
     ;(actions.updateSocialProvidersAction as jest.Mock).mockResolvedValue({
       providers: ['google'],
@@ -94,5 +127,32 @@ describe('AppEditDrawer', () => {
     )
     expect(actions.updateAppAction).not.toHaveBeenCalled()
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  // Finding 4: the component is kept mounted (with `open` toggling) for
+  // every selected row in AppsTable, including View and Delete — not just
+  // Edit. Before this fix, the fetch fired on mount regardless of `open`,
+  // so every row click made an authenticated request whose result was
+  // never shown. It must only fire once the drawer is actually open.
+  it('does not fetch social-provider settings while the drawer is mounted but closed', async () => {
+    render(withIntl(<AppEditDrawer app={app} open={false} onOpenChange={() => undefined} />))
+    // Give any stray microtask/effect a chance to run before asserting.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(actions.getSocialProviderSettingsAction).not.toHaveBeenCalled()
+  })
+
+  it('fetches social-provider settings once the drawer transitions to open', async () => {
+    ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({
+      available: ['google'],
+      enabled: ['google'],
+    })
+    const { rerender } = render(
+      withIntl(<AppEditDrawer app={app} open={false} onOpenChange={() => undefined} />),
+    )
+    expect(actions.getSocialProviderSettingsAction).not.toHaveBeenCalled()
+    rerender(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    await waitFor(() =>
+      expect(actions.getSocialProviderSettingsAction).toHaveBeenCalledWith('sq_1'),
+    )
   })
 })

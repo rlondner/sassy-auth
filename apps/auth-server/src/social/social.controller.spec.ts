@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { ForbiddenException, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { SocialController } from './social.controller';
@@ -12,16 +12,20 @@ jest.mock('../auth/auth.config', () => ({
 }));
 import { auth } from '../auth/auth.config';
 
-const mockGetSession = auth.api.getSession as unknown as jest.Mock;
+// Mocked, per apps.service.spec.ts's convention, so the authenticated
+// authorization tests below (caller has a session but lacks
+// 'platform.apps.manage') don't need a real database: checkPermission's
+// real implementation always hits the `prisma` singleton.
+jest.mock('../common/permissions/check-permission', () => ({
+  checkPermission: jest.fn(),
+}));
+import { checkPermission } from '../common/permissions/check-permission';
 
-// This is the check the task brief asks for: prove the route answers without
-// a session and without 404ing an unknown client_id. It mirrors
-// discovery.controller.spec.ts's pattern (Nest testing module + supertest +
-// the same setGlobalPrefix('api') used in configure-nest-app.ts) instead of
-// booting the real server, so it needs no database and no BetterAuth guard
-// wiring. No `@UseGuards` is registered anywhere in this module — guards in
-// this codebase are opt-in per controller — so the absence of one here is
-// sufficient for the route to be public; this test just proves it.
+const mockGetSession = auth.api.getSession as unknown as jest.Mock;
+const mockCheckPermission = checkPermission as jest.Mock;
+
+const authedSession = { user: { id: 'ba-caller' }, session: {} };
+
 describe('SocialController (public reachability)', () => {
   let app: INestApplication;
 
@@ -66,23 +70,40 @@ describe('SocialController (public reachability)', () => {
   });
 });
 
-// This proves the security property the task brief cares about: the PUT
-// changes which identity providers an app trusts, so — unlike the GET above
-// — it must reject an anonymous caller. It boots the SocialController with
-// the REAL BetterAuthGuard (only `auth.api.getSession` is mocked, per the
-// module mock above) so the guard actually runs, rather than stubbing the
-// guard away as AppsController's/MeController's unit specs do when they only
-// care about forwarding.
-describe('SocialController PUT :clientId (authenticated reachability)', () => {
+// This proves the security properties the task brief cares about for both
+// authenticated routes (PUT :clientId and GET :clientId/settings): they
+// reject an anonymous caller (401), they reject an authenticated caller
+// lacking 'platform.apps.manage' (the checkPermission call itself throws,
+// per checkPermission's real ForbiddenException contract — see
+// check-permission.ts), and they call checkPermission with exactly that
+// permission string (mirroring apps.service.spec.ts's assertions on
+// checkPermission's arguments). Both routes boot the SocialController with
+// the REAL BetterAuthGuard (only `auth.api.getSession` is mocked) so the
+// guard actually runs, rather than stubbing the guard away as
+// AppsController's/MeController's unit specs do when they only care about
+// forwarding.
+describe('SocialController authenticated routes (authentication + authorization)', () => {
   let app: INestApplication;
+  let setForApp: jest.Mock;
+  let listForApp: jest.Mock;
+  let getSettingsForApp: jest.Mock;
 
   async function buildApp(): Promise<INestApplication> {
+    setForApp = jest.fn().mockResolvedValue(undefined);
+    listForApp = jest.fn().mockResolvedValue(['google']);
+    getSettingsForApp = jest.fn().mockResolvedValue({ available: ['google', 'microsoft'], enabled: ['google'] });
     const moduleRef = await Test.createTestingModule({
       controllers: [SocialController],
-      providers: [{ provide: SocialService, useValue: { listForApp: jest.fn(), setForApp: jest.fn() } }],
+      providers: [{ provide: SocialService, useValue: { listForApp, setForApp, getSettingsForApp } }],
     }).compile();
     const instance = moduleRef.createNestApplication();
     instance.setGlobalPrefix('api');
+    // Matches configure-nest-app.ts's real ValidationPipe options — needed
+    // so the "malformed body" test below exercises the same DTO validation
+    // a real request would hit, not the test harness's default (no) pipe.
+    instance.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     await instance.init();
     return instance;
   }
@@ -95,12 +116,81 @@ describe('SocialController PUT :clientId (authenticated reachability)', () => {
     if (app) await app.close();
   });
 
-  it('rejects an anonymous PUT with 401, never reaching the service', async () => {
-    mockGetSession.mockResolvedValue(null);
-    app = await buildApp();
-    const res = await request(app.getHttpServer())
-      .put('/api/social-providers/qp31')
-      .send({ providers: ['google'] });
-    expect(res.status).toBe(401);
+  describe('PUT /api/social-providers/:clientId', () => {
+    it('rejects an anonymous PUT with 401, never reaching checkPermission or the service', async () => {
+      mockGetSession.mockResolvedValue(null);
+      app = await buildApp();
+      const res = await request(app.getHttpServer())
+        .put('/api/social-providers/qp31')
+        .send({ providers: ['google'] });
+      expect(res.status).toBe(401);
+      expect(mockCheckPermission).not.toHaveBeenCalled();
+      expect(setForApp).not.toHaveBeenCalled();
+    });
+
+    it('rejects an authenticated caller lacking platform.apps.manage, never reaching the service', async () => {
+      mockGetSession.mockResolvedValue(authedSession);
+      mockCheckPermission.mockRejectedValue(new ForbiddenException());
+      app = await buildApp();
+      const res = await request(app.getHttpServer())
+        .put('/api/social-providers/qp31')
+        .send({ providers: ['google'] });
+      expect(res.status).toBe(403);
+      expect(setForApp).not.toHaveBeenCalled();
+    });
+
+    it('calls checkPermission with the caller id and platform.apps.manage', async () => {
+      mockGetSession.mockResolvedValue(authedSession);
+      mockCheckPermission.mockResolvedValue(undefined);
+      app = await buildApp();
+      const res = await request(app.getHttpServer())
+        .put('/api/social-providers/qp31')
+        .send({ providers: ['google'] });
+      expect(res.status).toBe(200);
+      expect(mockCheckPermission).toHaveBeenCalledWith('ba-caller', 'platform.apps.manage');
+      expect(setForApp).toHaveBeenCalledWith('qp31', ['google']);
+    });
+
+    it('rejects a malformed body (non-string providers entries) with 400', async () => {
+      mockGetSession.mockResolvedValue(authedSession);
+      mockCheckPermission.mockResolvedValue(undefined);
+      app = await buildApp();
+      const res = await request(app.getHttpServer())
+        .put('/api/social-providers/qp31')
+        .send({ providers: [42] });
+      expect(res.status).toBe(400);
+      expect(setForApp).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/social-providers/:clientId/settings', () => {
+    it('rejects an anonymous GET with 401, never reaching checkPermission or the service', async () => {
+      mockGetSession.mockResolvedValue(null);
+      app = await buildApp();
+      const res = await request(app.getHttpServer()).get('/api/social-providers/qp31/settings');
+      expect(res.status).toBe(401);
+      expect(mockCheckPermission).not.toHaveBeenCalled();
+      expect(getSettingsForApp).not.toHaveBeenCalled();
+    });
+
+    it('rejects an authenticated caller lacking platform.apps.manage, never reaching the service', async () => {
+      mockGetSession.mockResolvedValue(authedSession);
+      mockCheckPermission.mockRejectedValue(new ForbiddenException());
+      app = await buildApp();
+      const res = await request(app.getHttpServer()).get('/api/social-providers/qp31/settings');
+      expect(res.status).toBe(403);
+      expect(getSettingsForApp).not.toHaveBeenCalled();
+    });
+
+    it('calls checkPermission with the caller id and platform.apps.manage, and returns available+enabled', async () => {
+      mockGetSession.mockResolvedValue(authedSession);
+      mockCheckPermission.mockResolvedValue(undefined);
+      app = await buildApp();
+      const res = await request(app.getHttpServer()).get('/api/social-providers/qp31/settings');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ available: ['google', 'microsoft'], enabled: ['google'] });
+      expect(mockCheckPermission).toHaveBeenCalledWith('ba-caller', 'platform.apps.manage');
+      expect(getSettingsForApp).toHaveBeenCalledWith('qp31');
+    });
   });
 });

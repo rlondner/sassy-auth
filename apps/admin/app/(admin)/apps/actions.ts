@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createApp, updateApp, deleteApp, getApps, getSocialProviders, setSocialProviders } from '@/lib/api'
+import { createApp, updateApp, deleteApp, getApps, getSocialProviderSettings, setSocialProviders } from '@/lib/api'
 import type {
   App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse,
 } from '@/lib/types'
@@ -60,15 +60,18 @@ export async function deleteAppAction(
   }
 }
 
-// Used by the edit drawer to populate the social sign-in checkbox group.
-// Failures fall back to an empty list rather than surfacing an error — the
-// rest of the drawer (name/url/2FA fields) must still be usable even if the
+// Used by the edit drawer to populate the social sign-in checkbox group:
+// `available` is every provider this deployment has credentials for (the
+// checkbox universe — including providers currently off for this app, so
+// opt-in works), `enabled` is which of those are ticked. Failures fall back
+// to an empty settings shape rather than surfacing an error — the rest of
+// the drawer (name/url/2FA fields) must still be usable even if the
 // social-providers call fails.
-export async function getSocialProvidersAction(
+export async function getSocialProviderSettingsAction(
   clientId: string,
-): Promise<{ providers: string[] } | ErrorResult> {
+): Promise<{ available: string[]; enabled: string[] } | ErrorResult> {
   try {
-    return { providers: await getSocialProviders(clientId) }
+    return await getSocialProviderSettings(clientId)
   } catch {
     return { errorKey: 'apps.errors.generic' }
   }

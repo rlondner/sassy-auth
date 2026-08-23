@@ -1,3 +1,4 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { SocialService } from './social.service';
 
 function makeService(rows: { appId: number | null; provider: string; enabled: boolean }[], app: { id: number } | null) {
@@ -68,5 +69,67 @@ describe('SocialService.setForApp', () => {
     };
     const svc = new SocialService(db as never, {});
     await expect(svc.setForApp('nope', [])).rejects.toThrow();
+  });
+
+  // Finding 2: mirrors AppsService.updateApp/deleteApp, which both refuse
+  // to modify the platform app even via a direct API call (the console
+  // merely hides the Edit action — that's not itself a security boundary).
+  it('refuses to modify the platform app', async () => {
+    const upsert = jest.fn(async () => undefined);
+    const db = {
+      saApp: { findUnique: async () => ({ id: 2, isPlatform: true }) },
+      saSocialProvider: { findMany: async () => [], upsert },
+    };
+    const svc = new SocialService(db as never, { GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's' });
+    await expect(svc.setForApp('platform-app', ['google'])).rejects.toBeInstanceOf(ForbiddenException);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('SocialService.getSettingsForApp', () => {
+  it('returns every available provider plus the subset enabled for the app', async () => {
+    const db = {
+      saApp: { findUnique: async () => ({ id: 7 }) },
+      saSocialProvider: {
+        findMany: async () => [{ appId: null, provider: 'google', enabled: true }],
+      },
+    };
+    const svc = new SocialService(db as never, {
+      GOOGLE_CLIENT_ID: 'g',
+      GOOGLE_CLIENT_SECRET: 's',
+      MICROSOFT_CLIENT_ID: 'm',
+      MICROSOFT_CLIENT_SECRET: 's',
+    });
+    await expect(svc.getSettingsForApp('qp31')).resolves.toEqual({
+      available: ['google', 'microsoft'],
+      enabled: ['google'],
+    });
+  });
+
+  // Unlike the public GET (which must return an empty list for an unknown
+  // client_id to avoid enumeration), this endpoint is authenticated, so an
+  // unknown app 404s the same way setForApp does.
+  it('throws for an unknown app rather than returning an empty settings shape', async () => {
+    const db = {
+      saApp: { findUnique: async () => null },
+      saSocialProvider: { findMany: async () => [] },
+    };
+    const svc = new SocialService(db as never, {});
+    await expect(svc.getSettingsForApp('nope')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  // Read-only, so — unlike setForApp — the platform app is NOT blocked here,
+  // mirroring AppsService.getApp/listApps (which allow reading the platform
+  // app; only updateApp/deleteApp refuse).
+  it('does not refuse to read the platform app', async () => {
+    const db = {
+      saApp: { findUnique: async () => ({ id: 2, isPlatform: true }) },
+      saSocialProvider: { findMany: async () => [] },
+    };
+    const svc = new SocialService(db as never, { GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's' });
+    await expect(svc.getSettingsForApp('platform-app')).resolves.toEqual({
+      available: ['google'],
+      enabled: [],
+    });
   });
 });

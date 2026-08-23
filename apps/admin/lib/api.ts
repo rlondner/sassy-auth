@@ -246,10 +246,19 @@ export async function deleteApp(publicId: string): Promise<void> {
   Sentry.addBreadcrumb({ category: 'admin.action', message: `App deleted: ${publicId}`, level: 'info' });
 }
 
-export async function getSocialProviders(clientId: string): Promise<string[]> {
-  const res = await apiFetch(`/api/social-providers?client_id=${encodeURIComponent(clientId)}`);
-  const body: { providers: string[] } = await res.json();
-  return body.providers;
+// Backs the admin console's checkbox group: `available` is every provider
+// this deployment has credentials for (so an app that has opted a provider
+// off still shows a checkbox for it — see GET /api/social-providers above,
+// which by construction only ever returns the currently-enabled subset and
+// so cannot drive an opt-in control), `enabled` is the subset currently
+// shown for this app. Authenticated (unlike getSocialProviders above),
+// because `available` reveals which providers this deployment has
+// credentials configured for.
+export async function getSocialProviderSettings(
+  clientId: string,
+): Promise<{ available: string[]; enabled: string[] }> {
+  const res = await apiFetch(`/api/social-providers/${clientId}/settings`);
+  return res.json();
 }
 
 export async function setSocialProviders(clientId: string, providers: string[]): Promise<string[]> {

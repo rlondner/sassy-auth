@@ -14,7 +14,7 @@ import {
   Input,
   Label,
 } from '@sassy-auth/ui'
-import { updateAppAction, getSocialProvidersAction, updateSocialProvidersAction } from '@/app/(admin)/apps/actions'
+import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction } from '@/app/(admin)/apps/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { App } from '@/lib/types'
 
@@ -37,11 +37,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
-  // The checkbox universe is the provider list GET /api/social-providers
-  // returns for this app (i.e. the currently-enabled set); unchecking one
-  // opts it out on save. `initialProviders` is the fetched baseline used to
-  // detect a change, kept separate from `checkedProviders` (the live
-  // checkbox state) so `dirty` can compare the two.
+  // The checkbox universe is `available` — every provider this deployment
+  // has credentials for, from GET /api/social-providers/:clientId/settings
+  // — not just the ones currently on for this app, so a provider that's
+  // off can be ticked back on. `checkedProviders` is the live checkbox
+  // state; `initialProviders` is the fetched `enabled` baseline used to
+  // detect a change, kept separate so `dirty` can compare the two.
   const [availableProviders, setAvailableProviders] = React.useState<string[]>([])
   const [checkedProviders, setCheckedProviders] = React.useState<Set<string>>(new Set())
   const [initialProviders, setInitialProviders] = React.useState<string[]>([])
@@ -54,20 +55,27 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
     setErrorKey(null)
+    // Gate the authenticated social-providers fetch on the drawer actually
+    // being open: AppsTable keeps this component mounted (with `open`
+    // toggling) for every selected row, including View and Delete, so an
+    // unconditional fetch here fired on every row click for a result that
+    // was never shown. Skipping while closed also means an app switch that
+    // happens while the drawer is closed doesn't fetch until it opens.
+    if (!open) return
     setSocialLoading(true)
     let cancelled = false
-    getSocialProvidersAction(app.publicId).then((result) => {
+    getSocialProviderSettingsAction(app.publicId).then((result) => {
       if (cancelled) return
-      const providers = 'providers' in result ? result.providers : []
-      setAvailableProviders(providers)
-      setCheckedProviders(new Set(providers))
-      setInitialProviders(providers)
+      const { available, enabled } = 'available' in result ? result : { available: [], enabled: [] }
+      setAvailableProviders(available)
+      setCheckedProviders(new Set(enabled))
+      setInitialProviders(enabled)
       setSocialLoading(false)
     })
     return () => {
       cancelled = true
     }
-  }, [app])
+  }, [app, open])
 
   function toggleProvider(provider: string, checked: boolean) {
     setCheckedProviders((prev) => {

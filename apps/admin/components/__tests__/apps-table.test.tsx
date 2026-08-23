@@ -9,10 +9,12 @@ jest.mock('@/app/(admin)/apps/actions', () => ({
   deleteAppAction: jest.fn(),
   listAppsAction: jest.fn(),
   updateAppAction: jest.fn(),
-  // AppEditDrawer (rendered by AppsTable's edit flow) fetches this on mount;
-  // resolve to an empty list so tests that don't care about social sign-in
-  // don't need to know about it.
-  getSocialProvidersAction: jest.fn().mockResolvedValue({ providers: [] }),
+  // AppEditDrawer (rendered whenever a row is selected — View and Delete
+  // included, not just Edit) only fetches this once its own `open` prop is
+  // true, so none of these tests (which never open the edit drawer) trigger
+  // it; no mock resolution is needed. Kept as a bare jest.fn() purely so the
+  // module shape matches actions.ts's exports.
+  getSocialProviderSettingsAction: jest.fn(),
   updateSocialProvidersAction: jest.fn(),
 }))
 
