@@ -193,8 +193,14 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
     return { twoFactor: true } as { twoFactor: true }
   }
 
+  // The auth server accepted the credentials and returned 200; we could not
+  // extract a session from its response. That is a server-side fault, not a bad
+  // password — forwardSessionCookie has already reported it to Sentry at error
+  // level. Reporting it as invalidCredentials would make the user retype a
+  // password that was just accepted, spending rate-limit budget on a retry that
+  // cannot succeed. All four call sites report this the same way.
   const ok = await forwardSessionCookie(res)
-  if (!ok) return { error: 'invalidCredentials' }
+  if (!ok) return { error: 'serverUnavailable' }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Admin login successful', level: 'info' })
   const nextRaw = formData.get('next')
@@ -329,8 +335,10 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
     return { twoFactor: true } as { twoFactor: true }
   }
 
+  // Same reasoning as signIn: the code was accepted, so a session we cannot
+  // read is a server-side fault rather than a bad code.
   const ok = await forwardSessionCookie(res)
-  if (!ok) return { error: 'invalidCode' }
+  if (!ok) return { error: 'serverUnavailable' }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Admin OTP login successful', level: 'info' })
   const nextRaw = formData.get('next')

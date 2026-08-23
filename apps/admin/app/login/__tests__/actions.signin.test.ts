@@ -250,14 +250,29 @@ describe('signIn success', () => {
     expect(target).toBe('/users')
   })
 
-  it('returns invalidCredentials when the 200 response carries no Set-Cookie', async () => {
+  // The auth server accepted the credentials and returned 200; we simply could
+  // not extract a session from the response. That is a server-side fault, not a
+  // bad password, and forwardSessionCookie already reports it to Sentry at
+  // error level. Telling the user their credentials were wrong would make them
+  // retype a password that was just accepted, burning rate-limit budget.
+  it('returns serverUnavailable when the 200 response carries no Set-Cookie', async () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
       upstream(200, {}),
     )
 
     const result = await signIn(formData({ email: 'a@b.io', password: 'pw' }))
 
-    expect(result).toEqual({ error: 'invalidCredentials' })
+    expect(result).toEqual({ error: 'serverUnavailable' })
+  })
+
+  it('returns serverUnavailable when the Set-Cookie cannot be parsed', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, {}, 'some-other-cookie=value; Path=/'),
+    )
+
+    const result = await signIn(formData({ email: 'a@b.io', password: 'pw' }))
+
+    expect(result).toEqual({ error: 'serverUnavailable' })
   })
 })
 

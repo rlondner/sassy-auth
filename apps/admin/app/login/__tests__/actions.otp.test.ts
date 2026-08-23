@@ -273,13 +273,15 @@ describe('verifyOtp success', () => {
     expect(target).toBe('/users')
   })
 
-  it('returns invalidCode when the 200 response carries no Set-Cookie', async () => {
+  // As in signIn: the code was accepted, so a missing session cookie is a
+  // server-side fault rather than a bad code.
+  it('returns serverUnavailable when the 200 response carries no Set-Cookie', async () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
       upstream(200, {}),
     )
 
     const result = await verifyOtp(formData({ email: 'a@b.io', otp: '123456' }))
 
-    expect(result).toEqual({ error: 'invalidCode' })
+    expect(result).toEqual({ error: 'serverUnavailable' })
   })
 })

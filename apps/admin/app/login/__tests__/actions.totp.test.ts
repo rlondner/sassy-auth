@@ -185,6 +185,16 @@ describe.each([
     expect(target).toBe('/users')
   })
 
+  it('returns serverUnavailable when the 200 response carries no Set-Cookie', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, {}),
+    )
+
+    const result = await getFn()(formData({ [codeField]: '123456' }))
+
+    expect(result).toEqual({ error: 'serverUnavailable' })
+  })
+
   it('does not touch the trust-device cookie when trustDevice is absent', async () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
       upstream(200, {}, SESSION_COOKIE),
