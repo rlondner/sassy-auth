@@ -71,6 +71,42 @@ function countUsersWithEmail(email: string): number {
   return Number.parseInt(out.trim(), 10)
 }
 
+/**
+ * Counts `Account` rows for the given user's email + providerId, direct
+ * against the database (same rationale/mechanism as countUsersWithEmail
+ * above). Added as fix-round-1 finding 2: the "second sign-in reuses the
+ * existing link" test previously only asserted the UI said "Signed in"
+ * twice, on the unbacked assumption that a duplicate Account row would
+ * surface as a visible failure. It would not — `Account` has no unique
+ * constraint on (providerId, accountId) in schema.prisma, only an index on
+ * userId — so a regression toward unconditional `create` (instead of
+ * find-or-create) would write a second row silently and this test would
+ * stay green. This counts the real row count before/after the second
+ * sign-in so that regression is actually caught.
+ */
+function countAccountsForEmail(email: string, providerId: string): number {
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) {
+    throw new Error(
+      'DATABASE_URL must be set explicitly on the process running Playwright — ' +
+        'see the module comment in rs-social-round-trip.spec.ts.',
+    )
+  }
+  const escapedEmail = email.replace(/'/g, "''")
+  const escapedProvider = providerId.replace(/'/g, "''")
+  const out = execFileSync(
+    'psql',
+    [
+      databaseUrl,
+      '-tAc',
+      `select count(*) from "Account" a join "User" u on u.id = a."userId" ` +
+        `where u.email = '${escapedEmail}' and a."providerId" = '${escapedProvider}'`,
+    ],
+    { encoding: 'utf8' },
+  )
+  return Number.parseInt(out.trim(), 10)
+}
+
 test.describe('FastAPI RS federated round-trip', () => {
   test.beforeEach(async ({ request }) => {
     if (!configured()) {
@@ -99,6 +135,12 @@ test.describe('FastAPI RS federated round-trip', () => {
 
   test('a second sign-in reuses the existing link', async ({ page, request }) => {
     const social = new SocialLoginPage(page)
+
+    // Fix round 1, finding 2: assert the real row count, not just that the
+    // UI looked fine — see countAccountsForEmail's comment for why the UI
+    // assertions below cannot, by themselves, catch a duplicate Account row.
+    const before = countAccountsForEmail(SOCIAL_EMAIL, 'stub')
+
     for (let i = 0; i < 2; i++) {
       await social.setIdentity(request, { sub: 'stub-sub-1', email: SOCIAL_EMAIL, email_verified: true })
       await page.goto(`${RS_BASE_URL}/auth/login`)
@@ -107,11 +149,9 @@ test.describe('FastAPI RS federated round-trip', () => {
       await expect(page.getByTestId('claim-amr')).toHaveText('ext')
       await page.context().clearCookies()
     }
-    // One Account row per (providerId, accountId) is what account-linking is
-    // supposed to guarantee; a duplicate would surface either as a linking
-    // failure (error page) or an "already linked" error, both of which the
-    // check above would have already caught since the second iteration
-    // reasserts "Signed in" + amr:ext, not merely the absence of an error.
+
+    const after = countAccountsForEmail(SOCIAL_EMAIL, 'stub')
+    expect(after, 'a second sign-in must reuse the existing Account row, not create a duplicate').toBe(before)
   })
 
   test('an unknown identity is refused generically and creates no user', async ({ page, request }) => {
@@ -140,11 +180,76 @@ test.describe('FastAPI RS federated round-trip', () => {
     await social.clickTestIdp()
 
     await expect(page).toHaveURL(/\/oauth-error\?code=social_email_unverified/)
+    // Fix round 1, finding 4: this test's name promises "refused with the
+    // specific message", but only the URL's error code was ever checked —
+    // unlike the adjacent unknown-identity test, which asserts on the
+    // rendered heading text too. Match that pattern here (heading text from
+    // apps/admin/messages/en.json's oauthError.codes.social_email_unverified.heading).
+    await expect(page.getByText('Email address not verified')).toBeVisible()
   })
 
-  test('a provider disabled for the app renders no button', async ({ page }) => {
-    await page.goto(`${RS_BASE_URL}/auth/login`)
-    await expect(page.getByRole('button', { name: /test idp/i })).toBeVisible()
+  test('a provider disabled for the app renders no button', async ({ page, request }) => {
+    // Fix round 1, finding 1: this test used to never disable anything and
+    // asserted the button WAS visible — the opposite of its own name, and a
+    // silent coverage gap for a security-relevant path (an admin-disabled
+    // provider must not remain a live sign-in vector). It now drives the
+    // real authenticated admin API exactly as an operator would.
+    const rsClientId = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
+    expect(rsClientId, 'RS_CLIENT_ID / SASSY_CLIENT_ID must be set').toBeTruthy()
+
+    // Capture the real current enabled set via the same public GET the
+    // login page itself calls (social-providers.ts), so restoration below
+    // writes back exactly what was there — never an assumed/hardcoded list.
+    const beforeRes = await request.get(
+      `${AUTH_SERVER_URL}/api/social-providers?client_id=${encodeURIComponent(rsClientId)}`,
+    )
+    expect(beforeRes.ok(), `GET /api/social-providers failed: ${beforeRes.status()}`).toBeTruthy()
+    const { providers: originalEnabled } = (await beforeRes.json()) as { providers: string[] }
+    expect(
+      originalEnabled,
+      'stub must already be enabled for the RS app for this test to prove anything by disabling it',
+    ).toContain('stub')
+
+    // Authenticate as a super-admin the same way the "not a 2FA bypass" test
+    // below does: a fresh browser context loaded with
+    // '.auth/super-admin.json' (produced by the `setup` project's
+    // auth-state.setup.ts). PUT /api/social-providers/:clientId requires
+    // platform.apps.manage (social.controller.ts), and this spec's own
+    // `page`/`request` fixtures run in the unauthenticated `chromium`
+    // project, so a second, explicitly-authenticated context is required —
+    // there is no way to drive this endpoint from this spec's own project
+    // without one.
+    const superCtx = await page.context().browser()!.newContext({
+      storageState: '.auth/super-admin.json',
+    })
+    try {
+      const disabledSet = originalEnabled.filter((p) => p !== 'stub')
+
+      // try/finally (not afterEach): the captured `originalEnabled` list is
+      // local to this test and would not be available to a separate
+      // afterEach hook without hoisting it to module state shared with every
+      // other test in the file — try/finally keeps the restore colocated
+      // with exactly the value it must restore, and (like the "not a 2FA
+      // bypass" test's own finally below) runs even if the assertion after
+      // the PUT throws, so one failure here never leaves every later test in
+      // this file without a stub button.
+      try {
+        const putRes = await superCtx.request.put(`${AUTH_SERVER_URL}/api/social-providers/${rsClientId}`, {
+          data: { providers: disabledSet },
+        })
+        expect(putRes.ok(), `failed to disable stub for the RS app: ${putRes.status()}`).toBeTruthy()
+
+        await page.goto(`${RS_BASE_URL}/auth/login`)
+        await expect(page.getByRole('button', { name: /test idp/i })).toHaveCount(0)
+      } finally {
+        const restoreRes = await superCtx.request.put(`${AUTH_SERVER_URL}/api/social-providers/${rsClientId}`, {
+          data: { providers: originalEnabled },
+        })
+        expect(restoreRes.ok(), `failed to restore social providers for the RS app: ${restoreRes.status()}`).toBeTruthy()
+      }
+    } finally {
+      await superCtx.close()
+    }
   })
 
   test('federated sign-in is not a 2FA bypass', async ({ page, request }) => {

@@ -72,16 +72,32 @@ export function SocialButtons({
         }),
       })
       if (!res.ok) {
+        // task-13 fix round 1, finding 3: every failure mode below used to
+        // collapse to a bare redirect with zero signal. The status + origin
+        // are safe to log (no credential/token/response body — the body
+        // could contain a provider error description we don't want to
+        // assume is safe) and are exactly what an operator needs to tell a
+        // CORS/misconfiguration failure (opaque network error, see catch
+        // below) from an auth-server-side rejection (a real HTTP status).
+        console.error(`[social-buttons] sign-in/social returned ${res.status} for provider "${provider}" (${authServerUrl})`)
         window.location.href = '/oauth-error'
         return
       }
       const body = (await res.json()) as { url?: string }
       if (!body.url) {
+        console.error(`[social-buttons] sign-in/social ${res.status} response for provider "${provider}" had no url`)
         window.location.href = '/oauth-error'
         return
       }
       window.location.href = body.url
-    } catch {
+    } catch (err) {
+      // A thrown fetch here is almost always a network-level failure (CORS
+      // rejection, DNS, connection refused) rather than an application
+      // error — err.message from the browser's fetch implementation does
+      // not carry credentials or response bodies, so it's safe to log.
+      console.error(
+        `[social-buttons] sign-in/social request failed for provider "${provider}" (${authServerUrl}): ${err instanceof Error ? err.message : String(err)}`,
+      )
       window.location.href = '/oauth-error'
     }
   }
