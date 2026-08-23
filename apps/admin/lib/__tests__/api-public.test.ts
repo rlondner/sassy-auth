@@ -29,6 +29,22 @@ describe('validateInvitation', () => {
     const calledUrl = fetchMock.mock.calls[0][0] as string
     expect(calledUrl).toBe('http://localhost:3000/api/invitations/abc%2F..%2Faccept')
   })
+
+  it('does not include the token value in the thrown error on a non-ok response', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock.mockResolvedValue(jsonResponse(404))
+
+    const secretToken = 'a-secret-invitation-token'
+    let caught: unknown
+    try {
+      await validateInvitation(secretToken)
+    } catch (err) {
+      caught = err
+    }
+
+    expect(caught).toBeInstanceOf(Error)
+    expect((caught as Error).message).not.toContain(secretToken)
+  })
 })
 
 describe('acceptInvitation', () => {
@@ -40,5 +56,21 @@ describe('acceptInvitation', () => {
 
     const calledUrl = fetchMock.mock.calls[0][0] as string
     expect(calledUrl).toBe('http://localhost:3000/api/invitations/abc%2F..%2Faccept/accept')
+  })
+
+  it('does not include the token value in the thrown error on a non-ok response', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock.mockResolvedValue(jsonResponse(400))
+
+    const secretToken = 'a-secret-invitation-token'
+    let caught: unknown
+    try {
+      await acceptInvitation(secretToken, 'pw')
+    } catch (err) {
+      caught = err
+    }
+
+    expect(caught).toBeInstanceOf(Error)
+    expect((caught as Error).message).not.toContain(secretToken)
   })
 })

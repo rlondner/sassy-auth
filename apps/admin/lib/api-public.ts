@@ -4,7 +4,7 @@ const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
 export async function validateInvitation(token: string): Promise<InvitationInfo> {
   const res = await fetch(`${BASE}/api/invitations/${encodeURIComponent(token)}`)
-  if (!res.ok) throw new Error(`API error ${res.status}: /api/invitations/${token}`)
+  if (!res.ok) throw new Error(`API error ${res.status}: fetching invitation`)
   return res.json()
 }
 
