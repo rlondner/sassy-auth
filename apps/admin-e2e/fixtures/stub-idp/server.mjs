@@ -67,6 +67,39 @@ function idToken(claims) {
 const DEFAULT_IDENTITY = { sub: 'stub-sub-1', email: 'social@cpm.io', email_verified: true }
 let nextIdentity = { ...DEFAULT_IDENTITY }
 
+// nextIdentity is a single process-global value, which is only safe because
+// playwright.config.ts runs with workers: 1 (one spec in flight at a time).
+// Nothing here enforces that from the stub's side — a later bump to
+// `workers` would let two specs interleave /__set-identity calls against
+// this one process, and each test would silently observe the wrong
+// identity instead of failing loudly.
+//
+// So a set-identity is treated as "pending" (claimed by one in-flight
+// sign-in) until it's consumed by a /token redemption. A second
+// /__set-identity while one is still pending is refused with 409 rather
+// than silently overwriting it — that turns a worker-count regression into
+// an immediate, readable CI failure instead of a green suite asserting
+// against the wrong identity.
+//
+// Trade-off: a test that calls /__set-identity and then fails/aborts
+// before ever reaching /token would wedge every later test behind a
+// pending identity that will never be redeemed. Two ways out are provided:
+// (1) POST /__reset-identity, which the suite can call in an
+// afterEach/global-teardown hook to clear pending state unconditionally,
+// and (2) a short time-based expiry (PENDING_TTL_MS below) so even a run
+// that never calls the explicit reset self-heals after a bounded delay
+// instead of wedging the rest of the suite indefinitely. The TTL is a
+// judgment call: long enough that a normal authorize->token round trip
+// never races it, short enough that a crashed test doesn't stall CI for
+// long. 30s is generous for a local HTTP round trip and small next to
+// typical CI job timeouts.
+const PENDING_TTL_MS = 30_000
+let pendingSince = null // Date.now() timestamp, or null when no identity is pending
+
+function isPending() {
+  return pendingSince !== null && Date.now() - pendingSince < PENDING_TTL_MS
+}
+
 // Authorization codes issued by /authorize, redeemed once by /token.
 const codes = new Map()
 
@@ -105,6 +138,22 @@ createServer(async (req, res) => {
   // call (however it's triggered — including through BetterAuth's redirect,
   // which carries no identity params of its own) will hand out.
   if (url.pathname === '/__set-identity' && req.method === 'POST') {
+    if (isPending()) {
+      return json(
+        {
+          error: 'identity_write_conflict',
+          error_description:
+            'A concurrent identity write was detected: a previously set identity is still ' +
+            'pending (not yet redeemed via /token). This stub supports exactly one in-flight ' +
+            'sign-in at a time and stores the pending identity in a single process-global ' +
+            'variable, which is only safe under playwright.config.ts workers: 1. If you are ' +
+            'seeing this in CI, someone likely raised the worker count — set it back to 1, or ' +
+            'call POST /__reset-identity between tests if a previous test failed before ' +
+            'reaching /token.',
+        },
+        409,
+      )
+    }
     const body = await readBody(req)
     let parsed = {}
     try {
@@ -118,11 +167,13 @@ createServer(async (req, res) => {
       email_verified: parsed.email_verified ?? DEFAULT_IDENTITY.email_verified,
       ...(parsed.name ? { name: parsed.name } : {}),
     }
+    pendingSince = Date.now()
     return json({ ok: true, identity: nextIdentity })
   }
 
   if (url.pathname === '/__reset-identity' && req.method === 'POST') {
     nextIdentity = { ...DEFAULT_IDENTITY }
+    pendingSince = null
     return json({ ok: true, identity: nextIdentity })
   }
 
@@ -159,7 +210,10 @@ createServer(async (req, res) => {
     // Consumed — restore the default so the next /authorize (any spec that
     // forgot to call /__set-identity, or a curl smoke test) gets a known,
     // deterministic identity rather than a previous test's leftover choice.
+    // Clearing pendingSince here is what lets the *next* /__set-identity
+    // succeed instead of being refused with 409.
     nextIdentity = { ...DEFAULT_IDENTITY }
+    pendingSince = null
     return json({
       access_token: 'stub-access-token',
       token_type: 'Bearer',
