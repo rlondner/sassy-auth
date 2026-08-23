@@ -14,7 +14,7 @@ import {
   Input,
   Label,
 } from '@sassy-auth/ui'
-import { updateAppAction } from '@/app/(admin)/apps/actions'
+import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction } from '@/app/(admin)/apps/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { App } from '@/lib/types'
 
@@ -37,6 +37,17 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
+  // The checkbox universe is `available` — every provider this deployment
+  // has credentials for, from GET /api/social-providers/:clientId/settings
+  // — not just the ones currently on for this app, so a provider that's
+  // off can be ticked back on. `checkedProviders` is the live checkbox
+  // state; `initialProviders` is the fetched `enabled` baseline used to
+  // detect a change, kept separate so `dirty` can compare the two.
+  const [availableProviders, setAvailableProviders] = React.useState<string[]>([])
+  const [checkedProviders, setCheckedProviders] = React.useState<Set<string>>(new Set())
+  const [initialProviders, setInitialProviders] = React.useState<string[]>([])
+  const [socialLoading, setSocialLoading] = React.useState(false)
+
   React.useEffect(() => {
     setName(app.name)
     setUrl(app.url)
@@ -44,9 +55,42 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
     setErrorKey(null)
-  }, [app])
+    // Gate the authenticated social-providers fetch on the drawer actually
+    // being open: AppsTable keeps this component mounted (with `open`
+    // toggling) for every selected row, including View and Delete, so an
+    // unconditional fetch here fired on every row click for a result that
+    // was never shown. Skipping while closed also means an app switch that
+    // happens while the drawer is closed doesn't fetch until it opens.
+    if (!open) return
+    setSocialLoading(true)
+    let cancelled = false
+    getSocialProviderSettingsAction(app.publicId).then((result) => {
+      if (cancelled) return
+      const { available, enabled } = 'available' in result ? result : { available: [], enabled: [] }
+      setAvailableProviders(available)
+      setCheckedProviders(new Set(enabled))
+      setInitialProviders(enabled)
+      setSocialLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [app, open])
 
-  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '') || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false)
+  function toggleProvider(provider: string, checked: boolean) {
+    setCheckedProviders((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(provider)
+      else next.delete(provider)
+      return next
+    })
+  }
+
+  const socialDirty =
+    checkedProviders.size !== initialProviders.length ||
+    initialProviders.some((p) => !checkedProviders.has(p))
+
+  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '') || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -66,10 +110,24 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
     startTransition(async () => {
-      const result = await updateAppAction(app.publicId, patch)
-      if ('errorKey' in result) {
-        setErrorKey(result.errorKey)
-        return
+      // Two independent endpoints: /api/apps for the core fields, and
+      // /api/social-providers/:clientId for the checkbox group — the
+      // button saves both if both changed.
+      if (Object.keys(patch).length > 0) {
+        const result = await updateAppAction(app.publicId, patch)
+        if ('errorKey' in result) {
+          setErrorKey(result.errorKey)
+          return
+        }
+      }
+      if (socialDirty) {
+        const result = await updateSocialProvidersAction(app.publicId, Array.from(checkedProviders))
+        if ('errorKey' in result) {
+          setErrorKey(result.errorKey)
+          return
+        }
+        setInitialProviders(result.providers)
+        setCheckedProviders(new Set(result.providers))
       }
       toast.success(t('apps.toast.updated'))
       onSuccess?.()
@@ -148,6 +206,32 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.requireTwoFactorHint')}
               </p>
+            </div>
+            <div>
+              <Label>{t('apps.fields.socialProviders')}</Label>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.socialProvidersHint')}
+              </p>
+              {!socialLoading && availableProviders.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {availableProviders.map((provider) => (
+                    <label
+                      key={provider}
+                      className="flex items-center gap-2 text-label-md cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checkedProviders.has(provider)}
+                        onChange={(e) => toggleProvider(provider, e.target.checked)}
+                        className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                      />
+                      {t.has(`apps.fields.socialProviderNames.${provider}`)
+                        ? t(`apps.fields.socialProviderNames.${provider}` as 'apps.fields.socialProviderNames.google')
+                        : provider}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <Label htmlFor="appPublicId">{t('apps.fields.publicId')}</Label>

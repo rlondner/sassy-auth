@@ -39,6 +39,7 @@ function makeEntry(overrides: Partial<Record<string, unknown>> = {}) {
     codeChallengeMethod: 'S256',
     expiresAt: new Date(Date.now() + 60_000),
     amr: JSON.stringify(['pwd']),
+    idp: null,
     ...overrides,
   };
 }
@@ -70,6 +71,7 @@ describe('OauthService', () => {
           codeChallenge: CHALLENGE,
           codeChallengeMethod: 'S256',
           amr: JSON.stringify(['pwd']),
+          idp: null,
           expiresAt: expect.any(Date),
         }),
       });
@@ -80,6 +82,13 @@ describe('OauthService', () => {
       const b = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256', ['pwd']);
       expect(a).not.toBe(b);
     });
+
+    it('persists the idp when a federated sign-in supplies one', async () => {
+      await service.generateCode('user-1', 'app-1', REDIRECT_URI, CHALLENGE, 'S256', ['ext'], 'google');
+      expect(mockPrisma.saOauthCode.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ amr: JSON.stringify(['ext']), idp: 'google' }),
+      });
+    });
   });
 
   describe('exchangeCode', () => {
@@ -88,6 +97,26 @@ describe('OauthService', () => {
       const result = await service.exchangeCode('some-code', 'app-55', REDIRECT_URI, VERIFIER);
       expect(result).toEqual({ userId: 'user-99', appPublicId: 'app-55', amr: ['pwd'] });
       expect(mockPrisma.saOauthCode.delete).toHaveBeenCalledWith({ where: { code: 'some-code' } });
+    });
+
+    it('carries the idp through from generateCode to exchangeCode', async () => {
+      let capturedData: Record<string, unknown> = {};
+      mockPrisma.saOauthCode.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+        capturedData = data;
+        return Promise.resolve({});
+      });
+      mockPrisma.saOauthCode.delete.mockImplementation(() =>
+        Promise.resolve({ ...capturedData, expiresAt: new Date(Date.now() + 60_000) }),
+      );
+      const code = await service.generateCode('u_pub', 'app-55', REDIRECT_URI, CHALLENGE, 'S256', ['ext'], 'microsoft');
+      const out = await service.exchangeCode(code, 'app-55', REDIRECT_URI, VERIFIER);
+      expect(out.idp).toBe('microsoft');
+    });
+
+    it('omits idp when the code was issued without one', async () => {
+      mockPrisma.saOauthCode.delete.mockResolvedValue(makeEntry());
+      const result = await service.exchangeCode('some-code', 'app-55', REDIRECT_URI, VERIFIER);
+      expect(result.idp).toBeUndefined();
     });
 
     it('round-trips amr from generateCode to exchangeCode', async () => {

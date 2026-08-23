@@ -8,8 +8,9 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { toNodeHandler } from 'better-auth/node';
 import { AppModule } from './app.module';
-import { auth } from './auth/auth.config';
+import { auth, TRUSTED_ORIGINS } from './auth/auth.config';
 import { createDefaultAuthRateLimiter } from './auth/auth-rate-limit';
+import { runWithPrivateRelayCapture } from './social/apple-private-relay-context';
 import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
@@ -79,7 +80,58 @@ async function bootstrap() {
   // middleware in front of the handler and applies the same 10/min/IP budget
   // as the Nest `auth` bucket to credential-bearing paths only (session reads
   // and sign-out are exempt — the admin console polls them constantly).
-  expressApp.all('/api/auth/*', createDefaultAuthRateLimiter(), toNodeHandler(auth));
+  // task-8 fix round 1 (review finding 1): wrap the whole BetterAuth
+  // request in an AsyncLocalStorage scope (apple-private-relay-context.ts)
+  // so Apple's mapProfileToUser (fired deep inside the /callback/:id
+  // endpoint handler, via getUserInfo) can hand `is_private_email` back to
+  // this same request's hooks.after matcher, which runs later in the same
+  // request but is a separate call made by BetterAuth's own framework code
+  // — see apple-private-relay-context.ts for the full mechanism and why the
+  // scope must be opened here, spanning the entire request, rather than
+  // around any single inner call.
+  const authNodeHandler = toNodeHandler(auth);
+  // task-13 fix (found live while verifying the federated sign-in button —
+  // no prior unit test exercises a real cross-origin browser request against
+  // this route, so nothing caught it): `/api/auth/*` is registered directly
+  // on the raw Express app, ahead of `NestFactory.create` /
+  // `configureNestApp`'s `app.enableCors(...)` below — by the time Nest's
+  // CORS middleware exists, this route has already been wired into the
+  // handler chain in front of it, so it never runs for these requests.
+  // BetterAuth's own `trustedOrigins` (auth.config.ts) is NOT a CORS
+  // mechanism either — it only gates an internal Origin-header CSRF check
+  // (better-auth/dist/context/create-context.mjs); it never sets
+  // `Access-Control-Allow-Origin`. Verified live: an OPTIONS preflight to
+  // `/api/auth/sign-in/social` from a cross-origin admin (its own port,
+  // e.g. :3001 talking to the auth-server's :3000 — the exact topology
+  // TRUSTED_ORIGINS/.env.local already documents as the deployment
+  // default) returned a bare 404, and the browser then blocked the actual
+  // POST with "No 'Access-Control-Allow-Origin' header is present". That
+  // meant the social-buttons.tsx POST/fetch fix (also task-13, also
+  // uncommitted) could never succeed against a real cross-origin admin —
+  // the same class of "never actually worked" bug that fix's own comment
+  // describes for the GET it replaced. Scoped to exactly TRUSTED_ORIGINS,
+  // matching the allow-list `configureNestApp` uses for the rest of the API.
+  const authCors = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const origin = req.headers.origin;
+    if (origin && TRUSTED_ORIGINS.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Vary', 'Origin');
+    }
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        req.headers['access-control-request-headers'] ?? 'content-type',
+      );
+      res.statusCode = 204;
+      return res.end();
+    }
+    return next();
+  };
+  expressApp.all('/api/auth/*', authCors, createDefaultAuthRateLimiter(), (req, res) =>
+    runWithPrivateRelayCapture(() => authNodeHandler(req, res)),
+  );
 
   const loggerService = new LoggerService();
 

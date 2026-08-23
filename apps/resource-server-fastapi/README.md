@@ -166,6 +166,42 @@ Other failure modes you can verify:
 
 The token endpoint (`GET /api/properties`) returns the verified JWT's `sub` and `org` claims on success, so you can confirm the right user/org pair was authenticated.
 
+## Social sign-in
+
+This sample requires **no code change** to support federated sign-in. `auth_login`
+redirects to `/api/token/oauth/authorize`, which — for an unauthenticated caller —
+bounces to the admin console's `/login` page. That page now renders the social
+buttons (Google, Microsoft, Apple, plus a test-only `stub` provider) whenever the
+app has one or more providers enabled, so this RS inherits federated sign-in for
+free by driving the same authorize redirect it always has.
+
+The demo seed provisions `social@cpm.io` as a dedicated link target in the
+`Citadel` org (`Citadel Property Managers` role, same as `m@cpm.io`). It is kept
+separate from `m@cpm.io` deliberately: linking a provider account to `m@cpm.io`
+would persist across test runs and change what the password round-trip exercises
+in the platform's e2e suite. Use `social@cpm.io` when you want to link/sign in
+with a federated identity by hand instead.
+
+The seed also enables the `stub` provider for `resourceserver01`, but only when
+`E2E_STUB_IDP_URL` is set in the environment running the seed — the `stub`
+provider is itself only ever offered to a browser when `E2E_STUB_IDP_URL` is set
+and `NODE_ENV` is `test` or `development`, so this row is inert (and harmless to
+leave seeded) everywhere else.
+
+### Telling password and federated sign-in apart
+
+The authorized page (`/auth/callback` on success) renders two additional claims
+from the access token, decoded for display only (the auth-server already
+verified the token during the code exchange):
+
+| Claim | `data-testid`  | Password sign-in | Federated sign-in |
+|-------|----------------|-------------------|--------------------|
+| `amr` | `claim-amr`    | `pwd`             | `ext`              |
+| `idp` | `claim-idp`    | `—` (absent claim)| the provider name, e.g. `stub` |
+
+A token without an `idp` claim (every password sign-in) renders the `—`
+placeholder rather than the literal string `None` or a blank cell.
+
 ## Tests
 
 ```bash

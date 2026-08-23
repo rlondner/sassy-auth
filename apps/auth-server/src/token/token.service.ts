@@ -11,6 +11,7 @@ interface IssueJwtParams {
   orgPublicId: string;
   appPublicId: string;
   amr?: string[];
+  idp?: string;
 }
 
 @Injectable()
@@ -80,6 +81,7 @@ export class TokenService {
       exp: now + 3600,
       scope: permissions.join(' '),
       ...(params.amr && params.amr.length ? { amr: params.amr } : {}),
+      ...(params.idp ? { idp: params.idp } : {}),
     };
 
     return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });

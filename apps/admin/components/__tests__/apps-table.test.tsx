@@ -8,6 +8,14 @@ import * as actions from '@/app/(admin)/apps/actions'
 jest.mock('@/app/(admin)/apps/actions', () => ({
   deleteAppAction: jest.fn(),
   listAppsAction: jest.fn(),
+  updateAppAction: jest.fn(),
+  // AppEditDrawer (rendered whenever a row is selected — View and Delete
+  // included, not just Edit) only fetches this once its own `open` prop is
+  // true, so none of these tests (which never open the edit drawer) trigger
+  // it; no mock resolution is needed. Kept as a bare jest.fn() purely so the
+  // module shape matches actions.ts's exports.
+  getSocialProviderSettingsAction: jest.fn(),
+  updateSocialProvidersAction: jest.fn(),
 }))
 
 // Radix DropdownMenu does not open in jsdom (it depends on pointer-events

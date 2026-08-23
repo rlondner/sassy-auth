@@ -1,15 +1,28 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { magicLink, emailOTP, openAPI, twoFactor } from 'better-auth/plugins';
+import { magicLink, emailOTP, openAPI, twoFactor, genericOAuth } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { getEmailer } from '../email/email.singleton';
 import { captureResetUrl } from './reset-url-context';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { evaluateSessionGate } from './session-gate';
 import { createAppLogger } from '../common/logger/winston.config';
 import { sendSignInOtp } from './otp-sender';
 import { otpTestStore } from './otp-test-store';
+import { buildSocialProviders } from '../social/build-social-providers';
+import { stubProviderConfig } from '../social/stub-provider';
+import { signInMethodFromPath } from '../social/sign-in-method';
+import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
+import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
+import { recordFederationEvent } from '../social/record-federation-event';
+import { readIsPrivateEmail } from '../social/apple-private-relay-context';
+// task-15: the only Sentry import outside instrument.ts / this adapter's own
+// module. record-federation-event.ts's OTel-Logs default emit is a no-op on
+// this stack (see telemetry-sentry-adapter.ts's header comment for the
+// file:line trail), so production wiring injects this adapter explicitly
+// rather than relying on the default.
+import { emitFederationEventToSentry } from '../social/telemetry-sentry-adapter';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -47,6 +60,15 @@ const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;          // extend if used with
 // rationale as the bug-0186 after-hook).
 const authLogger = createAppLogger();
 
+// task-4: BetterAuth's databaseHooks context does NOT carry the literal
+// request path. `ctx.path` here is `endpoint.path` — the *route template*
+// registered with better-call (e.g. "/callback/:id" or
+// "/oauth2/callback/:providerId") — not the resolved URL. The provider name
+// only exists in `ctx.params`. See `resolveHookRoutePath` in
+// ../social/resolve-hook-route-path.ts (moved there in the fix-round-1
+// review pass so it can be unit-tested directly) for the full source
+// evidence and the reconstruction logic.
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
   secret: process.env.BETTER_AUTH_SECRET!,
@@ -62,6 +84,12 @@ export const auth = betterAuth({
     // cached session on replica B" hazard that isn't worth the
     // few ms saved.
     cookieCache: { enabled: false },
+    // task-4: persisted by the databaseHooks.session.create.before hook
+    // below. `input: false` — this is derived server-side from the request
+    // route, never client-supplied.
+    additionalFields: {
+      signInMethod: { type: 'string', required: false, input: false },
+    },
   },
   advanced: {
     // bug-0158: explicit cookie attributes. `sameSite: 'lax'`
@@ -103,7 +131,10 @@ export const auth = betterAuth({
   databaseHooks: {
     session: {
       create: {
-        before: async (session: { userId: string }) => {
+        before: async (
+          session: { userId: string },
+          ctx?: { path?: string; params?: Record<string, string> } | null,
+        ) => {
           const gate = await evaluateSessionGate(prisma, session.userId);
           if (!gate.allowed) {
             // bug-0163-adjacent: no credential here, safe to log. This is the
@@ -118,6 +149,11 @@ export const auth = betterAuth({
               message: 'This account is not active.',
             });
           }
+          // task-4: gate runs first — a blocked user never reaches here. Only
+          // once the session is allowed do we record how it was created.
+          const signInMethod = signInMethodFromPath(resolveHookRoutePath(ctx));
+          if (!signInMethod) return;
+          return { data: { ...session, signInMethod } };
         },
         after: async (session: { userId: string }) => {
           try {
@@ -140,6 +176,73 @@ export const auth = betterAuth({
         },
       },
     },
+  },
+  // task-8: exactly ONE top-level `hooks.after` may exist on this config —
+  // BetterAuth's `getHooks()` (to-auth-endpoints.mjs) reads
+  // `authContext.options.hooks?.after` as a single value; a second
+  // `hooks: { after: ... }` object literal elsewhere in this file would
+  // silently overwrite this one rather than stacking. A later task that
+  // needs its own after-matcher MUST add another `if (...)` branch inside
+  // this same handler, not a second `hooks` block.
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      // task-8: only the OAuth callback route is in scope here. Matched by
+      // route TEMPLATE + params, same reconstruction task-4 already
+      // established for databaseHooks (see resolveHookRoutePath) — `ctx.path`
+      // is `/callback/:id` (callback.mjs:20), never the literal request path.
+      if (ctx.path !== '/callback/:id') return;
+      const providerId = (ctx.params as Record<string, string> | undefined)?.id;
+
+      // task-8: classifyCallbackOutcome reads BetterAuth's OWN redirect/error
+      // from ctx.context.returned — see classify-callback-outcome.ts for the
+      // full file:line trail on why the provider profile itself
+      // (emailVerified in particular) is NOT available here: it is
+      // discarded inside handleOAuthUserInfo before this hook ever runs.
+      //
+      // fix round 1 (review finding 1): `is_private_email` IS available,
+      // via a separate channel — build-social-providers.ts's Apple
+      // `mapProfileToUser` captured it into request-scoped AsyncLocalStorage
+      // (apple-private-relay-context.ts) earlier in this same request,
+      // before the refusal was even decided. readIsPrivateEmail() is safe
+      // to call unconditionally here: it returns false for every
+      // non-Apple provider and for any Apple callback that never captured.
+      const outcome = classifyCallbackOutcome(ctx.context.returned, readIsPrivateEmail());
+      if (!outcome) return;
+
+      // Audit trail first (never throws) — the real reason is recorded
+      // regardless of whether the browser can actually be redirected to our
+      // own error page (see the canRedirect note below).
+      await recordFederationEvent(
+        { db: prisma, logger: authLogger, emit: emitFederationEventToSentry },
+        {
+          type: 'social.signin.rejected',
+          provider: providerId ?? 'unknown',
+          reason: outcome.reason,
+        },
+      );
+
+      if (!outcome.canRedirect) {
+        // task-8 finding: this is the session-gate's FORBIDDEN throw (a
+        // matched-but-inactive SaUser). Rewriting response headers from an
+        // `after` hook cannot change the response's HTTP status code
+        // (to-auth-endpoints.mjs:172-174 always uses the status captured at
+        // the endpoint's original throw), so a 403 cannot be turned into a
+        // working redirect from here. The browser will see BetterAuth's raw
+        // 403 rather than our /oauth-error page; the audit event above is
+        // still the source of truth for operators. See task-8-report.md.
+        return;
+      }
+
+      const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+      const target = `${adminUrl}/oauth-error?code=${outcome.code}`;
+      // Mutate in place: ctx.context.responseHeaders is the SAME Headers
+      // object to-auth-endpoints.mjs's final toResponse() call reads as
+      // `result.headers` (to-auth-endpoints.mjs:148, 172-174). A reassignment
+      // here (`ctx.context.responseHeaders = new Headers(...)`) would NOT be
+      // seen by that call; only an in-place `.set` is visible outside this
+      // hook.
+      ctx.context.responseHeaders?.set('location', target);
+    }),
   },
   emailAndPassword: {
     enabled: true,
@@ -168,38 +271,11 @@ export const auth = betterAuth({
       await getEmailer().send({ to: user.email, ...passwordResetEmail({ firstName, resetUrl }) });
     },
   },
-  // bug-0175: gate each social provider on BOTH the id AND the secret.
-  // Previously the truthy check on the id was paired with a non-null
-  // assertion (`!`) on the secret — an operator who set the id but
-  // forgot the secret got an `undefined` cast to string, which crashed
-  // deep inside BetterAuth's OAuth flow or silently misbehaved. The
-  // symmetric guard falls back to "provider disabled" instead.
-  socialProviders: {
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && {
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && {
-      microsoft: {
-        clientId: process.env.MICROSOFT_CLIENT_ID,
-        clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET && {
-      apple: {
-        clientId: process.env.APPLE_CLIENT_ID,
-        clientSecret: process.env.APPLE_CLIENT_SECRET,
-      },
-    }),
-    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET && {
-      github: {
-        clientId: process.env.GITHUB_CLIENT_ID,
-        clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      },
-    }),
-  },
+  // Social providers are built from env by build-social-providers.ts, which
+  // keeps the bug-0175 both-halves guard, sets disableSignUp (invite-only),
+  // and deliberately does NOT trust any provider. GitHub is intentionally
+  // dropped here: it was never surfaced in any UI and is out of scope.
+  socialProviders: buildSocialProviders(process.env),
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
@@ -246,5 +322,12 @@ export const auth = betterAuth({
       // from a mis-scanned QR.
     }),
     openAPI({ disableDefaultReference: true }),
+    // task-11: registers no routes at all unless E2E_STUB_IDP_URL is set AND
+    // NODE_ENV is exactly 'test' or 'development' — see stub-provider.ts.
+    // Empty in production, and empty on every ambiguous NODE_ENV a
+    // blocklist would fail open on (unset, 'Production', '').
+    ...(stubProviderConfig(process.env).length
+      ? [genericOAuth({ config: stubProviderConfig(process.env) as never })]
+      : []),
   ],
 });

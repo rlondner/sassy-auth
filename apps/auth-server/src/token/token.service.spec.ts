@@ -110,6 +110,22 @@ describe('TokenService', () => {
       expect('amr' in undef).toBe(false);
     });
 
+    it('includes idp when provided and omits it entirely when absent', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
+      jest.spyOn(service as any, 'resolvePermissions').mockResolvedValue([]);
+
+      const withIdp = jwt.decode(
+        await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', amr: ['ext'], idp: 'google' }),
+      ) as jwt.JwtPayload;
+      expect(withIdp.idp).toBe('google');
+
+      // Omitted entirely — not emitted as null or empty string.
+      const undef = jwt.decode(
+        await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', amr: ['pwd'] }),
+      ) as jwt.JwtPayload;
+      expect('idp' in undef).toBe(false);
+    });
+
     it('returns a verifiable RS256 JWT with correct claims', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
 

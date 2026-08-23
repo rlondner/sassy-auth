@@ -35,6 +35,11 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // How this session was created: 'pwd', or 'ext:<provider>' for federated
+  // sign-in. Null for sessions predating this column and for routes we do not
+  // classify — readers fall back to legacy behaviour.
+  signInMethod String?
+
   // bug-0179: BetterAuth's session middleware runs
   // `Session.findFirst({ where: { userId } })` on every authenticated
   // request. Without this index the DB falls back to a sequential
@@ -107,6 +112,7 @@ model SaApp {
   orgs        SaOrg[]
   permissions SaPermission[]
   roles       SaRole[]
+  socialProviders SaSocialProvider[]
 }
 
 model SaOrg {
@@ -257,8 +263,55 @@ model SaOauthCode {
   codeChallenge       String
   codeChallengeMethod String
   amr                 String   @default("[\"pwd\"]")
+  idp                 String?
   expiresAt           DateTime
   createdAt           DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+// Which social login providers a deployment has, and which apps show them.
+// A row with appId = null is the deployment-global row: it declares that
+// credentials exist for this provider and supplies the default enablement.
+// A row with an appId is that app's explicit opt-in/opt-out.
+//
+// Credentials deliberately live in env vars, not here: per-app credentials
+// would need encryption at rest and rotation, for a capability nothing can
+// use yet. Adding `clientId` + encrypted secret columns later is one
+// migration plus resolve-enabled-providers.ts.
+model SaSocialProvider {
+  id        Int      @id @default(autoincrement())
+  appId     Int?
+  app       SaApp?   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  provider  String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([appId, provider])
+  @@index([appId])
+}
+
+// Durable record of federated-authentication outcomes. This is the record of
+// truth: OpenTelemetry is sampled and its backends have short retention, so
+// spans alone cannot answer "who linked this Google account to alice@acme.com,
+// and when" a year later. `reason` holds the REAL cause even where the user
+// was shown a deliberately generic message.
+model SaAuditEvent {
+  id               Int      @id @default(autoincrement())
+  publicId         String   @unique
+  type             String
+  provider         String?
+  saUserId         Int?
+  betterAuthUserId String?
+  appPublicId      String?
+  email            String?
+  providerSub      String?
+  reason           String?
+  ip               String?
+  userAgent        String?
+  createdAt        DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([saUserId])
 }
