@@ -10,6 +10,7 @@ import { toNodeHandler } from 'better-auth/node';
 import { AppModule } from './app.module';
 import { auth } from './auth/auth.config';
 import { createDefaultAuthRateLimiter } from './auth/auth-rate-limit';
+import { runWithPrivateRelayCapture } from './social/apple-private-relay-context';
 import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
@@ -79,7 +80,19 @@ async function bootstrap() {
   // middleware in front of the handler and applies the same 10/min/IP budget
   // as the Nest `auth` bucket to credential-bearing paths only (session reads
   // and sign-out are exempt — the admin console polls them constantly).
-  expressApp.all('/api/auth/*', createDefaultAuthRateLimiter(), toNodeHandler(auth));
+  // task-8 fix round 1 (review finding 1): wrap the whole BetterAuth
+  // request in an AsyncLocalStorage scope (apple-private-relay-context.ts)
+  // so Apple's mapProfileToUser (fired deep inside the /callback/:id
+  // endpoint handler, via getUserInfo) can hand `is_private_email` back to
+  // this same request's hooks.after matcher, which runs later in the same
+  // request but is a separate call made by BetterAuth's own framework code
+  // — see apple-private-relay-context.ts for the full mechanism and why the
+  // scope must be opened here, spanning the entire request, rather than
+  // around any single inner call.
+  const authNodeHandler = toNodeHandler(auth);
+  expressApp.all('/api/auth/*', createDefaultAuthRateLimiter(), (req, res) =>
+    runWithPrivateRelayCapture(() => authNodeHandler(req, res)),
+  );
 
   const loggerService = new LoggerService();
 

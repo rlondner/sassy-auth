@@ -3,10 +3,10 @@ import { classifyRejection } from './rejection-code';
 /**
  * Reads BetterAuth's OWN /callback/:id outcome and maps it onto our audit
  * reason + user-facing code. This does NOT call `classifyRejection` with a
- * real provider profile — by the time the `after` hook runs, the profile
- * (`userInfo`, including `emailVerified` and Apple's `is_private_email`) has
- * already been discarded. See task-8-report.md for the full file:line
- * evidence trail; the short version:
+ * real provider profile — by the time the `after` hook runs, `userInfo`
+ * (`emailVerified` in particular) has already been discarded. See
+ * task-8-report.md for the full file:line evidence trail; the short
+ * version:
  *
  * - `better-auth@1.6.11/dist/oauth2/link-account.mjs:73-78` — when no
  *   existing BetterAuth `user` row matches the incoming identity and
@@ -33,9 +33,14 @@ import { classifyRejection } from './rejection-code';
  *   `status: 'FOUND'` and a `location` header) to
  *   `<errorURL>?error=<code>[&error_description=...]`.
  * - Apple's `is_private_email` is never read by BetterAuth's own decision
- *   logic anywhere in this file, so no BetterAuth-native signal exists for
- *   it. It is unreachable from this hook; `social_private_relay` cannot be
- *   produced by `classifyCallbackOutcome`.
+ *   logic anywhere in this file either, so no BetterAuth-native error
+ *   string encodes it. task-8 fix round 1 (review finding 1) closes this
+ *   gap through a SEPARATE channel, not `returned`: Apple's provider config
+ *   (build-social-providers.ts) captures `is_private_email` via
+ *   `mapProfileToUser` into request-scoped AsyncLocalStorage
+ *   (apple-private-relay-context.ts) before the refusal is even decided,
+ *   and the caller of this function (auth.config.ts's hooks.after) passes
+ *   the captured value in as `isPrivateEmail` below.
  *
  * `canRedirect` reflects a SEPARATE, load-bearing finding: `to-auth-
  * endpoints.mjs`'s final response is built via
@@ -78,8 +83,18 @@ interface ReturnedLike {
  * has no `error` query param) or any outcome this function does not
  * recognise — callers should leave BetterAuth's original response alone in
  * that case rather than guess.
+ *
+ * `isPrivateEmail` (default `false`) is the Apple `is_private_email` flag
+ * captured out-of-band by apple-private-relay-context.ts — see this file's
+ * header comment. It only changes the outcome for the `signup_disabled`
+ * mapping (`matchedUser: false, emailVerified: true`): classifyRejection's
+ * own precedence still refuses on `email_unverified` first regardless of
+ * this flag, so an unverified private-relay address is unaffected.
  */
-export function classifyCallbackOutcome(returned: unknown): CallbackOutcome | null {
+export function classifyCallbackOutcome(
+  returned: unknown,
+  isPrivateEmail = false,
+): CallbackOutcome | null {
   if (!returned || typeof returned !== 'object') return null;
   const err = returned as ReturnedLike;
 
@@ -106,7 +121,7 @@ export function classifyCallbackOutcome(returned: unknown): CallbackOutcome | nu
   const input = BETTER_AUTH_ERROR_TO_INPUT[betterAuthError];
   if (!input) return null;
 
-  const classified = classifyRejection({ ...input, isPrivateEmail: false });
+  const classified = classifyRejection({ ...input, isPrivateEmail });
   if (!classified) return null;
   return { ...classified, canRedirect: true };
 }

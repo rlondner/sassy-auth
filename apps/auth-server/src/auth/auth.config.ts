@@ -15,6 +15,7 @@ import { signInMethodFromPath } from '../social/sign-in-method';
 import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
 import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
+import { readIsPrivateEmail } from '../social/apple-private-relay-context';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -188,9 +189,17 @@ export const auth = betterAuth({
       // task-8: classifyCallbackOutcome reads BetterAuth's OWN redirect/error
       // from ctx.context.returned — see classify-callback-outcome.ts for the
       // full file:line trail on why the provider profile itself
-      // (emailVerified, is_private_email) is NOT available here: it is
+      // (emailVerified in particular) is NOT available here: it is
       // discarded inside handleOAuthUserInfo before this hook ever runs.
-      const outcome = classifyCallbackOutcome(ctx.context.returned);
+      //
+      // fix round 1 (review finding 1): `is_private_email` IS available,
+      // via a separate channel — build-social-providers.ts's Apple
+      // `mapProfileToUser` captured it into request-scoped AsyncLocalStorage
+      // (apple-private-relay-context.ts) earlier in this same request,
+      // before the refusal was even decided. readIsPrivateEmail() is safe
+      // to call unconditionally here: it returns false for every
+      // non-Apple provider and for any Apple callback that never captured.
+      const outcome = classifyCallbackOutcome(ctx.context.returned, readIsPrivateEmail());
       if (!outcome) return;
 
       // Audit trail first (never throws) — the real reason is recorded

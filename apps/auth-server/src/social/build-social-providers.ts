@@ -1,5 +1,7 @@
+import type { AppleProfile } from 'better-auth/social-providers';
 import type { SocialProviderId } from './resolve-enabled-providers';
 import { createAppleClientSecretFactory } from './apple-client-secret';
+import { captureIsPrivateEmail } from './apple-private-relay-context';
 
 /**
  * bug-0175 kept: a provider is configured only when BOTH halves of its
@@ -87,6 +89,33 @@ export function buildSocialProviders(env: NodeJS.ProcessEnv): Record<string, unk
         return appleSecret();
       },
       disableSignUp: true,
+      // task-8 fix round 1 (review finding 1): capture Apple's
+      // `is_private_email` claim into request-scoped AsyncLocalStorage so
+      // the /callback/:id after-hook can tell a Hide My Email relay user
+      // (fixable by one checkbox on Apple's own consent screen) apart from
+      // any other uninvited sign-in, which otherwise leaves the user stuck.
+      //
+      // `getUserInfo` (@better-auth/core/dist/social-providers/apple.mjs:
+      // 71-95) calls `options.mapProfileToUser?.(enrichedProfile)`
+      // UNCONDITIONALLY, and `getUserInfo` itself is invoked before
+      // `handleOAuthUserInfo` (better-auth/dist/api/routes/callback.mjs:
+      // 89-92, 148) ever evaluates `disableSignUp` — so this fires even on
+      // a callback that is about to be refused. `enrichedProfile` is
+      // `{ ...decodeJwt(token.idToken), name }`, and `AppleProfile`
+      // (@better-auth/core/dist/social-providers/apple.d.mts) types
+      // `is_private_email: boolean` as a field of that decoded JWT, so it
+      // is present on every Apple callback, refused or not.
+      //
+      // Returning `{}` changes NOTHING about the mapped user: `getUserInfo`
+      // spreads this return value LAST — `{ id, name, emailVerified, email,
+      // ...userMap }` — so a partial with no keys contributes nothing.
+      // `mapProfileToUser`'s type (oauth-provider.ts) requires an object
+      // return (not `undefined`) when the function is provided at all, so
+      // `{}` is the type-safe form of "do nothing to the mapped user".
+      mapProfileToUser: (profile: AppleProfile) => {
+        captureIsPrivateEmail(Boolean(profile.is_private_email));
+        return {};
+      },
     };
   }
 

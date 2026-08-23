@@ -59,4 +59,42 @@ describe('classifyCallbackOutcome', () => {
     headers.set('location', 'not a url');
     expect(classifyCallbackOutcome({ status: 'FOUND', headers })).toBeNull();
   });
+
+  // task-8 fix round 1 (review finding 1): isPrivateEmail is captured
+  // out-of-band (apple-private-relay-context.ts) and passed in by the
+  // caller — see the header comment above for why `returned` itself never
+  // carries it.
+  describe('isPrivateEmail (task-8 fix round 1, review finding 1)', () => {
+    it('maps signup_disabled + isPrivateEmail true to the private-relay code', () => {
+      expect(
+        classifyCallbackOutcome(
+          redirectError('https://auth.example/error?error=signup_disabled'),
+          true,
+        ),
+      ).toEqual({ reason: 'private_relay', code: 'social_private_relay', canRedirect: true });
+    });
+
+    it('defaults isPrivateEmail to false when the argument is omitted', () => {
+      expect(
+        classifyCallbackOutcome(redirectError('https://auth.example/error?error=signup_disabled')),
+      ).toEqual({ reason: 'no_sauser_for_verified_email', code: 'social_no_account', canRedirect: true });
+    });
+
+    it('prefers email_unverified over private relay: account_not_linked + isPrivateEmail true stays email_unverified', () => {
+      expect(
+        classifyCallbackOutcome(
+          redirectError('https://auth.example/error?error=account_not_linked'),
+          true,
+        ),
+      ).toEqual({ reason: 'email_unverified', code: 'social_email_unverified', canRedirect: true });
+    });
+
+    it('does not affect the session-gate FORBIDDEN mapping (isPrivateEmail is irrelevant to a matched-but-inactive user)', () => {
+      expect(classifyCallbackOutcome(forbiddenError(), true)).toEqual({
+        reason: 'sauser_not_active',
+        code: 'social_no_account',
+        canRedirect: false,
+      });
+    });
+  });
 });
