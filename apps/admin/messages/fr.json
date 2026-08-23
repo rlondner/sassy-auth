@@ -47,7 +47,15 @@
       "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
       "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système.",
       "requireTwoFactor": "Exiger l'authentification à deux facteurs",
-      "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer."
+      "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer.",
+      "socialProviders": "Connexion sociale",
+      "socialProvidersHint": "Choisissez les fournisseurs d’identité sociale proposés sur l’écran de connexion de cette application.",
+      "socialProviderNames": {
+        "google": "Google",
+        "microsoft": "Microsoft",
+        "apple": "Apple",
+        "stub": "IdP de test"
+      }
     },
     "actions": {
       "view": "Voir",

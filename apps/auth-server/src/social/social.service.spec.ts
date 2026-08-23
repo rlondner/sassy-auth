@@ -35,3 +35,38 @@ describe('SocialService.listForApp', () => {
     await expect(svc.listForApp('qp31')).resolves.toEqual([]);
   });
 });
+
+describe('SocialService.setForApp', () => {
+  it('upserts an app row per available provider, enabled or not', async () => {
+    const upserts: { where: unknown; create: unknown; update: unknown }[] = [];
+    const db = {
+      saApp: { findUnique: async () => ({ id: 7 }) },
+      saSocialProvider: {
+        findMany: async () => [],
+        upsert: async (args: { where: unknown; create: unknown; update: unknown }) => {
+          upserts.push(args);
+        },
+      },
+    };
+    const svc = new SocialService(db as never, {
+      GOOGLE_CLIENT_ID: 'g',
+      GOOGLE_CLIENT_SECRET: 's',
+      MICROSOFT_CLIENT_ID: 'm',
+      MICROSOFT_CLIENT_SECRET: 's',
+    });
+
+    await svc.setForApp('qp31', ['google']);
+
+    expect(upserts).toHaveLength(2);
+    expect(upserts.map((u) => (u.update as { enabled: boolean }).enabled)).toEqual([true, false]);
+  });
+
+  it('throws for an unknown app rather than creating orphan rows', async () => {
+    const db = {
+      saApp: { findUnique: async () => null },
+      saSocialProvider: { findMany: async () => [], upsert: async () => undefined },
+    };
+    const svc = new SocialService(db as never, {});
+    await expect(svc.setForApp('nope', [])).rejects.toThrow();
+  });
+});

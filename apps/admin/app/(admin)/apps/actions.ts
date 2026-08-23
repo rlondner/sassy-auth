@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createApp, updateApp, deleteApp, getApps } from '@/lib/api'
+import { createApp, updateApp, deleteApp, getApps, getSocialProviders, setSocialProviders } from '@/lib/api'
 import type {
   App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse,
 } from '@/lib/types'
@@ -57,6 +57,31 @@ export async function deleteAppAction(
     return { ok: true }
   } catch (err) {
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'delete') }
+  }
+}
+
+// Used by the edit drawer to populate the social sign-in checkbox group.
+// Failures fall back to an empty list rather than surfacing an error — the
+// rest of the drawer (name/url/2FA fields) must still be usable even if the
+// social-providers call fails.
+export async function getSocialProvidersAction(
+  clientId: string,
+): Promise<{ providers: string[] } | ErrorResult> {
+  try {
+    return { providers: await getSocialProviders(clientId) }
+  } catch {
+    return { errorKey: 'apps.errors.generic' }
+  }
+}
+
+export async function updateSocialProvidersAction(
+  clientId: string,
+  providers: string[],
+): Promise<{ providers: string[] } | ErrorResult> {
+  try {
+    return { providers: await setSocialProviders(clientId, providers) }
+  } catch (err) {
+    return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
   }
 }
 

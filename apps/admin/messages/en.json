@@ -47,7 +47,15 @@
       "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
       "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server.",
       "requireTwoFactor": "Require two-factor authentication",
-      "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue."
+      "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue.",
+      "socialProviders": "Social sign-in",
+      "socialProvidersHint": "Choose which social identity providers this app's login screen offers.",
+      "socialProviderNames": {
+        "google": "Google",
+        "microsoft": "Microsoft",
+        "apple": "Apple",
+        "stub": "Test IdP"
+      }
     },
     "actions": {
       "view": "View",

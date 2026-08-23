@@ -246,6 +246,22 @@ export async function deleteApp(publicId: string): Promise<void> {
   Sentry.addBreadcrumb({ category: 'admin.action', message: `App deleted: ${publicId}`, level: 'info' });
 }
 
+export async function getSocialProviders(clientId: string): Promise<string[]> {
+  const res = await apiFetch(`/api/social-providers?client_id=${encodeURIComponent(clientId)}`);
+  const body: { providers: string[] } = await res.json();
+  return body.providers;
+}
+
+export async function setSocialProviders(clientId: string, providers: string[]): Promise<string[]> {
+  const res = await apiFetch(`/api/social-providers/${clientId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ providers }),
+  });
+  const body: { providers: string[] } = await res.json();
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Social providers updated: ${clientId}`, level: 'info' });
+  return body.providers;
+}
+
 export async function getMyPermissions(): Promise<string[]> {
   const res = await apiFetch('/api/me/permissions');
   const body: { permissions: string[] } = await res.json();

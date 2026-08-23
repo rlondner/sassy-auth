@@ -8,6 +8,12 @@ import * as actions from '@/app/(admin)/apps/actions'
 jest.mock('@/app/(admin)/apps/actions', () => ({
   deleteAppAction: jest.fn(),
   listAppsAction: jest.fn(),
+  updateAppAction: jest.fn(),
+  // AppEditDrawer (rendered by AppsTable's edit flow) fetches this on mount;
+  // resolve to an empty list so tests that don't care about social sign-in
+  // don't need to know about it.
+  getSocialProvidersAction: jest.fn().mockResolvedValue({ providers: [] }),
+  updateSocialProvidersAction: jest.fn(),
 }))
 
 // Radix DropdownMenu does not open in jsdom (it depends on pointer-events
