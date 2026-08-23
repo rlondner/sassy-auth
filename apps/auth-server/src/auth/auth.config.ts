@@ -5,7 +5,7 @@ import { prisma } from '@sassy-auth/db';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { getEmailer } from '../email/email.singleton';
 import { captureResetUrl } from './reset-url-context';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { evaluateSessionGate } from './session-gate';
 import { createAppLogger } from '../common/logger/winston.config';
 import { sendSignInOtp } from './otp-sender';
@@ -13,6 +13,8 @@ import { otpTestStore } from './otp-test-store';
 import { buildSocialProviders } from '../social/build-social-providers';
 import { signInMethodFromPath } from '../social/sign-in-method';
 import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
+import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
+import { recordFederationEvent } from '../social/record-federation-event';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -166,6 +168,65 @@ export const auth = betterAuth({
         },
       },
     },
+  },
+  // task-8: exactly ONE top-level `hooks.after` may exist on this config —
+  // BetterAuth's `getHooks()` (to-auth-endpoints.mjs) reads
+  // `authContext.options.hooks?.after` as a single value; a second
+  // `hooks: { after: ... }` object literal elsewhere in this file would
+  // silently overwrite this one rather than stacking. A later task that
+  // needs its own after-matcher MUST add another `if (...)` branch inside
+  // this same handler, not a second `hooks` block.
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      // task-8: only the OAuth callback route is in scope here. Matched by
+      // route TEMPLATE + params, same reconstruction task-4 already
+      // established for databaseHooks (see resolveHookRoutePath) — `ctx.path`
+      // is `/callback/:id` (callback.mjs:20), never the literal request path.
+      if (ctx.path !== '/callback/:id') return;
+      const providerId = (ctx.params as Record<string, string> | undefined)?.id;
+
+      // task-8: classifyCallbackOutcome reads BetterAuth's OWN redirect/error
+      // from ctx.context.returned — see classify-callback-outcome.ts for the
+      // full file:line trail on why the provider profile itself
+      // (emailVerified, is_private_email) is NOT available here: it is
+      // discarded inside handleOAuthUserInfo before this hook ever runs.
+      const outcome = classifyCallbackOutcome(ctx.context.returned);
+      if (!outcome) return;
+
+      // Audit trail first (never throws) — the real reason is recorded
+      // regardless of whether the browser can actually be redirected to our
+      // own error page (see the canRedirect note below).
+      await recordFederationEvent(
+        { db: prisma, logger: authLogger },
+        {
+          type: 'social.signin.rejected',
+          provider: providerId ?? 'unknown',
+          reason: outcome.reason,
+        },
+      );
+
+      if (!outcome.canRedirect) {
+        // task-8 finding: this is the session-gate's FORBIDDEN throw (a
+        // matched-but-inactive SaUser). Rewriting response headers from an
+        // `after` hook cannot change the response's HTTP status code
+        // (to-auth-endpoints.mjs:172-174 always uses the status captured at
+        // the endpoint's original throw), so a 403 cannot be turned into a
+        // working redirect from here. The browser will see BetterAuth's raw
+        // 403 rather than our /oauth-error page; the audit event above is
+        // still the source of truth for operators. See task-8-report.md.
+        return;
+      }
+
+      const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+      const target = `${adminUrl}/oauth-error?code=${outcome.code}`;
+      // Mutate in place: ctx.context.responseHeaders is the SAME Headers
+      // object to-auth-endpoints.mjs's final toResponse() call reads as
+      // `result.headers` (to-auth-endpoints.mjs:148, 172-174). A reassignment
+      // here (`ctx.context.responseHeaders = new Headers(...)`) would NOT be
+      // seen by that call; only an in-place `.set` is visible outside this
+      // hook.
+      ctx.context.responseHeaders?.set('location', target);
+    }),
   },
   emailAndPassword: {
     enabled: true,

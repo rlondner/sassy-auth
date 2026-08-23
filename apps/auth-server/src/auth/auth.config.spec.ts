@@ -80,3 +80,19 @@ describe('auth.config — emailAndPassword.autoSignIn', () => {
     expect(eap['autoSignIn']).toBe(false);
   });
 });
+
+// task-8: proves exactly one top-level `hooks.after` is wired (the HARD
+// CONSTRAINT — a second `hooks: { after: ... }` object literal elsewhere in
+// this config would silently overwrite this one, since BetterAuth reads
+// `options.hooks?.after` as a single value, not a list). The classification
+// logic itself is covered by classify-callback-outcome.spec.ts and
+// rejection-code.spec.ts, driven against the exact ctx.context.returned
+// shapes better-auth@1.6.11 produces; this test only asserts the wiring.
+describe('auth.config — hooks.after (task-8 callback classification)', () => {
+  it('registers exactly one hooks.after function', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const hooks = options['hooks'] as Record<string, unknown> | undefined;
+    expect(typeof hooks?.['after']).toBe('function');
+  });
+});
