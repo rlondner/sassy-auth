@@ -271,29 +271,65 @@ path; it fans out to two sinks.
 are try/catch-logged: an audit failure must never break sign-in, matching the
 `lastLoginAt` stance at `auth.config.ts:128-139`.
 
-**OpenTelemetry — everything else.** The new code imports `@opentelemetry/api`
-only, with **no direct `@sentry/*` imports**. Errors are recorded via
-`span.recordException()` + `ERROR` status; events use the OTel Logs API, not span
-attributes, so `tracesSampleRate: 0.2` cannot discard four in five audit events.
-Attributes: `auth.flow=social`, `auth.provider`, `auth.outcome`, `app.public_id`.
+**OpenTelemetry — everything else.** `record-federation-event.ts` imports only
+`@opentelemetry/api-logs`, with **no direct `@sentry/*` imports** in the feature
+code proper. Both severities (expected rejections → `WARN`, unexpected failures
+→ `ERROR`) go through the OTel Logs API as log records, not span attributes, so
+`tracesSampleRate: 0.2` cannot discard four in five audit events. Attributes:
+`auth.flow=social`, `auth.provider`, `auth.outcome`, `app.public_id`. (The
+earlier draft of this section described errors as `span.recordException()` +
+`ERROR` status; that was never implemented — the code has always routed both
+severities through the Logs API only, and task-15 confirmed that was the right
+call, see below.)
 
-Sentry (`instrument.ts`, unchanged) is the **backend that ingests that
-pipeline**, not an API the feature calls — `@sentry/nestjs` 10.x is
-OpenTelemetry-native. Two plan tasks verify this rather than assume it:
+**Task-15 finding (2026-08-23): the OTel Logs API alone is a no-op on this
+stack, and an adapter was required.** Read against the installed
+`@sentry/nestjs` / `@sentry/node` / `@sentry/opentelemetry` / `@opentelemetry/*`
+10.54.0 / 0.214.0 packages (see
+`.superpowers/sdd/2026-08-22-social-authentication/task-15-report.md` for the
+full file:line trail):
 
-1. confirm OTel-recorded span exceptions surface as Sentry issues under v10;
-2. confirm the OTel Logs API reaches Sentry (v10 has structured logs; the bridge
-   may need `enableLogs`).
+1. **OTel-recorded span exceptions surfacing as Sentry issues** —
+   `@sentry/opentelemetry`'s span processor (the package that bridges OTel
+   spans into Sentry) contains no handling of OTel's `exception` span-event
+   convention anywhere in its build output. `span.recordException()` is not
+   translated into a Sentry issue by this integration, and the feature never
+   calls it (see the correction above), so this is moot for the audit
+   pipeline. Whether NestJS's own uncaught-exception capture (a different,
+   non-OTel mechanism) reaches Sentry could not be verified live — no DSN, no
+   running server, Docker down in this environment.
+2. **OTel Logs API reaching Sentry** — it does not, on this version.
+   `logs.getLogger(...).emit(...)` (`@opentelemetry/api-logs`) is a documented
+   no-op until something calls `logs.setGlobalLoggerProvider(...)`; nothing in
+   this dependency tree does — `@opentelemetry/sdk-logs` isn't even installed,
+   and `@sentry/opentelemetry` never references `LoggerProvider` or
+   `api-logs`. Sentry 10.54 does have structured logging, but it is **its
+   own** capture path — `Sentry.logger.{warn,error,info,...}` — gated by the
+   client's `enableLogs` option, and it is a completely separate mechanism
+   from the vendor-neutral OTel Logs API. There is no bridge between the two
+   on this stack.
 
-If either gap is real, the fallback is **one** adapter module implementing the
-telemetry port — the feature code still never imports Sentry.
+Gap #2 is real, so the fallback described below was implemented: a single
+adapter, `apps/auth-server/src/social/telemetry-sentry-adapter.ts`, is the only
+file in the feature that imports `@sentry/*`. It implements the `emit` seam
+`FederationEventDeps` already accepted and is injected at the sign-in path's
+one call site (`auth.config.ts`). `instrument.ts` now sets `enableLogs: true`
+to open Sentry's log-capture gate; that gate is independent of
+`tracesSampleRate` (confirmed by reading `@sentry/core`'s
+`logs/internal.js`, which never references sampling), so audit events are
+still not subject to trace sampling — the property this design relies on.
+Unit tests assert `telemetry-sentry-adapter.ts` routes WARN/ERROR/INFO to the
+matching `Sentry.logger.*` call with the record intact. A live Sentry round
+trip (real DSN, running server) was not possible in this environment and
+remains unverified; a human with a test Sentry project should confirm the
+end-to-end path once Docker/DB access is available.
 
 Severity: unexpected failures (provider HTTP errors, secret generation failure,
-DB errors, malformed callbacks) → recorded exception, `ERROR`. Expected
+DB errors, malformed callbacks) → `ERROR` log record. Expected
 rejections (no invitation, unverified email, private relay, inactive user, org
-mismatch) → `WARN` log record. Both reach Sentry and are searchable, but a
-scripted run of unknown accounts reads as a warning spike rather than burying a
-real outage in alerts.
+mismatch) → `WARN` log record. Both now reach Sentry's log-capture path (via
+the adapter) and are searchable, but a scripted run of unknown accounts reads
+as a warning spike rather than burying a real outage in alerts.
 
 **PII rule:** email addresses and provider `sub` values go only to the
 `SaAuditEvent` row — never to OTel or Sentry, which get `saUser.publicId` and the
@@ -392,10 +428,16 @@ registration*; platform **Web**, redirect
 | Client secret **Value** (not the Secret ID; shown once) | `MICROSOFT_CLIENT_SECRET` |
 | Directory (tenant) ID | `MICROSOFT_TENANT_ID` |
 
-**Open item:** which Entra optional claim actually populates the fields
-BetterAuth reads (`microsoft-entra-id.mjs:97`) must be confirmed against a real
-tenant. That confirmation is a plan task; the setup doc gets the real steps once
-known, rather than plausible-looking invented ones.
+**Open item — still unverified after task-15 (2026-08-23):** which Entra
+optional claim actually populates the fields BetterAuth reads
+(`microsoft-entra-id.mjs:97`) has still not been confirmed against a real
+tenant — this environment has no Entra tenant to test against, and task-15's
+brief was explicit that inventing portal steps is worse than leaving this
+open. `docs/social-auth-setup.md`'s Microsoft section states the same thing
+and intentionally stops short of describing the optional-claim configuration.
+This remains a plan task for whoever next has access to a real tenant; the
+setup doc gets the real steps once known, rather than plausible-looking
+invented ones.
 
 **Apple** — requires a paid Apple Developer Program membership (~$99/year); there
 is no free path. Needed: an **App ID** with Sign in with Apple enabled; a
