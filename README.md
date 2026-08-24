@@ -173,7 +173,7 @@ Knowing the boundaries up front will save you an afternoon:
 
 - **Not a certified OpenID Connect provider.** It is an OAuth 2.0 authorization server (it publishes RFC 8414 metadata), but there is no `id_token`, no `/userinfo` endpoint, and no OIDC certification. Consumers read identity from the JWT's `sub` / `org` / `aud` claims, or call `/api/me`.
 - **No refresh tokens.** Access tokens live one hour and there is no refresh grant, no token introspection, and no revocation endpoint. Re-run the flow when a token expires.
-- **No SAML, LDAP, or SCIM.** Social login is limited to the providers BetterAuth supports (Google, Microsoft, Apple, GitHub).
+- **No SAML, LDAP, or SCIM.** Social login is limited to the three providers this repo wires up (Google, Microsoft, Apple) — see [Social Sign-In](#social-sign-in).
 - **Not horizontally scalable as shipped.** Rate limiting keeps its counters in process, so each pod enforces its own budget. See [Known Limitations](#known-limitations).
 - **Not a user-facing identity product.** There is no end-user self-service portal beyond `/account/security`; the console is built for operators and tenant admins.
 - **Not audited.** See the project-status callout above.
@@ -470,8 +470,6 @@ credentials gate.
 | `APPLE_TEAM_ID`               | Apple Developer Team ID    |
 | `APPLE_KEY_ID`                | Key ID of the Sign in with Apple `.p8` key |
 | `APPLE_PRIVATE_KEY`           | Contents of the `.p8` private key. There is no `APPLE_CLIENT_SECRET`: Apple's client secret is a short-lived JWT generated at runtime from these three vars, not a static value. |
-| `GITHUB_CLIENT_ID`           | GitHub OAuth client ID     |
-| `GITHUB_CLIENT_SECRET`       | GitHub OAuth client secret |
 | `E2E_STUB_IDP_URL`            | **Non-production only.** URL of the stub OIDC provider used by the e2e suite. Only registers when `NODE_ENV` is exactly `test` or `development` — never set this in production, the stub is a full authentication bypass if reachable. |
 | `SQIDS_ALPHABET`             | Custom alphabet for Sqids encoding; leave blank for default |
 
@@ -506,7 +504,7 @@ GET /api/token/oauth/authorize
   &state=<state>
 ```
 
-The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple, GitHub).
+The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple).
 
 **Step 3 — Receive the authorization code**
 
