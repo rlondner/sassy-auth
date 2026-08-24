@@ -28,7 +28,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate SARIF Report
-        uses: aquasecurity/trivy-action@master
+        # bug-0265 (continued): pin to a released version + commit SHA
+        # rather than the mutable @master branch. This step runs with
+        # security-events: write, and the "Enforce PR Block on Critical
+        # CVEs" step below gates every PR merge — floating on @master
+        # means an upstream compromise or an unreviewed breaking change
+        # takes effect the next time this workflow runs, with no diff to
+        # review. v0.36.0 was the latest tag at the time of this fix.
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -54,7 +61,9 @@ jobs:
 
       - name: Enforce PR Block on Critical CVEs
         if: github.event_name == 'pull_request'
-        uses: aquasecurity/trivy-action@master
+        # bug-0265 (continued): same version+SHA pin as above, same reason —
+        # this is the step that actually gates PR merges on CRITICAL CVEs.
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
