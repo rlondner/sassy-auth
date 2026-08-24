@@ -49,7 +49,14 @@ const ROTATED_SESSION =
 const EXPIRING_TRUST_DEVICE =
   'better-auth.trust_device=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
 
+const TOTP_URI = 'otpauth://totp/Sassy:a@b.io?secret=JBSWY3DPEHPK3PXP&issuer=Sassy'
+const BACKUP_CODES = ['aaaa-1111', 'bbbb-2222', 'cccc-3333']
+
 let disable2fa: any
+let enable2fa: any
+let confirmEnable: any
+let regenerateBackupCodes: any
+let forwardNamedCookieWithMaxAge: any
 let jar: ReturnType<typeof cookieJar>
 
 beforeEach(async () => {
@@ -62,7 +69,12 @@ beforeEach(async () => {
   ;(authOrigin.getForwardedOrigin as jest.MockedFunction<any>).mockResolvedValue(
     'https://admin.example.com',
   )
-  disable2fa = (await import('../actions')).disable2fa
+  const mod = await import('../actions')
+  disable2fa = mod.disable2fa
+  enable2fa = mod.enable2fa
+  confirmEnable = mod.confirmEnable
+  regenerateBackupCodes = mod.regenerateBackupCodes
+  forwardNamedCookieWithMaxAge = mod.forwardNamedCookieWithMaxAge
 })
 
 describe('disable2fa validation and error mapping', () => {
@@ -146,5 +158,313 @@ describe('disable2fa session rotation', () => {
     const result = await disable2fa(formData({ password: 'pw' }))
 
     expect(result).toEqual({ ok: true })
+  })
+})
+
+describe('enable2fa', () => {
+  it('rejects a missing password without calling the auth server', async () => {
+    const result = await enable2fa(formData({}))
+
+    expect(result).toEqual({ error: 'invalidPassword' })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('returns the enrollment payload on success', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, { totpURI: TOTP_URI, backupCodes: BACKUP_CODES }),
+    )
+
+    const result = await enable2fa(formData({ password: 'pw' }))
+
+    expect(result).toEqual({ totpURI: TOTP_URI, backupCodes: BACKUP_CODES })
+  })
+
+  it('posts the password with the forwarded origin and session cookie', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, { totpURI: TOTP_URI, backupCodes: BACKUP_CODES }),
+    )
+
+    await enable2fa(formData({ password: 'pw' }))
+
+    const [url, init] = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[0] as [string, RequestInit]
+    expect(url).toBe('http://localhost:3000/api/auth/two-factor/enable')
+    expect(JSON.parse(init.body as string)).toEqual({ password: 'pw' })
+    const headers = init.headers as Record<string, string>
+    expect(headers['Origin']).toBe('https://admin.example.com')
+    expect(headers['Cookie']).toContain('better-auth.session_token=stale-token')
+  })
+
+  it.each([400, 401, 403])('maps upstream %d to invalidPassword', async (status) => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(status),
+    )
+
+    expect(await enable2fa(formData({ password: 'pw' }))).toEqual({
+      error: 'invalidPassword',
+    })
+  })
+
+  it('maps an unexpected upstream status to generic', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(500),
+    )
+
+    expect(await enable2fa(formData({ password: 'pw' }))).toEqual({
+      error: 'generic',
+    })
+  })
+
+  it('returns serverUnavailable when the fetch rejects', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(
+      new Error('ECONNREFUSED'),
+    )
+
+    expect(await enable2fa(formData({ password: 'pw' }))).toEqual({
+      error: 'serverUnavailable',
+    })
+  })
+
+  it('returns generic when the success body is not JSON', async () => {
+    const res = {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => {
+        throw new Error('not json')
+      },
+    } as unknown as Response
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(res)
+
+    expect(await enable2fa(formData({ password: 'pw' }))).toEqual({
+      error: 'generic',
+    })
+  })
+})
+
+describe('confirmEnable', () => {
+  it('rejects a missing code without calling the auth server', async () => {
+    const result = await confirmEnable(formData({}))
+
+    expect(result).toEqual({ error: 'invalidCode' })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  // better-auth rotates the session when confirm flips twoFactorEnabled on.
+  it('forwards the rotated session cookie on success', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, { status: true }, ROTATED_SESSION),
+    )
+
+    const result = await confirmEnable(formData({ code: '123456' }))
+
+    expect(result).toEqual({ ok: true })
+    expect(jar.set).toHaveBeenCalledWith(
+      'better-auth.session_token',
+      'rotated-token',
+      expect.objectContaining({ httpOnly: true, path: '/' }),
+    )
+  })
+
+  it.each([400, 401])('maps upstream %d to invalidCode', async (status) => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(status),
+    )
+
+    expect(await confirmEnable(formData({ code: '123456' }))).toEqual({
+      error: 'invalidCode',
+    })
+  })
+
+  it('maps an unexpected upstream status to generic', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(500),
+    )
+
+    expect(await confirmEnable(formData({ code: '123456' }))).toEqual({
+      error: 'generic',
+    })
+  })
+
+  it('returns serverUnavailable when the fetch rejects', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(
+      new Error('ECONNREFUSED'),
+    )
+
+    expect(await confirmEnable(formData({ code: '123456' }))).toEqual({
+      error: 'serverUnavailable',
+    })
+  })
+})
+
+describe('regenerateBackupCodes', () => {
+  it('rejects a missing password without calling the auth server', async () => {
+    const result = await regenerateBackupCodes(formData({}))
+
+    expect(result).toEqual({ error: 'invalidPassword' })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('returns the new codes on success', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, { backupCodes: BACKUP_CODES }),
+    )
+
+    expect(await regenerateBackupCodes(formData({ password: 'pw' }))).toEqual({
+      backupCodes: BACKUP_CODES,
+    })
+  })
+
+  it.each([400, 401, 403])('maps upstream %d to invalidPassword', async (status) => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(status),
+    )
+
+    expect(await regenerateBackupCodes(formData({ password: 'pw' }))).toEqual({
+      error: 'invalidPassword',
+    })
+  })
+
+  it('returns serverUnavailable when the fetch rejects', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(
+      new Error('ECONNREFUSED'),
+    )
+
+    expect(await regenerateBackupCodes(formData({ password: 'pw' }))).toEqual({
+      error: 'serverUnavailable',
+    })
+  })
+
+  it('returns generic when the success body is not JSON', async () => {
+    const res = {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => {
+        throw new Error('not json')
+      },
+    } as unknown as Response
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(res)
+
+    expect(await regenerateBackupCodes(formData({ password: 'pw' }))).toEqual({
+      error: 'generic',
+    })
+  })
+})
+
+// The TOTP URI is a shared secret and the backup codes are single-use
+// credentials. They are returned to the caller to be rendered once, and must
+// not reach anything that persists them.
+describe('enrollment secrets are not logged', () => {
+  let spies: jest.SpyInstance[]
+
+  beforeEach(() => {
+    spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
+      jest.spyOn(console, m).mockImplementation(() => {}),
+    )
+  })
+
+  afterEach(() => {
+    spies.forEach((s) => s.mockRestore())
+  })
+
+  function loggedText() {
+    return spies
+      .flatMap((s) => s.mock.calls)
+      .flat()
+      .map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
+      .join(' ')
+  }
+
+  it('enable2fa does not write the totpURI or backup codes to the console', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, { totpURI: TOTP_URI, backupCodes: BACKUP_CODES }),
+    )
+
+    await enable2fa(formData({ password: 'pw' }))
+
+    const text = loggedText()
+    expect(text).not.toContain('JBSWY3DPEHPK3PXP')
+    BACKUP_CODES.forEach((c) => expect(text).not.toContain(c))
+  })
+
+  it('regenerateBackupCodes does not write the codes to the console', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, { backupCodes: BACKUP_CODES }),
+    )
+
+    await regenerateBackupCodes(formData({ password: 'pw' }))
+
+    const text = loggedText()
+    BACKUP_CODES.forEach((c) => expect(text).not.toContain(c))
+  })
+})
+
+// Exercised indirectly by the login actions' trust-device path, where it is
+// mocked; these cover the real implementation.
+describe('forwardNamedCookieWithMaxAge', () => {
+  it('overrides the upstream Max-Age with the supplied value', async () => {
+    const res = upstream(
+      200,
+      {},
+      'better-auth.trust_device=abc; Path=/; HttpOnly; Max-Age=60',
+    )
+
+    const ok = await forwardNamedCookieWithMaxAge(
+      res,
+      'better-auth.trust_device',
+      1234,
+    )
+
+    expect(ok).toBe(true)
+    expect(jar.set).toHaveBeenCalledWith(
+      'better-auth.trust_device',
+      'abc',
+      expect.objectContaining({ maxAge: 1234, httpOnly: true }),
+    )
+  })
+
+  it('returns false when the named cookie is absent from the response', async () => {
+    const res = upstream(200, {}, 'some-other=1; Path=/')
+
+    expect(
+      await forwardNamedCookieWithMaxAge(res, 'better-auth.trust_device', 10),
+    ).toBe(false)
+    expect(jar.set).not.toHaveBeenCalled()
+  })
+
+  it('returns false when the response has no Set-Cookie header', async () => {
+    expect(
+      await forwardNamedCookieWithMaxAge(upstream(200), 'better-auth.trust_device', 10),
+    ).toBe(false)
+  })
+})
+
+// D-01 requires every credential-bearing admin action to report upstream
+// throttling as its own result. These four do not: /two-factor/* is a
+// sensitive prefix for the auth rate limiter, so a 429 is reachable, and none
+// of them has a 429 branch.
+//
+// Worth being precise about what that costs, because it is NOT what W-10's
+// hypothesis predicted. The credential-invalid branches list 400/401/403
+// only, so a 429 falls through to `generic` — the user is told "something
+// went wrong", not "your password was wrong". Less actively misleading than
+// expected, but still useless: the one thing that would help is knowing to
+// wait. Pinned here as current behaviour; grove W-05 flips them to
+// tooManyRequests.
+describe('upstream throttling currently falls through to the generic error', () => {
+  it.each([
+    ['enable2fa', () => enable2fa, { password: 'pw' }],
+    ['disable2fa', () => disable2fa, { password: 'pw' }],
+    ['regenerateBackupCodes', () => regenerateBackupCodes, { password: 'pw' }],
+    ['confirmEnable', () => confirmEnable, { code: '123456' }],
+  ])('%s reports a 429 as generic', async (_name, getFn, fields) => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(429),
+    )
+
+    expect(await getFn()(formData(fields as Record<string, string>))).toEqual({
+      error: 'generic',
+    })
   })
 })
