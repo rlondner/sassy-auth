@@ -261,6 +261,19 @@ export async function disable2fa(formData: FormData): Promise<Disable2faResult> 
     return { error: 'generic' }
   }
 
+  // better-auth rotates the session on the way DOWN as well as up: the
+  // disable handler creates a new session, sets it via Set-Cookie, and then
+  // deletes the caller's existing token (dist/plugins/two-factor/index.mjs,
+  // disableTwoFactor). Without forwarding the replacement the browser keeps a
+  // token that no longer exists, so the user is bounced to /login on the next
+  // navigation while this action has already reported success. confirmEnable
+  // has handled the enable direction since it was written; this is the mirror.
+  await forwardNamedCookie(res, 'better-auth.session_token')
+  // The same response expires the trust-device cookie when the user had one,
+  // its verification record having just been deleted server-side. Forward that
+  // too rather than leaving a cookie pointing at nothing.
+  await forwardNamedCookie(res, 'better-auth.trust_device')
+
   return { ok: true }
 }
 

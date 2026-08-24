@@ -20,10 +20,15 @@ interface ParsedSessionCookie {
   expires?: Date
 }
 
-// Known limitation: the comma-splitting regex may fail when Node concatenates
-// multiple Set-Cookie headers with ", " and one contains an Expires date.
-// BetterAuth currently returns a single session cookie so this is safe.
-// Consider replacing with `set-cookie-parser` if more cookies are added.
+// BetterAuth does NOT always return a single cookie: /two-factor/disable
+// emits a rotated session cookie and, when the user had a trusted device, an
+// expiring better-auth.trust_device alongside it
+// (dist/plugins/two-factor/index.mjs, disableTwoFactor). The split below
+// handles that correctly, but for a narrower reason than "only one arrives":
+// it breaks on a comma only when the next segment looks like `name=`, and the
+// comma inside `Expires=Wed, 21 Oct ...` is followed by a date, not a cookie
+// name. Keep that property in mind before widening the pattern; consider
+// `set-cookie-parser` if the shapes get harder.
 //
 // Parse the first Set-Cookie clause that matches `better-auth.session_token=...`.
 // Node fetch combines multiple Set-Cookie headers with ", " — split on that
