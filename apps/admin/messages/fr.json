@@ -570,6 +570,7 @@
     "continueToApp": "Continuer",
     "errors": {
       "invalidPassword": "Mot de passe invalide.",
+      "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
       "invalidCode": "Code invalide ou expiré.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."

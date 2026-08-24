@@ -440,31 +440,41 @@ describe('forwardNamedCookieWithMaxAge', () => {
   })
 })
 
-// D-01 requires every credential-bearing admin action to report upstream
-// throttling as its own result. These four do not: /two-factor/* is a
-// sensitive prefix for the auth rate limiter, so a 429 is reachable, and none
-// of them has a 429 branch.
-//
-// Worth being precise about what that costs, because it is NOT what W-10's
-// hypothesis predicted. The credential-invalid branches list 400/401/403
-// only, so a 429 falls through to `generic` — the user is told "something
-// went wrong", not "your password was wrong". Less actively misleading than
-// expected, but still useless: the one thing that would help is knowing to
-// wait. Pinned here as current behaviour; grove W-05 flips them to
-// tooManyRequests.
-describe('upstream throttling currently falls through to the generic error', () => {
+// D-01: every credential-bearing admin action reports upstream throttling as
+// its own result. /two-factor/* is a sensitive prefix for the auth rate
+// limiter, so a 429 is reachable on all four of these.
+describe('upstream throttling is reported as tooManyRequests', () => {
   it.each([
     ['enable2fa', () => enable2fa, { password: 'pw' }],
     ['disable2fa', () => disable2fa, { password: 'pw' }],
     ['regenerateBackupCodes', () => regenerateBackupCodes, { password: 'pw' }],
     ['confirmEnable', () => confirmEnable, { code: '123456' }],
-  ])('%s reports a 429 as generic', async (_name, getFn, fields) => {
+  ])('%s maps a 429 to tooManyRequests', async (_name, getFn, fields) => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
       upstream(429),
     )
 
     expect(await getFn()(formData(fields as Record<string, string>))).toEqual({
-      error: 'generic',
+      error: 'tooManyRequests',
+    })
+  })
+
+  // The result is rendered by SecurityClient as t(`errors.${result.error}`),
+  // so a result with no matching key would surface as a broken lookup rather
+  // than a message.
+  it('has a message for every error result these actions can return', () => {
+    const en = require('@/messages/en.json')
+    const fr = require('@/messages/fr.json')
+    const returned = [
+      'invalidPassword',
+      'invalidCode',
+      'generic',
+      'serverUnavailable',
+      'tooManyRequests',
+    ]
+    returned.forEach((key) => {
+      expect(en.security.errors).toHaveProperty(key)
+      expect(fr.security.errors).toHaveProperty(key)
     })
   })
 })
