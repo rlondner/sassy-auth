@@ -33,7 +33,7 @@ touches a database or the network.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `admin` | 42 | 298 | 55.82% | 49.27% | 50.81% | 57.48% | 55 / 49 / 50 / 57 |
 | `auth-server` | 70 | 678 | not measured | not measured | not measured | not measured | none |
-| `ui` | 4 | 15 | 22.73% | 17.39% | 22.22% | 22.74% | 22 / 17 / 22 / 22 |
+| `ui` | 4 | 15 | 69.23% | 51.11% | 70.00% | 68.96% | 69 / 51 / 70 / 68 |
 | `db` | 1 | 4 | n/a | n/a | n/a | n/a | none |
 | `types` | — | — | — | — | — | — | deferred (W-25) |
 
@@ -53,8 +53,15 @@ the percentage because it removes numerator and denominator together.
 The difference is not marginal. Measured without `collectCoverageFrom`, admin
 reads 74.73/68.68/62.95/78.42 and ui reads 97.36/57.14/90.32/97.29. Those were
 the numbers first recorded here, and they are wrong for this purpose: ui's
-"97%" was four tested components out of roughly thirty-five, with the
-`src/components/ui/` primitives entirely invisible.
+"97%" was four tested components out of roughly thirty-five, with every other
+file — first-party and vendored alike — absent from the denominator.
+
+That is a separate matter from the shadcn exclusion below. Accidentally
+omitting a file because nothing imports it hides untested first-party code;
+deliberately excluding a vendored directory is a scoping decision that leaves
+every first-party file still counted. `ui` reads 69.23% with the exclusion and
+22.73% without it, and both of those are measured over the whole first-party
+tree.
 
 All suites pass. `pnpm --filter <pkg> typecheck:ci` is clean for `admin`,
 `auth-server` and `ui`.
@@ -72,12 +79,17 @@ percentages are genuinely unknown rather than estimated. This is the one gap in
 this document. It matters most, because it is the largest package and the one
 W-28 through W-37 target. Fill it before setting a floor for this package.
 
-**`ui`** — 22% across the board. Four components have specs (`confirm-dialog`,
-`data-table`, `status-chip`, `user-avatar`); the roughly thirty shadcn-derived
-primitives under `src/components/ui/` have none. Worth deciding separately
-whether vendored primitives should count at all — excluding them would raise
-the figure without adding a single test, so it is a reporting choice, not a
-quality one, and it is deliberately not made here.
+**`ui`** — 69% over the components this repo authors. The 19 vendored
+primitives under `src/components/ui/` are excluded from
+`collectCoverageFrom`: the shadcn CLI generates that directory, so counting
+them measured how much third-party code was untested rather than anything
+about this codebase. Including them reads 22.73%, and the difference is
+entirely a reporting choice — it changes no test and no behaviour.
+
+What remains is real: `src/components/` at 79.72% statements across six
+first-party components, `src/lib/utils.ts` fully covered, and
+`src/hooks/use-mobile.tsx` at 0% — that last one is the only untested
+first-party file in the package.
 
 **`db`** — reports `0/0`, which is not a failure. The single spec
 (`two-factor-fields.spec.ts`) reads `schema.prisma` as text and asserts on its
@@ -103,7 +115,7 @@ to backfill existing untested code before shipping, but no change can silently
 reduce coverage — which is the actual goal.
 
 - `admin` — 55 / 49 / 50 / 57.
-- `ui` — 22 / 17 / 22 / 22.
+- `ui` — 69 / 51 / 70 / 68, over first-party components only.
 - `auth-server` — none. Its coverage run was never completed, and a guessed
   number would be worse than no constraint. Its 678 unit tests still gate
   merges via the workflow below; the floor can be added later from a real
@@ -128,7 +140,10 @@ That flag is load-bearing rather than cosmetic: jest evaluates
 `coverageThreshold` only when coverage is collected, so dropping it would
 silently disable every floor while leaving the workflow green.
 
-Verified rather than assumed: removing
-`apps/admin/app/login/__tests__/actions.signin.test.ts` drops admin to 53.96%
-statements and exits **1** with `"global" coverage threshold for statements
-(55%) not met`; restoring it exits **0**.
+Verified rather than assumed, per package:
+
+- removing `apps/admin/app/login/__tests__/actions.signin.test.ts` drops admin
+  to 53.96% statements and exits **1** on statements, branches and lines;
+  restoring it exits **0**.
+- removing `packages/ui/src/__tests__/data-table.test.tsx` drops ui to 54.94%
+  statements and exits **1** on all four thresholds; restoring it exits **0**.

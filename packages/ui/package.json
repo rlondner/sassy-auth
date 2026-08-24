@@ -63,17 +63,18 @@
     },
     "coverageThreshold": {
       "global": {
-        "statements": 22,
-        "branches": 17,
-        "functions": 22,
-        "lines": 22
+        "statements": 69,
+        "branches": 51,
+        "functions": 70,
+        "lines": 68
       }
     },
     "collectCoverageFrom": [
       "src/**/*.{ts,tsx}",
       "!src/**/__tests__/**",
       "!src/index.ts",
-      "!**/*.d.ts"
+      "!**/*.d.ts",
+      "!src/components/ui/**"
     ]
   }
 }
