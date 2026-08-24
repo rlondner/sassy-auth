@@ -18,7 +18,8 @@
     "delete": "Delete",
     "confirm": "Confirm",
     "itemsPerPage": "Items per page",
-    "copyFailed": "Failed to copy — clipboard access denied"
+    "copyFailed": "Failed to copy — clipboard access denied",
+    "moreActions": "More actions"
   },
   "apps": {
     "title": "Applications",
