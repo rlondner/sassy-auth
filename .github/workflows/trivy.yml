@@ -41,6 +41,14 @@ jobs:
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()
+        # bug-0265: this repo is private without GitHub Advanced Security, so
+        # code scanning is not enabled and this upload always fails with
+        # "Code scanning is not enabled for this repository". Without
+        # continue-on-error, that failure stops the job here — the next step
+        # (the actual CRITICAL-CVE build gate) never runs, silently
+        # defeating the one thing this workflow exists to enforce. Re-enable
+        # the SARIF upload for real once code scanning is available.
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 
