@@ -42,7 +42,16 @@ jobs:
           find . -name "*_rsa" -type f -delete
 
       - name: Run Claude Security Review
-        uses: anthropics/claude-code-security-review@v1
+        # bug-0266: anthropics/claude-code-security-review has no tags or
+        # releases at all (`gh api repos/anthropics/claude-code-security-review/tags`
+        # is empty) — `@v1` can never resolve and every run fails immediately
+        # at "Unable to resolve action ... unable to find version `v1`",
+        # before the review itself is ever attempted. Pin to a specific
+        # commit SHA on main rather than `@main` itself: this action reads
+        # ANTHROPIC_API_KEY and has PR write access, so floating on a mutable
+        # branch is a supply-chain risk this workflow's own hardening
+        # comments elsewhere are trying to avoid. Bump deliberately.
+        uses: anthropics/claude-code-security-review@0c6a49f1fa56a1d472575da86a94dbc1edb78eda
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
