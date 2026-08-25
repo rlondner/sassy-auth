@@ -4,7 +4,8 @@
 [![Status: experimental](https://img.shields.io/badge/Status-experimental-orange.svg)](SECURITY.md)
 [![e2e](https://github.com/rlondner/sassy-auth/actions/workflows/e2e.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/e2e.yml)
 [![typecheck](https://github.com/rlondner/sassy-auth/actions/workflows/typecheck.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/typecheck.yml)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![unit tests](https://github.com/rlondner/sassy-auth/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/unit-tests.yml)
+[![Node](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 
@@ -173,7 +174,7 @@ Knowing the boundaries up front will save you an afternoon:
 
 - **Not a certified OpenID Connect provider.** It is an OAuth 2.0 authorization server (it publishes RFC 8414 metadata), but there is no `id_token`, no `/userinfo` endpoint, and no OIDC certification. Consumers read identity from the JWT's `sub` / `org` / `aud` claims, or call `/api/me`.
 - **No refresh tokens.** Access tokens live one hour and there is no refresh grant, no token introspection, and no revocation endpoint. Re-run the flow when a token expires.
-- **No SAML, LDAP, or SCIM.** Social login is limited to the providers BetterAuth supports (Google, Microsoft, Apple, GitHub).
+- **No SAML, LDAP, or SCIM.** Social login is wired up for Google, Microsoft, and Apple — see [Social providers](#social-providers-optional).
 - **Not horizontally scalable as shipped.** Rate limiting keeps its counters in process, so each pod enforces its own budget. See [Known Limitations](#known-limitations).
 - **Not a user-facing identity product.** There is no end-user self-service portal beyond `/account/security`; the console is built for operators and tenant admins.
 - **Not audited.** See the project-status callout above.
@@ -228,7 +229,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 
 ## Prerequisites
 
-- Node.js >= 20
+- Node.js >= 24
 - pnpm >= 9
 - PostgreSQL 14+
 
@@ -434,6 +435,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
 | `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
 | `PLATFORM_REQUIRE_2FA` | Set to exactly `true` to require 2FA for all platform operators. See [Two-Factor Authentication](#two-factor-authentication-2fa). Default: unset |
+| `TWO_FACTOR_TRUST_DAYS` | System-wide default for the "trust this device" cookie lifetime and the 2FA re-prompt threshold, in days. Falls back to 14 if unset, empty, zero, negative, or not an integer. An individual app can override this via its `twoFactorTrustDays` field. |
 
 ### Observability (optional)
 
@@ -470,8 +472,6 @@ credentials gate.
 | `APPLE_TEAM_ID`               | Apple Developer Team ID    |
 | `APPLE_KEY_ID`                | Key ID of the Sign in with Apple `.p8` key |
 | `APPLE_PRIVATE_KEY`           | Contents of the `.p8` private key. There is no `APPLE_CLIENT_SECRET`: Apple's client secret is a short-lived JWT generated at runtime from these three vars, not a static value. |
-| `GITHUB_CLIENT_ID`           | GitHub OAuth client ID     |
-| `GITHUB_CLIENT_SECRET`       | GitHub OAuth client secret |
 | `E2E_STUB_IDP_URL`            | **Non-production only.** URL of the stub OIDC provider used by the e2e suite. Only registers when `NODE_ENV` is exactly `test` or `development` — never set this in production, the stub is a full authentication bypass if reachable. |
 | `SQIDS_ALPHABET`             | Custom alphabet for Sqids encoding; leave blank for default |
 
@@ -506,7 +506,7 @@ GET /api/token/oauth/authorize
   &state=<state>
 ```
 
-The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple, GitHub).
+The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple).
 
 **Step 3 — Receive the authorization code**
 
