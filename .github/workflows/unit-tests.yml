@@ -1,0 +1,61 @@
+name: unit tests
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # Same prerequisite as the typecheck workflow: admin and ui resolve
+      # @sassy-auth/db and @sassy-auth/types through their built output, and
+      # `prisma generate` is what produces the db package's types.
+      - name: Generate Prisma client
+        run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
+
+      - name: Build shared packages
+        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
+
+      # These are unit runs only — no database, no network. The auth-server
+      # config sets rootDir=src and module-maps better-auth, otplib and uuid to
+      # __mocks__; the suites that need real infrastructure are the e2e ones
+      # (auth-server test:e2e, and apps/admin-e2e), which the e2e workflow owns.
+      #
+      # --coverage is not decoration: the per-package coverageThreshold values
+      # only evaluate when coverage is collected, so dropping the flag would
+      # silently disable the floors these packages declare.
+      - name: auth-server
+        run: pnpm --filter @sassy-auth/auth-server test -- --coverage --coverageReporters=text-summary
+
+      - name: admin
+        run: pnpm --filter @sassy-auth/admin test -- --coverage --coverageReporters=text-summary
+
+      - name: ui
+        run: pnpm --filter @sassy-auth/ui test -- --coverage --coverageReporters=text-summary
+
+      # db has no coverage floor: its spec asserts on schema.prisma as text and
+      # executes no instrumented JavaScript, so there is nothing to measure.
+      - name: db
+        run: pnpm --filter @sassy-auth/db test

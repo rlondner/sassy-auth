@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { isRedirectSentinel } from '@/lib/redirect-sentinel'
 import { createApp, updateApp, deleteApp, getApps, getSocialProviderSettings, setSocialProviders } from '@/lib/api'
 import type {
   App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse,
@@ -31,6 +32,7 @@ export async function createAppAction(
     revalidatePath('/apps')
     return { app }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'create') }
   }
 }
@@ -44,6 +46,7 @@ export async function updateAppAction(
     revalidatePath('/apps')
     return { app }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
   }
 }
@@ -56,6 +59,7 @@ export async function deleteAppAction(
     revalidatePath('/apps')
     return { ok: true }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'delete') }
   }
 }
@@ -72,7 +76,8 @@ export async function getSocialProviderSettingsAction(
 ): Promise<{ available: string[]; enabled: string[] } | ErrorResult> {
   try {
     return await getSocialProviderSettings(clientId)
-  } catch {
+  } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: 'apps.errors.generic' }
   }
 }
@@ -84,6 +89,7 @@ export async function updateSocialProvidersAction(
   try {
     return { providers: await setSocialProviders(clientId, providers) }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
   }
 }
@@ -95,6 +101,7 @@ export async function listAppsAction(
   try {
     return await getApps(params)
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return {
       errorKey:
         err instanceof Error && err.message.includes('403')

@@ -20,10 +20,15 @@ interface ParsedSessionCookie {
   expires?: Date
 }
 
-// Known limitation: the comma-splitting regex may fail when Node concatenates
-// multiple Set-Cookie headers with ", " and one contains an Expires date.
-// BetterAuth currently returns a single session cookie so this is safe.
-// Consider replacing with `set-cookie-parser` if more cookies are added.
+// BetterAuth does NOT always return a single cookie: /two-factor/disable
+// emits a rotated session cookie and, when the user had a trusted device, an
+// expiring better-auth.trust_device alongside it
+// (dist/plugins/two-factor/index.mjs, disableTwoFactor). The split below
+// handles that correctly, but for a narrower reason than "only one arrives":
+// it breaks on a comma only when the next segment looks like `name=`, and the
+// comma inside `Expires=Wed, 21 Oct ...` is followed by a date, not a cookie
+// name. Keep that property in mind before widening the pattern; consider
+// `set-cookie-parser` if the shapes get harder.
 //
 // Parse the first Set-Cookie clause that matches `better-auth.session_token=...`.
 // Node fetch combines multiple Set-Cookie headers with ", " — split on that
@@ -193,8 +198,14 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
     return { twoFactor: true } as { twoFactor: true }
   }
 
+  // The auth server accepted the credentials and returned 200; we could not
+  // extract a session from its response. That is a server-side fault, not a bad
+  // password — forwardSessionCookie has already reported it to Sentry at error
+  // level. Reporting it as invalidCredentials would make the user retype a
+  // password that was just accepted, spending rate-limit budget on a retry that
+  // cannot succeed. All four call sites report this the same way.
   const ok = await forwardSessionCookie(res)
-  if (!ok) return { error: 'invalidCredentials' }
+  if (!ok) return { error: 'serverUnavailable' }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Admin login successful', level: 'info' })
   const nextRaw = formData.get('next')
@@ -205,6 +216,13 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
   const cookieStore2 = await cookies()
   let twoFactorEnabled = false
   let twoFactorPromptedAt: string | null = null
+  // Fail open means "do not prompt when we could not read the user's real 2FA
+  // state". The defaults above (unenrolled, never prompted) are exactly the
+  // input that makes shouldPromptTwoFactor return true, so leaving them in
+  // place on failure produced the opposite: a status-lookup outage sent every
+  // successful login to the setup interstitial, enrolled users included.
+  // Only consult the interstitial when BOTH lookups actually answered.
+  let twoFactorStateKnown = false
   try {
     const [sessRes, statusRes] = await Promise.all([
       fetch(`${AUTH_SERVER_URL}/api/auth/get-session`, {
@@ -216,13 +234,12 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
         cache: 'no-store',
       }),
     ])
-    if (sessRes.ok) {
+    if (sessRes.ok && statusRes.ok) {
       const sess = (await sessRes.json()) as { user?: { twoFactorEnabled?: boolean } } | null
       twoFactorEnabled = sess?.user?.twoFactorEnabled ?? false
-    }
-    if (statusRes.ok) {
       const statusData = (await statusRes.json()) as { twoFactorPromptedAt: string | null }
       twoFactorPromptedAt = statusData.twoFactorPromptedAt
+      twoFactorStateKnown = true
     }
   } catch { /* fail open — no prompt on error */ }
 
@@ -250,7 +267,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
     } catch { /* use system default */ }
   }
 
-  if (shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
+  if (twoFactorStateKnown && shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
     const encodedNext = nextSafe ? encodeURIComponent(nextSafe) : ''
     redirect(`/login/two-factor-prompt${encodedNext ? `?next=${encodedNext}` : ''}`)
   }
@@ -323,8 +340,10 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
     return { twoFactor: true } as { twoFactor: true }
   }
 
+  // Same reasoning as signIn: the code was accepted, so a session we cannot
+  // read is a server-side fault rather than a bad code.
   const ok = await forwardSessionCookie(res)
-  if (!ok) return { error: 'invalidCode' }
+  if (!ok) return { error: 'serverUnavailable' }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Admin OTP login successful', level: 'info' })
   const nextRaw = formData.get('next')
@@ -333,8 +352,8 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
 }
 
 /**
- * Resolve the effective per-app trust-device duration from the `next` form
- * field (which may carry a client_id query param for per-app overrides) and
+ * Resolve the effective per-app trust-device duration from the `next` value
+ * (which may carry a client_id query param for per-app overrides) and
  * re-set the better-auth.trust_device cookie Max-Age accordingly.
  *
  * BetterAuth uses its plugin DEFAULT trust-device duration (no
@@ -344,6 +363,12 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
  *
  * We override the browser cookie's Max-Age here to honour per-app
  * twoFactorTrustDays.
+ *
+ * `nextStr` MUST be a validateNextUrl-checked value. A `next` we refuse to
+ * redirect to must not be trusted to name an app either: the client_id it
+ * carries selects the trust interval, so an attacker-supplied off-origin
+ * `next` could otherwise point at an app with a long twoFactorTrustDays and
+ * extend how long the victim's device skips the TOTP challenge.
  */
 async function applyPerAppTrustCookie(
   res: Response,
@@ -416,8 +441,7 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
   await forwardNamedCookie(res, 'better-auth.two_factor')
 
   if (trustDevice) {
-    const nextStr = typeof nextRaw === 'string' ? nextRaw : null
-    await applyPerAppTrustCookie(res, nextStr)
+    await applyPerAppTrustCookie(res, nextSafe)
   }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'TOTP verify success', level: 'info' })
@@ -454,6 +478,10 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
 
   if (!res.ok) {
     Sentry.addBreadcrumb({ category: 'auth', message: 'Backup code verify failed', level: 'warning' })
+    // Same budget as the TOTP path: a throttled challenge must not be reported
+    // as a bad code, which is untrue and invites the retry that extends the
+    // lockout window.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     return { error: 'invalidCode' }
   }
 
@@ -464,8 +492,7 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
   await forwardNamedCookie(res, 'better-auth.two_factor')
 
   if (trustDevice) {
-    const nextStr = typeof nextRaw === 'string' ? nextRaw : null
-    await applyPerAppTrustCookie(res, nextStr)
+    await applyPerAppTrustCookie(res, nextSafe)
   }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Backup code verify success', level: 'info' })

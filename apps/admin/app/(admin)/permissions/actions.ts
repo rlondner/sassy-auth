@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { isRedirectSentinel } from '@/lib/redirect-sentinel'
 import {
   createPermission, updatePermission, deletePermission, getPermissions, getPermission,
 } from '@/lib/api'
@@ -37,6 +38,7 @@ export async function createPermissionAction(
     revalidatePath('/permissions')
     return { permission }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'create') }
   }
 }
@@ -50,6 +52,7 @@ export async function updatePermissionAction(
     revalidatePath('/permissions')
     return { permission }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
   }
 }
@@ -62,6 +65,7 @@ export async function deletePermissionAction(
     revalidatePath('/permissions')
     return { ok: true }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'delete') }
   }
 }
@@ -72,6 +76,7 @@ export async function listPermissionsAction(
   try {
     return await getPermissions(params)
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return {
       errorKey:
         err instanceof Error && err.message.includes('403')
@@ -87,6 +92,7 @@ export async function getPermissionAction(
   try {
     return await getPermission(publicId)
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return {
       errorKey:
         err instanceof Error && err.message.includes('403')
