@@ -4,7 +4,8 @@
 [![Status: experimental](https://img.shields.io/badge/Status-experimental-orange.svg)](SECURITY.md)
 [![e2e](https://github.com/rlondner/sassy-auth/actions/workflows/e2e.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/e2e.yml)
 [![typecheck](https://github.com/rlondner/sassy-auth/actions/workflows/typecheck.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/typecheck.yml)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![unit tests](https://github.com/rlondner/sassy-auth/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/unit-tests.yml)
+[![Node](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 
@@ -228,7 +229,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 
 ## Prerequisites
 
-- Node.js >= 20
+- Node.js >= 24 (`.nvmrc` pins the exact version if you use nvm/fnm)
 - pnpm >= 9
 - PostgreSQL 14+
 
