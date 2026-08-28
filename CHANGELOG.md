@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-28
+
+No commits landed on `master` in the last 24 hours (`master` has been at
+`ea82b95` since 2026-08-25). This is now the fourth consecutive daily review
+to find master unchanged; the review PR backlog has grown to 14 open PRs
+(#349–#363) with none merged since 2026-08-25 — see
+[TODO_2026-08-28.md](./docs/history/todo/TODO_2026-08-28.md) for the escalation.
+
+With no new diff to review, this run did a fresh static scan of auth-flow
+code not yet covered by the bug-0095–0274 series and found one new issue.
+`master`'s `unit-tests` CI job remains red (root-caused 2026-08-27 as
+bug-0273/bug-0274; both fixes still await merge in #360/#361). See
+[BUGS_2026-08-28.md](./docs/history/bugs/BUGS_2026-08-28.md).
+
+### Fixed (1 bug)
+
+- **bug-0275** (High) — 2FA enrollment (`confirmEnable`) only rotated the
+  session on the device where 2FA was enabled; any other active session for
+  the user was never re-verified against 2FA, yet would later have its OAuth
+  `amr` claim falsely stamped `['otp','mfa']` based on the account's live
+  `twoFactorEnabled` flag. Fixed by revoking every other session immediately
+  on confirm, mirroring the existing revoke-on-deactivate pattern. PR #363.
+
+### Docs
+
+- README: `Node.js >= 20` → `>= 24` (Prerequisites section and badge), and
+  added a `unit-tests` CI badge — both were already fixed once in the still-
+  unmerged #362; reapplied directly since this review branches from `master`.
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
