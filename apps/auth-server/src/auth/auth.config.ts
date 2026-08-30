@@ -263,6 +263,16 @@ export const auth = betterAuth({
     // RegistrationService checks for that explicitly — see its 409 path.
     autoSignIn: false,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
+    // Without this, BetterAuth's /reset-password endpoint changes the
+    // password but leaves every other active session untouched (see
+    // node_modules/better-auth/dist/api/routes/password.mjs — the
+    // deleteSessions(userId) call is gated behind this exact option,
+    // default off). Password reset is the standard incident-response step
+    // for a compromised account; if a stolen session survives it, the
+    // reset accomplishes nothing for that attacker. Mirrors the
+    // revoke-other-sessions fix already applied to 2FA enrollment
+    // (bug-0275, confirmEnable in apps/admin/app/account/security/actions.ts).
+    revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, token }: { user: { email: string; name?: string }; token: string }) => {
       const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
       const resetUrl = `${adminUrl}/reset-password?token=${token}`;
