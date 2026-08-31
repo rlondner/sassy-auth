@@ -35,8 +35,10 @@
 
 ```bash
 cd apps/auth-server
-pnpm add @opentelemetry/sdk-trace-base@^2.0.0 @opentelemetry/sdk-metrics@^0.214.0 @opentelemetry/resources@^2.0.0 @opentelemetry/semantic-conventions@^1.30.0 @opentelemetry/exporter-trace-otlp-http@^0.214.0 @opentelemetry/exporter-metrics-otlp-http@^0.214.0
+pnpm add @opentelemetry/sdk-trace-base@^2.0.0 @opentelemetry/sdk-metrics@^2.0.0 @opentelemetry/resources@^2.0.0 @opentelemetry/semantic-conventions@^1.30.0 @opentelemetry/exporter-trace-otlp-http@^0.51.0 @opentelemetry/exporter-metrics-otlp-http@^0.51.0
 ```
+
+If any of these pinned versions fail to resolve against the versions of `@opentelemetry/api`/`@opentelemetry/api-logs` already in `apps/auth-server/package.json`, use `pnpm add <package>@latest` for that package instead and record the version that actually resolved in your report — package resolution, not the exact number here, is the requirement.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -72,6 +74,21 @@ describe('setupOtel', () => {
     const { setupOtel } = await import('./otel');
     expect(() => setupOtel()).not.toThrow();
   });
+
+  describe('buildDatadogSpanProcessors', () => {
+    it('returns an empty array when DD_API_KEY is unset', async () => {
+      delete process.env.DD_API_KEY;
+      const { buildDatadogSpanProcessors } = await import('./otel');
+      expect(buildDatadogSpanProcessors()).toEqual([]);
+    });
+
+    it('returns one span processor when DD_API_KEY is set', async () => {
+      process.env.DD_API_KEY = 'test-key';
+      process.env.DD_SITE = 'datadoghq.com';
+      const { buildDatadogSpanProcessors } = await import('./otel');
+      expect(buildDatadogSpanProcessors()).toHaveLength(1);
+    });
+  });
 });
 ```
 
@@ -82,10 +99,13 @@ Expected: FAIL with "Cannot find module './otel'"
 
 - [ ] **Step 4: Write minimal implementation**
 
+There is no `Sentry.addOpenTelemetrySpanProcessor` function — it does not exist in `@sentry/nestjs`/`@sentry/node` v10. Verified against the installed package source
+(`node_modules/@sentry/node/build/esm/sdk/initOtel.js` in this repo): by default `@sentry/node` registers its own minimal `SentryTracerProvider`, which does not run a standard OTel span-processor pipeline at all. Passing `openTelemetrySpanProcessors` as a **`Sentry.init()` option** is what makes it fall back to a real `BasicTracerProvider` (from `@opentelemetry/sdk-trace-base`) that runs `SentrySpanProcessor` (Sentry's own) plus whatever processors you pass in — see `setupOtel()` in that same file, which does exactly `spanProcessors: [new SentrySpanProcessor(...), ...(options.spanProcessors || [])]`. This means the Datadog span processor must be built *before* `Sentry.init()` is called and passed into it, not added afterward.
+
 ```typescript
 // apps/auth-server/src/telemetry/otel.ts
 import { metrics, type Meter } from '@opentelemetry/api';
-import * as Sentry from '@sentry/nestjs';
+import type { SpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
@@ -102,21 +122,25 @@ function datadogOtlpConfig(): { url: string; headers: Record<string, string> } |
   return { url: `https://otlp-http-intake.logs.${site}`, headers: { 'dd-api-key': apiKey } };
 }
 
+/**
+ * Built and passed into `Sentry.init({ openTelemetrySpanProcessors: ... })`
+ * BEFORE init runs — `@sentry/node` only stands up a real OTel span-processor
+ * pipeline (vs. its default minimal SentryTracerProvider) when this option is
+ * non-empty at init time. See this file's header note for the source trail.
+ */
+export function buildDatadogSpanProcessors(): SpanProcessor[] {
+  const dd = datadogOtlpConfig();
+  if (!dd) return [];
+  return [
+    new BatchSpanProcessor(
+      new OTLPTraceExporter({ url: `${dd.url}/v1/traces`, headers: dd.headers }),
+    ),
+  ];
+}
+
 export function setupOtel(): { meter: Meter } {
   const resource = resourceFromAttributes({ [ATTR_SERVICE_NAME]: SERVICE_NAME });
   const dd = datadogOtlpConfig();
-
-  if (dd) {
-    // Sentry (@sentry/nestjs v10) already registers the global OTel
-    // TracerProvider for its own span capture. Adding a Datadog exporter as
-    // an extra processor on that provider avoids two competing providers
-    // fighting over `trace.setGlobalTracerProvider`.
-    Sentry.addOpenTelemetrySpanProcessor(
-      new BatchSpanProcessor(
-        new OTLPTraceExporter({ url: `${dd.url}/v1/traces`, headers: dd.headers }),
-      ),
-    );
-  }
 
   const readers = dd
     ? [
@@ -140,10 +164,12 @@ Expected: PASS
 
 - [ ] **Step 6: Wire into instrument.ts**
 
+`buildDatadogSpanProcessors()` must be called and its result passed into `Sentry.init()` itself — not after:
+
 ```typescript
 // apps/auth-server/src/instrument.ts
 import * as Sentry from '@sentry/nestjs';
-import { setupOtel } from './telemetry/otel';
+import { setupOtel, buildDatadogSpanProcessors } from './telemetry/otel';
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
@@ -151,6 +177,7 @@ Sentry.init({
   tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
   enableLogs: true,
   integrations: [Sentry.prismaIntegration()],
+  openTelemetrySpanProcessors: buildDatadogSpanProcessors(),
 });
 
 export const otel = setupOtel();
@@ -194,8 +221,10 @@ git commit -m "feat(otel): bootstrap OTel traces and metrics with Datadog export
 
 ```bash
 cd apps/auth-server
-pnpm add @opentelemetry/sdk-logs@^0.214.0 @opentelemetry/exporter-logs-otlp-http@^0.214.0
+pnpm add @opentelemetry/sdk-logs@^0.214.0 @opentelemetry/exporter-logs-otlp-http@^0.51.0
 ```
+
+If either pinned version fails to resolve against the versions of `@opentelemetry/api-logs`/`@opentelemetry/sdk-trace-base` already installed, use `pnpm add <package>@latest` and record the version that actually resolved in your report.
 
 - [ ] **Step 2: Write the failing test for the Sentry log exporter**
 
@@ -1198,37 +1227,42 @@ git commit -m "feat(otel): trace JWT verification with an outcome counter"
 - Modify: `apps/admin/jest.setup.ts`
 
 **Interfaces:**
-- Consumes: `Sentry.addOpenTelemetrySpanProcessor` (same API used in auth-server's `otel.ts`, available from `@sentry/nextjs` since it re-exports `@sentry/node`'s server-side API for the `nodejs` runtime).
+- Consumes: `Sentry.init()`'s `openTelemetrySpanProcessors` option — the real, documented extension point (there is no `Sentry.addOpenTelemetrySpanProcessor` function; verified against the installed `@sentry/node` v10 source during Task 1, which showed `@sentry/node` only runs a real OTel span-processor pipeline, instead of its default minimal `SentryTracerProvider`, when `openTelemetrySpanProcessors` is passed as an `init()` option). Same pattern as auth-server's `buildDatadogSpanProcessors()` from Task 1 — this task duplicates that small function rather than sharing it, since `apps/admin` and `apps/auth-server` are separate pnpm workspace packages with no shared runtime-code package between them (per the design's "Shared workspace packages" finding: `packages/db` and `packages/types` are TS-only utility packages, not a home for cross-app bootstrap logic, and creating one is out of scope for this task).
 
 - [ ] **Step 1: Add the OTel trace exporter dependency**
 
 ```bash
 cd apps/admin
-pnpm add @opentelemetry/sdk-trace-base@^2.0.0 @opentelemetry/exporter-trace-otlp-http@^0.214.0
+pnpm add @opentelemetry/sdk-trace-base@^2.0.0 @opentelemetry/exporter-trace-otlp-http@^0.51.0
 ```
+
+If either pinned version fails to resolve, use `pnpm add <package>@latest` and record the version that actually resolved in your report.
 
 - [ ] **Step 2: Add Datadog export to the server Sentry config**
 
-Read `apps/admin/sentry.server.config.ts` first to see its existing `Sentry.init(...)` call, then add after it (this file only runs for `NEXT_RUNTIME === 'nodejs'`, per `instrumentation.ts` — Next.js edge runtime cannot load Node OTel exporter packages, so Datadog export is server-only, matching the spec's "Out of scope: browser RUM"):
+Read `apps/admin/sentry.server.config.ts` first to find its existing `Sentry.init({...})` call. Add the span processor builder above it and pass the result into the `openTelemetrySpanProcessors` option of that same call — it must be part of the `init()` call's options object, not added afterward:
 
 ```typescript
-// apps/admin/sentry.server.config.ts — append at the end of the file
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
+// apps/admin/sentry.server.config.ts — add near the top, before Sentry.init
+import { BatchSpanProcessor, type SpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 
-const ddApiKey = process.env.DD_API_KEY;
-if (ddApiKey) {
+function buildDatadogSpanProcessors(): SpanProcessor[] {
+  const ddApiKey = process.env.DD_API_KEY;
+  if (!ddApiKey) return [];
   const site = process.env.DD_SITE ?? 'datadoghq.com';
-  Sentry.addOpenTelemetrySpanProcessor(
+  return [
     new BatchSpanProcessor(
       new OTLPTraceExporter({
         url: `https://otlp-http-intake.logs.${site}/v1/traces`,
         headers: { 'dd-api-key': ddApiKey },
       }),
     ),
-  );
+  ];
 }
 ```
+
+Then add `openTelemetrySpanProcessors: buildDatadogSpanProcessors(),` as a new property inside the existing `Sentry.init({ ... })` call's options object, alongside whatever options are already there — do not remove or reorder the existing options.
 
 - [ ] **Step 3: Write the failing test for the login action span**
 
