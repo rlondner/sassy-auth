@@ -34,8 +34,8 @@ const loggerFake: Partial<LoggerService> = {
   getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() } as never),
 };
 
-const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false };
-const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', callbackUrl: null, isPlatform: true, twoFactorTrustDays: null, requireTwoFactor: false };
+const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false };
+const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', isPlatform: true, twoFactorTrustDays: null, requireTwoFactor: false };
 
 describe('AppsService', () => {
   let service: AppsService;
@@ -58,7 +58,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -81,7 +81,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
     expect(result).toEqual({
       publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
-      callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false,
+      isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -116,27 +116,13 @@ describe('AppsService', () => {
         publicId: expect.stringMatching(/^pending-/),
         name: 'Customer Portal',
         url: 'https://portal.example.com',
-        callbackUrl: null,
         isPlatform: false,
         twoFactorTrustDays: null,
         requireTwoFactor: false,
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false });
-  });
-
-  it('createApp stores a provided callbackUrl', async () => {
-    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
-    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
-    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, callbackUrl: 'https://portal.example.com/cb' });
-    const result = await service.createApp('ba-caller', {
-      name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: 'https://portal.example.com/cb',
-    });
-    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ callbackUrl: 'https://portal.example.com/cb' }),
-    }));
-    expect(result.callbackUrl).toBe('https://portal.example.com/cb');
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -157,7 +143,7 @@ describe('AppsService', () => {
     await expect(service.createApp('ba-caller', { name: 'x', url: 'https://x' })).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('updateApp throws BadRequestException when name, url, callbackUrl, and twoFactorTrustDays are all absent', async () => {
+  it('updateApp throws BadRequestException when name, url, and twoFactorTrustDays are all absent', async () => {
     await expect(service.updateApp('ba-caller', 'sq_1', {})).rejects.toBeInstanceOf(BadRequestException);
     expect(mockPrisma.saApp.findUnique).not.toHaveBeenCalled();
   });
@@ -216,16 +202,6 @@ describe('AppsService', () => {
     const result = await service.updateApp('ba-caller', 'sq_1', { name: 'Renamed' });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { publicId: 'sq_1' }, data: { name: 'Renamed' } });
     expect(result.name).toBe('Renamed');
-  });
-
-  it('updateApp clears callbackUrl when given empty string', async () => {
-    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
-    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, callbackUrl: null });
-    await service.updateApp('ba-caller', 'sq_1', { callbackUrl: '' });
-    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
-      where: { publicId: 'sq_1' },
-      data: { callbackUrl: null },
-    });
   });
 
   it('updateApp throws ConflictException on P2002', async () => {

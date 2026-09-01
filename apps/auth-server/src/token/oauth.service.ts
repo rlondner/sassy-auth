@@ -76,8 +76,8 @@ export class OauthService {
       userId: string;
       appPublicId: string;
       redirectUri: string;
-      codeChallenge: string;
-      codeChallengeMethod: string;
+      codeChallenge: string | null;
+      codeChallengeMethod: string | null;
       expiresAt: Date;
       amr: string;
     };
@@ -100,6 +100,10 @@ export class OauthService {
 
     // bug-0054: byte-exact comparison per RFC 6749 §4.1.3.
     if (entry.redirectUri !== redirectUri) {
+      throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
+    }
+
+    if (!entry.codeChallenge) {
       throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
     }
 

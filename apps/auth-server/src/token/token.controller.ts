@@ -124,7 +124,10 @@ export class TokenController {
       } catch {
         throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
       }
-      const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+      const app = await prisma.saApp.findUnique({
+        where: { id: numericId },
+        include: { redirectUris: true },
+      });
       if (!app) {
         throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
       }
@@ -267,7 +270,10 @@ export class TokenController {
     } catch {
       throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
     }
-    const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+    const app = await prisma.saApp.findUnique({
+      where: { id: numericId },
+      include: { redirectUris: true },
+    });
     if (!app) {
       throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
     }

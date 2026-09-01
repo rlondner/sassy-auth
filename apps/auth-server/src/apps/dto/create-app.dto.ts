@@ -5,13 +5,6 @@ export class CreateAppDto {
   @IsString() @MinLength(1) @MaxLength(120) name!: string;
   @IsAppUrl() @MaxLength(2048) url!: string;
 
-  // Optional exact-match callback URL. Omitted / null / '' all mean "default"
-  // (origin match against `url`) and skip validation.
-  @ValidateIf((o) => o.callbackUrl !== undefined && o.callbackUrl !== null && o.callbackUrl !== '')
-  @IsAppUrl()
-  @MaxLength(2048)
-  callbackUrl?: string | null;
-
   /**
    * Per-app 2FA trust / re-prompt interval in days.
    * null → use system default (TWO_FACTOR_TRUST_DAYS env var, default 14).
