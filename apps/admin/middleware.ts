@@ -112,9 +112,16 @@ async function validateSession(request: NextRequest): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  // Exact-or-child, not bare startsWith: `/loginaudit` merely shares a prefix
+  // with `/login` and is a different route, but a plain startsWith would treat
+  // it as public and skip both session validation and the Cache-Control header
+  // below. Genuine children like `/login/two-factor` are part of the same
+  // public flow and stay public. Mirrors isSensitiveAuthPath in
+  // apps/auth-server/src/auth/auth-rate-limit.ts, which matches its own
+  // prefix list the same way.
   const isPublic =
-    PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
-    pathname.startsWith('/_next')
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
+    pathname.startsWith('/_next/')
 
   if (isPublic) return NextResponse.next()
 

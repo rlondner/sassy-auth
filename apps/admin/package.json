@@ -61,6 +61,25 @@
           "jsx": "react-jsx"
         }
       }
-    }
+    },
+    "coverageThreshold": {
+      "global": {
+        "statements": 55,
+        "branches": 49,
+        "functions": 50,
+        "lines": 57
+      }
+    },
+    "collectCoverageFrom": [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+      "middleware.ts",
+      "!**/__tests__/**",
+      "!**/__mocks__/**",
+      "!**/*.d.ts",
+      "!**/layout.tsx",
+      "!**/loading.tsx"
+    ]
   }
 }

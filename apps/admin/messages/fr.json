@@ -13,12 +13,13 @@
     "switchToDark": "Passer en mode sombre"
   },
   "common": {
-    "save": "Save",
-    "edit": "Edit",
-    "delete": "Delete",
-    "confirm": "Confirm",
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
     "itemsPerPage": "Éléments par page",
-    "copyFailed": "Échec de la copie — accès au presse-papiers refusé"
+    "copyFailed": "Échec de la copie — accès au presse-papiers refusé",
+    "moreActions": "Plus d'actions"
   },
   "apps": {
     "title": "Applications",
@@ -468,6 +469,8 @@
     "submit": "Réinitialiser le mot de passe",
     "success": "Mot de passe mis à jour. Vous pouvez maintenant vous connecter.",
     "invalidToken": "Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.",
+    "serverUnavailable": "Impossible de joindre le serveur. Veuillez réessayer dans un instant.",
+    "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
     "mismatch": "Les mots de passe ne correspondent pas.",
     "tooShort": "Le mot de passe doit comporter au moins 12 caractères.",
     "complexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
@@ -568,6 +571,7 @@
     "continueToApp": "Continuer",
     "errors": {
       "invalidPassword": "Mot de passe invalide.",
+      "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
       "invalidCode": "Code invalide ou expiré.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."

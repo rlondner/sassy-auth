@@ -60,6 +60,21 @@
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
-    }
+    },
+    "coverageThreshold": {
+      "global": {
+        "statements": 69,
+        "branches": 51,
+        "functions": 70,
+        "lines": 68
+      }
+    },
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/__tests__/**",
+      "!src/index.ts",
+      "!**/*.d.ts",
+      "!src/components/ui/**"
+    ]
   }
 }
