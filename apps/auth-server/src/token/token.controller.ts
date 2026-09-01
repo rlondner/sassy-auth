@@ -47,12 +47,13 @@ import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
-import { assertRedirectUriAllowed } from './redirect-uri';
+import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed } from './redirect-uri';
 import { buildClientErrorRedirectUrl, buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { LoggerService } from '../common/logger/logger.service';
 import {
   JWKS_ROUTE,
   OAUTH_AUTHORIZE_ROUTE,
+  OAUTH_LOGOUT_ROUTE,
   OAUTH_TOKEN_ROUTE,
   OAUTH_USERINFO_ROUTE,
   TOKEN_CONTROLLER_PATH,
@@ -797,5 +798,64 @@ export class TokenController {
 
     const scoped = await this.tokenService.buildScopedClaims(saUser.id, claims.scope ?? '');
     return { sub: claims.sub, ...scoped };
+  }
+
+  /**
+   * GET /api/token/oauth/logout — OIDC RP-Initiated Logout.
+   *
+   * Always terminates the SassyAuth session. Only redirects when the hint
+   * identifies a client that has registered the requested URI: an unvalidated
+   * post-logout redirect is an open redirect by another name.
+   */
+  @Get(OAUTH_LOGOUT_ROUTE)
+  @Redirect()
+  async oauthLogout(
+    @Query('id_token_hint') idTokenHint: string = '',
+    @Query('post_logout_redirect_uri') postLogoutRedirectUri: string = '',
+    @Query('state') state: string = '',
+    @Req() req: Request,
+  ) {
+    // Terminate first, unconditionally. A failure to validate the hint must
+    // never leave the user still signed in.
+    try {
+      await auth.api.signOut({ headers: fromNodeHeaders(req.headers) });
+    } catch {
+      // Already signed out, or no session — logout is idempotent.
+    }
+
+    const adminUrl = (process.env.ADMIN_URL ?? '').replace(/\/$/, '');
+    const loggedOut = `${adminUrl}/logged-out`;
+
+    if (!idTokenHint || !postLogoutRedirectUri) {
+      return { url: loggedOut, statusCode: 302 };
+    }
+
+    let audience: string;
+    try {
+      const claims = this.tokenService.verifyAccessToken(idTokenHint);
+      if (!claims.aud) return { url: loggedOut, statusCode: 302 };
+      audience = claims.aud;
+    } catch {
+      return { url: loggedOut, statusCode: 302 };
+    }
+
+    const app = await prisma.saApp.findUnique({
+      where: { publicId: audience },
+      include: { redirectUris: true },
+    });
+    if (!app) return { url: loggedOut, statusCode: 302 };
+
+    try {
+      assertPostLogoutRedirectUriAllowed(postLogoutRedirectUri, app);
+    } catch {
+      this.logger.getWinstonLogger().warn('oauth.post_logout_redirect_uri.rejected', {
+        context: 'TokenController', appId: audience,
+      });
+      return { url: loggedOut, statusCode: 302 };
+    }
+
+    const target = new URL(postLogoutRedirectUri);
+    if (state) target.searchParams.set('state', state);
+    return { url: target.toString(), statusCode: 302 };
   }
 }

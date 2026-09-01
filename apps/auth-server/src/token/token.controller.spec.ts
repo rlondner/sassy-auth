@@ -35,7 +35,7 @@ jest.mock('@sassy-auth/db', () => ({
 jest.mock('../auth/verify-user-totp');
 
 jest.mock('../auth/auth.config', () => ({
-  auth: { api: { getSession: jest.fn() } },
+  auth: { api: { getSession: jest.fn(), signOut: jest.fn() } },
 }));
 
 jest.mock('better-auth/crypto', () => ({
@@ -50,6 +50,7 @@ import { verifyUserTotp } from '../auth/verify-user-totp';
 
 const mockGetSession = auth.api.getSession as unknown as jest.Mock;
 const mockVerifyPassword = verifyPassword as unknown as jest.Mock;
+const mockAuth = auth as unknown as { api: { signOut: jest.Mock; getSession: jest.Mock } };
 
 const mockPrisma = prisma as unknown as {
   saApp: { findUnique: jest.Mock };
@@ -72,6 +73,11 @@ const testPublicPem = testPublicKey.export({ type: 'spki', format: 'pem' }) as s
 function signTestToken(payload: Record<string, unknown>): string {
   return jwt.sign(payload, testPrivatePem, { algorithm: 'RS256', issuer: resolveIssuer() });
 }
+
+// id_token_hint validation reuses TokenService.verifyAccessToken (Ruling 3,
+// T11 pre-flight ledger): both tokens are RS256 from the same key/issuer, so
+// the same signing helper produces both in these tests.
+const signTestIdToken = signTestToken;
 
 const mockTokenService = {
   issueJwt: jest.fn(),
@@ -1216,6 +1222,88 @@ describe('TokenController', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // ── GET /api/token/oauth/logout ──────────────────────────────────────────
+
+  describe('GET /api/token/oauth/logout', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        controllers: [TokenController],
+        providers: [
+          { provide: TokenService, useValue: mockTokenService },
+          { provide: OauthService, useValue: mockOauthService },
+          { provide: SqidService, useValue: mockSqidService },
+          { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api');
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockAuth.api.signOut.mockResolvedValue(undefined);
+    });
+
+    it('terminates the session and redirects to a registered post_logout URI', async () => {
+      const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({
+          id_token_hint: idToken,
+          post_logout_redirect_uri: 'https://app.example.com/bye',
+          state: 'xyz',
+        });
+
+      expect(mockAuth.api.signOut).toHaveBeenCalled();
+      expect(res.status).toBe(302);
+      const target = new URL(res.headers.location);
+      expect(target.origin + target.pathname).toBe('https://app.example.com/bye');
+      expect(target.searchParams.get('state')).toBe('xyz');
+    });
+
+    it('refuses to redirect to an unregistered post_logout URI but still signs out', async () => {
+      const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com', redirectUris: [],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({ id_token_hint: idToken, post_logout_redirect_uri: 'https://evil.example.com/bye' });
+
+      expect(mockAuth.api.signOut).toHaveBeenCalled();
+      expect(res.headers.location).not.toContain('evil.example.com');
+      expect(res.headers.location).toContain('/logged-out');
+    });
+
+    it('signs out and shows the logged-out page with no id_token_hint', async () => {
+      const res = await request(app.getHttpServer()).get('/api/token/oauth/logout');
+
+      expect(mockAuth.api.signOut).toHaveBeenCalled();
+      expect(res.headers.location).toContain('/logged-out');
+    });
+
+    it('ignores an id_token_hint with a bad signature', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({ id_token_hint: 'not.a.token', post_logout_redirect_uri: 'https://app.example.com/bye' });
+
+      expect(res.headers.location).toContain('/logged-out');
     });
   });
 });
