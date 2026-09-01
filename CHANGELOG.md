@@ -4,6 +4,59 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-25
+
+Daily code review covering the last 24h of `master` activity. Quiet, high-quality day:
+two Jules palette PRs merged, a 5-commit admin hardening/test bundle landed via PR
+#356, a Node 20→24 migration, and a same-day manual fix for bug-0266 (the AI security
+review workflow referencing a nonexistent action tag). 2 new bugs found (0 critical, 2
+warning), both fixed in this review's PRs. Note: `master`'s docs (this file, README,
+bug catalog) have not tracked reviewed daily-review output since 2026-07-09 — the
+review PRs that would have updated them (going back to PR #291 on 2026-07-22) have
+consistently stayed unmerged; see `docs/history/todo/TODO_2026-08-25.md` item 2.
+
+### Fixed
+
+- **bug-0266** — AI Semantic Security Review workflow pinned a nonexistent action tag
+  (`anthropics/claude-code-security-review@v1`, no releases exist), so every run
+  failed before any review executed. Manually corrected on `master` (`16e6055`) to use
+  `anthropics/claude-code-action@v1`; the missing `ANTHROPIC_API_KEY` repo secret this
+  bug's PR also called out was added the same morning.
+- **bug-0271** — `apps/admin` declared `react ^18.3.0` while `LoginForm`/
+  `LoginOtpForm`/`TwoFactorForm` all depend on React 19-only APIs (`useActionState`,
+  function-valued `<form action>`), masked entirely by Next 15's bundler-level React
+  alias. Left a new 22-case test suite permanently `describe.skip`'d. Fixed in PR #357
+  by aligning `apps/admin` and `packages/ui` on React 19 and un-skipping the suite.
+- **bug-0272** — the AI security review workflow's secret-file sanitization pre-scan
+  used a glob (`*.env`) that misses this repo's actual dotenv convention
+  (`.env.local`, `.env.production`, `.env.local.bak-*`) — the exact file shape
+  `.gitignore`'s own history says has been accidentally committed here once already.
+  Fixed in PR #358.
+- **Redirect-sentinel swallowing in four admin resource-action modules** (`apps/orgs`,
+  `apps/apps`, `apps/permissions`, `apps/roles`) — an expired session produced a
+  generic error toast instead of the intended bounce to `/login`, because the catch-alls
+  didn't rethrow Next's `NEXT_REDIRECT` sentinel the way `users/actions.ts` already did.
+  Brings all five resource modules onto the same pattern, with new regression coverage
+  for all nine affected actions.
+- **Missing 429 handling in the account-security 2FA actions** — `enable2fa`,
+  `confirmEnable`, `disable2fa`, and `regenerateBackupCodes` fell through to a generic
+  "something went wrong" on rate-limit responses instead of the actionable
+  `tooManyRequests`. New locale-coverage test asserts every action error string has an
+  `en`/`fr` translation key, which would have caught the gap.
+
+### Added
+
+- CI now runs the unit suites and enforces per-package coverage floors (`f8cdbe7`).
+- `docs/testing-coverage-baseline.md` records the per-package coverage baseline.
+- New test coverage: `SecurityClient`, the admin table row editors, and the four
+  redirect-sentinel-guarded resource-action modules (via PR #356).
+
+### Changed
+
+- Migrated Node 20 → 24 across CI (`e2e.yml`, `typecheck.yml`), the Dockerfile, and
+  `engines` — Node 20 is past EOL and was failing Trivy's CVE scan as a deprecated
+  runtime. Added `.nvmrc` for local dev parity.
+
 ## [Unreleased] — 2026-08-30
 
 No commits landed on `master` in the last 24 hours (`master` has been at
