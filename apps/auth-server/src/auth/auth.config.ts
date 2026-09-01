@@ -12,7 +12,7 @@ import { sendSignInOtp } from './otp-sender';
 import { otpTestStore } from './otp-test-store';
 import { buildSocialProviders } from '../social/build-social-providers';
 import { stubProviderConfig } from '../social/stub-provider';
-import { signInMethodFromPath } from '../social/sign-in-method';
+import { providerFromSignInMethod, signInMethodFromPath } from '../social/sign-in-method';
 import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
 import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
@@ -149,7 +149,7 @@ export const auth = betterAuth({
           if (!signInMethod) return;
           return { data: { ...session, signInMethod } };
         },
-        after: async (session: { userId: string }) => {
+        after: async (session: { userId: string; signInMethod?: string | null }) => {
           try {
             await prisma.saUser.updateMany({
               where: { betterAuthUserId: session.userId },
@@ -165,6 +165,27 @@ export const auth = betterAuth({
             console.error(
               `[bug-0186] Failed to update lastLoginAt for BetterAuth user ${session.userId}:`,
               err,
+            );
+          }
+
+          // bug-0268: `created` from BetterAuth's createWithHooks is the
+          // full persisted row, including the signInMethod this same
+          // hooks.before override wrote (with-hooks.mjs merges the
+          // before-hook's returned `data` into what gets inserted, and
+          // passes that same inserted row to `after` — verified in
+          // better-auth@1.6.11/dist/db/with-hooks.mjs), so it's available
+          // here at runtime despite the narrower type BetterAuth exposes
+          // for this callback. Before this fix, recordFederationEvent was
+          // only ever called for a REJECTED social callback
+          // (hooks.after below) — a successful federated sign-in produced
+          // no audit-trail entry at all, despite docs/social-auth-setup.md
+          // describing this as the durable "record of truth" for who
+          // linked which account and when.
+          const provider = providerFromSignInMethod(session.signInMethod);
+          if (provider) {
+            await recordFederationEvent(
+              { db: prisma, logger: authLogger, emit: emitFederationEventToSentry },
+              { type: 'social.signin.ok', provider, betterAuthUserId: session.userId },
             );
           }
         },

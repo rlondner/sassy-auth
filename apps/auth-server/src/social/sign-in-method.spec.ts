@@ -1,4 +1,4 @@
-import { signInMethodFromPath } from './sign-in-method';
+import { providerFromSignInMethod, signInMethodFromPath } from './sign-in-method';
 
 describe('signInMethodFromPath', () => {
   it('maps a social callback to ext:<provider>', () => {
@@ -24,5 +24,24 @@ describe('signInMethodFromPath', () => {
 
   it('rejects a provider name that is not one we support', () => {
     expect(signInMethodFromPath('/callback/evilprovider')).toBeNull();
+  });
+});
+
+describe('providerFromSignInMethod', () => {
+  it('extracts the provider from an ext:<provider> value', () => {
+    expect(providerFromSignInMethod('ext:google')).toBe('google');
+    expect(providerFromSignInMethod('ext:microsoft')).toBe('microsoft');
+    expect(providerFromSignInMethod('ext:apple')).toBe('apple');
+    expect(providerFromSignInMethod('ext:stub')).toBe('stub');
+  });
+
+  it('returns null for password sign-in', () => {
+    expect(providerFromSignInMethod('pwd')).toBeNull();
+  });
+
+  it('returns null for a legacy/unclassified session (null, undefined, empty)', () => {
+    expect(providerFromSignInMethod(null)).toBeNull();
+    expect(providerFromSignInMethod(undefined)).toBeNull();
+    expect(providerFromSignInMethod('')).toBeNull();
   });
 });
