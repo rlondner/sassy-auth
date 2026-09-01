@@ -1,6 +1,7 @@
 import { trace } from '@opentelemetry/api';
 import { InMemorySpanExporter, SimpleSpanProcessor, BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
 import { recordFederationEvent } from './record-federation-event';
+import * as authMetrics from '../telemetry/auth-metrics';
 
 function makeDeps() {
   const created: unknown[] = [];
@@ -74,11 +75,23 @@ describe('recordFederationEvent', () => {
 });
 
 describe('recordFederationEvent span', () => {
-  it('emits an auth.social.federation span with provider and outcome attributes', async () => {
-    const exporter = new InMemorySpanExporter();
+  // The tracer in record-federation-event.ts is captured once at module load
+  // (`const tracer = trace.getTracer(...)`), and OTel's ProxyTracer caches its
+  // delegate on first use — so re-registering a global tracer provider mid-suite
+  // does not rebind it. All span assertions in this describe block therefore
+  // share a single provider/exporter, reset between tests.
+  const exporter = new InMemorySpanExporter();
+
+  beforeAll(() => {
     const provider = new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
     trace.setGlobalTracerProvider(provider);
+  });
 
+  beforeEach(() => {
+    exporter.reset();
+  });
+
+  it('emits an auth.social.federation span with provider and outcome attributes', async () => {
     const { deps } = makeDeps();
     await recordFederationEvent(deps, { type: 'social.signin.ok', provider: 'google', appPublicId: 'qp31' });
 
@@ -87,5 +100,38 @@ describe('recordFederationEvent span', () => {
     expect(spans[0].name).toBe('auth.social.federation');
     expect(spans[0].attributes['auth.provider']).toBe('google');
     expect(spans[0].attributes['auth.outcome']).toBe('ok');
+  });
+
+  it('keeps email and provider sub out of span attributes', async () => {
+    const { deps } = makeDeps();
+    await recordFederationEvent(deps, {
+      type: 'social.signin.ok',
+      provider: 'google',
+      email: 'alice@acme.com',
+      providerSub: 'sub-123',
+      appPublicId: 'qp31',
+    });
+
+    const spans = exporter.getFinishedSpans();
+    const serialized = JSON.stringify(spans[0].attributes);
+    expect(serialized).not.toContain('alice@acme.com');
+    expect(serialized).not.toContain('sub-123');
+  });
+
+  it('never throws when span/counter telemetry fails', async () => {
+    const spy = jest.spyOn(authMetrics, 'recordFederationOutcome').mockImplementation(() => {
+      throw new Error('counter exploded');
+    });
+    try {
+      const { deps, created, emitted } = makeDeps();
+      await expect(
+        recordFederationEvent(deps, { type: 'social.signin.ok', provider: 'google' }),
+      ).resolves.toBeUndefined();
+      expect(deps.logger.warn).toHaveBeenCalled();
+      expect(created).toHaveLength(1); // DB write still happened
+      expect(emitted).toHaveLength(1); // emit still happened
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

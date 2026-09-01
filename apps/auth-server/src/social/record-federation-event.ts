@@ -67,10 +67,15 @@ export async function recordFederationEvent(
 ): Promise<void> {
   return tracer.startActiveSpan('auth.social.federation', async (span) => {
     const outcome = event.reason ?? 'ok';
-    span.setAttribute('auth.provider', event.provider);
-    span.setAttribute('auth.event', event.type);
-    span.setAttribute('auth.outcome', outcome);
-    recordFederationOutcome({ provider: event.provider, type: event.type, outcome });
+
+    try {
+      span.setAttribute('auth.provider', event.provider);
+      span.setAttribute('auth.event', event.type);
+      span.setAttribute('auth.outcome', outcome);
+      recordFederationOutcome({ provider: event.provider, type: event.type, outcome });
+    } catch (err: unknown) {
+      deps.logger.warn('Federation telemetry span/counter failed', { type: event.type, err: String(err) });
+    }
 
     const emit = deps.emit ?? defaultEmit;
 
