@@ -307,8 +307,9 @@ export class TokenController {
     let userPublicId: string;
     let appPublicId: string;
     let exchangedAmr: string[] = ['pwd'];
+    let exchanged: Awaited<ReturnType<OauthService['exchangeCode']>>;
     try {
-      const exchanged = await this.oauthService.exchangeCode(
+      exchanged = await this.oauthService.exchangeCode(
         dto.code,
         dto.client_id,
         dto.redirect_uri,
@@ -346,9 +347,24 @@ export class TokenController {
       orgPublicId: saUser.org.publicId,
       appPublicId,
       appId: app.id,
-      scope: '',
+      scope: exchanged.scope,
       amr: exchangedAmr,
     });
+
+    const grantedOpenId = exchanged.scope.split(/\s+/).includes('openid');
+    const idToken = grantedOpenId
+      ? await this.tokenService.issueIdToken({
+          saUserId: saUser.id,
+          userPublicId: saUser.publicId,
+          orgPublicId: saUser.org.publicId,
+          appPublicId,
+          scope: exchanged.scope,
+          nonce: exchanged.nonce,
+          authTime: exchanged.authTime,
+          amr: exchangedAmr,
+          accessToken: token,
+        })
+      : undefined;
 
     this.logger.getWinstonLogger().info('OAuth code exchanged, JWT issued', {
       context: 'TokenController',
@@ -357,7 +373,13 @@ export class TokenController {
       pkceMethod: 'S256',
     });
 
-    return { access_token: token, token_type: 'Bearer', expires_in: 3600 };
+    return {
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: exchanged.scope,
+      ...(idToken ? { id_token: idToken } : {}),
+    };
   }
 
   /**

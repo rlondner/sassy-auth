@@ -54,6 +54,7 @@ const mockPrisma = prisma as unknown as {
 
 const mockTokenService = {
   issueJwt: jest.fn(),
+  issueIdToken: jest.fn(),
   getJwks: jest.fn(),
   resolvePermissions: jest.fn(),
 };
@@ -590,6 +591,7 @@ describe('TokenController', () => {
       mockOauthService.exchangeCode.mockReturnValue({
         userId: 'sqid-1',
         appPublicId: 'sqid-10',
+        scope: '',
       });
       const saUser = {
         id: 1,
@@ -613,7 +615,57 @@ describe('TokenController', () => {
         access_token: 'oauth.jwt.token',
         token_type: 'Bearer',
         expires_in: 3600,
+        scope: '',
       });
+    });
+
+    it('returns id_token when the openid scope was granted', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        scope: 'openid profile',
+        nonce: 'n-abc',
+        authTime: new Date('2026-08-21T10:00:00Z'),
+        amr: ['pwd'],
+      });
+      const saUser = {
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'active',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      };
+      mockPrisma.saUser.findFirst.mockResolvedValue(saUser);
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+      mockTokenService.issueIdToken.mockResolvedValue('oauth.id.token');
+
+      const result = await controller.oauthToken({
+        code: 'valid-code',
+        client_id: 'sqid-10',
+        code_verifier: 'a'.repeat(64),
+        redirect_uri: 'https://app.example.com/callback',
+      });
+
+      expect(result).toEqual({
+        access_token: 'oauth.jwt.token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'openid profile',
+        id_token: 'oauth.id.token',
+      });
+      expect(mockTokenService.issueIdToken).toHaveBeenCalledWith(
+        expect.objectContaining({
+          saUserId: 1,
+          userPublicId: 'sqid-1',
+          orgPublicId: 'sqid-5',
+          appPublicId: 'sqid-10',
+          scope: 'openid profile',
+          nonce: 'n-abc',
+          amr: ['pwd'],
+          accessToken: 'oauth.jwt.token',
+        }),
+      );
     });
 
     // bug-0074 — the OAuth code was issued at /authorize time when the user

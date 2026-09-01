@@ -17,6 +17,27 @@ interface IssueJwtParams {
   amr?: string[];
 }
 
+interface IssueIdTokenParams {
+  saUserId: number;
+  userPublicId: string;
+  orgPublicId: string;
+  appPublicId: string;
+  scope: string;
+  nonce: string | null;
+  authTime: Date;
+  amr: string[];
+  accessToken: string;
+}
+
+/**
+ * OIDC at_hash: base64url of the left-most half of the SHA-256 of the
+ * access token's ASCII octets (RS256 → SHA-256 → 128 bits kept).
+ */
+function atHash(accessToken: string): string {
+  const digest = crypto.createHash('sha256').update(accessToken, 'ascii').digest();
+  return digest.subarray(0, digest.length / 2).toString('base64url');
+}
+
 @Injectable()
 export class TokenService {
   private readonly privateKey: string;
@@ -90,6 +111,58 @@ export class TokenService {
       scope: params.scope,
       permissions,
       ...(params.amr && params.amr.length ? { amr: params.amr } : {}),
+    };
+
+    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
+  }
+
+  /**
+   * Resolves the scope-gated identity claims. Single source of truth shared by
+   * the id_token and /userinfo, so the two cannot disagree about what a scope
+   * grants.
+   */
+  async buildScopedClaims(saUserId: number, scope: string): Promise<Record<string, unknown>> {
+    const granted = new Set(scope.split(/\s+/).filter(Boolean));
+    if (!granted.has('profile') && !granted.has('email')) return {};
+
+    const user = await prisma.saUser.findUnique({
+      where: { id: saUserId },
+      include: { betterAuthUser: true },
+    });
+    if (!user) throw new NotFoundException(TokenErrorCode.USER_NOT_FOUND);
+
+    const claims: Record<string, unknown> = {};
+    if (granted.has('profile')) {
+      claims.name = `${user.firstName} ${user.lastName}`.trim();
+      claims.given_name = user.firstName;
+      claims.family_name = user.lastName;
+    }
+    if (granted.has('email')) {
+      claims.email = user.betterAuthUser.email;
+      claims.email_verified = user.betterAuthUser.emailVerified;
+    }
+    return claims;
+  }
+
+  async issueIdToken(params: IssueIdTokenParams): Promise<string> {
+    const issuer = resolveIssuer();
+    const now = Math.floor(Date.now() / 1000);
+    const scoped = await this.buildScopedClaims(params.saUserId, params.scope);
+
+    const payload = {
+      sub: params.userPublicId,
+      aud: params.appPublicId,
+      iss: issuer,
+      iat: now,
+      exp: now + 3600,
+      auth_time: Math.floor(params.authTime.getTime() / 1000),
+      amr: params.amr,
+      at_hash: atHash(params.accessToken),
+      // A SassyAuth identity is org-scoped; an id_token without `org` would
+      // describe a user that does not exist.
+      org: params.orgPublicId,
+      ...(params.nonce ? { nonce: params.nonce } : {}),
+      ...scoped,
     };
 
     return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });

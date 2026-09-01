@@ -220,6 +220,67 @@ describe('TokenService', () => {
     });
   });
 
+  // ── id_token issuance ────────────────────────────────────────────────────
+
+  describe('issueIdToken', () => {
+    const baseParams = {
+      saUserId: 1, userPublicId: 'u_1', orgPublicId: 'o_1', appPublicId: 'a_7',
+      nonce: 'n-123', authTime: new Date('2026-08-21T10:00:00Z'),
+      amr: ['pwd'], accessToken: 'header.payload.signature',
+    };
+
+    beforeEach(() => {
+      mockPrisma.saUser.findUnique.mockResolvedValue({
+        id: 1, firstName: 'Ada', lastName: 'Lovelace',
+        org: { publicId: 'o_1' },
+        betterAuthUser: { email: 'ada@example.com', emailVerified: true },
+      });
+    });
+
+    it('always emits the core identity claims', async () => {
+      const decoded = jwt.decode(await service.issueIdToken({ ...baseParams, scope: 'openid' })) as Record<string, unknown>;
+
+      expect(decoded.sub).toBe('u_1');
+      expect(decoded.aud).toBe('a_7');
+      expect(decoded.org).toBe('o_1');
+      expect(decoded.nonce).toBe('n-123');
+      expect(decoded.amr).toEqual(['pwd']);
+      expect(decoded.auth_time).toBe(Math.floor(baseParams.authTime.getTime() / 1000));
+      expect(typeof decoded.at_hash).toBe('string');
+      expect(decoded.azp).toBeUndefined();
+    });
+
+    it('omits profile and email claims when those scopes were not granted', async () => {
+      const decoded = jwt.decode(await service.issueIdToken({ ...baseParams, scope: 'openid' })) as Record<string, unknown>;
+
+      expect(decoded.name).toBeUndefined();
+      expect(decoded.email).toBeUndefined();
+    });
+
+    it('includes profile claims for the profile scope', async () => {
+      const decoded = jwt.decode(await service.issueIdToken({ ...baseParams, scope: 'openid profile' })) as Record<string, unknown>;
+
+      expect(decoded.name).toBe('Ada Lovelace');
+      expect(decoded.given_name).toBe('Ada');
+      expect(decoded.family_name).toBe('Lovelace');
+      expect(decoded.email).toBeUndefined();
+    });
+
+    it('includes email claims for the email scope', async () => {
+      const decoded = jwt.decode(await service.issueIdToken({ ...baseParams, scope: 'openid email' })) as Record<string, unknown>;
+
+      expect(decoded.email).toBe('ada@example.com');
+      expect(decoded.email_verified).toBe(true);
+      expect(decoded.name).toBeUndefined();
+    });
+
+    it('omits nonce when the client did not send one', async () => {
+      const decoded = jwt.decode(await service.issueIdToken({ ...baseParams, nonce: null, scope: 'openid' })) as Record<string, unknown>;
+
+      expect(decoded).not.toHaveProperty('nonce');
+    });
+  });
+
   // ── JWKS ──────────────────────────────────────────────────────────────────
 
   describe('getJwks', () => {
