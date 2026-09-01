@@ -19,6 +19,17 @@ _verify_counter = _meter.create_counter(
 )
 
 
+def _record_verify_outcome(outcome: str) -> None:
+    # OTel's API contract says counter calls shouldn't throw, but per the
+    # "telemetry failures must never break the app" constraint we guard
+    # defensively anyway. This is a low-level metric call, so failures are
+    # swallowed silently with no logging (mirrors auth-metrics.ts's guard()).
+    try:
+        _verify_counter.add(1, {"outcome": outcome})
+    except Exception:
+        pass
+
+
 def verify(token: str) -> dict:
     with _tracer.start_as_current_span("auth.token.verify") as span:
         try:
@@ -32,11 +43,11 @@ def verify(token: str) -> dict:
                 options={"require": ["exp", "iat", "sub", "iss", "aud", "scope"]},
             )
             span.set_attribute("auth.outcome", "ok")
-            _verify_counter.add(1, {"outcome": "ok"})
+            _record_verify_outcome("ok")
             return claims
         except Exception:
             span.set_attribute("auth.outcome", "invalid_token")
-            _verify_counter.add(1, {"outcome": "invalid_token"})
+            _record_verify_outcome("invalid_token")
             raise HTTPException(
                 status_code=401,
                 detail={"result": "Unauthorized", "reason": "invalid_token"},
