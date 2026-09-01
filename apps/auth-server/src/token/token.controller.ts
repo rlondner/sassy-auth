@@ -57,7 +57,7 @@ import {
 import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
 import { isTwoFactorRequired } from '../auth/two-factor-required';
 import { verifyUserTotp } from '../auth/verify-user-totp';
-import { recordSignInOutcome } from '../telemetry/auth-metrics';
+import { record2faChallengeOutcome, recordSignInOutcome } from '../telemetry/auth-metrics';
 
 const tracer = trace.getTracer('sassy-auth.auth-server');
 
@@ -549,18 +549,21 @@ export class TokenController {
     if (isTwoFactorRequired(app) || twoFactorEnabled) {
       if (!twoFactorEnabled) {
         // Required app, user not enrolled: cannot self-enroll non-interactively.
+        record2faChallengeOutcome('required_not_enrolled');
         this.logger.getWinstonLogger().warn('Direct login blocked: 2FA required, user not enrolled', {
           context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
         });
         throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
       }
       if (!dto.totpCode || !(await verifyUserTotp(saUser.betterAuthUserId, dto.totpCode))) {
+        record2faChallengeOutcome('missing_or_invalid_code');
         this.logger.getWinstonLogger().warn('Direct login blocked: missing/invalid 2FA code', {
           context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
         });
         throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
       }
       amr = ['pwd', 'otp', 'mfa'];
+      record2faChallengeOutcome('ok');
     }
 
     // bug-0186: record the login timestamp. This is the JWT-issuance

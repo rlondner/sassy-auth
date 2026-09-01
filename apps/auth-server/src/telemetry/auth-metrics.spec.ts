@@ -31,4 +31,14 @@ describe('auth-metrics', () => {
       recordFederationOutcome({ provider: 'google', type: 'social.signin.rejected', outcome: 'email_unverified' }),
     ).not.toThrow();
   });
+
+  it('records a 2FA challenge outcome counter', async () => {
+    const { record2faChallengeOutcome } = await import('./auth-metrics');
+    expect(() => record2faChallengeOutcome('missing_or_invalid_code')).not.toThrow();
+  });
+
+  it('records a registration rate-limit counter', async () => {
+    const { recordRegistrationRateLimited } = await import('./auth-metrics');
+    expect(() => recordRegistrationRateLimited()).not.toThrow();
+  });
 });

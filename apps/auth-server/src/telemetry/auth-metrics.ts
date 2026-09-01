@@ -26,3 +26,21 @@ const federationCounter = meter.createCounter('auth.social.federation.count', {
 export function recordFederationOutcome(event: { provider: string; type: string; outcome: string }): void {
   federationCounter.add(1, { provider: event.provider, event_type: event.type, outcome: event.outcome });
 }
+
+const twoFactorCounter = meter.createCounter('auth.2fa.challenge.count', {
+  description: '2FA challenge outcomes on the direct-login path',
+});
+
+const registrationRateLimitCounter = meter.createCounter('auth.register.rate_limited', {
+  description: 'Self-serve registration requests rejected by the rate limiter',
+});
+
+export function record2faChallengeOutcome(
+  outcome: 'ok' | 'missing_or_invalid_code' | 'required_not_enrolled',
+): void {
+  twoFactorCounter.add(1, { outcome });
+}
+
+export function recordRegistrationRateLimited(): void {
+  registrationRateLimitCounter.add(1);
+}
