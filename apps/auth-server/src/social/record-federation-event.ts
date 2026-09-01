@@ -72,10 +72,12 @@ export async function recordFederationEvent(
       span.setAttribute('auth.provider', event.provider);
       span.setAttribute('auth.event', event.type);
       span.setAttribute('auth.outcome', outcome);
-      recordFederationOutcome({ provider: event.provider, type: event.type, outcome });
     } catch (err: unknown) {
-      deps.logger.warn('Federation telemetry span/counter failed', { type: event.type, err: String(err) });
+      deps.logger.warn('Federation telemetry span attribute failed', { type: event.type, err: String(err) });
     }
+    // recordFederationOutcome (auth-metrics.ts) guards its own counter.add()
+    // call internally, so it does not need a try/catch here.
+    recordFederationOutcome({ provider: event.provider, type: event.type, outcome });
 
     const emit = deps.emit ?? defaultEmit;
 

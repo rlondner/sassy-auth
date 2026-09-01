@@ -11,12 +11,25 @@ const tokenIssueDuration = meter.createHistogram('auth.token.issue.duration', {
   unit: 'ms',
 });
 
+// OTel's API contract says counter/histogram calls shouldn't throw, but per
+// the "telemetry failures must never break the app" constraint we guard
+// defensively anyway. These are low-level metric calls (unlike the
+// higher-level audit path in record-federation-event.ts, which already has
+// its own logger), so failures are swallowed silently with no logging.
+function guard(fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    // swallow — telemetry must never break the app
+  }
+}
+
 export function recordSignInOutcome(outcome: 'ok' | 'invalid_credentials' | 'two_factor_required'): void {
-  signInCounter.add(1, { method: 'password', outcome });
+  guard(() => signInCounter.add(1, { method: 'password', outcome }));
 }
 
 export function recordTokenIssueDuration(durationMs: number, outcome: 'ok' | 'error'): void {
-  tokenIssueDuration.record(durationMs, { outcome });
+  guard(() => tokenIssueDuration.record(durationMs, { outcome }));
 }
 
 const federationCounter = meter.createCounter('auth.social.federation.count', {
@@ -24,7 +37,9 @@ const federationCounter = meter.createCounter('auth.social.federation.count', {
 });
 
 export function recordFederationOutcome(event: { provider: string; type: string; outcome: string }): void {
-  federationCounter.add(1, { provider: event.provider, event_type: event.type, outcome: event.outcome });
+  guard(() =>
+    federationCounter.add(1, { provider: event.provider, event_type: event.type, outcome: event.outcome }),
+  );
 }
 
 const twoFactorCounter = meter.createCounter('auth.2fa.challenge.count', {
@@ -38,9 +53,9 @@ const registrationRateLimitCounter = meter.createCounter('auth.register.rate_lim
 export function record2faChallengeOutcome(
   outcome: 'ok' | 'missing_or_invalid_code' | 'required_not_enrolled',
 ): void {
-  twoFactorCounter.add(1, { outcome });
+  guard(() => twoFactorCounter.add(1, { outcome }));
 }
 
 export function recordRegistrationRateLimited(): void {
-  registrationRateLimitCounter.add(1);
+  guard(() => registrationRateLimitCounter.add(1));
 }

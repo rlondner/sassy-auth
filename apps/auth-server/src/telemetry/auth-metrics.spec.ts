@@ -3,26 +3,42 @@ import { metrics } from '@opentelemetry/api';
 
 describe('auth-metrics', () => {
   let exporter: InMemoryMetricExporter;
+  let reader: PeriodicExportingMetricReader;
 
   beforeEach(async () => {
     jest.resetModules();
     exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
-    const provider = new MeterProvider({
-      readers: [new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 100000 })],
-    });
+    reader = new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 100000 });
+    const provider = new MeterProvider({ readers: [reader] });
     metrics.setGlobalMeterProvider(provider);
   });
 
   it('records a sign-in outcome counter', async () => {
     const { recordSignInOutcome } = await import('./auth-metrics');
     recordSignInOutcome('invalid_credentials');
-    const { resourceMetrics } = await exporter.export ? { resourceMetrics: undefined } : { resourceMetrics: undefined };
-    // Force a collection via the reader on the current provider.
-    const reader = (metrics.getMeterProvider() as MeterProvider);
-    const result = await (reader as unknown as { _sharedState: { metricCollectors: { collect(): Promise<unknown> }[] } })
-      ._sharedState.metricCollectors[0].collect();
-    expect(JSON.stringify(result)).toContain('auth.signin.count');
-    expect(JSON.stringify(result)).toContain('invalid_credentials');
+
+    // Force a collection via the reader's public API rather than reaching
+    // into SDK internals (e.g. `_sharedState.metricCollectors`).
+    await reader.forceFlush();
+    const collected = exporter.getMetrics();
+    const serialized = JSON.stringify(collected);
+    expect(serialized).toContain('auth.signin.count');
+    expect(serialized).toContain('invalid_credentials');
+  });
+
+  it('swallows a counter.add failure without throwing (telemetry must never break the app)', async () => {
+    const { recordSignInOutcome } = await import('./auth-metrics');
+    const counterProto = Object.getPrototypeOf(
+      (metrics.getMeterProvider() as MeterProvider).getMeter('sassy-auth.auth-server').createCounter('tmp'),
+    );
+    const spy = jest.spyOn(counterProto, 'add').mockImplementation(() => {
+      throw new Error('add exploded');
+    });
+    try {
+      expect(() => recordSignInOutcome('ok')).not.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('records a federation outcome counter', async () => {
