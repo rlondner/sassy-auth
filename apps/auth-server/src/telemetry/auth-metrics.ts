@@ -18,3 +18,11 @@ export function recordSignInOutcome(outcome: 'ok' | 'invalid_credentials' | 'two
 export function recordTokenIssueDuration(durationMs: number, outcome: 'ok' | 'error'): void {
   tokenIssueDuration.record(durationMs, { outcome });
 }
+
+const federationCounter = meter.createCounter('auth.social.federation.count', {
+  description: 'Social federation events by provider, type and outcome',
+});
+
+export function recordFederationOutcome(event: { provider: string; type: string; outcome: string }): void {
+  federationCounter.add(1, { provider: event.provider, event_type: event.type, outcome: event.outcome });
+}

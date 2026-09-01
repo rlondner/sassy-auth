@@ -24,4 +24,11 @@ describe('auth-metrics', () => {
     expect(JSON.stringify(result)).toContain('auth.signin.count');
     expect(JSON.stringify(result)).toContain('invalid_credentials');
   });
+
+  it('records a federation outcome counter', async () => {
+    const { recordFederationOutcome } = await import('./auth-metrics');
+    expect(() =>
+      recordFederationOutcome({ provider: 'google', type: 'social.signin.rejected', outcome: 'email_unverified' }),
+    ).not.toThrow();
+  });
 });

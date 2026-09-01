@@ -1,3 +1,5 @@
+import { trace } from '@opentelemetry/api';
+import { InMemorySpanExporter, SimpleSpanProcessor, BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
 import { recordFederationEvent } from './record-federation-event';
 
 function makeDeps() {
@@ -68,5 +70,22 @@ describe('recordFederationEvent', () => {
     ).resolves.toBeUndefined();
     expect(deps.logger.warn).toHaveBeenCalled();
     expect(emitted).toHaveLength(1); // telemetry still emitted
+  });
+});
+
+describe('recordFederationEvent span', () => {
+  it('emits an auth.social.federation span with provider and outcome attributes', async () => {
+    const exporter = new InMemorySpanExporter();
+    const provider = new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+    trace.setGlobalTracerProvider(provider);
+
+    const { deps } = makeDeps();
+    await recordFederationEvent(deps, { type: 'social.signin.ok', provider: 'google', appPublicId: 'qp31' });
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans).toHaveLength(1);
+    expect(spans[0].name).toBe('auth.social.federation');
+    expect(spans[0].attributes['auth.provider']).toBe('google');
+    expect(spans[0].attributes['auth.outcome']).toBe('ok');
   });
 });
