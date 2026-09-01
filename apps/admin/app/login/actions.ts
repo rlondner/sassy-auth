@@ -3,11 +3,14 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
+import { trace } from '@opentelemetry/api'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
 import { forwardNamedCookie, forwardNamedCookieWithMaxAge } from '../account/security/actions'
 import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '@/lib/two-factor-prompt'
+
+const tracer = trace.getTracer('sassy-auth.admin')
 
 interface ParsedSessionCookie {
   value: string
@@ -123,7 +126,64 @@ async function forwardSessionCookie(res: Response): Promise<boolean> {
   return true
 }
 
+// Next.js signals a server-action redirect by throwing an error carrying a
+// `digest` string starting with `NEXT_REDIRECT` (see
+// next/dist/client/components/redirect-error.js:isRedirectError). signIn's
+// success paths call redirect() rather than returning, so the span wrapper
+// below must recognize this control-flow throw and record it as a normal
+// (successful) exit rather than an `auth.outcome: error`.
+function isNextRedirectError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'digest' in err &&
+    typeof (err as { digest?: unknown }).digest === 'string' &&
+    (err as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  )
+}
+
+// signInInner's error codes are a mix of camelCase codes returned by this
+// file (invalidCredentials, tooManyRequests, serverUnavailable, inactive) and,
+// on the missing-email/password path, a free-text validation sentence. Map
+// them onto the snake_case `auth.outcome` vocabulary shared with auth-server
+// (`ok` / `invalid_credentials` / `two_factor_required`) and
+// resource-server-fastapi (`ok` / `invalid_token`) so the attribute means the
+// same thing across all three services.
+const ERROR_CODE_TO_OUTCOME: Record<string, string> = {
+  invalidCredentials: 'invalid_credentials',
+  tooManyRequests: 'too_many_requests',
+  serverUnavailable: 'server_unavailable',
+  inactive: 'inactive',
+}
+
+function normalizeAuthOutcome(error: string): string {
+  return ERROR_CODE_TO_OUTCOME[error] ?? 'validation_error'
+}
+
 export async function signIn(formData: FormData): Promise<{ error?: string } | { twoFactor: true }> {
+  return tracer.startActiveSpan('admin.login.submit', async (span) => {
+    try {
+      const result = await signInInner(formData)
+      if ('twoFactor' in result && result.twoFactor) {
+        span.setAttribute('auth.outcome', 'two_factor_required')
+      } else if ('error' in result && result.error) {
+        span.setAttribute('auth.outcome', normalizeAuthOutcome(result.error))
+      } else {
+        span.setAttribute('auth.outcome', 'ok')
+      }
+      return result
+    } catch (err) {
+      // redirect() throwing is the success path (plain sign-in or the
+      // optional 2FA-prompt interstitial) — not a real error.
+      span.setAttribute('auth.outcome', isNextRedirectError(err) ? 'ok' : 'error')
+      throw err
+    } finally {
+      span.end()
+    }
+  })
+}
+
+async function signInInner(formData: FormData): Promise<{ error?: string } | { twoFactor: true }> {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
