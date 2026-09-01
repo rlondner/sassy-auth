@@ -276,6 +276,49 @@ describe('confirmEnable', () => {
     })
   })
 
+  // bug-0275: better-auth only rotates the session on the device that
+  // enabled 2FA. Any other still-valid session was never re-verified against
+  // 2FA, yet deriveAuthMethods would later stamp its OAuth codes with
+  // amr: ['otp','mfa'] based on the account's now-true twoFactorEnabled flag.
+  // Revoking every other session on confirm closes that gap.
+  it('revokes other sessions using the rotated token, not the stale one', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, { status: true }, ROTATED_SESSION),
+    )
+
+    const result = await confirmEnable(formData({ code: '123456' }))
+
+    expect(result).toEqual({ ok: true })
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+    const [url, init] = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[1] as [string, RequestInit]
+    expect(url).toBe('http://localhost:3000/api/auth/revoke-other-sessions')
+    expect(init.method).toBe('POST')
+    const headers = init.headers as Record<string, string>
+    expect(headers['Cookie']).toBe('better-auth.session_token=rotated-token')
+  })
+
+  it('does not call revoke-other-sessions when the response carries no rotated cookie', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, { status: true }),
+    )
+
+    const result = await confirmEnable(formData({ code: '123456' }))
+
+    expect(result).toEqual({ ok: true })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('still reports success even if revoking other sessions fails', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>)
+      .mockResolvedValueOnce(upstream(200, { status: true }, ROTATED_SESSION))
+      .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+
+    const result = await confirmEnable(formData({ code: '123456' }))
+
+    expect(result).toEqual({ ok: true })
+  })
+
   it('maps an unexpected upstream status to generic', async () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
       upstream(500),

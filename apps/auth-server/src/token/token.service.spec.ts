@@ -3,6 +3,8 @@ import { TokenService } from './token.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
+import { trace } from '@opentelemetry/api';
+import { InMemorySpanExporter, SimpleSpanProcessor, BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
 
 // ── Prisma mock ──────────────────────────────────────────────────────────────
 
@@ -154,6 +156,42 @@ describe('TokenService', () => {
         header: { alg: string; kid?: string };
       };
       expect(completed.header.kid).toBe('test-kid-1');
+    });
+  });
+
+  // ── auth.token.issue span ───────────────────────────────────────────────────
+  //
+  // The tracer in token.service.ts is captured once at module load
+  // (`const tracer = trace.getTracer(...)`), and OTel's ProxyTracer caches
+  // its delegate on first use — so the provider must be registered before
+  // this describe block's tests import/instantiate TokenService.
+  describe('issueJwt span', () => {
+    const exporter = new InMemorySpanExporter();
+
+    beforeAll(() => {
+      const provider = new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+      trace.setGlobalTracerProvider(provider);
+    });
+
+    beforeEach(() => {
+      exporter.reset();
+    });
+
+    it('emits an auth.token.issue span with kid and ttl attributes', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
+
+      await service.issueJwt({
+        saUserId: 1,
+        userPublicId: 'usr-1',
+        orgPublicId: 'org-1',
+        appPublicId: 'app-1',
+      });
+
+      const spans = exporter.getFinishedSpans();
+      const issueSpan = spans.find((s) => s.name === 'auth.token.issue');
+      expect(issueSpan).toBeDefined();
+      expect(issueSpan?.attributes['kid']).toBe('test-kid-1');
+      expect(issueSpan?.attributes['ttl']).toBe(3600);
     });
   });
 

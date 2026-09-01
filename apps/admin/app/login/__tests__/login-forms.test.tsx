@@ -1,23 +1,3 @@
-/**
- * SKIPPED - blocked on grove W-63.
- *
- * These three components depend on two React 19 features:
- *   - useActionState, which react 18.3.1 does not export at all
- *   - a function-valued <form action={fn}>, which react-dom 18.3.1 does not
- *     invoke (probed directly: 0 calls, rendered action attribute null)
- *
- * apps/admin/package.json declares react ^18.3.0, and jest resolves 18.3.1.
- * The app works only because Next 15 vendors its own React 19 at
- * next/dist/compiled/react and aliases `react` to it when bundling, and
- * typecheck passes because @types/react 18.3.29 declares useActionState in
- * canary.d.ts — so nothing surfaces the mismatch until you render these
- * outside the Next bundler.
- *
- * Polyfilling useActionState here would test the polyfill rather than the
- * component, and would not address the form-action wiring at all. The cases
- * below are written against the real React 19 behaviour and should pass
- * unchanged once W-63 aligns the declared version; un-skip them then.
- */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '@/messages/en.json'
@@ -78,7 +58,7 @@ beforeEach(() => {
   mockVerifyBackup.mockResolvedValue({})
 })
 
-describe.skip('LoginForm', () => {
+describe('LoginForm', () => {
   it('submits the credentials through signIn', async () => {
     wrap(<LoginForm next="" authServerUrl="https://auth.test" />)
 
@@ -153,7 +133,7 @@ describe.skip('LoginForm', () => {
   })
 })
 
-describe.skip('LoginOtpForm', () => {
+describe('LoginOtpForm', () => {
   it('requests a code and advances to the code step', async () => {
     wrap(<LoginOtpForm next="" />)
 
@@ -209,20 +189,21 @@ describe.skip('LoginOtpForm', () => {
   })
 })
 
-describe.skip('TwoFactorForm', () => {
-  it('submits a TOTP code with next and the trust-device flag', async () => {
+describe('TwoFactorForm', () => {
+  it('defaults the trust-device box to checked and submits trustDevice=true', async () => {
     wrap(<TwoFactorForm next="/orgs" trustDays={14} />)
 
+    expect(screen.getByRole('checkbox')).toBeChecked()
     submitForm('code', { code: '123456' })
 
     await waitFor(() => expect(mockVerifyTotp).toHaveBeenCalled())
     const fd = mockVerifyTotp.mock.calls[0][0] as FormData
     expect(fd.get('code')).toBe('123456')
     expect(fd.get('next')).toBe('/orgs')
-    expect(fd.get('trustDevice')).toBe('false')
+    expect(fd.get('trustDevice')).toBe('true')
   })
 
-  it('sends trustDevice=true once the box is ticked', async () => {
+  it('sends trustDevice=false once the pre-checked box is unticked', async () => {
     wrap(<TwoFactorForm next="" trustDays={14} />)
 
     fireEvent.click(screen.getByRole('checkbox'))
@@ -230,7 +211,7 @@ describe.skip('TwoFactorForm', () => {
 
     await waitFor(() => expect(mockVerifyTotp).toHaveBeenCalled())
     expect((mockVerifyTotp.mock.calls[0][0] as FormData).get('trustDevice')).toBe(
-      'true',
+      'false',
     )
   })
 

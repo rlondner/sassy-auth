@@ -36,9 +36,21 @@ jobs:
       # 4. HARDENING: Explicitly delete sensitive file types before the AI agent
       # can even read the directory tree, acting as a failsafe against misconfiguration.
       - name: Pre-scan Context Sanitization
+        # bug-0266 (continued): `*.env` only matches a file literally named
+        # ".env" or ending in ".env" with nothing after — it never matched
+        # this repo's actual secret-bearing files: `.env.local`,
+        # `.env.example` (template, low-risk, but still not what was
+        # intended to survive), or any other `.env.*`. Also added the
+        # Apple `.p8` private key format this repo actually uses
+        # (APPLE_PRIVATE_KEY in .env.example) alongside the RSA key pattern.
         run: |
-          find . -name "*.env" -type f -delete
+          # "*.env" alone only matches names ending in .env (foo.env) — it misses
+          # this repo's actual dotenv convention (.env, .env.local, .env.production,
+          # .env.local.bak-*, see .gitignore), which is exactly the shape of file
+          # that has been accidentally committed here before.
+          find . -name ".env*" -type f -delete
           find . -name "*.pem" -type f -delete
+          find . -name "*.p8" -type f -delete
           find . -name "*_rsa" -type f -delete
 
       - name: Run Claude Security Review
