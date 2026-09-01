@@ -1,5 +1,6 @@
 import {
   buildOAuthAuthorizationServerMetadata,
+  buildOpenIdConfiguration,
   ISSUER_PLACEHOLDER,
   JWKS_ROUTE,
   OAUTH_AUTHORIZE_ROUTE,
@@ -35,8 +36,9 @@ describe('buildOAuthAuthorizationServerMetadata', () => {
     expect(doc.response_types_supported).toEqual(['code']);
     expect(doc.grant_types_supported).toEqual(['authorization_code']);
     expect(doc.code_challenge_methods_supported).toEqual(['S256']);
-    // Public PKCE clients only — no client_secret support on /token.
-    expect(doc.token_endpoint_auth_methods_supported).toEqual(['none']);
+    expect(doc.token_endpoint_auth_methods_supported).toEqual([
+      'none', 'client_secret_basic', 'client_secret_post',
+    ]);
   });
 
   it('handles a localhost issuer with a non-default port', () => {
@@ -61,6 +63,43 @@ describe('buildOAuthAuthorizationServerMetadata', () => {
         'token_endpoint_auth_methods_supported',
       ].sort(),
     );
+  });
+});
+
+describe('buildOpenIdConfiguration', () => {
+  const doc = buildOpenIdConfiguration('http://localhost:3000');
+
+  it('advertises the OIDC endpoints under the API prefix', () => {
+    expect(doc.issuer).toBe('http://localhost:3000');
+    expect(doc.authorization_endpoint).toBe('http://localhost:3000/api/token/oauth/authorize');
+    expect(doc.token_endpoint).toBe('http://localhost:3000/api/token/oauth/token');
+    expect(doc.userinfo_endpoint).toBe('http://localhost:3000/api/token/oauth/userinfo');
+    expect(doc.end_session_endpoint).toBe('http://localhost:3000/api/token/oauth/logout');
+    expect(doc.jwks_uri).toBe('http://localhost:3000/api/token/jwks');
+  });
+
+  it('advertises the supported OIDC capabilities', () => {
+    expect(doc.scopes_supported).toEqual(['openid', 'profile', 'email']);
+    expect(doc.response_types_supported).toEqual(['code']);
+    expect(doc.grant_types_supported).toEqual(['authorization_code']);
+    expect(doc.subject_types_supported).toEqual(['public']);
+    expect(doc.id_token_signing_alg_values_supported).toEqual(['RS256']);
+    expect(doc.code_challenge_methods_supported).toEqual(['S256']);
+    expect(doc.token_endpoint_auth_methods_supported).toEqual([
+      'none', 'client_secret_basic', 'client_secret_post',
+    ]);
+  });
+
+  it('does not advertise offline_access — refresh tokens are unsupported', () => {
+    expect(doc.scopes_supported).not.toContain('offline_access');
+    expect(doc.grant_types_supported).not.toContain('refresh_token');
+  });
+
+  it('shares endpoint URLs with the RFC 8414 document', () => {
+    const oauthDoc = buildOAuthAuthorizationServerMetadata('http://localhost:3000');
+    expect(doc.authorization_endpoint).toBe(oauthDoc.authorization_endpoint);
+    expect(doc.token_endpoint).toBe(oauthDoc.token_endpoint);
+    expect(doc.jwks_uri).toBe(oauthDoc.jwks_uri);
   });
 });
 

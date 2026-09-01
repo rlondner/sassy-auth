@@ -38,8 +38,9 @@ export function resolveIssuer(): string {
 const RESPONSE_TYPES_SUPPORTED = ['code'] as const;
 const GRANT_TYPES_SUPPORTED = ['authorization_code'] as const;
 const CODE_CHALLENGE_METHODS_SUPPORTED = ['S256'] as const;
-// Public PKCE clients only — there is no client_secret-based auth on /token.
-const TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED = ['none'] as const;
+const TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED = [
+  'none', 'client_secret_basic', 'client_secret_post',
+] as const;
 
 export interface OAuthAuthorizationServerMetadata {
   issuer: string;
@@ -71,4 +72,57 @@ export function buildOAuthAuthorizationServerMetadata(
 
 function stripTrailingSlash(s: string): string {
   return s.endsWith('/') ? s.slice(0, -1) : s;
+}
+
+export const OAUTH_USERINFO_ROUTE = 'oauth/userinfo';
+export const OAUTH_LOGOUT_ROUTE = 'oauth/logout';
+
+// OIDC Discovery well-known URI. Like RFC 8414, served at the host root.
+export const OIDC_METADATA_PATH = '.well-known/openid-configuration';
+
+const SCOPES_SUPPORTED = ['openid', 'profile', 'email'] as const;
+const SUBJECT_TYPES_SUPPORTED = ['public'] as const;
+const ID_TOKEN_SIGNING_ALGS = ['RS256'] as const;
+const CLAIMS_SUPPORTED = [
+  'sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'amr', 'at_hash',
+  'org', 'name', 'given_name', 'family_name', 'email', 'email_verified',
+] as const;
+
+export interface OpenIdConfiguration {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  userinfo_endpoint: string;
+  end_session_endpoint: string;
+  jwks_uri: string;
+  scopes_supported: readonly string[];
+  response_types_supported: readonly string[];
+  grant_types_supported: readonly string[];
+  subject_types_supported: readonly string[];
+  id_token_signing_alg_values_supported: readonly string[];
+  code_challenge_methods_supported: readonly string[];
+  token_endpoint_auth_methods_supported: readonly string[];
+  claims_supported: readonly string[];
+}
+
+export function buildOpenIdConfiguration(issuer: string): OpenIdConfiguration {
+  const oauth = buildOAuthAuthorizationServerMetadata(issuer);
+  const base = stripTrailingSlash(issuer);
+  const tokenRoot = `${base}/${NEST_GLOBAL_PREFIX}/${TOKEN_CONTROLLER_PATH}`;
+  return {
+    issuer: oauth.issuer,
+    authorization_endpoint: oauth.authorization_endpoint,
+    token_endpoint: oauth.token_endpoint,
+    jwks_uri: oauth.jwks_uri,
+    userinfo_endpoint: `${tokenRoot}/${OAUTH_USERINFO_ROUTE}`,
+    end_session_endpoint: `${tokenRoot}/${OAUTH_LOGOUT_ROUTE}`,
+    scopes_supported: [...SCOPES_SUPPORTED],
+    response_types_supported: oauth.response_types_supported,
+    grant_types_supported: oauth.grant_types_supported,
+    subject_types_supported: [...SUBJECT_TYPES_SUPPORTED],
+    id_token_signing_alg_values_supported: [...ID_TOKEN_SIGNING_ALGS],
+    code_challenge_methods_supported: oauth.code_challenge_methods_supported,
+    token_endpoint_auth_methods_supported: oauth.token_endpoint_auth_methods_supported,
+    claims_supported: [...CLAIMS_SUPPORTED],
+  };
 }

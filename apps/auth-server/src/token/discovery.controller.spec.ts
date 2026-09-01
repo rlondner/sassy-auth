@@ -4,6 +4,7 @@ import request from 'supertest';
 import { DiscoveryController } from './discovery.controller';
 import {
   OAUTH_AS_METADATA_PATH,
+  OIDC_METADATA_PATH,
   buildOAuthAuthorizationServerMetadata,
 } from './oauth-metadata';
 
@@ -29,9 +30,9 @@ describe('DiscoveryController', () => {
     }).compile();
     const instance = moduleRef.createNestApplication();
     // Mirror the production wiring in configure-nest-app.ts: the /api global
-    // prefix applies to everything EXCEPT the well-known discovery doc, which
-    // RFC 8414 mandates be served at the host root.
-    instance.setGlobalPrefix('api', { exclude: [OAUTH_AS_METADATA_PATH] });
+    // prefix applies to everything EXCEPT the well-known discovery docs, which
+    // RFC 8414 and OIDC mandate be served at the host root.
+    instance.setGlobalPrefix('api', { exclude: [OAUTH_AS_METADATA_PATH, OIDC_METADATA_PATH] });
     await instance.init();
     return instance;
   }
@@ -99,5 +100,13 @@ describe('DiscoveryController', () => {
   it('does NOT warn when BETTER_AUTH_URL is set', async () => {
     app = await buildApp('http://localhost:3000');
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('serves the OIDC metadata at /.well-known/openid-configuration (root, not /api/...)', async () => {
+    app = await buildApp('http://localhost:3000');
+    const res = await request(app.getHttpServer()).get('/.well-known/openid-configuration');
+    expect(res.status).toBe(200);
+    expect(res.body.issuer).toBe('http://localhost:3000');
+    expect(res.body.userinfo_endpoint).toBe('http://localhost:3000/api/token/oauth/userinfo');
   });
 });
