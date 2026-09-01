@@ -184,7 +184,7 @@ export const auth = betterAuth({
           const provider = providerFromSignInMethod(session.signInMethod);
           if (provider) {
             await recordFederationEvent(
-              { db: prisma, logger: authLogger, emit: emitFederationEventToSentry },
+              { db: prisma, logger: authLogger },
               { type: 'social.signin.ok', provider, betterAuthUserId: session.userId },
             );
           }
