@@ -10,6 +10,7 @@ import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 const SERVICE_NAME = process.env.OTEL_SERVICE_NAME ?? 'sassy-auth-auth-server';
 
 function datadogOtlpConfig(): { url: string; headers: Record<string, string> } | null {
+  if (process.env.OTEL_SDK_DISABLED === 'true') return null;
   const apiKey = process.env.DD_API_KEY;
   if (!apiKey) return null;
   const site = process.env.DD_SITE ?? 'datadoghq.com';

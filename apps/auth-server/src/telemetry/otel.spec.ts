@@ -23,6 +23,7 @@ describe('setupOtel', () => {
   });
 
   it('does not throw when DD_API_KEY is set but unreachable', async () => {
+    delete process.env.OTEL_SDK_DISABLED;
     process.env.DD_API_KEY = 'test-key';
     process.env.DD_SITE = 'datadoghq.com';
     const { setupOtel } = await import('./otel');
@@ -37,10 +38,18 @@ describe('setupOtel', () => {
     });
 
     it('returns one span processor when DD_API_KEY is set', async () => {
+      delete process.env.OTEL_SDK_DISABLED;
       process.env.DD_API_KEY = 'test-key';
       process.env.DD_SITE = 'datadoghq.com';
       const { buildDatadogSpanProcessors } = await import('./otel');
       expect(buildDatadogSpanProcessors()).toHaveLength(1);
+    });
+
+    it('returns an empty array when OTEL_SDK_DISABLED is true, even if DD_API_KEY is set', async () => {
+      process.env.DD_API_KEY = 'test-key';
+      process.env.OTEL_SDK_DISABLED = 'true';
+      const { buildDatadogSpanProcessors } = await import('./otel');
+      expect(buildDatadogSpanProcessors()).toEqual([]);
     });
   });
 });
