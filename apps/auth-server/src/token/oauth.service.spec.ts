@@ -179,6 +179,13 @@ describe('OauthService', () => {
       ).rejects.toThrow(/invalid_grant/);
     });
 
+    it('throws invalid_grant when the stored code has no codeChallenge', async () => {
+      mockPrisma.saOauthCode.delete.mockResolvedValue(makeEntry({ codeChallenge: null }));
+      await expect(
+        service.exchangeCode('c', 'app-55', REDIRECT_URI, VERIFIER),
+      ).rejects.toThrow(/invalid_grant/);
+    });
+
     it('throws invalid_grant when verifier does not match challenge', async () => {
       mockPrisma.saOauthCode.delete.mockResolvedValue(makeEntry());
       await expect(

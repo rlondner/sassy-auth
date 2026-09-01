@@ -3,7 +3,6 @@ import { TokenErrorCode } from '@sassy-auth/types';
 
 export interface RedirectUriApp {
   url: string;
-  callbackUrl?: string | null;
   redirectUris?: Array<{ uri: string; kind: string }> | null;
 }
 
@@ -45,12 +44,6 @@ function registered(app: RedirectUriApp, kind: string): string[] {
  *   pre-OIDC fallback, preserved so the migration changes no app's behaviour.
  */
 export function assertRedirectUriAllowed(redirectUri: string, app: RedirectUriApp): void {
-  // Support legacy callbackUrl for backward compatibility
-  if (app.callbackUrl) {
-    if (!isExactMatch(redirectUri, app.callbackUrl)) reject();
-    return;
-  }
-
   const allowed = registered(app, 'login');
   if (allowed.length > 0) {
     if (!allowed.some((uri) => isExactMatch(redirectUri, uri))) reject();
