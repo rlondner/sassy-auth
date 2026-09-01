@@ -1,10 +1,15 @@
+import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import request from 'supertest';
+import * as jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
 import { TokenController } from './token.controller';
 import { TokenService } from './token.service';
 import { OauthService } from './oauth.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { resolveIssuer } from './oauth-metadata';
 
 jest.mock('@sentry/nestjs', () => ({
   setTag: jest.fn(),
@@ -52,11 +57,30 @@ const mockPrisma = prisma as unknown as {
   user: { findUnique: jest.Mock };
 };
 
+// ── Key pair for signing test bearer tokens ─────────────────────────────────
+// verifyAccessToken below actually verifies against this key, so
+// signTestToken produces tokens the controller's real auth-gate logic
+// accepts or rejects for real, rather than the mock trivially agreeing
+// with itself.
+const { privateKey: testPrivateKey, publicKey: testPublicKey } = crypto.generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+});
+const testPrivatePem = testPrivateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+const testPublicPem = testPublicKey.export({ type: 'spki', format: 'pem' }) as string;
+
+function signTestToken(payload: Record<string, unknown>): string {
+  return jwt.sign(payload, testPrivatePem, { algorithm: 'RS256', issuer: resolveIssuer() });
+}
+
 const mockTokenService = {
   issueJwt: jest.fn(),
   issueIdToken: jest.fn(),
   getJwks: jest.fn(),
   resolvePermissions: jest.fn(),
+  buildScopedClaims: jest.fn(),
+  verifyAccessToken: jest.fn((token: string) =>
+    jwt.verify(token, testPublicPem, { algorithms: ['RS256'], issuer: resolveIssuer() }),
+  ),
 };
 
 const mockOauthService = {
@@ -693,6 +717,99 @@ describe('TokenController', () => {
           redirect_uri: 'https://app.example.com/callback',
         }),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  // ── GET /api/token/oauth/userinfo ────────────────────────────────────────
+
+  describe('GET /api/token/oauth/userinfo', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        controllers: [TokenController],
+        providers: [
+          { provide: TokenService, useValue: mockTokenService },
+          { provide: OauthService, useValue: mockOauthService },
+          { provide: SqidService, useValue: mockSqidService },
+          { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api');
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    it('returns sub plus the claims the token was granted', async () => {
+      const token = signTestToken({ sub: 'u_1', aud: 'a_7', scope: 'openid profile' });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ id: 1, publicId: 'u_1', status: 'active' });
+      mockTokenService.buildScopedClaims.mockResolvedValue({
+        name: 'Ada Lovelace', given_name: 'Ada', family_name: 'Lovelace',
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.sub).toBe('u_1');
+      expect(res.body.name).toBe('Ada Lovelace');
+    });
+
+    it('cannot return a claim the token did not grant', async () => {
+      const token = signTestToken({ sub: 'u_1', aud: 'a_7', scope: 'openid' });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ id: 1, publicId: 'u_1', status: 'active' });
+      mockTokenService.buildScopedClaims.mockResolvedValue({});
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ sub: 'u_1' });
+      expect(mockTokenService.buildScopedClaims).toHaveBeenCalledWith(expect.any(Number), 'openid');
+    });
+
+    it('rejects a missing bearer token', async () => {
+      const res = await request(app.getHttpServer()).get('/api/token/oauth/userinfo');
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects a token with a bad signature', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', 'Bearer not.a.token');
+      expect(res.status).toBe(401);
+    });
+
+    // Not in the brief's exact test list, but this is the named security
+    // invariant this endpoint exists to uphold: a valid token for a user
+    // who is no longer active must not be served stale claims.
+    it('rejects a valid token for a user who is no longer active', async () => {
+      const token = signTestToken({ sub: 'u_1', aud: 'a_7', scope: 'openid profile' });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ id: 1, publicId: 'u_1', status: 'inactive' });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(401);
+      expect(mockTokenService.buildScopedClaims).not.toHaveBeenCalled();
+    });
+
+    it('rejects a token for a user that no longer exists', async () => {
+      const token = signTestToken({ sub: 'u_ghost', aud: 'a_7', scope: 'openid' });
+      mockPrisma.saUser.findFirst.mockResolvedValue(null);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(401);
     });
   });
 });

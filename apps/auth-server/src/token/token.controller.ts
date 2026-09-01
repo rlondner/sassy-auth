@@ -50,6 +50,7 @@ import {
   JWKS_ROUTE,
   OAUTH_AUTHORIZE_ROUTE,
   OAUTH_TOKEN_ROUTE,
+  OAUTH_USERINFO_ROUTE,
   TOKEN_CONTROLLER_PATH,
 } from './oauth-metadata';
 import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
@@ -614,5 +615,36 @@ export class TokenController {
     Sentry.setTag('appId', dto.appId);
 
     return { access_token: token, token_type: 'Bearer', expires_in: 3600 };
+  }
+
+  /**
+   * GET /api/token/oauth/userinfo
+   *
+   * Claims for the bearer token's subject, gated by that token's own `scope`
+   * claim. Deriving the gate from the presented token means /userinfo can never
+   * return more than was granted, with no second source of truth to drift.
+   */
+  @Get(OAUTH_USERINFO_ROUTE)
+  async userinfo(@Req() req: Request) {
+    const header = req.headers.authorization ?? '';
+    const [scheme, raw] = header.split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !raw) {
+      throw new UnauthorizedException(TokenErrorCode.INVALID_REQUEST);
+    }
+
+    let claims: { sub?: string; scope?: string };
+    try {
+      claims = this.tokenService.verifyAccessToken(raw);
+    } catch {
+      throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
+    }
+
+    const saUser = await prisma.saUser.findFirst({ where: { publicId: claims.sub } });
+    if (!saUser || saUser.status !== 'active') {
+      throw new UnauthorizedException(TokenErrorCode.USER_NOT_FOUND);
+    }
+
+    const scoped = await this.tokenService.buildScopedClaims(saUser.id, claims.scope ?? '');
+    return { sub: claims.sub, ...scoped };
   }
 }

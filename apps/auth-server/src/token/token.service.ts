@@ -168,6 +168,14 @@ export class TokenService {
     return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
   }
 
+  /** Verifies an access token this server issued. Throws on any failure. */
+  verifyAccessToken(token: string): { sub?: string; scope?: string; aud?: string } {
+    return jwt.verify(token, this.publicKey, {
+      algorithms: ['RS256'],
+      issuer: resolveIssuer(),
+    }) as { sub?: string; scope?: string; aud?: string };
+  }
+
   getJwks(): { keys: Record<string, unknown>[] } {
     const keyObject = crypto.createPublicKey(this.publicKey);
     const jwk = keyObject.export({ format: 'jwk' });
