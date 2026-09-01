@@ -3,6 +3,7 @@ import { BatchSpanProcessor, type SpanProcessor } from '@opentelemetry/sdk-trace
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 
 function buildDatadogSpanProcessors(): SpanProcessor[] {
+  if (process.env.OTEL_SDK_DISABLED === 'true') return [];
   const ddApiKey = process.env.DD_API_KEY;
   if (!ddApiKey) return [];
   const site = process.env.DD_SITE ?? 'datadoghq.com';

@@ -137,6 +137,24 @@ function isNextRedirectError(err: unknown): boolean {
   )
 }
 
+// signInInner's error codes are a mix of camelCase codes returned by this
+// file (invalidCredentials, tooManyRequests, serverUnavailable, inactive) and,
+// on the missing-email/password path, a free-text validation sentence. Map
+// them onto the snake_case `auth.outcome` vocabulary shared with auth-server
+// (`ok` / `invalid_credentials` / `two_factor_required`) and
+// resource-server-fastapi (`ok` / `invalid_token`) so the attribute means the
+// same thing across all three services.
+const ERROR_CODE_TO_OUTCOME: Record<string, string> = {
+  invalidCredentials: 'invalid_credentials',
+  tooManyRequests: 'too_many_requests',
+  serverUnavailable: 'server_unavailable',
+  inactive: 'inactive',
+}
+
+function normalizeAuthOutcome(error: string): string {
+  return ERROR_CODE_TO_OUTCOME[error] ?? 'validation_error'
+}
+
 export async function signIn(formData: FormData): Promise<{ error?: string } | { twoFactor: true }> {
   return tracer.startActiveSpan('admin.login.submit', async (span) => {
     try {
@@ -144,7 +162,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string } | {
       if ('twoFactor' in result && result.twoFactor) {
         span.setAttribute('auth.outcome', 'two_factor_required')
       } else if ('error' in result && result.error) {
-        span.setAttribute('auth.outcome', result.error)
+        span.setAttribute('auth.outcome', normalizeAuthOutcome(result.error))
       } else {
         span.setAttribute('auth.outcome', 'ok')
       }

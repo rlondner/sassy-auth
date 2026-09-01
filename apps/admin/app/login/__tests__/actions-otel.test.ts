@@ -54,6 +54,10 @@ describe('signIn span', () => {
     const spans = exporter.getFinishedSpans();
     const loginSpan = spans.find((s) => s.name === 'admin.login.submit');
     expect(loginSpan).toBeDefined();
-    expect(loginSpan?.attributes['auth.outcome']).toBeDefined();
+    // The mocked fetch responds 401, which signInInner maps to the
+    // `invalidCredentials` error code; the span attribute must carry the
+    // normalized snake_case outcome shared with the other services, not the
+    // raw camelCase code.
+    expect(loginSpan?.attributes['auth.outcome']).toBe('invalid_credentials');
   });
 });
