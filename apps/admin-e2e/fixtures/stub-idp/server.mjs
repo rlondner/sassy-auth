@@ -154,11 +154,20 @@ createServer(async (req, res) => {
         409,
       )
     }
+    // bug-0270: claim the pending slot BEFORE the only await in this
+    // handler. readBody() is a genuine async yield point (it waits on the
+    // request's 'data'/'end' events), so two POSTs that both arrive before
+    // either finishes reading its body would otherwise both pass the
+    // isPending() check above and the second would silently overwrite
+    // nextIdentity instead of getting the 409 this guard exists to produce.
+    // Claiming the slot synchronously, before the await, closes that gap.
+    pendingSince = Date.now()
     const body = await readBody(req)
     let parsed = {}
     try {
       parsed = body ? JSON.parse(body) : {}
     } catch {
+      pendingSince = null
       return json({ error: 'invalid_json' }, 400)
     }
     nextIdentity = {
@@ -167,7 +176,6 @@ createServer(async (req, res) => {
       email_verified: parsed.email_verified ?? DEFAULT_IDENTITY.email_verified,
       ...(parsed.name ? { name: parsed.name } : {}),
     }
-    pendingSince = Date.now()
     return json({ ok: true, identity: nextIdentity })
   }
 

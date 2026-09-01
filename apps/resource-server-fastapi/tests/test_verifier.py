@@ -3,6 +3,9 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from app.oauth.verifier import verify
 
@@ -111,3 +114,55 @@ def test_verify_rejects_missing_scope(monkeypatch, rsa_keypair):
     with pytest.raises(HTTPException) as ei:
         verify(token)
     assert ei.value.status_code == 401
+
+
+class _RaisingCounter:
+    def add(self, *args, **kwargs):
+        raise RuntimeError("boom: simulated OTel SDK failure")
+
+
+def test_verify_accepts_valid_token_even_if_counter_raises(monkeypatch, rsa_keypair):
+    from app.oauth import verifier as v
+
+    priv, pub = rsa_keypair
+    _stub_pyjwk(monkeypatch, pub)
+    monkeypatch.setattr(v, "_verify_counter", _RaisingCounter())
+    token = _sign(priv, _claims())
+    claims = verify(token)
+    assert claims["scope"].startswith("rs.properties.create")
+
+
+def test_verify_rejects_invalid_token_even_if_counter_raises(monkeypatch, rsa_keypair):
+    from app.oauth import verifier as v
+    from fastapi import HTTPException
+
+    priv, pub = rsa_keypair
+    _stub_pyjwk(monkeypatch, pub)
+    monkeypatch.setattr(v, "_verify_counter", _RaisingCounter())
+    token = _sign(priv, _claims(aud="other-app"))
+    with pytest.raises(HTTPException) as ei:
+        verify(token)
+    assert ei.value.status_code == 401
+    assert ei.value.detail == {"result": "Unauthorized", "reason": "invalid_token"}
+
+
+def test_verify_emits_a_span_with_outcome_attribute(monkeypatch):
+    monkeypatch.delenv("OTEL_SDK_DISABLED", raising=False)
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+    from app.oauth import verifier
+    monkeypatch.setattr(verifier, "_tracer", provider.get_tracer("test"))
+
+    from fastapi import HTTPException
+    try:
+        verifier.verify("not-a-real-jwt")
+    except HTTPException:
+        pass
+
+    spans = exporter.get_finished_spans()
+    assert len(spans) == 1
+    assert spans[0].name == "auth.token.verify"
+    assert spans[0].attributes["auth.outcome"] == "invalid_token"

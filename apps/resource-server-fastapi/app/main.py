@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.routes import router as api_router
 from app.config import get_settings
 from app.oauth.routes import router as oauth_router
+from app.telemetry import setup_telemetry
 from app.web.routes import router as web_router
 
 
@@ -47,6 +48,7 @@ def _configure_logging() -> None:
 _configure_logging()
 
 app = FastAPI(title="resource-server-fastapi")
+setup_telemetry(app)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(web_router)
 app.include_router(oauth_router)

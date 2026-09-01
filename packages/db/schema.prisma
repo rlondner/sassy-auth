@@ -68,6 +68,15 @@ model Account {
   // bug-0179: BetterAuth loads the credential account by userId at
   // password-verification time (`Account.findFirst({ where: { userId } })`).
   @@index([userId])
+  // bug-0269: the social-login feature's invite-only safety story
+  // (disableSignUp on every provider, no trustedProviders) is enforced
+  // entirely at the application layer in BetterAuth's find-or-create
+  // account-linking logic. Nothing in the database itself stopped the same
+  // external identity (providerId + accountId, e.g. the same Google `sub`)
+  // from ending up linked to two different local users if that logic ever
+  // raced or had a bug. This constraint backs the app-layer guarantee with
+  // a real one.
+  @@unique([providerId, accountId])
 }
 
 model Verification {
