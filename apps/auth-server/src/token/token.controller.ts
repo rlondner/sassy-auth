@@ -55,6 +55,7 @@ import {
 import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
 import { isTwoFactorRequired } from '../auth/two-factor-required';
 import { verifyUserTotp } from '../auth/verify-user-totp';
+import { parseScopes } from './scopes';
 
 @ApiTags('Token')
 @Controller(TOKEN_CONTROLLER_PATH)
@@ -112,6 +113,8 @@ export class TokenController {
     @Query('code_challenge_method') codeChallengeMethod: string,
     @Query('state') state: string = '',
     @Req() req: Request,
+    @Query('scope') scope: string = '',
+    @Query('nonce') nonce: string = '',
   ) {
     try {
       if (!codeChallenge || codeChallengeMethod !== 'S256') {
@@ -184,6 +187,8 @@ export class TokenController {
             code_challenge_method: codeChallengeMethod,
           });
           if (state) query.set('state', state);
+          if (scope) query.set('scope', scope);
+          if (nonce) query.set('nonce', nonce);
           const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
           const enrollUrl = `${adminUrl.replace(/\/$/, '')}/account/security?enroll=1&next=${encodeURIComponent(nextPath)}`;
           this.logger.getWinstonLogger().info('OAuth authorize: forced 2FA enrollment', {
@@ -196,13 +201,21 @@ export class TokenController {
       }
 
       const amr = (session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled ? ['pwd', 'otp', 'mfa'] : ['pwd'];
+      const granted = parseScopes(scope);
+      const authTime = session.session?.createdAt
+        ? new Date(session.session.createdAt)
+        : new Date();
+
       const code = await this.oauthService.generateCode(
         saUser.publicId,
         app.publicId,
         redirectUri,
-        codeChallenge,
-        'S256',
+        codeChallenge || null,
+        codeChallenge ? 'S256' : null,
         amr,
+        nonce || null,
+        granted.join(' '),
+        authTime,
       );
       const url = new URL(redirectUri);
       url.searchParams.set('code', code);

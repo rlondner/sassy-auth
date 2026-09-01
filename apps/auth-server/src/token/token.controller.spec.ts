@@ -461,7 +461,92 @@ describe('TokenController', () => {
         'fake-challenge',
         'S256',
         ['pwd', 'otp', 'mfa'],
+        null,
+        '',
+        expect.any(Date),
       );
+    });
+
+    // Task 6: nonce/scope/auth_time plumbing
+    it('parses granted scopes and passes nonce through to generateCode', async () => {
+      mockApp();
+      mockSession();
+      mockSaUser();
+      mockOauthService.generateCode.mockReturnValue('test-code-abc');
+
+      await controller.oauthAuthorize(
+        'sqid-10',
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        '',
+        fakeReq,
+        'email openid wat',
+        'n-xyz',
+      );
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['pwd'],
+        'n-xyz',
+        'openid email',
+        expect.any(Date),
+      );
+    });
+
+    it('derives auth_time from the BetterAuth session createdAt', async () => {
+      mockApp();
+      const createdAt = new Date('2026-08-21T10:00:00Z');
+      mockGetSession.mockResolvedValue({
+        user: { ...fakeSession.user },
+        session: { createdAt },
+      });
+      mockSaUser();
+      mockOauthService.generateCode.mockReturnValue('test-code-abc');
+
+      await controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq);
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['pwd'],
+        null,
+        '',
+        createdAt,
+      );
+    });
+
+    it('carries scope and nonce through the forced 2FA enrollment next= round-trip', async () => {
+      process.env.ADMIN_URL = 'https://admin.example';
+      mockApp({ requireTwoFactor: true, isPlatform: false });
+      mockSession({ twoFactorEnabled: false });
+      mockSaUser({ status: 'active' });
+
+      const res = await controller.oauthAuthorize(
+        'sqid-10',
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        '',
+        fakeReq,
+        'openid profile',
+        'n-abc',
+      );
+
+      const nextParam = new URL(res.url).searchParams.get('next');
+      expect(nextParam).toBeTruthy();
+      const nextParams = new URLSearchParams((nextParam as string).split('?')[1]);
+      expect(nextParams.get('scope')).toBe('openid profile');
+      expect(nextParams.get('nonce')).toBe('n-abc');
+
+      delete process.env.ADMIN_URL;
     });
   });
 

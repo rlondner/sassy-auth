@@ -39,6 +39,9 @@ function makeEntry(overrides: Partial<Record<string, unknown>> = {}) {
     codeChallengeMethod: 'S256',
     expiresAt: new Date(Date.now() + 60_000),
     amr: JSON.stringify(['pwd']),
+    nonce: null,
+    scope: '',
+    authTime: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
   };
 }
@@ -58,7 +61,10 @@ describe('OauthService', () => {
 
   describe('generateCode', () => {
     it('inserts a row with all fields and returns the code', async () => {
-      const code = await service.generateCode('user-1', 'app-1', REDIRECT_URI, CHALLENGE, 'S256', ['pwd']);
+      const authTime = new Date('2026-08-21T10:00:00Z');
+      const code = await service.generateCode(
+        'user-1', 'app-1', REDIRECT_URI, CHALLENGE, 'S256', ['pwd'], null, '', authTime,
+      );
       expect(typeof code).toBe('string');
       expect(code.length).toBeGreaterThan(10);
       expect(mockPrisma.saOauthCode.create).toHaveBeenCalledWith({
@@ -70,15 +76,30 @@ describe('OauthService', () => {
           codeChallenge: CHALLENGE,
           codeChallengeMethod: 'S256',
           amr: JSON.stringify(['pwd']),
+          nonce: null,
+          scope: '',
+          authTime,
           expiresAt: expect.any(Date),
         }),
       });
     });
 
     it('produces unique codes across consecutive calls', async () => {
-      const a = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256', ['pwd']);
-      const b = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256', ['pwd']);
+      const authTime = new Date();
+      const a = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256', ['pwd'], null, '', authTime);
+      const b = await service.generateCode('u', 'app', REDIRECT_URI, CHALLENGE, 'S256', ['pwd'], null, '', authTime);
       expect(a).not.toBe(b);
+    });
+
+    it('persists nonce, scope, and authTime with the code', async () => {
+      const authTime = new Date('2026-08-21T10:00:00Z');
+      await service.generateCode('u_1', 'a_7', 'https://app/cb', 'chal', 'S256', ['pwd'], 'n-123', 'openid profile', authTime);
+
+      expect(mockPrisma.saOauthCode.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          nonce: 'n-123', scope: 'openid profile', authTime,
+        }),
+      });
     });
   });
 
@@ -86,7 +107,15 @@ describe('OauthService', () => {
     it('returns userId, appPublicId, and amr when everything matches', async () => {
       mockPrisma.saOauthCode.delete.mockResolvedValue(makeEntry());
       const result = await service.exchangeCode('some-code', 'app-55', REDIRECT_URI, VERIFIER);
-      expect(result).toEqual({ userId: 'user-99', appPublicId: 'app-55', amr: ['pwd'] });
+      expect(result).toEqual({
+        userId: 'user-99',
+        appPublicId: 'app-55',
+        amr: ['pwd'],
+        nonce: null,
+        scope: '',
+        authTime: new Date('2026-01-01T00:00:00Z'),
+        hadChallenge: true,
+      });
       expect(mockPrisma.saOauthCode.delete).toHaveBeenCalledWith({ where: { code: 'some-code' } });
     });
 
@@ -106,7 +135,10 @@ describe('OauthService', () => {
           expiresAt: new Date(Date.now() + 60_000),
         }),
       );
-      const code = await service.generateCode('u_pub', 'a_pub', 'https://rs.example/cb', challenge, 'S256', ['pwd', 'otp', 'mfa']);
+      const code = await service.generateCode(
+        'u_pub', 'a_pub', 'https://rs.example/cb', challenge, 'S256', ['pwd', 'otp', 'mfa'],
+        null, '', new Date(),
+      );
       const out = await service.exchangeCode(code, 'a_pub', 'https://rs.example/cb', verifier);
       expect(out.amr).toEqual(['pwd', 'otp', 'mfa']);
     });
@@ -179,11 +211,39 @@ describe('OauthService', () => {
       ).rejects.toThrow(/invalid_grant/);
     });
 
-    it('throws invalid_grant when the stored code has no codeChallenge', async () => {
-      mockPrisma.saOauthCode.delete.mockResolvedValue(makeEntry({ codeChallenge: null }));
-      await expect(
-        service.exchangeCode('c', 'app-55', REDIRECT_URI, VERIFIER),
-      ).rejects.toThrow(/invalid_grant/);
+    it('returns nonce, scope, authTime, and hadChallenge on exchange', async () => {
+      // NOTE: the brief's literal placeholders ('s256-of-verifier' /
+      // 'verifier-matching-challenge') do not actually hash to each other;
+      // using them verbatim would fail PKCE verification before the new
+      // fields are ever returned. Substituted with a real matching pair
+      // (same approach as the round-trip test above) so this test exercises
+      // the intended behavior instead of always throwing.
+      mockPrisma.saOauthCode.delete.mockResolvedValue({
+        userId: 'u_1', appPublicId: 'a_7', redirectUri: 'https://app/cb',
+        codeChallenge: CHALLENGE, codeChallengeMethod: 'S256',
+        amr: '["pwd"]', nonce: 'n-123', scope: 'openid profile',
+        authTime: new Date('2026-08-21T10:00:00Z'),
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+
+      const result = await service.exchangeCode('code', 'a_7', 'https://app/cb', VERIFIER);
+
+      expect(result.nonce).toBe('n-123');
+      expect(result.scope).toBe('openid profile');
+      expect(result.hadChallenge).toBe(true);
+    });
+
+    it('reports hadChallenge false for a code stored without PKCE', async () => {
+      mockPrisma.saOauthCode.delete.mockResolvedValue({
+        userId: 'u_1', appPublicId: 'a_7', redirectUri: 'https://app/cb',
+        codeChallenge: null, codeChallengeMethod: null,
+        amr: '["pwd"]', nonce: null, scope: '',
+        authTime: new Date(), expiresAt: new Date(Date.now() + 60_000),
+      });
+
+      const result = await service.exchangeCode('code', 'a_7', 'https://app/cb', undefined);
+
+      expect(result.hadChallenge).toBe(false);
     });
 
     it('throws invalid_grant when verifier does not match challenge', async () => {
