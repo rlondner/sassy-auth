@@ -131,6 +131,56 @@ export async function forwardNamedCookieWithMaxAge(
   return false
 }
 
+/**
+ * Pull a single cookie's decoded value out of a Set-Cookie response header,
+ * without touching the Next.js cookie jar. Used when a follow-up server-side
+ * call needs to authenticate as the session a response just minted, rather
+ * than the (now-stale) session on the incoming request.
+ */
+function extractSetCookieValue(res: Response, cookieName: string): string | undefined {
+  const setCookieHeader = res.headers.get('set-cookie')
+  if (!setCookieHeader) return undefined
+
+  const parts = setCookieHeader.split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/)
+  for (const part of parts) {
+    const [namePair = ''] = part.split(';').map((s) => s.trim())
+    const eq = namePair.indexOf('=')
+    if (eq < 0) continue
+    if (namePair.slice(0, eq) !== cookieName) continue
+    try {
+      return decodeURIComponent(namePair.slice(eq + 1))
+    } catch {
+      return namePair.slice(eq + 1)
+    }
+  }
+  return undefined
+}
+
+/**
+ * bug-0275: enabling 2FA only rotates the session on the device where it was
+ * enabled (better-auth creates a new session, deletes the old one) — any
+ * other still-valid session for this user was never re-verified against 2FA.
+ * deriveAuthMethods stamps `amr` from the account's live `twoFactorEnabled`
+ * flag, so those other sessions would later mint OAuth codes falsely
+ * asserting `otp`/`mfa` to resource servers. Revoking every other session the
+ * moment 2FA is confirmed closes the gap the same way account deactivation
+ * already does (users.service.ts) — best-effort: a failure here must not
+ * turn a successful enrollment into a reported error.
+ */
+async function revokeOtherSessions(rotatedSessionToken: string, origin: string | null): Promise<void> {
+  try {
+    await fetch(`${AUTH_SERVER_URL}/api/auth/revoke-other-sessions`, {
+      method: 'POST',
+      headers: {
+        Cookie: `better-auth.session_token=${rotatedSessionToken}`,
+        ...(origin && { Origin: origin }),
+      },
+    })
+  } catch {
+    // Best-effort — see doc comment above.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 2FA server actions
 // ---------------------------------------------------------------------------
@@ -167,6 +217,11 @@ export async function enable2fa(formData: FormData): Promise<Enable2faResult> {
   }
 
   if (!res.ok) {
+    // /two-factor/* is a sensitive prefix for the auth rate limiter, so a
+    // throttled call must say so rather than fall through to the catch-all
+    // "something went wrong" — the one actionable fact is that they should
+    // wait.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     // better-auth 1.6.11 returns 400 for an invalid password on the enable
     // endpoint (BAD_REQUEST / INVALID_PASSWORD in index.mjs).
     if (res.status === 400 || res.status === 401 || res.status === 403) return { error: 'invalidPassword' }
@@ -212,6 +267,9 @@ export async function confirmEnable(formData: FormData): Promise<ConfirmEnableRe
   }
 
   if (!res.ok) {
+    // Same rate-limit budget as the other two-factor endpoints; a throttled
+    // confirm must not be reported as a bad code.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     // better-auth 1.6.11 returns 401 for an invalid TOTP code
     // (INVALID_CODE → UNAUTHORIZED in verify-two-factor.mjs).
     if (res.status === 400 || res.status === 401) return { error: 'invalidCode' }
@@ -222,6 +280,14 @@ export async function confirmEnable(formData: FormData): Promise<ConfirmEnableRe
   // it creates a new session and deletes the old one. Forward the new session
   // token so the browser's cookie stays valid after enable completes.
   await forwardNamedCookie(res, 'better-auth.session_token')
+
+  // bug-0275: also revoke every other active session for this user now that
+  // 2FA is on, so a device that never completed the 2FA challenge can't keep
+  // minting OAuth codes that falsely claim `amr: ['otp','mfa']`.
+  const rotatedToken = extractSetCookieValue(res, 'better-auth.session_token')
+  if (rotatedToken) {
+    await revokeOtherSessions(rotatedToken, origin)
+  }
 
   return { ok: true }
 }
@@ -255,11 +321,29 @@ export async function disable2fa(formData: FormData): Promise<Disable2faResult> 
   }
 
   if (!res.ok) {
+    // /two-factor/* is a sensitive prefix for the auth rate limiter, so a
+    // throttled call must say so rather than fall through to the catch-all
+    // "something went wrong" — the one actionable fact is that they should
+    // wait.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     // better-auth 1.6.11 returns 400 for an invalid password on the disable
     // endpoint (BAD_REQUEST / INVALID_PASSWORD in index.mjs).
     if (res.status === 400 || res.status === 401 || res.status === 403) return { error: 'invalidPassword' }
     return { error: 'generic' }
   }
+
+  // better-auth rotates the session on the way DOWN as well as up: the
+  // disable handler creates a new session, sets it via Set-Cookie, and then
+  // deletes the caller's existing token (dist/plugins/two-factor/index.mjs,
+  // disableTwoFactor). Without forwarding the replacement the browser keeps a
+  // token that no longer exists, so the user is bounced to /login on the next
+  // navigation while this action has already reported success. confirmEnable
+  // has handled the enable direction since it was written; this is the mirror.
+  await forwardNamedCookie(res, 'better-auth.session_token')
+  // The same response expires the trust-device cookie when the user had one,
+  // its verification record having just been deleted server-side. Forward that
+  // too rather than leaving a cookie pointing at nothing.
+  await forwardNamedCookie(res, 'better-auth.trust_device')
 
   return { ok: true }
 }
@@ -298,6 +382,9 @@ export async function regenerateBackupCodes(
   }
 
   if (!res.ok) {
+    // Same rate-limit budget as the other two-factor endpoints; a throttled
+    // regeneration must not be reported as a bad password.
+    if (res.status === 429) return { error: 'tooManyRequests' }
     // better-auth 1.6.11 returns 400 for an invalid password on the
     // generate-backup-codes endpoint (BAD_REQUEST / INVALID_PASSWORD).
     if (res.status === 400 || res.status === 401 || res.status === 403) return { error: 'invalidPassword' }

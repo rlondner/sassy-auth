@@ -63,7 +63,11 @@ export function ConfirmDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error && (
-          <div className="mt-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-body-sm text-destructive">
+          <div
+            className="mt-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-body-sm text-destructive"
+            role="alert"
+            aria-live="assertive"
+          >
             {error}
           </div>
         )}
@@ -71,10 +75,10 @@ export function ConfirmDialog({
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={pending}
+            loading={pending}
             className={cn(buttonVariants({ variant: variant === 'destructive' ? 'destructive' : 'default' }))}
           >
-            {pending ? '…' : confirmLabel}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

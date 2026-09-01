@@ -18,7 +18,7 @@
 #
 # See README → "Quick Start (Docker)" for what a real deployment would need.
 
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 
 # openssl — required by Prisma's query engine on bookworm-slim.
 # curl    — used by the compose healthcheck.

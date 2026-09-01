@@ -25,3 +25,15 @@ export function signInMethodFromPath(path: string | undefined): string | null {
 
   return null;
 }
+
+/**
+ * Inverse of the `ext:<provider>` half of signInMethodFromPath: reads a
+ * Session.signInMethod value back out into the provider name, or null for
+ * anything that isn't a federated sign-in (password, or an unrecognised/
+ * legacy null value). Used to decide whether a successful session-create
+ * should also record a 'social.signin.ok' audit event.
+ */
+export function providerFromSignInMethod(signInMethod: string | null | undefined): string | null {
+  if (!signInMethod?.startsWith('ext:')) return null;
+  return signInMethod.slice('ext:'.length);
+}

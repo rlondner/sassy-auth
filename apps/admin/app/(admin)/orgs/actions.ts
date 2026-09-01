@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { isRedirectSentinel } from '@/lib/redirect-sentinel'
 import { createOrg, updateOrg, deleteOrg, getOrgs } from '@/lib/api'
 import type {
   OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse,
@@ -32,6 +33,7 @@ export async function createOrgAction(
     revalidatePath('/orgs')
     return { org }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'create') }
   }
 }
@@ -45,6 +47,7 @@ export async function updateOrgAction(
     revalidatePath('/orgs')
     return { org }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
   }
 }
@@ -57,6 +60,7 @@ export async function deleteOrgAction(
     revalidatePath('/orgs')
     return { ok: true }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'delete') }
   }
 }
@@ -67,6 +71,7 @@ export async function listOrgsAction(
   try {
     return await getOrgs(params)
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return {
       errorKey:
         err instanceof Error && err.message.includes('403')
