@@ -52,4 +52,11 @@ describe('setupOtel', () => {
       expect(buildDatadogSpanProcessors()).toEqual([]);
     });
   });
+
+  describe('setupLogging', () => {
+    it('does not throw regardless of env configuration', async () => {
+      const { setupLogging } = await import('./otel');
+      expect(() => setupLogging()).not.toThrow();
+    });
+  });
 });
