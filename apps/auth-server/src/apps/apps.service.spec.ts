@@ -68,7 +68,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [] }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -92,6 +92,7 @@ describe('AppsService', () => {
     expect(result).toEqual({
       publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
       isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [],
+      isConfidential: false, clientSecretUpdatedAt: null,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -132,7 +133,7 @@ describe('AppsService', () => {
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [] });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -403,5 +404,45 @@ describe('AppsService', () => {
         redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  // ── Task 9: confidential clients — rotateClientSecret ────────────────────
+
+  describe('rotateClientSecret', () => {
+    it('generates a new secret, hashes it, stores the hash, and returns the plaintext once', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.saApp.update.mockResolvedValue({ ...appRow, clientSecretHash: 'hashed', clientSecretUpdatedAt: new Date() });
+
+      const result = await service.rotateClientSecret('ba-caller', 'sq_1');
+
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.apps.manage');
+      expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        data: { clientSecretHash: expect.any(String), clientSecretUpdatedAt: expect.any(Date) },
+      });
+      // The plaintext returned to the caller must be exactly what was hashed
+      // and stored — not, say, the stored hash itself (which would leak the
+      // hash to an admin-console response and defeat its purpose).
+      expect(typeof result.clientSecret).toBe('string');
+      expect(result.clientSecret.length).toBeGreaterThan(20);
+      const storedHash = mockPrisma.saApp.update.mock.calls[0][0].data.clientSecretHash;
+      expect(storedHash).not.toBe(result.clientSecret);
+    });
+
+    it('throws NotFoundException when the app does not exist', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+      await expect(service.rotateClientSecret('ba-caller', 'nope')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('returns a different secret on each call (no reuse)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.saApp.update.mockResolvedValue(appRow);
+
+      const first = await service.rotateClientSecret('ba-caller', 'sq_1');
+      const second = await service.rotateClientSecret('ba-caller', 'sq_1');
+
+      expect(first.clientSecret).not.toBe(second.clientSecret);
+    });
   });
 });

@@ -76,6 +76,10 @@ export interface App {
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
   requireTwoFactor: boolean;
+  // Client type is derived from whether a secret hash exists server-side —
+  // the hash itself is never sent to the admin console.
+  isConfidential?: boolean;
+  clientSecretUpdatedAt?: string | null;
 }
 
 export interface CreateAppPayload {

@@ -14,7 +14,7 @@ import {
   Input,
   Label,
 } from '@sassy-auth/ui'
-import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction } from '@/app/(admin)/apps/actions'
+import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction } from '@/app/(admin)/apps/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { App, RedirectUri } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
@@ -38,6 +38,16 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
 
+  // Client secret: rotation is a separate, immediate call (not part of the
+  // dirty/save flow below) because the plaintext only ever comes back once,
+  // at the moment of rotation — there is nothing to "save" afterwards, only
+  // to display and let the admin copy.
+  const [newClientSecret, setNewClientSecret] = React.useState<string | null>(null)
+  const [clientSecretUpdatedAt, setClientSecretUpdatedAt] = React.useState<string | null>(
+    app.clientSecretUpdatedAt ?? null,
+  )
+  const [rotatingSecret, setRotatingSecret] = React.useState(false)
+
   // The checkbox universe is `available` — every provider this deployment
   // has credentials for, from GET /api/social-providers/:clientId/settings
   // — not just the ones currently on for this app, so a provider that's
@@ -56,6 +66,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
     setErrorKey(null)
+    setNewClientSecret(null)
+    setClientSecretUpdatedAt(app.clientSecretUpdatedAt ?? null)
     // Gate the authenticated social-providers fetch on the drawer actually
     // being open: AppsTable keeps this component mounted (with `open`
     // toggling) for every selected row, including View and Delete, so an
@@ -84,6 +96,23 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       if (checked) next.add(provider)
       else next.delete(provider)
       return next
+    })
+  }
+
+  function handleRotateClientSecret() {
+    setRotatingSecret(true)
+    startTransition(async () => {
+      const result = await rotateClientSecretAction(app.publicId)
+      setRotatingSecret(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      // Shown exactly once — the server never returns the plaintext again
+      // after this response.
+      setNewClientSecret(result.clientSecret)
+      setClientSecretUpdatedAt(new Date().toISOString())
+      toast.success(t('apps.toast.updated'))
     })
   }
 
@@ -257,6 +286,58 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 <p className="mt-1 text-label-sm text-primary">
                   {t('apps.actions.copied')}
                 </p>
+              )}
+            </div>
+            <div>
+              <Label>{t('apps.fields.clientSecret')}</Label>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.clientSecretHint')}
+              </p>
+              {newClientSecret ? (
+                <div className="mt-2">
+                  <div className="flex gap-2">
+                    <Input
+                      id="newClientSecret"
+                      value={newClientSecret}
+                      readOnly
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={t('apps.actions.copy')}
+                      onClick={() => void copy(newClientSecret, 'clientSecret')}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        {copiedKey === 'clientSecret' ? 'check' : 'content_copy'}
+                      </span>
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-label-sm text-destructive">
+                    {t('apps.fields.clientSecretWarning')}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <p className="text-body-sm text-muted-foreground">
+                    {clientSecretUpdatedAt
+                      ? t('apps.fields.clientSecretUpdatedAt', {
+                          date: new Date(clientSecretUpdatedAt).toLocaleString(),
+                        })
+                      : t('apps.fields.noClientSecret')}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2"
+                    loading={rotatingSecret}
+                    onClick={handleRotateClientSecret}
+                  >
+                    {clientSecretUpdatedAt
+                      ? t('apps.fields.regenerateClientSecret')
+                      : t('apps.fields.generateClientSecret')}
+                  </Button>
+                </div>
               )}
             </div>
             {errorKey && (

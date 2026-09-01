@@ -42,7 +42,7 @@ jest.mock('better-auth/crypto', () => ({
   hashPassword: jest.fn().mockResolvedValue('dummy-hash'),
 }));
 
-import { verifyPassword } from 'better-auth/crypto';
+import { verifyPassword, hashPassword } from 'better-auth/crypto';
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';
 import { verifyUserTotp } from '../auth/verify-user-totp';
@@ -645,11 +645,20 @@ describe('TokenController', () => {
   // ── POST /api/token/oauth/token ───────────────────────────────────────────
 
   describe('oauthToken', () => {
+    // Task 9: oauthToken now takes @Req/@Res for client-secret extraction and
+    // the WWW-Authenticate header. These unit-level tests don't exercise
+    // client auth (no Authorization header, no client_secret in the body),
+    // so a bare stand-in is enough — the confidential-client invariants
+    // below exercise real req/res via supertest.
+    const fakeTokenReq = { headers: {} } as unknown as import('express').Request;
+    const fakeTokenRes = { setHeader: jest.fn() } as unknown as import('express').Response;
+
     it('returns access_token when code is valid', async () => {
       mockOauthService.exchangeCode.mockReturnValue({
         userId: 'sqid-1',
         appPublicId: 'sqid-10',
         scope: '',
+        hadChallenge: true,
       });
       const saUser = {
         id: 1,
@@ -662,12 +671,16 @@ describe('TokenController', () => {
       mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
       mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
 
-      const result = await controller.oauthToken({
-        code: 'valid-code',
-        client_id: 'sqid-10',
-        code_verifier: 'a'.repeat(64),
-        redirect_uri: 'https://app.example.com/callback',
-      });
+      const result = await controller.oauthToken(
+        {
+          code: 'valid-code',
+          client_id: 'sqid-10',
+          code_verifier: 'a'.repeat(64),
+          redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq,
+        fakeTokenRes,
+      );
 
       expect(result).toEqual({
         access_token: 'oauth.jwt.token',
@@ -685,6 +698,7 @@ describe('TokenController', () => {
         nonce: 'n-abc',
         authTime: new Date('2026-08-21T10:00:00Z'),
         amr: ['pwd'],
+        hadChallenge: true,
       });
       const saUser = {
         id: 1,
@@ -698,12 +712,16 @@ describe('TokenController', () => {
       mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
       mockTokenService.issueIdToken.mockResolvedValue('oauth.id.token');
 
-      const result = await controller.oauthToken({
-        code: 'valid-code',
-        client_id: 'sqid-10',
-        code_verifier: 'a'.repeat(64),
-        redirect_uri: 'https://app.example.com/callback',
-      });
+      const result = await controller.oauthToken(
+        {
+          code: 'valid-code',
+          client_id: 'sqid-10',
+          code_verifier: 'a'.repeat(64),
+          redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq,
+        fakeTokenRes,
+      );
 
       expect(result).toEqual({
         access_token: 'oauth.jwt.token',
@@ -735,6 +753,7 @@ describe('TokenController', () => {
         amr: ['ext'],
         scope: '',
         idp: 'google',
+        hadChallenge: true,
       });
       mockPrisma.saUser.findFirst.mockResolvedValue({
         id: 1,
@@ -746,12 +765,16 @@ describe('TokenController', () => {
       mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
       mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
 
-      await controller.oauthToken({
-        code: 'valid-code',
-        client_id: 'sqid-10',
-        code_verifier: 'a'.repeat(64),
-        redirect_uri: 'https://app.example.com/callback',
-      });
+      await controller.oauthToken(
+        {
+          code: 'valid-code',
+          client_id: 'sqid-10',
+          code_verifier: 'a'.repeat(64),
+          redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq,
+        fakeTokenRes,
+      );
 
       expect(mockTokenService.issueJwt).toHaveBeenCalledWith(
         expect.objectContaining({ amr: ['ext'], idp: 'google' }),
@@ -765,6 +788,7 @@ describe('TokenController', () => {
       mockOauthService.exchangeCode.mockReturnValue({
         userId: 'sqid-1',
         appPublicId: 'sqid-10',
+        hadChallenge: true,
       });
       mockPrisma.saUser.findFirst.mockResolvedValue({
         id: 1,
@@ -776,13 +800,238 @@ describe('TokenController', () => {
       mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
 
       await expect(
-        controller.oauthToken({
-          code: 'valid-code',
-          client_id: 'sqid-10',
-          code_verifier: 'a'.repeat(64),
-          redirect_uri: 'https://app.example.com/callback',
-        }),
+        controller.oauthToken(
+          {
+            code: 'valid-code',
+            client_id: 'sqid-10',
+            code_verifier: 'a'.repeat(64),
+            redirect_uri: 'https://app.example.com/callback',
+          },
+          fakeTokenReq,
+          fakeTokenRes,
+        ),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  // ── Task 9: confidential clients — §2 invariant ──────────────────────────
+  //
+  // "A PKCE-challenge-less authorization code may only be exchanged by a
+  // request that authenticates with a client secret" is enforced at two
+  // independent points: /authorize (refuses to *issue* a challenge-less code
+  // unless the app is confidential) and /token (refuses to *exchange* a
+  // challenge-less code unless the caller authenticated). Neither check
+  // alone is sufficient — a bug removing either one must be caught by a test
+  // that cannot pass via the other check. Tests below are written so each
+  // exercises exactly one side.
+
+  describe('confidential client invariants', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        controllers: [TokenController],
+        providers: [
+          { provide: TokenService, useValue: mockTokenService },
+          { provide: OauthService, useValue: mockOauthService },
+          { provide: SqidService, useValue: mockSqidService },
+          { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api');
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockVerifyPassword.mockResolvedValue(true);
+    });
+
+    it('/authorize refuses to omit PKCE for a public app', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: null, redirectUris: [],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/authorize')
+        .query({ client_id: 'a_7', redirect_uri: 'https://app.example.com/cb', scope: 'openid' });
+
+      expect(res.status).toBe(400);
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+    });
+
+    it('/authorize allows omitting PKCE for a confidential app', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: 'scrypt-hash', redirectUris: [],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/authorize')
+        .query({ client_id: 'a_7', redirect_uri: 'https://app.example.com/cb', scope: 'openid' });
+
+      // Weak on its own (see Ruling 2, T9 pre-flight ledger): `not.toBe(400)`
+      // alone would also pass if the request failed for an unrelated reason
+      // downstream (e.g. no session) while the PKCE gate itself was broken
+      // and rejecting everything with 400 regardless of app type. Assert
+      // directly that the response is not the PKCE `invalid_request` error,
+      // so a regression that makes PKCE mandatory again for confidential
+      // apps is caught even if some other check also happens to fail here.
+      expect(res.status).not.toBe(400);
+      expect(res.body?.message).not.toBe('invalid_request');
+    });
+
+    // Exercises the /authorize-side check only: it would fail (400 becomes
+    // something else, or a code gets issued) if that check were removed,
+    // independent of whatever /token does.
+    it('/authorize issues a challenge-less code once the app is confidential', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: 'scrypt-hash', redirectUris: [],
+      });
+      mockGetSession.mockResolvedValue({
+        user: { id: 'ba-user-1', email: 'user@example.com', twoFactorEnabled: false },
+        session: { signInMethod: null },
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1, publicId: 'sqid-1', betterAuthUserId: 'ba-user-1', status: 'active',
+        org: { id: 5, publicId: 'sqid-5', appId: 7 },
+      });
+      mockOauthService.generateCode.mockResolvedValue('confidential-code');
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/authorize')
+        .query({ client_id: 'a_7', redirect_uri: 'https://app.example.com/cb', scope: 'openid' });
+
+      expect(res.status).toBe(302);
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        'sqid-1', 'a_7', 'https://app.example.com/cb', null, null,
+        expect.any(Array), null, 'openid', expect.any(Date), undefined,
+      );
+    });
+
+    it('/token rejects a challenge-less code when the client did not authenticate', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: 'scrypt-hash', redirectUris: [],
+      });
+      mockOauthService.exchangeCode.mockResolvedValue({
+        userId: 'u_1', appPublicId: 'a_7', amr: ['pwd'],
+        nonce: null, scope: 'openid', authTime: new Date(), hadChallenge: false,
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ code: 'c', client_id: 'a_7', redirect_uri: 'https://app.example.com/cb' });
+
+      expect(res.status).toBe(401);
+      expect(mockTokenService.issueJwt).not.toHaveBeenCalled();
+    });
+
+    // Exercises the /token-side check in isolation from the /token-side
+    // "confidential app failed to authenticate" check above: the app here
+    // is public (no clientSecretHash), so the first check (`app.clientSecretHash
+    // && !clientAuthenticated`) never fires — only the second check
+    // (`!exchanged.hadChallenge && !clientAuthenticated`) can produce the
+    // 401. This is the scenario the invariant exists for: a code that
+    // somehow carries no PKCE challenge (e.g. the app's secret was rotated
+    // away, or a bug elsewhere let one slip past /authorize) must still be
+    // refused at exchange time.
+    it('/token rejects a challenge-less code for a public app with no client secret to present', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: null, redirectUris: [],
+      });
+      mockOauthService.exchangeCode.mockResolvedValue({
+        userId: 'u_1', appPublicId: 'a_7', amr: ['pwd'],
+        nonce: null, scope: 'openid', authTime: new Date(), hadChallenge: false,
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ code: 'c', client_id: 'a_7', redirect_uri: 'https://app.example.com/cb' });
+
+      expect(res.status).toBe(401);
+      expect(mockTokenService.issueJwt).not.toHaveBeenCalled();
+    });
+
+    it('/token allows a challenge-less code when the client authenticated with the correct secret', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: 'scrypt-hash', redirectUris: [],
+      });
+      mockOauthService.exchangeCode.mockResolvedValue({
+        userId: 'u_1', appPublicId: 'a_7', amr: ['pwd'],
+        nonce: null, scope: 'openid', authTime: new Date(), hadChallenge: false,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1, publicId: 'u_1', status: 'active', org: { publicId: 'org_1', appId: 7 },
+      });
+      mockTokenService.issueJwt.mockResolvedValue('jwt-token');
+      mockVerifyPassword.mockResolvedValue(true);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({
+          code: 'c', client_id: 'a_7', redirect_uri: 'https://app.example.com/cb',
+          client_secret: 'right',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.access_token).toBe('jwt-token');
+    });
+
+    it('/token rejects a wrong client secret with invalid_client', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: await hashPassword('right'), redirectUris: [],
+      });
+      mockVerifyPassword.mockResolvedValueOnce(false);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ code: 'c', client_id: 'a_7', redirect_uri: 'https://app.example.com/cb', client_secret: 'wrong' });
+
+      expect(res.status).toBe(401);
+      expect(res.headers['www-authenticate']).toContain('Basic');
+      expect(mockOauthService.exchangeCode).not.toHaveBeenCalled();
+    });
+
+    it('checks both a presented client secret and a presented PKCE verifier when both are sent', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: 'scrypt-hash', redirectUris: [],
+      });
+      mockOauthService.exchangeCode.mockResolvedValue({
+        userId: 'u_1', appPublicId: 'a_7', amr: ['pwd'],
+        nonce: null, scope: 'openid', authTime: new Date(), hadChallenge: true,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1, publicId: 'u_1', status: 'active', org: { publicId: 'org_1', appId: 7 },
+      });
+      mockTokenService.issueJwt.mockResolvedValue('jwt-token');
+      mockVerifyPassword.mockResolvedValue(true);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({
+          code: 'c', client_id: 'a_7', redirect_uri: 'https://app.example.com/cb',
+          client_secret: 'right', code_verifier: 'v'.repeat(64),
+        });
+
+      expect(res.status).toBe(201);
+      // Both credentials were checked: the secret via verifyPassword, the
+      // verifier via exchangeCode (PKCE lives inside OauthService).
+      expect(mockVerifyPassword).toHaveBeenCalled();
+      expect(mockOauthService.exchangeCode).toHaveBeenCalledWith(
+        'c', 'a_7', 'https://app.example.com/cb', 'v'.repeat(64),
+      );
     });
   });
 

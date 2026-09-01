@@ -6,8 +6,32 @@
 // real ESM-only better-auth crypto module.
 import * as nodeCrypto from 'crypto';
 
-export const verifyPassword = async (_: { hash: string; password: string }) => true;
-export const hashPassword = async (_password: string) => 'stub-hash';
+// hashPassword/verifyPassword are a lightweight scrypt-based stand-in (not
+// better-auth's actual KDF params) that genuinely distinguishes correct vs.
+// incorrect passwords — unlike an earlier version of this stub that always
+// returned a constant hash and always verified true. Task 9's client-secret
+// tests need a real correct/incorrect distinction to be meaningful; a stub
+// that can't fail can't prove the comparison logic works.
+export const hashPassword = async (password: string): Promise<string> => {
+  const salt = nodeCrypto.randomBytes(16).toString('hex');
+  const derived = nodeCrypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${derived}`;
+};
+
+export const verifyPassword = async ({
+  hash,
+  password,
+}: {
+  hash: string;
+  password: string;
+}): Promise<boolean> => {
+  const [salt, key] = hash.split(':');
+  if (!salt || !key) return false;
+  const derived = nodeCrypto.scryptSync(password, salt, 64);
+  const expected = Buffer.from(key, 'hex');
+  if (derived.length !== expected.length) return false;
+  return nodeCrypto.timingSafeEqual(derived, expected);
+};
 
 async function deriveKey(secret: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {

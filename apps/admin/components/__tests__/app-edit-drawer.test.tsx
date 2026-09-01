@@ -9,6 +9,7 @@ jest.mock('@/app/(admin)/apps/actions', () => ({
   updateAppAction: jest.fn(),
   getSocialProviderSettingsAction: jest.fn(),
   updateSocialProvidersAction: jest.fn(),
+  rotateClientSecretAction: jest.fn(),
 }))
 Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } })
 
@@ -196,6 +197,52 @@ describe('AppEditDrawer', () => {
     rerender(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
     await waitFor(() =>
       expect(actions.getSocialProviderSettingsAction).toHaveBeenCalledWith('sq_1'),
+    )
+  })
+
+  // Task 9: confidential clients — the admin console's client-secret UI.
+
+  it('shows "no client secret" for a public app and a Generate button', () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expect(screen.getByText(en.apps.fields.noClientSecret)).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: en.apps.fields.generateClientSecret }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the rotation date and a Regenerate button for a confidential app', () => {
+    const confidentialApp = { ...app, isConfidential: true, clientSecretUpdatedAt: '2026-08-01T00:00:00Z' }
+    render(withIntl(<AppEditDrawer app={confidentialApp} open onOpenChange={() => undefined} />))
+    expect(
+      screen.getByRole('button', { name: en.apps.fields.regenerateClientSecret }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(en.apps.fields.noClientSecret)).not.toBeInTheDocument()
+  })
+
+  it('generating a client secret displays the plaintext once, with a copy control and warning', async () => {
+    ;(actions.rotateClientSecretAction as jest.Mock).mockResolvedValue({
+      clientSecret: 'plaintext-secret-value',
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.fields.generateClientSecret }))
+
+    await waitFor(() =>
+      expect(actions.rotateClientSecretAction).toHaveBeenCalledWith('sq_1'),
+    )
+    const secretInput = (await screen.findByDisplayValue(
+      'plaintext-secret-value',
+    )) as HTMLInputElement
+    expect(secretInput.readOnly).toBe(true)
+    expect(screen.getByText(en.apps.fields.clientSecretWarning)).toBeInTheDocument()
+
+    // Both the publicId field and the new-secret field render a "Copy"
+    // button with the same accessible name; the secret's copy button is
+    // the one rendered nearest the secret input.
+    const copyButtons = screen.getAllByRole('button', { name: en.apps.actions.copy })
+    fireEvent.click(copyButtons[copyButtons.length - 1])
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('plaintext-secret-value'),
     )
   })
 })

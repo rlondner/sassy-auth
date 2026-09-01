@@ -65,7 +65,14 @@
         "microsoft": "Microsoft",
         "apple": "Apple",
         "stub": "Test IdP"
-      }
+      },
+      "clientSecret": "Client secret",
+      "clientSecretHint": "Confidential clients (server-side apps) can exchange authorization codes without PKCE by authenticating with this secret. Public clients (SPAs, mobile apps) should not have one.",
+      "generateClientSecret": "Generate client secret",
+      "regenerateClientSecret": "Regenerate client secret",
+      "clientSecretWarning": "Copy this secret now — it will not be shown again.",
+      "clientSecretUpdatedAt": "Secret last rotated {date}",
+      "noClientSecret": "No client secret configured — this is a public client."
     },
     "actions": {
       "view": "View",

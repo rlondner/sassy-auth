@@ -10,13 +10,15 @@ import {
   Query,
   Redirect,
   Req,
+  Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import * as Sentry from '@sentry/nestjs';
 import { trace } from '@opentelemetry/api';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+import { extractClientSecret, verifyClientSecret } from './client-auth';
 import { prisma } from '@sassy-auth/db';
 import { detectIdentifierType, TokenErrorCode } from '@sassy-auth/types';
 import { auth } from '../auth/auth.config';
@@ -123,10 +125,6 @@ export class TokenController {
     @Query('nonce') nonce: string = '',
   ) {
     try {
-      if (!codeChallenge || codeChallengeMethod !== 'S256') {
-        throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
-      }
-
       let numericId: number;
       try {
         numericId = this.sqidService.decode(clientId);
@@ -139,6 +137,19 @@ export class TokenController {
       });
       if (!app) {
         throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+      }
+
+      // PKCE is mandatory for public clients. Confidential clients may omit it —
+      // the client secret provides the same protection — but a challenge, when
+      // sent, must still be S256. This must run after the app lookup, since
+      // whether PKCE can be omitted depends on the app's client type.
+      const isConfidential = app.clientSecretHash !== null;
+      if (codeChallenge) {
+        if (codeChallengeMethod !== 'S256') {
+          throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
+        }
+      } else if (!isConfidential) {
+        throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
       }
 
       try {
@@ -288,7 +299,11 @@ export class TokenController {
    * Exchanges an authorization code for a signed RS256 JWT.
    */
   @Post(OAUTH_TOKEN_ROUTE)
-  async oauthToken(@Body() dto: OauthTokenExchangeDto) {
+  async oauthToken(
+    @Body() dto: OauthTokenExchangeDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     let numericId: number;
     try {
       numericId = this.sqidService.decode(dto.client_id);
@@ -302,6 +317,7 @@ export class TokenController {
     if (!app) {
       throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
     }
+    const appClientSecretHash = app.clientSecretHash;
 
     try {
       assertRedirectUriAllowed(dto.redirect_uri, app);
@@ -312,6 +328,28 @@ export class TokenController {
         attemptedOrigin: (() => { try { return new URL(dto.redirect_uri).origin; } catch { return '<unparseable>'; } })(),
       });
       throw err;
+    }
+
+    // Client authentication (RFC 6749 §2.3): client_secret_basic (Authorization
+    // header) or client_secret_post (body). Basic wins if both are present.
+    // Checked once here; the result feeds both halves of the §2 invariant
+    // below and (for a confidential client) gates the exchange itself.
+    const presentedSecret = extractClientSecret(req, dto);
+    const clientAuthenticated = await verifyClientSecret(presentedSecret, appClientSecretHash ?? null);
+
+    // A confidential client must authenticate. Public clients must not present
+    // a secret they were never issued — but we don't need to reject that case
+    // specially: verifyClientSecret already returns false when the app has no
+    // secret configured, and a public app's `appClientSecretHash` check below
+    // never fires, so an unauthenticated public client falls through here as
+    // intended.
+    if (appClientSecretHash && !clientAuthenticated) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="sassy-auth"');
+      this.logger.getWinstonLogger().warn('oauth.client_auth.failed', {
+        context: 'TokenController',
+        appId: dto.client_id,
+      });
+      throw new UnauthorizedException(TokenErrorCode.UNAUTHORIZED_CLIENT);
     }
 
     let userPublicId: string;
@@ -337,6 +375,22 @@ export class TokenController {
         reason: err instanceof Error ? err.message : String(err),
       });
       throw err;
+    }
+
+    // §2 invariant, enforced independently of /authorize: a code carrying no
+    // PKCE challenge is only exchangeable by an authenticated client. This is
+    // the second line of defense — it still applies even if the app is not
+    // (or is no longer) confidential, catching a challenge-less code that
+    // should never have existed for a public client. The code has already
+    // been consumed (single-use) by this point, so this cannot be bypassed
+    // by retrying with a secret.
+    if (!exchanged.hadChallenge && !clientAuthenticated) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="sassy-auth"');
+      this.logger.getWinstonLogger().warn('oauth.client_auth.required_for_challengeless_code', {
+        context: 'TokenController',
+        appId: dto.client_id,
+      });
+      throw new UnauthorizedException(TokenErrorCode.UNAUTHORIZED_CLIENT);
     }
 
     const saUser = await prisma.saUser.findFirst({
