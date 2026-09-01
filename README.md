@@ -131,10 +131,15 @@ docker compose down -v      # -v also drops the database and the signing keys
 > which is load-bearing rather than lazy: the session cookie's `Secure` flag is
 > set from `NODE_ENV === 'production'`, and browsers do not store a Secure
 > cookie sent over plain `http://localhost`, so a "production" container served
-> over http could not be signed into at all. A real deployment needs compiled
-> builds, TLS termination, separately scaled processes, a managed Postgres, and
-> secrets that come from somewhere other than a volume on the host. No hardened
-> image is provided — see [Known Limitations](#known-limitations).
+> over http could not be signed into at all. For compiled production images,
+> TLS termination, and Render/Neon deployment, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+## Deployment
+
+For production deployment to Render with Neon Postgres — including custom domains
+(`auth.milissai.com`, `auth-api.milissai.com`, `testapp.milissai.com`), a
+[`render.yaml`](render.yaml) Blueprint, production Dockerfiles, and a local mock
+layout on custom ports — see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ## Quick Start (Flox)
 
@@ -202,6 +207,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 - [The name](#the-name)
 - [Screenshots](#screenshots)
 - [Quick Start (Docker)](#quick-start-docker)
+- [Deployment](#deployment)
 - [Quick Start (Flox)](#quick-start-flox)
 - [What SassyAuth is not](#what-sassyauth-is-not)
 - [How it compares](#how-it-compares)
@@ -449,6 +455,33 @@ Leave blank to disable. See [Observability](#observability) for behavior.
 | `SENTRY_AUTH_TOKEN`         | admin | Build-time auth token for source-map upload                          |
 | `SENTRY_ORG`                | admin | Sentry organization slug (build-time only)                           |
 | `SENTRY_PROJECT`            | admin | Sentry project slug (build-time only)                                |
+| `OTEL_SERVICE_NAME`         | auth  | Per-service override for the OpenTelemetry service name (each app has a sensible default) |
+| `DD_API_KEY`                | auth  | Datadog API key. Unset disables all Datadog export (traces, metrics, logs) |
+| `DD_SITE`                   | auth  | Datadog site — `datadoghq.com`, `datadoghq.eu`, etc. (default: `datadoghq.com`) |
+| `SENTRY_DSN_RESOURCE_SERVER` | RS sample | Sentry DSN for `apps/resource-server-fastapi` (its own `.env`, not the root one). Leave blank to disable. |
+
+### Email (optional)
+
+Transport is chosen by priority: `RESEND_API_KEY` > `EMAIL_SMTP_HOST` > console. With everything blank the auth-server logs outgoing mail instead of sending it — the default for dev and CI. See [Local email testing (Mailpit)](#local-email-testing-mailpit).
+
+| Variable            | Description                                                             |
+|----------------------|--------------------------------------------------------------------------|
+| `EMAIL_FROM`         | `From` address on outgoing mail. Default: `no-reply@sassy-auth.local`   |
+| `RESEND_API_KEY`     | Resend API key. Production HTTP transport; takes precedence over SMTP when set |
+| `EMAIL_SMTP_HOST`     | SMTP host, e.g. `localhost` for local Mailpit                            |
+| `EMAIL_SMTP_PORT`     | SMTP port, e.g. `1025` for local Mailpit                                 |
+| `EMAIL_SMTP_SECURE`   | `true` to use implicit TLS. Default: `false`                             |
+| `EMAIL_SMTP_USER`     | SMTP auth username, if required by the provider                          |
+| `EMAIL_SMTP_PASS`     | SMTP auth password, if required by the provider                          |
+
+### Test credentials (optional)
+
+Only needed to run the E2E suites; irrelevant to normal app usage.
+
+| Variable            | Description                                              |
+|----------------------|------------------------------------------------------------|
+| `E2E_ADMIN_EMAIL`    | Super-admin email the Playwright/Jest E2E suites sign in as. Default: `s@sa.io` |
+| `E2E_ADMIN_PASSWORD` | Password for that account, and the fallback source for `SEED_ADMIN_PASSWORD`. Default: `Pass@word1234` |
 
 ### Social providers (optional)
 
