@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { TokenErrorCode } from '@sassy-auth/types';
-import { buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
+import { buildClientErrorRedirectUrl, buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 
 describe('extractTokenErrorCode', () => {
   it.each([
@@ -55,5 +55,32 @@ describe('buildOauthErrorRedirectUrl', () => {
   it('URL-encodes special characters in clientId', () => {
     const url = buildOauthErrorRedirectUrl('http://localhost:3001', TokenErrorCode.APP_NOT_FOUND, 'a b/c');
     expect(url).toBe('http://localhost:3001/oauth-error?code=APP_NOT_FOUND&app=a+b%2Fc');
+  });
+});
+
+describe('buildClientErrorRedirectUrl', () => {
+  it('appends the OAuth error parameters to the client redirect URI', () => {
+    const url = buildClientErrorRedirectUrl(
+      'https://app.example.com/cb', 'login_required', 'No active session', 'xyz',
+    );
+    const parsed = new URL(url);
+    expect(parsed.origin + parsed.pathname).toBe('https://app.example.com/cb');
+    expect(parsed.searchParams.get('error')).toBe('login_required');
+    expect(parsed.searchParams.get('error_description')).toBe('No active session');
+    expect(parsed.searchParams.get('state')).toBe('xyz');
+  });
+
+  it('preserves an existing query string on the redirect URI', () => {
+    const url = buildClientErrorRedirectUrl(
+      'https://app.example.com/cb?tenant=acme', 'access_denied', 'Denied', '',
+    );
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get('tenant')).toBe('acme');
+    expect(parsed.searchParams.get('error')).toBe('access_denied');
+  });
+
+  it('omits state when the client did not send one', () => {
+    const url = buildClientErrorRedirectUrl('https://app.example.com/cb', 'access_denied', 'Denied', '');
+    expect(new URL(url).searchParams.has('state')).toBe(false);
   });
 });

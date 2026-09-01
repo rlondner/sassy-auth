@@ -439,7 +439,12 @@ describe('TokenController', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('throws ForbiddenException when user org does not match app', async () => {
+    // Task 10: once redirect_uri has been validated (as it has here — it
+    // matches the mocked app's origin), a USER_ORG_MISMATCH failure now
+    // redirects the error back to the client as access_denied instead of
+    // throwing, so an OIDC library sitting on that callback sees the error
+    // rather than a dead 403.
+    it('redirects access_denied to the client when user org does not match app', async () => {
       mockApp();
       mockSession();
       mockPrisma.saUser.findFirst.mockResolvedValue({
@@ -447,23 +452,36 @@ describe('TokenController', () => {
         org: { id: 5, publicId: 'sqid-5', appId: 999 }, // wrong app
       });
 
-      await expect(
-        controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
-      ).rejects.toThrow(ForbiddenException);
+      const res = await controller.oauthAuthorize(
+        'sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq,
+      );
+
+      expect(res.statusCode).toBe(302);
+      const target = new URL(res.url);
+      expect(target.origin + target.pathname).toBe('https://app.example.com/callback');
+      expect(target.searchParams.get('error')).toBe('access_denied');
+      expect(target.searchParams.get('error_description')).toBe(TokenErrorCode.USER_ORG_MISMATCH);
     });
 
     // bug-0074 — a still-valid BetterAuth session cannot mint an OAuth code
-    // for a user whose SaUser.status is not 'active'.
+    // for a user whose SaUser.status is not 'active'. Task 10: this now
+    // redirects access_denied to the client (redirect_uri is validated)
+    // rather than throwing.
     it.each(['inactive', 'pending'] as const)(
-      'throws ForbiddenException when user status is %s',
+      'redirects access_denied to the client when user status is %s',
       async (status) => {
         mockApp();
         mockSession();
         mockSaUser({ status });
 
-        await expect(
-          controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq),
-        ).rejects.toThrow(ForbiddenException);
+        const res = await controller.oauthAuthorize(
+          'sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq,
+        );
+
+        expect(res.statusCode).toBe(302);
+        const target = new URL(res.url);
+        expect(target.searchParams.get('error')).toBe('access_denied');
+        expect(target.searchParams.get('error_description')).toBe(TokenErrorCode.USER_NOT_FOUND);
       },
     );
 
@@ -1034,6 +1052,77 @@ describe('TokenController', () => {
       expect(mockOauthService.exchangeCode).toHaveBeenCalledWith(
         'c', 'a_7', 'https://app.example.com/cb', 'v'.repeat(64),
       );
+    });
+
+    // ── prompt / max_age / error redirects to the client ───────────────────
+
+    describe('prompt and max_age', () => {
+      it('returns login_required to the client for prompt=none with no session', async () => {
+        mockPrisma.saApp.findUnique.mockResolvedValue({
+          id: 7, publicId: 'a_7', url: 'https://app.example.com',
+          clientSecretHash: null, redirectUris: [],
+        });
+        mockGetSession.mockResolvedValue(null);
+
+        const res = await request(app.getHttpServer())
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: 'a_7', redirect_uri: 'https://app.example.com/cb',
+            code_challenge: 'c', code_challenge_method: 'S256',
+            scope: 'openid', prompt: 'none', state: 'xyz',
+          });
+
+        expect(res.status).toBe(302);
+        const target = new URL(res.headers.location);
+        expect(target.origin + target.pathname).toBe('https://app.example.com/cb');
+        expect(target.searchParams.get('error')).toBe('login_required');
+        expect(target.searchParams.get('state')).toBe('xyz');
+      });
+
+      it('bounces to the login page when max_age is exceeded', async () => {
+        process.env.ADMIN_URL = 'https://admin.example';
+        mockPrisma.saApp.findUnique.mockResolvedValue({
+          id: 7, publicId: 'a_7', url: 'https://app.example.com',
+          clientSecretHash: null, redirectUris: [],
+        });
+        mockGetSession.mockResolvedValue({
+          user: { id: 'ba_1', twoFactorEnabled: true },
+          session: { createdAt: new Date(Date.now() - 7200_000) },
+        });
+
+        const res = await request(app.getHttpServer())
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: 'a_7', redirect_uri: 'https://app.example.com/cb',
+            code_challenge: 'c', code_challenge_method: 'S256',
+            scope: 'openid', max_age: '3600',
+          });
+
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toContain('/login');
+
+        delete process.env.ADMIN_URL;
+      });
+
+      it('sends an invalid redirect_uri to the admin error page, never a redirect', async () => {
+        process.env.ADMIN_URL = 'https://admin.example';
+        mockPrisma.saApp.findUnique.mockResolvedValue({
+          id: 7, publicId: 'a_7', url: 'https://app.example.com',
+          clientSecretHash: null,
+          redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+        });
+
+        const res = await request(app.getHttpServer())
+          .get('/api/token/oauth/authorize')
+          .query({
+            client_id: 'a_7', redirect_uri: 'https://evil.example.com/cb',
+            code_challenge: 'c', code_challenge_method: 'S256', scope: 'openid',
+          });
+
+        expect(res.headers.location).not.toContain('evil.example.com');
+
+        delete process.env.ADMIN_URL;
+      });
     });
   });
 

@@ -48,7 +48,7 @@ import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
 import { assertRedirectUriAllowed } from './redirect-uri';
-import { buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
+import { buildClientErrorRedirectUrl, buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { LoggerService } from '../common/logger/logger.service';
 import {
   JWKS_ROUTE,
@@ -123,7 +123,16 @@ export class TokenController {
     @Req() req: Request,
     @Query('scope') scope: string = '',
     @Query('nonce') nonce: string = '',
+    @Query('prompt') prompt: string = '',
+    @Query('max_age') maxAge: string = '',
   ) {
+    // Tracks whether redirect_uri has passed assertRedirectUriAllowed. Once
+    // true, errors below (including the prompt=none client-facing errors)
+    // may be redirected to the client itself. An unvalidated redirect_uri
+    // must never receive a redirect — that's the open redirect the
+    // assertRedirectUriAllowed gate exists to prevent — so it always falls
+    // through to the admin's own error page/JSON instead.
+    let redirectUriValidated = false;
     try {
       let numericId: number;
       try {
@@ -154,6 +163,7 @@ export class TokenController {
 
       try {
         assertRedirectUriAllowed(redirectUri, app);
+        redirectUriValidated = true;
       } catch (err) {
         this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
           context: 'TokenController',
@@ -166,8 +176,49 @@ export class TokenController {
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
-      if (!session) {
-        throw new UnauthorizedException();
+
+      // prompt / max_age (OIDC): prompt=login or a session older than
+      // max_age forces re-authentication even if a session already exists.
+      // prompt=none forbids ANY interactive bounce here — it must report the
+      // failure back to the client as an OAuth error (login_required)
+      // instead, never redirect to the admin login page.
+      const promptValues = new Set(prompt.split(/\s+/).filter(Boolean));
+      const sessionAge = session?.session?.createdAt
+        ? (Date.now() - new Date(session.session.createdAt).getTime()) / 1000
+        : Infinity;
+      const maxAgeSeconds = maxAge ? Number(maxAge) : null;
+      const staleForMaxAge =
+        maxAgeSeconds !== null && Number.isFinite(maxAgeSeconds) && sessionAge > maxAgeSeconds;
+
+      const mustReauthenticate = !session || promptValues.has('login') || staleForMaxAge;
+
+      if (mustReauthenticate) {
+        if (promptValues.has('none')) {
+          return {
+            url: buildClientErrorRedirectUrl(
+              redirectUri, 'login_required', 'No active session satisfying the request', state,
+            ),
+            statusCode: 302,
+          };
+        }
+        const adminUrl = process.env.ADMIN_URL;
+        if (!adminUrl) throw new UnauthorizedException();
+        const query = new URLSearchParams({
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          scope,
+          ...(nonce ? { nonce } : {}),
+          ...(codeChallenge ? { code_challenge: codeChallenge, code_challenge_method: 'S256' } : {}),
+        });
+        if (state) query.set('state', state);
+        // Deliberately drop prompt/max_age from `next`: carrying prompt=login
+        // would loop forever, and the fresh session satisfies max_age by
+        // construction.
+        const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
+        return {
+          url: `${adminUrl.replace(/\/$/, '')}/login?next=${encodeURIComponent(nextPath)}`,
+          statusCode: 302,
+        };
       }
 
       const saUser = await prisma.saUser.findFirst({
@@ -195,6 +246,16 @@ export class TokenController {
       // full authorize URL as `next`, so they return here and get a code only
       // after enrolling. `enroll=1` puts the page in forced (no-skip) mode.
       if (isTwoFactorRequired(app) && !(session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled) {
+        // prompt=none forbids this interactive bounce too: report back to
+        // the client rather than sending the user to the enrollment page.
+        if (promptValues.has('none')) {
+          return {
+            url: buildClientErrorRedirectUrl(
+              redirectUri, 'interaction_required', 'Two-factor enrollment required', state,
+            ),
+            statusCode: 302,
+          };
+        }
         const adminUrl = process.env.ADMIN_URL;
         if (adminUrl) {
           const query = new URLSearchParams({
@@ -254,37 +315,38 @@ export class TokenController {
 
       return { url: url.toString(), statusCode: 302 };
     } catch (err) {
-      // bug-0149: a browser hitting /authorize without a session
-      // previously got JSON 401 — confusing for a top-level nav.
-      // Redirect to the admin console's /login and preserve the
-      // full authorize URL as `next` so the user lands back here
-      // after signing in. Only when ADMIN_URL is set (dev without
-      // it still falls through to the JSON path below).
-      if (err instanceof UnauthorizedException) {
-        const adminUrl = process.env.ADMIN_URL;
-        if (adminUrl) {
-          const query = new URLSearchParams({
-            client_id: clientId,
-            redirect_uri: redirectUri,
-            code_challenge: codeChallenge,
-            code_challenge_method: codeChallengeMethod,
-          });
-          if (state) query.set('state', state);
-          if (scope) query.set('scope', scope);
-          if (nonce) query.set('nonce', nonce);
-          const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
-          const loginUrl = `${adminUrl.replace(/\/$/, '')}/login?next=${encodeURIComponent(nextPath)}`;
-          return { url: loginUrl, statusCode: 302 };
-        }
-        throw err;
-      }
+      // bug-0149: a browser hitting /authorize without a session used to get
+      // a bare JSON 401 — confusing for a top-level nav. That "no session"
+      // bounce to the admin's /login is now handled inline above and never
+      // throws; UnauthorizedException reaching this catch only happens via
+      // the fail-closed path (ADMIN_URL unset), so just fall through to
+      // Nest's default JSON 401 in that case.
+      if (err instanceof UnauthorizedException) throw err;
       if (!(err instanceof HttpException)) throw err;
       const status = err.getStatus();
       if (status < 400 || status >= 500) throw err;
 
-      const adminUrl = process.env.ADMIN_URL;
       const code = extractTokenErrorCode(err);
-      if (!adminUrl || !code) throw err; // fall back to JSON
+      if (!code) throw err; // fall back to JSON
+
+      // Once redirect_uri has been validated, prefer sending the error back
+      // to the client (RFC 6749 §4.1.2.1) — an OIDC/OAuth library sitting on
+      // that callback needs an `error` response, not a dead end on the admin
+      // console. An unvalidated redirect_uri must never be redirected to at
+      // all, so that branch keeps going to the admin's own error page below.
+      if (redirectUriValidated) {
+        const oauthError =
+          code === TokenErrorCode.USER_ORG_MISMATCH || code === TokenErrorCode.USER_NOT_FOUND
+            ? 'access_denied'
+            : 'invalid_request';
+        return {
+          url: buildClientErrorRedirectUrl(redirectUri, oauthError, code, state),
+          statusCode: 302,
+        };
+      }
+
+      const adminUrl = process.env.ADMIN_URL;
+      if (!adminUrl) throw err; // fall back to JSON
 
       return {
         url: buildOauthErrorRedirectUrl(adminUrl, code, clientId),

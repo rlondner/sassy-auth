@@ -44,3 +44,21 @@ export function buildOauthErrorRedirectUrl(
   if (clientId) params.set('app', clientId);
   return `${base}/oauth-error?${params.toString()}`;
 }
+
+/**
+ * Builds the OAuth error redirect back to a client. Only ever called with a
+ * `redirect_uri` that has already passed assertRedirectUriAllowed — redirecting
+ * to an unvalidated URI is the open redirect that validation prevents.
+ */
+export function buildClientErrorRedirectUrl(
+  redirectUri: string,
+  error: string,
+  description: string,
+  state: string,
+): string {
+  const url = new URL(redirectUri);
+  url.searchParams.set('error', error);
+  url.searchParams.set('error_description', description);
+  if (state) url.searchParams.set('state', state);
+  return url.toString();
+}
