@@ -1,6 +1,7 @@
 from typing import Callable
 import jwt
 from fastapi import Header, HTTPException
+from opentelemetry import metrics, trace
 
 from app.config import get_settings
 
@@ -11,24 +12,46 @@ _jwks_client = jwt.PyJWKClient(
     lifespan=600,
 )
 
+_tracer = trace.get_tracer("sassy-auth.resource-server")
+_meter = metrics.get_meter("sassy-auth.resource-server")
+_verify_counter = _meter.create_counter(
+    "auth.token.verify.count", description="JWT verification attempts by outcome"
+)
+
+
+def _record_verify_outcome(outcome: str) -> None:
+    # OTel's API contract says counter calls shouldn't throw, but per the
+    # "telemetry failures must never break the app" constraint we guard
+    # defensively anyway. This is a low-level metric call, so failures are
+    # swallowed silently with no logging (mirrors auth-metrics.ts's guard()).
+    try:
+        _verify_counter.add(1, {"outcome": outcome})
+    except Exception:
+        pass
+
 
 def verify(token: str) -> dict:
-    try:
-        signing_key = _jwks_client.get_signing_key_from_jwt(token).key
-        claims = jwt.decode(
-            token,
-            signing_key,
-            algorithms=["RS256"],
-            audience=_settings.audience,
-            issuer=_settings.issuer,
-            options={"require": ["exp", "iat", "sub", "iss", "aud", "scope"]},
-        )
-        return claims
-    except Exception:
-        raise HTTPException(
-            status_code=401,
-            detail={"result": "Unauthorized", "reason": "invalid_token"},
-        )
+    with _tracer.start_as_current_span("auth.token.verify") as span:
+        try:
+            signing_key = _jwks_client.get_signing_key_from_jwt(token).key
+            claims = jwt.decode(
+                token,
+                signing_key,
+                algorithms=["RS256"],
+                audience=_settings.audience,
+                issuer=_settings.issuer,
+                options={"require": ["exp", "iat", "sub", "iss", "aud", "scope"]},
+            )
+            span.set_attribute("auth.outcome", "ok")
+            _record_verify_outcome("ok")
+            return claims
+        except Exception:
+            span.set_attribute("auth.outcome", "invalid_token")
+            _record_verify_outcome("invalid_token")
+            raise HTTPException(
+                status_code=401,
+                detail={"result": "Unauthorized", "reason": "invalid_token"},
+            )
 
 
 def require_scope(required: str) -> Callable[[str | None], dict]:
