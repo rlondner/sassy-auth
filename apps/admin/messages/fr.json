@@ -13,12 +13,13 @@
     "switchToDark": "Passer en mode sombre"
   },
   "common": {
-    "save": "Save",
-    "edit": "Edit",
-    "delete": "Delete",
-    "confirm": "Confirm",
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
     "itemsPerPage": "Éléments par page",
-    "copyFailed": "Échec de la copie — accès au presse-papiers refusé"
+    "copyFailed": "Échec de la copie — accès au presse-papiers refusé",
+    "moreActions": "Plus d'actions"
   },
   "apps": {
     "title": "Applications",
@@ -47,7 +48,15 @@
       "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
       "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système.",
       "requireTwoFactor": "Exiger l'authentification à deux facteurs",
-      "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer."
+      "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer.",
+      "socialProviders": "Connexion sociale",
+      "socialProvidersHint": "Choisissez les fournisseurs d’identité sociale proposés sur l’écran de connexion de cette application.",
+      "socialProviderNames": {
+        "google": "Google",
+        "microsoft": "Microsoft",
+        "apple": "Apple",
+        "stub": "IdP de test"
+      }
     },
     "actions": {
       "view": "Voir",
@@ -460,6 +469,8 @@
     "submit": "Réinitialiser le mot de passe",
     "success": "Mot de passe mis à jour. Vous pouvez maintenant vous connecter.",
     "invalidToken": "Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.",
+    "serverUnavailable": "Impossible de joindre le serveur. Veuillez réessayer dans un instant.",
+    "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
     "mismatch": "Les mots de passe ne correspondent pas.",
     "tooShort": "Le mot de passe doit comporter au moins 12 caractères.",
     "complexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
@@ -473,6 +484,11 @@
     "submit": "Se connecter",
     "forgotPassword": "Mot de passe oublié ?",
     "useCode": "Se connecter avec un code",
+    "socialDivider": "ou continuer avec",
+    "socialGoogle": "Continuer avec Google",
+    "socialMicrosoft": "Continuer avec Microsoft",
+    "socialApple": "Continuer avec Apple",
+    "socialStub": "Continuer avec l'IdP de test",
     "otp": {
       "title": "Connexion par code",
       "subtitle": "Nous vous enverrons un code à usage unique par e-mail",
@@ -555,6 +571,7 @@
     "continueToApp": "Continuer",
     "errors": {
       "invalidPassword": "Mot de passe invalide.",
+      "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
       "invalidCode": "Code invalide ou expiré.",
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "serverUnavailable": "Service indisponible. Veuillez réessayer dans un moment."
@@ -618,6 +635,21 @@
         "heading": "Accès non autorisé à cette application",
         "body": "Votre compte SassyAuth existe mais n'est pas rattaché à l'application demandée.",
         "hint": "Demandez à un administrateur de vous ajouter à une organisation associée à cette application."
+      },
+      "social_no_account": {
+        "heading": "Connexion impossible",
+        "body": "Ce compte n'est pas autorisé pour cette application.",
+        "hint": "Si vous avez reçu une invitation, connectez-vous avec l'adresse e-mail à laquelle elle a été envoyée, ou demandez à un administrateur de vous inviter."
+      },
+      "social_email_unverified": {
+        "heading": "Adresse e-mail non vérifiée",
+        "body": "Votre fournisseur d'identité n'a pas confirmé que cette adresse e-mail vous appartient.",
+        "hint": "Vérifiez l'adresse auprès de votre fournisseur, puis réessayez."
+      },
+      "social_private_relay": {
+        "heading": "Les adresses masquées ne sont pas prises en charge",
+        "body": "Vous avez choisi « Masquer mon adresse e-mail » d'Apple : nous avons reçu une adresse relais qui ne correspond à aucune invitation.",
+        "hint": "Reconnectez-vous avec Apple et choisissez « Partager mon adresse e-mail »."
       }
     }
   }

@@ -15,6 +15,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import * as Sentry from '@sentry/nestjs';
+import { trace } from '@opentelemetry/api';
 import { Request } from 'express';
 import { prisma } from '@sassy-auth/db';
 import { detectIdentifierType, TokenErrorCode } from '@sassy-auth/types';
@@ -24,6 +25,7 @@ import { fromNodeHeaders } from 'better-auth/node';
 // not bcrypt — use its own verifier so direct-login stays compatible with any
 // account created via BetterAuth (sign-up, seed, admin invite, etc.).
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
+import { deriveAuthMethods } from './derive-auth-methods';
 
 // bug-0209: pre-compute a dummy scrypt hash lazily so the user-not-found
 // path can spend equivalent CPU time as the user-found path. Without this,
@@ -57,6 +59,9 @@ import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days
 import { isTwoFactorRequired } from '../auth/two-factor-required';
 import { verifyUserTotp } from '../auth/verify-user-totp';
 import { parseScopes } from './scopes';
+import { record2faChallengeOutcome, recordSignInOutcome } from '../telemetry/auth-metrics';
+
+const tracer = trace.getTracer('sassy-auth.auth-server');
 
 @ApiTags('Token')
 @Controller(TOKEN_CONTROLLER_PATH)
@@ -201,7 +206,10 @@ export class TokenController {
         throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
       }
 
-      const amr = (session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled ? ['pwd', 'otp', 'mfa'] : ['pwd'];
+      const { amr, idp } = deriveAuthMethods({
+        signInMethod: (session.session as { signInMethod?: string | null }).signInMethod ?? null,
+        twoFactorEnabled: Boolean((session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
+      });
       const granted = parseScopes(scope);
       const authTime = session.session?.createdAt
         ? new Date(session.session.createdAt)
@@ -217,6 +225,7 @@ export class TokenController {
         nonce || null,
         granted.join(' '),
         authTime,
+        idp,
       );
       const url = new URL(redirectUri);
       url.searchParams.set('code', code);
@@ -309,6 +318,7 @@ export class TokenController {
     let appPublicId: string;
     let exchangedAmr: string[] = ['pwd'];
     let exchanged: Awaited<ReturnType<OauthService['exchangeCode']>>;
+    let exchangedIdp: string | undefined;
     try {
       exchanged = await this.oauthService.exchangeCode(
         dto.code,
@@ -319,6 +329,7 @@ export class TokenController {
       userPublicId = exchanged.userId;
       appPublicId = exchanged.appPublicId;
       exchangedAmr = exchanged.amr ?? ['pwd'];
+      exchangedIdp = exchanged.idp;
     } catch (err) {
       this.logger.getWinstonLogger().warn('oauth.pkce.verify_failed', {
         context: 'TokenController',
@@ -350,6 +361,7 @@ export class TokenController {
       appId: app.id,
       scope: exchanged.scope,
       amr: exchangedAmr,
+      idp: exchangedIdp,
     });
 
     const grantedOpenId = exchanged.scope.split(/\s+/).includes('openid');
@@ -398,6 +410,26 @@ export class TokenController {
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   @Post('direct/login')
   async directLogin(@Body() dto: DirectLoginDto) {
+    return tracer.startActiveSpan('auth.signin', async (span) => {
+      span.setAttribute('auth.method', 'password');
+      try {
+        const result = await this.directLoginInner(dto);
+        span.setAttribute('auth.outcome', 'ok');
+        recordSignInOutcome('ok');
+        return result;
+      } catch (err) {
+        const outcome =
+          err instanceof ForbiddenException ? 'two_factor_required' : 'invalid_credentials';
+        span.setAttribute('auth.outcome', outcome);
+        recordSignInOutcome(outcome);
+        throw err;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
+  private async directLoginInner(dto: DirectLoginDto) {
     // 1. Validate app exists
     let appNumericId: number;
     try {
@@ -563,18 +595,21 @@ export class TokenController {
     if (isTwoFactorRequired(app) || twoFactorEnabled) {
       if (!twoFactorEnabled) {
         // Required app, user not enrolled: cannot self-enroll non-interactively.
+        record2faChallengeOutcome('required_not_enrolled');
         this.logger.getWinstonLogger().warn('Direct login blocked: 2FA required, user not enrolled', {
           context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
         });
         throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
       }
       if (!dto.totpCode || !(await verifyUserTotp(saUser.betterAuthUserId, dto.totpCode))) {
+        record2faChallengeOutcome('missing_or_invalid_code');
         this.logger.getWinstonLogger().warn('Direct login blocked: missing/invalid 2FA code', {
           context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
         });
         throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
       }
       amr = ['pwd', 'otp', 'mfa'];
+      record2faChallengeOutcome('ok');
     }
 
     // bug-0186: record the login timestamp. This is the JWT-issuance

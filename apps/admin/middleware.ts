@@ -85,7 +85,16 @@ async function validateSession(request: NextRequest): Promise<boolean> {
       signal: abortSignal,
     })
     if (!res.ok) {
-      sessionCache.set(token, { at: now, ok: false })
+      // Only an authoritative rejection (401/403 and friends) is a cacheable
+      // negative — the auth-server answered, and the answer won't change
+      // within the TTL. A 5xx or a 429 means it did NOT answer: caching that
+      // would pin the user to /login for TTL seconds even after the
+      // auth-server recovers, which is the same lockout the catch block
+      // below deliberately avoids for transport errors. Fail closed for this
+      // request, but re-probe on the next one.
+      if (res.status < 500 && res.status !== 429) {
+        sessionCache.set(token, { at: now, ok: false })
+      }
       return false
     }
     const body = (await res.json()) as { user?: unknown } | null
@@ -103,9 +112,16 @@ async function validateSession(request: NextRequest): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  // Exact-or-child, not bare startsWith: `/loginaudit` merely shares a prefix
+  // with `/login` and is a different route, but a plain startsWith would treat
+  // it as public and skip both session validation and the Cache-Control header
+  // below. Genuine children like `/login/two-factor` are part of the same
+  // public flow and stay public. Mirrors isSensitiveAuthPath in
+  // apps/auth-server/src/auth/auth-rate-limit.ts, which matches its own
+  // prefix list the same way.
   const isPublic =
-    PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
-    pathname.startsWith('/_next')
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
+    pathname.startsWith('/_next/')
 
   if (isPublic) return NextResponse.next()
 

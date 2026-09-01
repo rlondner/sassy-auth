@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, HttpException, Injectable } from '@nestjs/common';
+import { recordRegistrationRateLimited } from '../telemetry/auth-metrics';
 
 interface WindowEntry {
   count: number;
@@ -53,6 +54,7 @@ export class RateLimitGuard implements CanActivate {
       return true;
     }
 
+    recordRegistrationRateLimited();
     throw new HttpException('Too many requests', 429);
   }
 }

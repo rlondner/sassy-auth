@@ -4,6 +4,125 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-28
+
+No commits landed on `master` in the last 24 hours (`master` has been at
+`ea82b95` since 2026-08-25). This is now the fourth consecutive daily review
+to find master unchanged; the review PR backlog has grown to 14 open PRs
+(#349–#363) with none merged since 2026-08-25 — see
+[TODO_2026-08-28.md](./docs/history/todo/TODO_2026-08-28.md) for the escalation.
+
+With no new diff to review, this run did a fresh static scan of auth-flow
+code not yet covered by the bug-0095–0274 series and found one new issue.
+`master`'s `unit-tests` CI job remains red (root-caused 2026-08-27 as
+bug-0273/bug-0274; both fixes still await merge in #360/#361). See
+[BUGS_2026-08-28.md](./docs/history/bugs/BUGS_2026-08-28.md).
+
+### Fixed (1 bug)
+
+- **bug-0275** (High) — 2FA enrollment (`confirmEnable`) only rotated the
+  session on the device where 2FA was enabled; any other active session for
+  the user was never re-verified against 2FA, yet would later have its OAuth
+  `amr` claim falsely stamped `['otp','mfa']` based on the account's live
+  `twoFactorEnabled` flag. Fixed by revoking every other session immediately
+  on confirm, mirroring the existing revoke-on-deactivate pattern. PR #363.
+## [Unreleased] — 2026-08-27
+
+No commits landed on `master` in the last 24 hours (`master` has been at `ea82b95` since 2026-08-25; the 08-25 review bundle and its two bug-fix PRs — #357, #358, #359 — are still open, as are seven earlier daily-review PRs going back to 2026-08-24). This is the recurring "review PRs never merge" pattern tracked since 2026-07-22: filing keeps working, merging is the bottleneck.
+
+With no new code to review, this run did a live CI-health check instead (the standing step added 2026-08-19 after the e2e suite was found silently red for 34 days) and found `master`'s `unit-tests` job has been red since 2026-08-25 04:33 UTC — invisible in the repo's normal PR/commit view because nothing has pushed since. Both root causes were found, fixed, and verified against a full local test run. See [BUGS_2026-08-27.md](./docs/history/bugs/BUGS_2026-08-27.md).
+
+### Fixed (2 bugs)
+
+- **bug-0273** (Critical) — `packages/ui`'s branch-coverage floor (51%, added 2026-08-24) has been unmet since PR #347 merged, driven by an untested first-party `FormField` component. Added direct coverage; package branches now 83.72%. PR #360.
+- **bug-0274** (Low) — `unit-tests.yml` was missed by the 2026-08-25 Node 24 migration and still ran on a deprecated Node 20 runner. Aligned with `e2e.yml`/`typecheck.yml`/`Dockerfile`/`engines`. PR #361.
+
+### Docs
+
+- README: `Node.js >= 20` → `>= 24` (Prerequisites section and badge) — stale since the Node 24 migration; a new dev following the README verbatim would provision the wrong runtime. Added a `unit-tests` CI badge alongside the existing `e2e`/`typecheck` ones.
+
+## [Unreleased] — 2026-08-25
+
+Daily code review covering the last 24h of `master` activity. Quiet, high-quality day:
+two Jules palette PRs merged, a 5-commit admin hardening/test bundle landed via PR
+#356, a Node 20→24 migration, and a same-day manual fix for bug-0266 (the AI security
+review workflow referencing a nonexistent action tag). 2 new bugs found (0 critical, 2
+warning), both fixed in this review's PRs. Note: `master`'s docs (this file, README,
+bug catalog) have not tracked reviewed daily-review output since 2026-07-09 — the
+review PRs that would have updated them (going back to PR #291 on 2026-07-22) have
+consistently stayed unmerged; see `docs/history/todo/TODO_2026-08-25.md` item 2.
+
+### Fixed
+
+- **bug-0266** — AI Semantic Security Review workflow pinned a nonexistent action tag
+  (`anthropics/claude-code-security-review@v1`, no releases exist), so every run
+  failed before any review executed. Manually corrected on `master` (`16e6055`) to use
+  `anthropics/claude-code-action@v1`; the missing `ANTHROPIC_API_KEY` repo secret this
+  bug's PR also called out was added the same morning.
+- **bug-0271** — `apps/admin` declared `react ^18.3.0` while `LoginForm`/
+  `LoginOtpForm`/`TwoFactorForm` all depend on React 19-only APIs (`useActionState`,
+  function-valued `<form action>`), masked entirely by Next 15's bundler-level React
+  alias. Left a new 22-case test suite permanently `describe.skip`'d. Fixed in PR #357
+  by aligning `apps/admin` and `packages/ui` on React 19 and un-skipping the suite.
+- **bug-0272** — the AI security review workflow's secret-file sanitization pre-scan
+  used a glob (`*.env`) that misses this repo's actual dotenv convention
+  (`.env.local`, `.env.production`, `.env.local.bak-*`) — the exact file shape
+  `.gitignore`'s own history says has been accidentally committed here once already.
+  Fixed in PR #358.
+- **Redirect-sentinel swallowing in four admin resource-action modules** (`apps/orgs`,
+  `apps/apps`, `apps/permissions`, `apps/roles`) — an expired session produced a
+  generic error toast instead of the intended bounce to `/login`, because the catch-alls
+  didn't rethrow Next's `NEXT_REDIRECT` sentinel the way `users/actions.ts` already did.
+  Brings all five resource modules onto the same pattern, with new regression coverage
+  for all nine affected actions.
+- **Missing 429 handling in the account-security 2FA actions** — `enable2fa`,
+  `confirmEnable`, `disable2fa`, and `regenerateBackupCodes` fell through to a generic
+  "something went wrong" on rate-limit responses instead of the actionable
+  `tooManyRequests`. New locale-coverage test asserts every action error string has an
+  `en`/`fr` translation key, which would have caught the gap.
+
+### Added
+
+- CI now runs the unit suites and enforces per-package coverage floors (`f8cdbe7`).
+- `docs/testing-coverage-baseline.md` records the per-package coverage baseline.
+- New test coverage: `SecurityClient`, the admin table row editors, and the four
+  redirect-sentinel-guarded resource-action modules (via PR #356).
+
+### Changed
+
+- Migrated Node 20 → 24 across CI (`e2e.yml`, `typecheck.yml`), the Dockerfile, and
+  `engines` — Node 20 is past EOL and was failing Trivy's CVE scan as a deprecated
+  runtime. Added `.nvmrc` for local dev parity.
+
+## [Unreleased] — 2026-08-30
+
+No commits landed on `master` in the last 24 hours (`master` has been at
+`ea82b95` since 2026-08-25 — 5 days now). This is the fifth consecutive
+daily review to find `master` unchanged; the review PR backlog has grown to
+16 open PRs (#349–#365) with none merged since 2026-08-25 — see
+[TODO_2026-08-30.md](./docs/history/todo/TODO_2026-08-30.md) for the
+escalation.
+
+With no new diff to review, this run did a fresh static scan of the
+password-reset flow (not yet covered by the bug-0095–0275 series) and found
+one new issue. `master`'s `unit-tests` CI job remains red (root-caused
+2026-08-27 as bug-0273/bug-0274; both fixes still await merge in #360/#361).
+See [BUGS_2026-08-30.md](./docs/history/bugs/BUGS_2026-08-30.md).
+
+### Fixed (1 bug)
+
+- **bug-0276** (High) — `emailAndPassword.revokeSessionsOnPasswordReset` was
+  never set, so BetterAuth's `/reset-password` endpoint changed the password
+  but left every other active session — including a stolen/hijacked one —
+  untouched. Fixed by setting the flag; mirrors the bug-0275 fix for 2FA
+  enrollment. PR #365.
+
+### Docs
+
+- README: `Node.js >= 20` → `>= 24` (Prerequisites section and badge), and
+  added a `unit-tests` CI badge — both were already fixed once in the still-
+  unmerged #362; reapplied directly since this review branches from `master`.
+
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).

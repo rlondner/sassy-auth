@@ -47,6 +47,7 @@ export class OauthService {
     nonce: string | null,
     scope: string,
     authTime: Date,
+    idp?: string,
   ): Promise<string> {
     const code = crypto.randomBytes(32).toString('hex');
     await prisma.saOauthCode.create({
@@ -61,6 +62,7 @@ export class OauthService {
         nonce,
         scope,
         authTime,
+        idp: idp ?? null,
         expiresAt: new Date(Date.now() + CODE_TTL_MS),
       },
     });
@@ -80,6 +82,7 @@ export class OauthService {
     scope: string;
     authTime: Date;
     hadChallenge: boolean;
+    idp?: string;
   }> {
     // Atomic delete-and-return: race-safe against concurrent
     // exchanges. P2025 = record not found = INVALID_GRANT.
@@ -97,6 +100,7 @@ export class OauthService {
       nonce: string | null;
       scope: string;
       authTime: Date;
+      idp: string | null;
     };
     try {
       entry = await prisma.saOauthCode.delete({ where: { code } });
@@ -145,6 +149,7 @@ export class OauthService {
       scope: entry.scope,
       authTime: entry.authTime,
       hadChallenge: entry.codeChallenge !== null,
+      idp: entry.idp ?? undefined,
     };
   }
 }

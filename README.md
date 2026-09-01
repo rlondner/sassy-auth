@@ -4,11 +4,12 @@
 [![Status: experimental](https://img.shields.io/badge/Status-experimental-orange.svg)](SECURITY.md)
 [![e2e](https://github.com/rlondner/sassy-auth/actions/workflows/e2e.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/e2e.yml)
 [![typecheck](https://github.com/rlondner/sassy-auth/actions/workflows/typecheck.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/typecheck.yml)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![unit tests](https://github.com/rlondner/sassy-auth/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/rlondner/sassy-auth/actions/workflows/unit-tests.yml)
+[![Node](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 
-**A self-hosted, multitenant authentication and authorization server with a batteries-included admin console.** Your apps stop shipping their own login pages, session stores, and permission tables: they redirect to SassyAuth, receive an RS256 JWT carrying the user's org and effective permissions, and verify it independently against a JWKS endpoint.
+**An open-source, self-hosted, multitenant authentication and authorization server with a batteries-included admin console.** Your apps stop shipping their own login pages, session stores, and permission tables: they redirect to SassyAuth, receive an RS256 JWT carrying the user's org and effective permissions, and verify it independently against a JWKS endpoint.
 
 It models four things — **apps**, **orgs**, **users**, and **permissions/roles** — so one deployment can serve several products, each with its own tenants, without any of them sharing a permission namespace or an admin UI.
 
@@ -49,11 +50,22 @@ SassyAuth carries the user's effective permissions in the token itself:
   "org": "Xm4T",
   "iss": "https://auth.example.com",
   "scope": "reports.read reports.export billing.read",
-  "amr": ["pwd", "mfa"]
+  "amr": ["ext"],
+  "idp": "google"
 }
 ```
 
 (`sub`, `aud`, and `org` are Sqid public IDs; `iat` and `exp` omitted here for brevity.)
+
+The token has two shapes depending on how the user signed in. Password
+sign-in carries `amr: ["pwd"]` and no `idp` claim at all. Federated (social)
+sign-in carries `amr: ["ext"]` plus `idp` set to `"google"`, `"microsoft"`, or
+`"apple"` — `ext` is a naming convention, not an RFC 8176 registered value
+(the registry has no value meaning "federated"), and the provider name is
+kept out of `amr` and given its own `idp` claim so a resource server can match
+`amr` against one bounded, provider-independent set of values. Either shape
+gets `otp` and `mfa` appended to `amr` when the user also completed
+SassyAuth's own TOTP (see [Two-Factor Authentication](#two-factor-authentication-2fa)).
 
 One RS256 JWT, verified against a JWKS endpoint, answers both questions from the same source: your API rejects the call, and your UI hides the control, using the same `scope` claim. No second round-trip to an authorization service on every request, and no permission table duplicated into your frontend.
 
@@ -85,7 +97,51 @@ The admin console (Next.js 15 + Tailwind + Radix), light and dark:
 
 ---
 
-## Quick Start
+## Quick Start (Docker)
+
+Nothing to install but Docker:
+
+```bash
+git clone https://github.com/rlondner/sassy-auth.git
+cd sassy-auth
+docker compose up
+```
+
+First run takes a few minutes (it installs dependencies and builds the workspace). It generates an RS256 key pair and a BetterAuth secret onto a named volume, brings up PostgreSQL, applies migrations, and seeds platform data.
+
+When it settles, open <http://localhost:3001/login> and sign in as `s@sa.io` / `Pass@word1234`.
+
+| | |
+|---|---|
+| Admin console | <http://localhost:3001/login> |
+| Auth server | <http://localhost:3000> |
+| API docs (Swagger) | <http://localhost:3000/api/docs> |
+| Mailpit — invitation + reset emails | <http://localhost:8025> |
+
+Uncomment `SEED_DEMO` in `docker-compose.yml` to also seed the app, org, roles, and users the [FastAPI sample resource server](#sample-resource-server-fastapi) expects.
+
+To rotate the generated keys, or start completely clean:
+
+```bash
+docker compose down -v      # -v also drops the database and the signing keys
+```
+
+> **This is a preview image, not a deployment artifact.** It runs the dev
+> servers, runs both apps in one container, and runs with `NODE_ENV` unset —
+> which is load-bearing rather than lazy: the session cookie's `Secure` flag is
+> set from `NODE_ENV === 'production'`, and browsers do not store a Secure
+> cookie sent over plain `http://localhost`, so a "production" container served
+> over http could not be signed into at all. For compiled production images,
+> TLS termination, and Render/Neon deployment, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+## Deployment
+
+For production deployment to Render with Neon Postgres — including custom domains
+(`auth.milissai.com`, `auth-api.milissai.com`, `testapp.milissai.com`), a
+[`render.yaml`](render.yaml) Blueprint, production Dockerfiles, and a local mock
+layout on custom ports — see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+## Quick Start (Flox)
 
 If you have [Flox](https://flox.dev) installed, this is the whole thing — it provisions Node.js, pnpm, PostgreSQL, Python, and uv, writes a `.env.local` with freshly generated RSA keys, migrates the database, and seeds platform data:
 
@@ -123,7 +179,7 @@ Knowing the boundaries up front will save you an afternoon:
 
 - **Not a certified OpenID Connect provider.** It is an OAuth 2.0 authorization server (it publishes RFC 8414 metadata), but there is no `id_token`, no `/userinfo` endpoint, and no OIDC certification. Consumers read identity from the JWT's `sub` / `org` / `aud` claims, or call `/api/me`.
 - **No refresh tokens.** Access tokens live one hour and there is no refresh grant, no token introspection, and no revocation endpoint. Re-run the flow when a token expires.
-- **No SAML, LDAP, or SCIM.** Social login is limited to the providers BetterAuth supports (Google, Microsoft, Apple, GitHub).
+- **No SAML, LDAP, or SCIM.** Social login is limited to the three providers this repo wires up (Google, Microsoft, Apple) — see [Social Sign-In](#social-sign-in).
 - **Not horizontally scalable as shipped.** Rate limiting keeps its counters in process, so each pod enforces its own budget. See [Known Limitations](#known-limitations).
 - **Not a user-facing identity product.** There is no end-user self-service portal beyond `/account/security`; the console is built for operators and tenant admins.
 - **Not audited.** See the project-status callout above.
@@ -146,37 +202,62 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 
 ## Table of Contents
 
-- [Who it's for](#who-its-for)
-- [Permissions that reach the API, not just the UI](#permissions-that-reach-the-api-not-just-the-ui)
-- [The name](#the-name)
-- [Screenshots](#screenshots)
-- [Quick Start](#quick-start)
-- [What SassyAuth is not](#what-sassyauth-is-not)
-- [How it compares](#how-it-compares)
-- [Prerequisites](#prerequisites)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [RSA Key Pair Generation](#rsa-key-pair-generation)
-- [Environment Variables](#environment-variables)
-- [Auth Flows](#auth-flows)
-- [JWKS and Token Verification](#jwks-and-token-verification)
-- [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
-- [API Reference](#api-reference)
-- [Self-serve Registration](#self-serve-registration-post-apiregister)
-- [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
-- [Admin Console](#admin-console)
-- [Observability](#observability)
-- [Running Tests](#running-tests)
-- [Local email testing (Mailpit)](#local-email-testing-mailpit)
-- [Known Limitations](#known-limitations)
-- [Contributing](#contributing)
-- [License](#license)
+- [SassyAuth](#sassyauth)
+  - [Who it's for](#who-its-for)
+  - [Permissions that reach the API, not just the UI](#permissions-that-reach-the-api-not-just-the-ui)
+  - [Screenshots](#screenshots)
+  - [Quick Start (Docker)](#quick-start-docker)
+  - [Deployment](#deployment)
+  - [Quick Start (Flox)](#quick-start-flox)
+  - [What SassyAuth is not](#what-sassyauth-is-not)
+  - [How it compares](#how-it-compares)
+  - [The name](#the-name)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Project Structure](#project-structure)
+  - [Getting Started](#getting-started)
+    - [1. Clone and install dependencies](#1-clone-and-install-dependencies)
+    - [2. Configure environment variables](#2-configure-environment-variables)
+    - [3. Set up the database](#3-set-up-the-database)
+    - [4. Generate the Prisma client](#4-generate-the-prisma-client)
+    - [5. Seed platform data](#5-seed-platform-data)
+    - [6. Start the development servers](#6-start-the-development-servers)
+  - [RSA Key Pair Generation](#rsa-key-pair-generation)
+  - [Environment Variables](#environment-variables)
+    - [Required](#required)
+    - [Admin console](#admin-console)
+    - [Observability (optional)](#observability-optional)
+    - [Email (optional)](#email-optional)
+    - [Test credentials (optional)](#test-credentials-optional)
+    - [Social providers (optional)](#social-providers-optional)
+  - [Auth Flows](#auth-flows)
+    - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
+    - [Flow B: Direct Login](#flow-b-direct-login)
+    - [Flow C: Invite + Accept](#flow-c-invite--accept)
+  - [JWKS and Token Verification](#jwks-and-token-verification)
+  - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
+  - [Social Sign-In](#social-sign-in)
+  - [API Reference](#api-reference)
+  - [Self-serve Registration (`POST /api/register`)](#self-serve-registration-post-apiregister)
+    - [Request](#request)
+    - [Responses](#responses)
+    - [Rate limiting](#rate-limiting)
+  - [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
+  - [Admin Console](#admin-console-1)
+  - [Observability](#observability)
+  - [Running Tests](#running-tests)
+    - [Unit tests](#unit-tests)
+    - [E2E tests](#e2e-tests)
+  - [Local email testing (Mailpit)](#local-email-testing-mailpit)
+  - [Known Limitations](#known-limitations)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ---
 
 ## Prerequisites
 
-- Node.js >= 20
+- Node.js >= 24 (`.nvmrc` pins the exact version if you use nvm/fnm)
 - pnpm >= 9
 - PostgreSQL 14+
 
@@ -376,11 +457,13 @@ Copy the two output lines directly into your `.env.local` file.
 |-----------------------|--------------------------------------------------------------------------------------------|
 | `ADMIN_URL`           | Public URL of the admin console, used by the API to build invitation links. Default: `http://localhost:3001` |
 | `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `http://localhost:3000`      |
+| `PUBLIC_AUTH_SERVER_URL` | Optional. URL of the auth server as seen by the BROWSER, used to build the social sign-in redirect on the login page. Defaults to `AUTH_SERVER_URL`. Set separately when `AUTH_SERVER_URL` is an internal address (e.g. a docker-network hostname) the browser cannot resolve. |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | Comma-separated origins allowed by `/login?next=` redirect validation (in addition to `AUTH_SERVER_URL`). Default: empty |
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
 | `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
 | `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
 | `PLATFORM_REQUIRE_2FA` | Set to exactly `true` to require 2FA for all platform operators. See [Two-Factor Authentication](#two-factor-authentication-2fa). Default: unset |
+| `TWO_FACTOR_TRUST_DAYS` | System-wide default for the "trust this device" cookie lifetime and the 2FA re-prompt threshold, in days. Falls back to 14 if unset, empty, zero, negative, or not an integer. An individual app can override this via its `twoFactorTrustDays` field. |
 
 ### Observability (optional)
 
@@ -395,21 +478,56 @@ Leave blank to disable. See [Observability](#observability) for behavior.
 | `SENTRY_AUTH_TOKEN`         | admin | Build-time auth token for source-map upload                          |
 | `SENTRY_ORG`                | admin | Sentry organization slug (build-time only)                           |
 | `SENTRY_PROJECT`            | admin | Sentry project slug (build-time only)                                |
+| `OTEL_SERVICE_NAME`         | auth  | Per-service override for the OpenTelemetry service name (each app has a sensible default) |
+| `DD_API_KEY`                | auth  | Datadog API key. Unset disables all Datadog export (traces, metrics, logs) |
+| `DD_SITE`                   | auth  | Datadog site — `datadoghq.com`, `datadoghq.eu`, etc. (default: `datadoghq.com`) |
+| `SENTRY_DSN_RESOURCE_SERVER` | RS sample | Sentry DSN for `apps/resource-server-fastapi` (its own `.env`, not the root one). Leave blank to disable. |
+
+### Email (optional)
+
+Transport is chosen by priority: `RESEND_API_KEY` > `EMAIL_SMTP_HOST` > console. With everything blank the auth-server logs outgoing mail instead of sending it — the default for dev and CI. See [Local email testing (Mailpit)](#local-email-testing-mailpit).
+
+| Variable            | Description                                                             |
+|----------------------|--------------------------------------------------------------------------|
+| `EMAIL_FROM`         | `From` address on outgoing mail. Default: `no-reply@sassy-auth.local`   |
+| `RESEND_API_KEY`     | Resend API key. Production HTTP transport; takes precedence over SMTP when set |
+| `EMAIL_SMTP_HOST`     | SMTP host, e.g. `localhost` for local Mailpit                            |
+| `EMAIL_SMTP_PORT`     | SMTP port, e.g. `1025` for local Mailpit                                 |
+| `EMAIL_SMTP_SECURE`   | `true` to use implicit TLS. Default: `false`                             |
+| `EMAIL_SMTP_USER`     | SMTP auth username, if required by the provider                          |
+| `EMAIL_SMTP_PASS`     | SMTP auth password, if required by the provider                          |
+
+### Test credentials (optional)
+
+Only needed to run the E2E suites; irrelevant to normal app usage.
+
+| Variable            | Description                                              |
+|----------------------|------------------------------------------------------------|
+| `E2E_ADMIN_EMAIL`    | Super-admin email the Playwright/Jest E2E suites sign in as. Default: `s@sa.io` |
+| `E2E_ADMIN_PASSWORD` | Password for that account, and the fallback source for `SEED_ADMIN_PASSWORD`. Default: `Pass@word1234` |
 
 ### Social providers (optional)
 
-Omit the client ID and secret for any provider you do not want to enable.
+Omit the vars for any provider you do not want to enable — a provider is only
+registered when every one of its required vars is set. Full setup steps
+(provider console configuration, redirect URIs, Apple's paid-membership and
+domain-verification requirements) are in
+[`docs/social-auth-setup.md`](docs/social-auth-setup.md). See also
+[Social Sign-In](#social-sign-in) for the invite-only behavior these
+credentials gate.
 
 | Variable                     | Description                |
 |------------------------------|----------------------------|
 | `GOOGLE_CLIENT_ID`           | Google OAuth client ID     |
 | `GOOGLE_CLIENT_SECRET`       | Google OAuth client secret |
-| `MICROSOFT_CLIENT_ID`        | Microsoft OAuth client ID  |
-| `MICROSOFT_CLIENT_SECRET`    | Microsoft OAuth client secret |
-| `APPLE_CLIENT_ID`            | Apple OAuth client ID      |
-| `APPLE_CLIENT_SECRET`        | Apple OAuth client secret  |
-| `GITHUB_CLIENT_ID`           | GitHub OAuth client ID     |
-| `GITHUB_CLIENT_SECRET`       | GitHub OAuth client secret |
+| `MICROSOFT_CLIENT_ID`        | Microsoft (Entra ID) OAuth client ID |
+| `MICROSOFT_CLIENT_SECRET`    | Microsoft (Entra ID) OAuth client secret |
+| `MICROSOFT_TENANT_ID`        | Optional. Pins Microsoft sign-in to a single Entra directory instead of `common`. See [`docs/social-auth-setup.md`](docs/social-auth-setup.md) for why this matters for email verification. |
+| `APPLE_CLIENT_ID`            | Apple Services ID (Apple's OAuth `client_id` — not the App ID) |
+| `APPLE_TEAM_ID`               | Apple Developer Team ID    |
+| `APPLE_KEY_ID`                | Key ID of the Sign in with Apple `.p8` key |
+| `APPLE_PRIVATE_KEY`           | Contents of the `.p8` private key. There is no `APPLE_CLIENT_SECRET`: Apple's client secret is a short-lived JWT generated at runtime from these three vars, not a static value. |
+| `E2E_STUB_IDP_URL`            | **Non-production only.** URL of the stub OIDC provider used by the e2e suite. Only registers when `NODE_ENV` is exactly `test` or `development` — never set this in production, the stub is a full authentication bypass if reachable. |
 | `SQIDS_ALPHABET`             | Custom alphabet for Sqids encoding; leave blank for default |
 
 </details>
@@ -443,7 +561,7 @@ GET /api/token/oauth/authorize
   &state=<state>
 ```
 
-The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple, GitHub).
+The user authenticates using any method BetterAuth supports: email/password, magic link, email OTP, or a configured social provider (Google, Microsoft, Apple).
 
 **Step 3 — Receive the authorization code**
 
@@ -577,6 +695,7 @@ curl http://localhost:3000/api/token/jwks
 | `iss`          | Value of `BETTER_AUTH_URL` at issuance time                                   |
 | `scope`        | Space-separated list of effective permission names (OAuth 2.0 `scope` claim)  |
 | `amr`          | Authentication methods — see [2FA](#two-factor-authentication-2fa)             |
+| `idp`          | Identity provider for a federated sign-in — `google`, `microsoft`, or `apple`. Present only when `amr` includes `ext`; absent for password sign-in. See [Social Sign-In](#social-sign-in). |
 | `iat`          | Issued at (Unix timestamp)                                                    |
 | `exp`          | Expiry — 1 hour after issuance                                                |
 
@@ -641,6 +760,60 @@ Resource servers can inspect the `amr` claim to gate sensitive operations.
 
 ---
 
+## Social Sign-In
+
+Users can sign in with Google, Microsoft, or Apple in addition to a password.
+Setup steps (provider console configuration, env vars) are in
+[`docs/social-auth-setup.md`](docs/social-auth-setup.md); this section covers
+the behavior.
+
+**Invite-only — not a signup method.** Social sign-in only ever *links* to an
+existing, active `SaUser`; it never creates one. A user must already have been
+provisioned (by an admin, or via an accepted invitation) before their first
+"Sign in with Google/Microsoft/Apple" click will work. An unrecognised
+identity is refused, with no `User`, `SaUser`, or org row created as a side
+effect. First sign-in matches on `(providerId, sub)` if a link already exists,
+and otherwise on an email address the provider asserts is verified.
+Just-in-time provisioning and domain-claimed orgs (an org auto-admitting users
+whose email domain matches) are both deliberately out of scope — see
+[Known Limitations](#known-limitations).
+
+**Credentials are deployment-global.** One `clientId`/`clientSecret` pair per
+provider is configured for the whole deployment via environment variables;
+individual apps opt a configured provider's button in or out, but cannot
+bring their own OAuth client. See
+[`docs/social-auth-setup.md`](docs/social-auth-setup.md).
+
+**Token contract.** A federated sign-in's JWT carries `amr: ["ext"]` and an
+`idp` claim naming the provider (`"google"` | `"microsoft"` | `"apple"`);
+`otp`/`mfa` are appended to `amr` exactly as with password sign-in when the
+user also completes SassyAuth's own TOTP. See
+[JWKS and Token Verification](#jwks-and-token-verification) for the full
+claim table. Social sign-in never satisfies or bypasses an app's
+`requireTwoFactor` setting — a federated user with a 2FA-required app still
+has to enroll in and complete SassyAuth's own TOTP.
+
+**Two things worth knowing before you rely on this:**
+
+- A user whose `SaUser` exists but is not `active` gets a bare `403` response
+  instead of the friendly `/oauth-error` page. BetterAuth's session-creation
+  gate freezes the response status before the hook that would redirect to
+  `/oauth-error` can run. The refusal is still recorded in the audit trail
+  (`SaAuditEvent`); only the user-facing presentation is affected.
+- Apple's "Hide My Email" relay addresses (`@privaterelay.appleid.com`) *are*
+  detected — via Apple's own `is_private_email` claim, not domain
+  pattern-matching — and the user is shown a specific message telling them to
+  choose "Share My Email" on Apple's consent screen instead. This works
+  correctly; it is not a limitation.
+
+**Provider discovery.** `GET /api/social-providers?client_id=<appPublicId>`
+returns the list of provider buttons that app's login page should render.
+It is public and unauthenticated by design — it discloses only which buttons
+to show, never credentials — and returns an empty list (not a 404) for an
+unknown `client_id`, so it cannot be used to enumerate registered apps.
+
+---
+
 ## API Reference
 
 The endpoints you will use from a resource server:
@@ -654,6 +827,8 @@ The endpoints you will use from a resource server:
 | POST   | `/api/token/direct/login`                     | Direct credential login — returns JWT            |
 | GET    | `/api/me`                                     | Caller's profile: org, app context, effective permissions |
 | POST   | `/api/register`                               | **Self-serve signup** — atomically create org + user + org↔app association ([details](#self-serve-registration-post-apiregister)) |
+| GET    | `/api/social-providers`                       | **Public.** Which social sign-in buttons an app's login page should render ([details](#social-sign-in)) |
+| PUT    | `/api/social-providers/{clientId}`            | Set an app's enabled social providers (`platform.apps.manage`)  |
 | ALL    | `/api/auth/*`                                 | BetterAuth: sign-up, sign-in, magic link, OTP, social login |
 
 <details>
@@ -956,11 +1131,23 @@ Authentication endpoints are rate-limited via `@nestjs/throttler` (10 requests/m
 **CI — no lint, single-package typecheck.**
 A GitHub Actions E2E workflow (`.github/workflows/e2e.yml`) runs Playwright tests on PR and push to `master`. It also gates on `pnpm --filter @sassy-auth/auth-server build` (see bug-0092), but lint and per-package typecheck across the rest of the workspace are not yet wired.
 
+**No production container image.**
+The [Docker quickstart](#quick-start-docker) is an evaluation preview: dev servers, both apps in one container, `NODE_ENV` unset so the session cookie works over plain http. There is no hardened image, no published image on a registry, and no Helm chart or deployment manifest. Deploying this seriously means building your own image from compiled output (`pnpm build`) and terminating TLS in front of it.
+
 **`deleteUser` does not remove BetterAuth identity.**
 Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Account`, and `Session` rows persist. The user's email remains permanently consumed and active sessions continue working. Tracked as **bug-0151**.
 
 **LIKE wildcard characters not escaped in search.**
 The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.
+
+**Social sign-in is invite-only, with no self-service alternative.**
+Google/Microsoft/Apple sign-in only links to an existing, active `SaUser` — there is no just-in-time provisioning of a new user or org, and no domain-claimed orgs (an org auto-admitting users whose email matches a verified domain). A user who has not been provisioned by an admin or an invitation cannot get in via a social button, no matter how legitimate their identity. Both are deliberately deferred; the linking logic is centralized so they can be added later without rework. See [`docs/social-auth-setup.md`](docs/social-auth-setup.md) and the [Social Sign-In](#social-sign-in) section.
+
+**Social provider credentials are deployment-global, not per-app.**
+Each of Google/Microsoft/Apple has one `clientId`/`clientSecret` pair for the whole deployment. Individual apps can opt a configured provider in or out, but cannot register their own OAuth client. Per-app credentials (with the encryption-at-rest and key-rotation work that requires) are deferred; the data model is shaped to add them later.
+
+**Apple sign-in is documented but not covered by automated tests.**
+Apple rejects `localhost` return URLs and uses a `form_post` callback, so it cannot be exercised locally or in CI — only Google and Microsoft (plus a stub OIDC provider) are covered by the e2e suite. Apple's integration is implemented and its setup is documented in [`docs/social-auth-setup.md`](docs/social-auth-setup.md), but validating it requires manual testing against a real, publicly reachable HTTPS deployment.
 
 </details>
 

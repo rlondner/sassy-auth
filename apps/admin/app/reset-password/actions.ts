@@ -21,6 +21,10 @@ export async function resetPasswordSubmitAction(
     Sentry.captureException(err, { tags: { area: 'auth', action: 'reset-password' } })
     return { error: 'serverUnavailable' }
   }
+  // /reset-password is a sensitive prefix for the auth rate limiter, so a
+  // throttled submission must not be reported as a bad link — that would send
+  // the user to request a new one, which is rate-limited too.
+  if (res.status === 429) return { error: 'tooManyRequests' }
   if (!res.ok) return { error: 'invalidToken' }
   return { ok: true }
 }

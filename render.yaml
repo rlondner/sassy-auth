@@ -1,0 +1,145 @@
+# SassyAuth — Render Blueprint
+#
+# Deploys three web services against an external Neon Postgres database.
+# See DEPLOYMENT.md for DNS, secrets, first-time seed, and app registration.
+#
+# Apply: Render Dashboard → New → Blueprint → connect this repo.
+# Custom domains and secret values are prompted on first sync (sync: false).
+
+envVarGroups:
+  - name: sassy-auth-production
+    envVars:
+      # ── Neon Postgres (https://neon.tech) ───────────────────────────────
+      - key: DATABASE_URL
+        sync: false
+
+      # ── JWT signing (generate once — see DEPLOYMENT.md) ─────────────────
+      - key: RSA_PRIVATE_KEY
+        sync: false
+      - key: RSA_PUBLIC_KEY
+        sync: false
+      - key: JWT_KEY_ID
+        value: sassy-auth-1
+
+      # ── BetterAuth session secret (32+ random chars, stable across deploys)
+      - key: BETTER_AUTH_SECRET
+        sync: false
+
+      # ── Public URLs (must match custom domains + TLS) ───────────────────
+      - key: BETTER_AUTH_URL
+        value: https://auth-api.milissai.com
+      - key: AUTH_SERVER_URL
+        value: https://auth-api.milissai.com
+      - key: ADMIN_URL
+        value: https://auth.milissai.com
+
+      # BetterAuth CSRF + Nest CORS. Include every browser origin that talks
+      # to the auth-server (admin console + resource-server sample app).
+      - key: TRUSTED_ORIGINS
+        value: https://auth.milissai.com,https://testapp.milissai.com
+
+      # ── Production defaults ─────────────────────────────────────────────
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: EMAIL_FROM
+        value: no-reply@milissai.com
+
+services:
+  # ── Auth server (NestJS + BetterAuth) ───────────────────────────────────
+  - type: web
+    name: sassy-auth-server
+    runtime: node
+    plan: starter
+    branch: master
+    buildCommand: >-
+      corepack enable &&
+      corepack prepare pnpm@9.0.0 --activate &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @sassy-auth/db --filter @sassy-auth/types build &&
+      pnpm --filter @sassy-auth/auth-server build
+    # Requires a paid instance type (Starter or above). On Free, move this
+    # command to the end of buildCommand — see DEPLOYMENT.md.
+    preDeployCommand: cd packages/db && npx prisma migrate deploy
+    startCommand: cd apps/auth-server && node dist/main.js
+    healthCheckPath: /.well-known/oauth-authorization-server
+    domains:
+      - auth-api.milissai.com
+    envVars:
+      - fromGroup: sassy-auth-production
+      - key: NODE_VERSION
+        value: "24"
+      # Required in production — seed refuses the dev default otherwise.
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      # Outbound mail — set RESEND_API_KEY (recommended) or SMTP vars.
+      - key: RESEND_API_KEY
+        sync: false
+      # Optional social providers — see docs/social-auth-setup.md
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_TENANT_ID
+        sync: false
+
+  # ── Admin console (Next.js) ───────────────────────────────────────────────
+  - type: web
+    name: sassy-auth-admin
+    runtime: node
+    plan: starter
+    branch: master
+    buildCommand: >-
+      corepack enable &&
+      corepack prepare pnpm@9.0.0 --activate &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @sassy-auth/admin build
+    startCommand: cd apps/admin && npx next start -p $PORT
+    healthCheckPath: /login
+    domains:
+      - auth.milissai.com
+    envVars:
+      - fromGroup: sassy-auth-production
+      - key: NODE_VERSION
+        value: "24"
+      # Browser-facing auth-server URL for social sign-in redirects on /login.
+      - key: PUBLIC_AUTH_SERVER_URL
+        value: https://auth-api.milissai.com
+      # Allow /login?next= redirects back to the sample resource server.
+      - key: LOGIN_NEXT_ALLOWED_ORIGINS
+        value: https://testapp.milissai.com
+
+  # ── Sample resource server (FastAPI) ──────────────────────────────────────
+  - type: web
+    name: sassy-resource-server
+    runtime: python
+    plan: starter
+    branch: master
+    rootDir: apps/resource-server-fastapi
+    buildCommand: pip install .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    domains:
+      - testapp.milissai.com
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: AUTH_SERVER_URL
+        value: https://auth-api.milissai.com
+      - key: ADMIN_URL
+        value: https://auth.milissai.com
+      - key: RS_BASE_URL
+        value: https://testapp.milissai.com
+      - key: REDIRECT_URI
+        value: https://testapp.milissai.com/auth/callback
+      # sa_app.publicId for the resource-server app — set after seed or
+      # manual app registration in the admin console.
+      - key: SASSY_CLIENT_ID
+        sync: false
+      - key: LOG_LEVEL
+        value: info

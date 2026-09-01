@@ -1,0 +1,59 @@
+name: Dependency & CVE Scan (Trivy)
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Daily at midnight UTC. CVE databases update constantly;
+    # this catches new vulnerabilities even if no code changes occur.
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+  # Required to upload SARIF results to the GitHub Security tab
+  security-events: write
+  actions: read
+
+jobs:
+  trivy-scan:
+    name: Trivy SCA & Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Prevent execution on unverified external forks
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'schedule'
+
+    steps:
+      - name: Checkout codebase
+        uses: actions/checkout@v4
+
+      - name: Generate SARIF Report
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          # Filter for actionable, fixable vulnerabilities
+          ignore-unfixed: true
+          severity: 'HIGH,CRITICAL'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Enforce PR Block on Critical CVEs
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          ignore-unfixed: true
+          # Only hard-fail the build on CRITICAL severities
+          severity: 'CRITICAL'
+          format: 'table'
+          # Exit code 1 forces the action to fail, blocking the PR
+          exit-code: '1'

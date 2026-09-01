@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { isRedirectSentinel } from '@/lib/redirect-sentinel'
 import {
   createRole, updateRole, deleteRole, getRoles, getRole,
 } from '@/lib/api'
@@ -34,6 +35,7 @@ export async function createRoleAction(
     revalidatePath('/roles')
     return { role }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'create') }
   }
 }
@@ -47,6 +49,7 @@ export async function updateRoleAction(
     revalidatePath('/roles')
     return { role }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
   }
 }
@@ -59,6 +62,7 @@ export async function deleteRoleAction(
     revalidatePath('/roles')
     return { ok: true }
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'delete') }
   }
 }
@@ -69,6 +73,7 @@ export async function listRolesAction(
   try {
     return await getRoles(params)
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return {
       errorKey:
         err instanceof Error && err.message.includes('403')
@@ -84,6 +89,7 @@ export async function getRoleAction(
   try {
     return await getRole(publicId)
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return {
       errorKey:
         err instanceof Error && err.message.includes('403')
@@ -104,6 +110,7 @@ export async function listAppPermissionsAction(
     const result = await getPermissions({ appId: appPublicId, pageSize: 200 })
     return result.items.map((p) => ({ publicId: p.publicId, name: p.name }))
   } catch (err) {
+    if (isRedirectSentinel(err)) throw err
     return {
       errorKey:
         err instanceof Error && err.message.includes('403')

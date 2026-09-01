@@ -1,0 +1,37 @@
+# Build context exclusions for Docker images (preview + production).
+#
+# Two of these matter for more than build speed:
+#   .env.local  — never bake a developer's real signing keys into an image
+#   node_modules — host modules may be built for a different platform/libc
+
+.git
+.github
+.worktrees
+.flox
+.claude
+
+node_modules
+**/node_modules
+**/.venv
+**/__pycache__
+
+.turbo
+**/.turbo
+**/dist
+**/.next
+**/coverage
+
+.env.local
+.env.local.*
+**/.env
+**/.env.local
+
+test-results
+**/test-results
+playwright-report
+**/playwright-report
+**/logs
+**/*.log
+
+designs
+screenshots

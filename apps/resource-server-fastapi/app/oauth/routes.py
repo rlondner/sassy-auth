@@ -4,6 +4,7 @@ import time
 from urllib.parse import quote, urlencode
 
 import httpx
+import jwt
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -116,9 +117,18 @@ async def auth_callback(
             status_code=400,
         )
 
+    # Decoded for display only (no signature check — the auth-server already
+    # verified this token during the exchange above, and app.js also decodes
+    # it client-side for the same reason). This is what lets amr/idp render
+    # server-side in the Jinja template without waiting on JS execution.
+    try:
+        claims = jwt.decode(token, options={"verify_signature": False})
+    except jwt.PyJWTError:
+        claims = {}
+
     log.info("auth.callback.success", extra={"state": state})
     return templates.TemplateResponse(
         request,
         "authorized.html",
-        {"access_token": token},
+        {"access_token": token, "claims": claims},
     )

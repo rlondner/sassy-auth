@@ -1,0 +1,76 @@
+# syntax=docker/dockerfile:1
+#
+# Production admin console image (compiled Next.js).
+# Build from repo root:
+#   docker build -f docker/Dockerfile.admin -t sassy-auth-admin .
+#
+# See DEPLOYMENT.md for required environment variables.
+
+FROM node:24-bookworm-slim AS base
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get clean
+
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+WORKDIR /app
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+FROM base AS deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/admin/package.json apps/admin/
+COPY packages/ui/package.json packages/ui/
+COPY packages/ui/tsconfig.json packages/ui/
+COPY packages/ui/src packages/ui/src
+COPY packages/ui/globals.css packages/ui/
+COPY packages/ui/tailwind.config.ts packages/ui/
+
+RUN pnpm install --frozen-lockfile
+
+# ── Build ─────────────────────────────────────────────────────────────────────
+FROM deps AS build
+
+COPY apps/admin apps/admin
+COPY packages/ui packages/ui
+
+# Next.js inlines NEXT_PUBLIC_* at build time when present.
+ARG NEXT_PUBLIC_ADMIN_CONTACT_EMAIL=""
+ARG NEXT_PUBLIC_SENTRY_DSN=""
+
+ENV NEXT_PUBLIC_ADMIN_CONTACT_EMAIL=$NEXT_PUBLIC_ADMIN_CONTACT_EMAIL
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+
+RUN pnpm --filter @sassy-auth/admin build
+
+# ── Runtime ───────────────────────────────────────────────────────────────────
+FROM base AS runner
+
+ENV NODE_ENV=production
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=build /app/apps/admin/.next ./apps/admin/.next
+COPY --from=build /app/apps/admin/package.json ./apps/admin/package.json
+COPY --from=build /app/apps/admin/next.config.ts ./apps/admin/next.config.ts
+COPY --from=build /app/apps/admin/lib ./apps/admin/lib
+COPY --from=build /app/apps/admin/i18n ./apps/admin/i18n
+COPY --from=build /app/apps/admin/messages ./apps/admin/messages
+COPY --from=build /app/apps/admin/middleware.ts ./apps/admin/middleware.ts
+COPY --from=build /app/apps/admin/instrumentation.ts ./apps/admin/instrumentation.ts
+COPY --from=build /app/apps/admin/sentry.client.config.ts ./apps/admin/sentry.client.config.ts
+COPY --from=build /app/apps/admin/sentry.server.config.ts ./apps/admin/sentry.server.config.ts
+COPY --from=build /app/apps/admin/sentry.edge.config.ts ./apps/admin/sentry.edge.config.ts
+COPY --from=build /app/packages/ui ./packages/ui
+
+WORKDIR /app/apps/admin
+
+EXPOSE 3001
+
+CMD ["sh", "-c", "npx next start -p ${PORT:-3001}"]

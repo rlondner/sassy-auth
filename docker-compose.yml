@@ -1,0 +1,83 @@
+# SassyAuth — one-command local evaluation.
+#
+#   docker compose up
+#
+# Then open http://localhost:3001/login and sign in as s@sa.io / Pass@word1234.
+#
+# This brings up a developer preview, not a deployment. See the header of
+# ./Dockerfile for why it runs dev servers, and README → "Quick Start (Docker)"
+# for what a production deployment would need to change.
+
+name: sassy-auth
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sassy
+      POSTGRES_PASSWORD: sassy
+      POSTGRES_DB: sassyauth
+    volumes:
+      - sassy-pgdata:/var/lib/postgresql/data
+    # Deliberately not published to the host: binding 5432 is the most common
+    # way a first run fails on a developer machine that already runs Postgres.
+    # To inspect the database directly, add:  ports: ["5433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sassy -d sassyauth"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025" # Web UI — invitation and password-reset emails land here
+
+  sassy-auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000" # auth-server (NestJS)
+      - "3001:3001" # admin console (Next.js)
+    volumes:
+      # Keeps the generated RS256 key pair and BetterAuth secret stable across
+      # `docker compose down` / `up`. Delete this volume to rotate them.
+      - sassy-secrets:/secrets
+    environment:
+      DATABASE_URL: postgresql://sassy:sassy@postgres:5432/sassyauth
+
+      # Both apps run in the same container, so `localhost` means the same
+      # thing inside it and in your browser. That is what makes the OAuth
+      # redirect flow work: apps/admin/app/login builds browser-facing
+      # redirects from AUTH_SERVER_URL, so this value has to be one the
+      # browser can also resolve — a Docker service name could not be.
+      BETTER_AUTH_URL: http://localhost:3000
+      AUTH_SERVER_URL: http://localhost:3000
+      ADMIN_URL: http://localhost:3001
+      TRUSTED_ORIGINS: http://localhost:3001
+
+      # Lets you register apps whose URLs are http://localhost — required to
+      # try the OAuth flow locally, and refused by default for good reason.
+      SASSY_AUTH_ALLOW_INSECURE_APP_URLS: "true"
+
+      # Route outbound mail to Mailpit instead of the console transport.
+      EMAIL_SMTP_HOST: mailpit
+      EMAIL_SMTP_PORT: "1025"
+
+      # Uncomment to also seed the app, org, roles and users used by the
+      # FastAPI sample resource server in apps/resource-server-fastapi.
+      # SEED_DEMO: "1"
+
+      # Uncomment to seed a second app with two orgs, for trying the
+      # org-scoped admin experience.
+      # SEED_DEMO_MULTITENANT: "1"
+
+volumes:
+  sassy-pgdata:
+  sassy-secrets:

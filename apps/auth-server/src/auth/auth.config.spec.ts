@@ -80,3 +80,158 @@ describe('auth.config — emailAndPassword.autoSignIn', () => {
     expect(eap['autoSignIn']).toBe(false);
   });
 });
+
+// bug-0276: BetterAuth's /reset-password endpoint only revokes the user's
+// other sessions when this flag is explicitly set (see
+// node_modules/better-auth/dist/api/routes/password.mjs — the
+// deleteSessions(userId) call is gated behind it, default off). Without it,
+// a stolen session survives the account owner resetting their password.
+describe('auth.config — emailAndPassword.revokeSessionsOnPasswordReset (bug-0276)', () => {
+  it('revokes other sessions when a password is reset via the forgot-password token flow', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const eap = options['emailAndPassword'] as Record<string, unknown>;
+    expect(eap['revokeSessionsOnPasswordReset']).toBe(true);
+  });
+});
+
+// task-8: proves exactly one top-level `hooks.after` is wired (the HARD
+// CONSTRAINT — a second `hooks: { after: ... }` object literal elsewhere in
+// this config would silently overwrite this one, since BetterAuth reads
+// `options.hooks?.after` as a single value, not a list). The classification
+// logic itself is covered by classify-callback-outcome.spec.ts and
+// rejection-code.spec.ts, driven against the exact ctx.context.returned
+// shapes better-auth@1.6.11 produces; this test only asserts the wiring.
+describe('auth.config — hooks.after (task-8 callback classification)', () => {
+  it('registers exactly one hooks.after function', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const hooks = options['hooks'] as Record<string, unknown> | undefined;
+    expect(typeof hooks?.['after']).toBe('function');
+  });
+});
+
+// task-8 fix round 1 (review finding 2): the createAuthMiddleware(async (ctx)
+// => {...}) body above was previously only asserted to be "a function". The
+// __mocks__/better-auth-api.ts createAuthMiddleware mock is an identity
+// function, so `options.hooks.after` IS the handler itself — it can be
+// invoked directly with a hand-built ctx, exercising the route match, the
+// ctx.params?.id extraction, the recordFederationEvent call, the
+// !outcome.canRedirect early return, and the responseHeaders.set(...) call,
+// without driving BetterAuth's real router.
+jest.mock('../social/record-federation-event', () => ({
+  recordFederationEvent: jest.fn().mockResolvedValue(undefined),
+}));
+
+describe('auth.config — hooks.after handler body (task-8 fix round 1, review finding 2)', () => {
+  async function loadAfterHook() {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const hooks = options['hooks'] as Record<string, unknown>;
+    return hooks['after'] as (ctx: {
+      path?: string;
+      params?: Record<string, string>;
+      context: { returned: unknown; responseHeaders?: Headers };
+    }) => Promise<void>;
+  }
+
+  function redirectReturned(errorCode: string): { status: string; headers: Headers } {
+    const headers = new Headers();
+    headers.set('location', `https://auth.example/error?error=${errorCode}`);
+    return { status: 'FOUND', headers };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('ignores a non-callback path: no audit event, no header set', async () => {
+    const after = await loadAfterHook();
+    const { recordFederationEvent } = require('../social/record-federation-event');
+    const responseHeaders = new Headers();
+
+    await after({
+      path: '/sign-in/email',
+      context: { returned: redirectReturned('signup_disabled'), responseHeaders },
+    });
+
+    expect(recordFederationEvent).not.toHaveBeenCalled();
+    expect(responseHeaders.get('location')).toBeNull();
+  });
+
+  it('a refused callback sets the location header to the expected /oauth-error?code=... URL', async () => {
+    const after = await loadAfterHook();
+    const { recordFederationEvent } = require('../social/record-federation-event');
+    const responseHeaders = new Headers();
+
+    await after({
+      path: '/callback/:id',
+      params: { id: 'google' },
+      context: { returned: redirectReturned('signup_disabled'), responseHeaders },
+    });
+
+    const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    expect(responseHeaders.get('location')).toBe(`${adminUrl}/oauth-error?code=social_no_account`);
+    expect(recordFederationEvent).toHaveBeenCalledWith(
+      expect.objectContaining({}),
+      expect.objectContaining({
+        type: 'social.signin.rejected',
+        provider: 'google',
+        reason: 'no_sauser_for_verified_email',
+      }),
+    );
+  });
+
+  it('a canRedirect: false outcome (session-gate FORBIDDEN) sets NO location header but still records an audit event', async () => {
+    const after = await loadAfterHook();
+    const { recordFederationEvent } = require('../social/record-federation-event');
+    const responseHeaders = new Headers();
+
+    await after({
+      path: '/callback/:id',
+      params: { id: 'microsoft' },
+      context: { returned: { status: 'FORBIDDEN' }, responseHeaders },
+    });
+
+    expect(responseHeaders.get('location')).toBeNull();
+    expect(recordFederationEvent).toHaveBeenCalledWith(
+      expect.objectContaining({}),
+      expect.objectContaining({
+        type: 'social.signin.rejected',
+        provider: 'microsoft',
+        reason: 'sauser_not_active',
+      }),
+    );
+  });
+
+  it('the private-relay path (fix round 1, finding 1) produces social_private_relay', async () => {
+    const after = await loadAfterHook();
+    const { recordFederationEvent } = require('../social/record-federation-event');
+    const { runWithPrivateRelayCapture, captureIsPrivateEmail } = await import(
+      '../social/apple-private-relay-context'
+    );
+    const responseHeaders = new Headers();
+
+    await runWithPrivateRelayCapture(async () => {
+      // Mirrors what build-social-providers.ts's Apple mapProfileToUser
+      // does earlier in the same request, before the refusal is decided.
+      captureIsPrivateEmail(true);
+      await after({
+        path: '/callback/:id',
+        params: { id: 'apple' },
+        context: { returned: redirectReturned('signup_disabled'), responseHeaders },
+      });
+    });
+
+    const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    expect(responseHeaders.get('location')).toBe(`${adminUrl}/oauth-error?code=social_private_relay`);
+    expect(recordFederationEvent).toHaveBeenCalledWith(
+      expect.objectContaining({}),
+      expect.objectContaining({
+        type: 'social.signin.rejected',
+        provider: 'apple',
+        reason: 'private_relay',
+      }),
+    );
+  });
+});

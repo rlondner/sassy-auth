@@ -396,8 +396,16 @@ describe('TokenController', () => {
     // Helper to mock common authorize dependencies
     const mockApp = (overrides: Partial<typeof app> = {}) =>
       mockPrisma.saApp.findUnique.mockResolvedValue({ ...app, ...overrides });
-    const mockSession = (userOverrides: Record<string, unknown> = {}) =>
-      mockGetSession.mockResolvedValue({ user: { ...fakeSession.user, ...userOverrides } });
+    const mockSession = (
+      userOverrides: Record<string, unknown> = {},
+      sessionOverrides: Record<string, unknown> = {},
+    ) =>
+      mockGetSession.mockResolvedValue({
+        user: { ...fakeSession.user, ...userOverrides },
+        // signInMethod defaults to null, matching a pre-migration session
+        // (Task 4): deriveAuthMethods falls back to the legacy 'pwd' path.
+        session: { signInMethod: null, ...sessionOverrides },
+      });
     const mockSaUser = (overrides: Partial<typeof saUser & { status: string }> = {}) =>
       mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, ...overrides });
 
@@ -489,6 +497,30 @@ describe('TokenController', () => {
         null,
         '',
         expect.any(Date),
+        undefined,
+      );
+    });
+
+    // Task 5 — a federated sign-in must never claim 'pwd' and must carry
+    // the provider name through to the authorization code.
+    it('issues a code with ext amr and the provider idp for a federated session', async () => {
+      mockApp();
+      mockSession({}, { signInMethod: 'ext:google' });
+      mockSaUser();
+      mockOauthService.generateCode.mockReturnValue('federated-code');
+
+      await controller.oauthAuthorize('sqid-10', 'https://app.example.com/callback', 'fake-challenge', 'S256', '', fakeReq);
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['ext'],
+        null,
+        '',
+        expect.any(Date),
+        'google',
       );
     });
 
@@ -520,6 +552,7 @@ describe('TokenController', () => {
         'n-xyz',
         'openid email',
         expect.any(Date),
+        undefined,
       );
     });
 
@@ -545,6 +578,7 @@ describe('TokenController', () => {
         null,
         '',
         createdAt,
+        undefined,
       );
     });
 
@@ -689,6 +723,38 @@ describe('TokenController', () => {
           amr: ['pwd'],
           accessToken: 'oauth.jwt.token',
         }),
+      );
+    });
+
+    // Task 5 — idp must round-trip from the exchanged code into issueJwt so
+    // the JWT can carry which provider was used for a federated sign-in.
+    it('passes the exchanged idp through to issueJwt', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        amr: ['ext'],
+        scope: '',
+        idp: 'google',
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'active',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+
+      await controller.oauthToken({
+        code: 'valid-code',
+        client_id: 'sqid-10',
+        code_verifier: 'a'.repeat(64),
+        redirect_uri: 'https://app.example.com/callback',
+      });
+
+      expect(mockTokenService.issueJwt).toHaveBeenCalledWith(
+        expect.objectContaining({ amr: ['ext'], idp: 'google' }),
       );
     });
 

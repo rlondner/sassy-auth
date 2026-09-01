@@ -23,7 +23,16 @@ export function ResetPasswordForm({ token }: { token: string }) {
     setSubmitting(true)
     const res = await resetPasswordSubmitAction(token, password)
     setSubmitting(false)
-    if ('error' in res) { setError(t('invalidToken')); return }
+    // Branch on the error value, not merely its presence. The action
+    // distinguishes an unreachable server and a throttled request from a
+    // rejected token; blaming the link in either case sends the user to
+    // request a new one, which is itself rate-limited.
+    if ('error' in res) {
+      const known = ['serverUnavailable', 'tooManyRequests'] as const
+      const key = (known as readonly string[]).includes(res.error) ? res.error : 'invalidToken'
+      setError(t(key as 'serverUnavailable' | 'tooManyRequests' | 'invalidToken'))
+      return
+    }
     setSuccess(true)
   }
 

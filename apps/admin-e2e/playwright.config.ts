@@ -6,6 +6,22 @@ const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
+const STUB_IDP_URL = process.env.E2E_STUB_IDP_URL ?? 'http://localhost:9099'
+
+// task-13: ports for the three local webServer processes below are derived
+// from the *_URL constants above rather than hardcoded, so the whole suite
+// can be pointed at alternate ports (e.g. when 3000/3001/8010 are already
+// bound by an unrelated docker stack on this machine) purely via env vars —
+// no source edit needed per run. Two call sites previously hardcoded a
+// literal port despite the corresponding *_URL already being configurable:
+// `next start --port 3001` (apps/admin/package.json's own `start` script)
+// and `uvicorn ... --port 8010` below. Both are worked around here without
+// editing admin's package.json: `pnpm --filter @sassy-auth/admin exec next
+// start --port <PORT>` calls the local `next` binary directly, bypassing the
+// package.json script's own hardcoded flag entirely.
+const AUTH_SERVER_PORT = new URL(AUTH_SERVER_URL).port || '3000'
+const ADMIN_PORT = new URL(ADMIN_URL).port || '3001'
+const RS_PORT = new URL(RS_BASE_URL).port || '8010'
 
 let RS_CLIENT_ID = process.env.RS_CLIENT_ID ?? ''
 if (!RS_CLIENT_ID) {
@@ -86,12 +102,45 @@ export default defineConfig({
   webServer: CI_TESTS
     ? [
         {
+          // task-11: stubProviderConfig (auth-server/src/social/stub-provider.ts)
+          // registers the stub OIDC provider ONLY when E2E_STUB_IDP_URL is set
+          // AND NODE_ENV is exactly 'test' or 'development' — a positive
+          // allowlist, not a `!== 'production'` blocklist, because the stub is a
+          // complete auth bypass if it's ever reachable outside test. NODE_ENV is
+          // therefore set explicitly here rather than inherited: an unset value
+          // would make the allowlist refuse the stub and the federated specs
+          // below would fail with "provider not found".
           command: 'pnpm --filter @sassy-auth/auth-server dev',
           url: `${AUTH_SERVER_URL}/api/token/jwks`,
           reuseExistingServer: false,
           timeout: 120_000,
           stdout: 'pipe',
           stderr: 'pipe',
+          env: {
+            NODE_ENV: 'test',
+            E2E_STUB_IDP_URL: STUB_IDP_URL,
+            // task-13: without this the auth-server always binds 3000
+            // (main.ts: `app.listen(process.env.PORT ?? 3000)`), which
+            // breaks AUTH_SERVER_URL-based port overrides.
+            PORT: AUTH_SERVER_PORT,
+          },
+        },
+        {
+          // task-11: the stub identity provider itself. Must be up before the
+          // auth-server's discovery-document fetch on first sign-in attempt, so
+          // it's an independent webServer entry rather than something the
+          // auth-server spawns; Playwright starts all entries concurrently and
+          // waits on each `url` before running tests.
+          command: 'node fixtures/stub-idp/server.mjs',
+          url: `${STUB_IDP_URL}/.well-known/openid-configuration`,
+          reuseExistingServer: false,
+          timeout: 30_000,
+          stdout: 'pipe',
+          stderr: 'pipe',
+          env: {
+            STUB_IDP_PORT: new URL(STUB_IDP_URL).port || '9099',
+            STUB_IDP_ISSUER: STUB_IDP_URL,
+          },
         },
         {
           // `next start`, not `next dev`. In dev mode Next compiles each route
@@ -109,7 +158,12 @@ export default defineConfig({
           // (login/actions.ts, (admin)/actions.ts) and adds HSTS, and a Secure
           // cookie is never returned over the plain-http localhost origin the
           // suite runs against.
-          command: 'pnpm --filter @sassy-auth/admin start',
+          // task-13: `pnpm --filter @sassy-auth/admin start` runs the
+          // package.json `start` script verbatim, which hardcodes
+          // `next start --port 3001` — that literal would win over any
+          // ADMIN_URL-derived port. Calling `next` directly via `exec`
+          // bypasses the script and lets us pass our own --port.
+          command: `pnpm --filter @sassy-auth/admin exec next start --port ${ADMIN_PORT}`,
           url: ADMIN_URL,
           reuseExistingServer: false,
           timeout: 120_000,
@@ -123,7 +177,9 @@ export default defineConfig({
             `RS_BASE_URL=${RS_BASE_URL}`,
             `AUTH_SERVER_URL=${AUTH_SERVER_URL}`,
             `ADMIN_URL=${ADMIN_URL}`,
-            'uvicorn app.main:app --port 8010',
+            // task-13: was a literal `--port 8010`, which blocked pointing
+            // RS_BASE_URL at an alternate port.
+            `uvicorn app.main:app --port ${RS_PORT}`,
           ].join(' '),
           // Playwright resolves a relative webServer.cwd against the config
           // directory (apps/admin-e2e), not the repo root — so a repo-relative

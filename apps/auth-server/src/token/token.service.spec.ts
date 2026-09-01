@@ -3,6 +3,8 @@ import { TokenService } from './token.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
+import { trace } from '@opentelemetry/api';
+import { InMemorySpanExporter, SimpleSpanProcessor, BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
 
 // ── Prisma mock ──────────────────────────────────────────────────────────────
 
@@ -108,6 +110,22 @@ describe('TokenService', () => {
 
       const undef = jwt.decode(await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', appId: 5, scope: '' })) as jwt.JwtPayload;
       expect('amr' in undef).toBe(false);
+    });
+
+    it('includes idp when provided and omits it entirely when absent', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
+      jest.spyOn(service as any, 'resolvePermissions').mockResolvedValue([]);
+
+      const withIdp = jwt.decode(
+        await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', appId: 5, scope: '', amr: ['ext'], idp: 'google' }),
+      ) as jwt.JwtPayload;
+      expect(withIdp.idp).toBe('google');
+
+      // Omitted entirely — not emitted as null or empty string.
+      const undef = jwt.decode(
+        await service.issueJwt({ saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'a', appId: 5, scope: '', amr: ['pwd'] }),
+      ) as jwt.JwtPayload;
+      expect('idp' in undef).toBe(false);
     });
 
     it('returns a verifiable RS256 JWT with correct claims', async () => {
@@ -278,6 +296,44 @@ describe('TokenService', () => {
       const decoded = jwt.decode(await service.issueIdToken({ ...baseParams, nonce: null, scope: 'openid' })) as Record<string, unknown>;
 
       expect(decoded).not.toHaveProperty('nonce');
+    });
+  });
+
+  // ── auth.token.issue span ───────────────────────────────────────────────────
+  //
+  // The tracer in token.service.ts is captured once at module load
+  // (`const tracer = trace.getTracer(...)`), and OTel's ProxyTracer caches
+  // its delegate on first use — so the provider must be registered before
+  // this describe block's tests import/instantiate TokenService.
+  describe('issueJwt span', () => {
+    const exporter = new InMemorySpanExporter();
+
+    beforeAll(() => {
+      const provider = new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+      trace.setGlobalTracerProvider(provider);
+    });
+
+    beforeEach(() => {
+      exporter.reset();
+    });
+
+    it('emits an auth.token.issue span with kid and ttl attributes', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
+
+      await service.issueJwt({
+        saUserId: 1,
+        userPublicId: 'usr-1',
+        orgPublicId: 'org-1',
+        appPublicId: 'app-1',
+        appId: 5,
+        scope: '',
+      });
+
+      const spans = exporter.getFinishedSpans();
+      const issueSpan = spans.find((s) => s.name === 'auth.token.issue');
+      expect(issueSpan).toBeDefined();
+      expect(issueSpan?.attributes['kid']).toBe('test-kid-1');
+      expect(issueSpan?.attributes['ttl']).toBe(3600);
     });
   });
 
