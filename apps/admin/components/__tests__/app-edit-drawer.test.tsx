@@ -59,6 +59,49 @@ describe('AppEditDrawer', () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
+  // Task 4: the single callbackUrl input is gone — apps now register a
+  // repeatable list of login/post_logout redirect URIs.
+  it('shows the no-login-URIs warning when the app has none registered', () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expect(screen.getByText(en.apps.fields.noLoginUrisWarning)).toBeInTheDocument()
+  })
+
+  it('adds a redirect URI row, fills it in, and submits it in the patch', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }] },
+    })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.fields.addRedirectUri }))
+    fireEvent.change(screen.getByLabelText(en.apps.fields.redirectUris), {
+      target: { value: 'https://app.example.com/cb' },
+    })
+    expect(screen.queryByText(en.apps.fields.noLoginUrisWarning)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', {
+        redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+      }),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  it('removes a redirect URI row', () => {
+    const appWithUri = {
+      ...app,
+      redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' as const }],
+    }
+    render(withIntl(<AppEditDrawer app={appWithUri} open onOpenChange={() => undefined} />))
+    expect(screen.queryByText(en.apps.fields.noLoginUrisWarning)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.fields.removeRedirectUri }))
+    expect(screen.getByText(en.apps.fields.noLoginUrisWarning)).toBeInTheDocument()
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    expect(save).toBeEnabled()
+  })
+
   it('renders social sign-in checkboxes from the fetched list, checked by default', async () => {
     ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({
       available: ['google', 'microsoft'],

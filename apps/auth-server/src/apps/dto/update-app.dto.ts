@@ -1,4 +1,5 @@
-import { IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 
 // "At least one of name / url" is enforced server-side in
@@ -21,4 +22,14 @@ export class UpdateAppDto {
   twoFactorTrustDays?: number | null;
 
   @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
+
+  /**
+   * Registered login / post_logout redirect URIs for this app. When present,
+   * replaces the app's entire redirect URI set. Validated as absolute
+   * http(s) URLs in AppsService — see assertValidRedirectUris.
+   */
+  @ApiPropertyOptional({ type: [Object] })
+  @IsOptional()
+  @IsArray()
+  redirectUris?: Array<{ uri: string; kind: 'login' | 'post_logout' }>;
 }

@@ -16,7 +16,8 @@ import {
 } from '@sassy-auth/ui'
 import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction } from '@/app/(admin)/apps/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
-import type { App } from '@/lib/types'
+import type { App, RedirectUri } from '@/lib/types'
+import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 
 interface Props {
   app: App
@@ -29,7 +30,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
-  const [callbackUrl, setCallbackUrl] = React.useState(app.callbackUrl ?? '')
+  const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -51,7 +52,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   React.useEffect(() => {
     setName(app.name)
     setUrl(app.url)
-    setCallbackUrl(app.callbackUrl ?? '')
+    setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
     setErrorKey(null)
@@ -90,7 +91,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     checkedProviders.size !== initialProviders.length ||
     initialProviders.some((p) => !checkedProviders.has(p))
 
-  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '') || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty
+  const redirectUrisDirty = JSON.stringify(redirectUris) !== JSON.stringify(app.redirectUris ?? [])
+  const dirty = name !== app.name || url !== app.url || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -103,10 +105,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; callbackUrl?: string | null; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean } = {}
+    const patch: { name?: string; url?: string; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
-    if (callbackUrl !== (app.callbackUrl ?? '')) patch.callbackUrl = callbackUrl.trim() || null
+    if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
     startTransition(async () => {
@@ -163,17 +165,13 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               />
             </div>
             <div>
-              <Label htmlFor="appCallbackUrl">{t('apps.fields.callbackUrl')}</Label>
-              <Input
-                id="appCallbackUrl"
-                type="url"
-                value={callbackUrl}
-                onChange={(e) => setCallbackUrl(e.target.value)}
-                placeholder="https://app.example.com/auth/callback"
-              />
+              <Label>{t('apps.fields.redirectUris')}</Label>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.callbackUrlHint')}
+                {t('apps.fields.redirectUrisHint')}
               </p>
+              <div className="mt-2">
+                <RedirectUriRowsEditor rows={redirectUris} onRowsChange={setRedirectUris} />
+              </div>
             </div>
             <div>
               <Label htmlFor="appTrustDays">{t('apps.fields.twoFactorTrustDays')}</Label>

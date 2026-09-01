@@ -10,6 +10,9 @@ jest.mock('@sassy-auth/db', () => ({
       findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn(),
       create: jest.fn(), update: jest.fn(), delete: jest.fn(),
     },
+    saAppRedirectUri: {
+      deleteMany: jest.fn(), createMany: jest.fn(),
+    },
     $transaction: jest.fn(),
   },
   Prisma: {},
@@ -21,6 +24,7 @@ jest.mock('../common/permissions/check-permission', () => ({
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saApp: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
+  saAppRedirectUri: { deleteMany: jest.Mock; createMany: jest.Mock };
   $transaction: jest.Mock;
 };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -58,7 +62,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [] }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -78,10 +82,10 @@ describe('AppsService', () => {
   it('getApp returns the formatted row when found', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     const result = await service.getApp('ba-caller', 'sq_1');
-    expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
+    expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' }, include: { redirectUris: true } });
     expect(result).toEqual({
       publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
-      isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false,
+      isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [],
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -122,7 +126,7 @@ describe('AppsService', () => {
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [] });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -285,5 +289,35 @@ describe('AppsService', () => {
       mockPrisma.saApp.delete.mockRejectedValueOnce(unexpected);
       await expect(service.deleteApp('ba-caller', 'sq_1')).rejects.toThrow('Network failure');
     });
+  });
+
+  it('replaces the redirect URI set on update', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+    mockPrisma.saApp.update.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    await service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://app.example.com/bye', kind: 'post_logout' },
+      ],
+    });
+
+    expect(mockPrisma.saAppRedirectUri.deleteMany).toHaveBeenCalledWith({ where: { appId: 7 } });
+    expect(mockPrisma.saAppRedirectUri.createMany).toHaveBeenCalledWith({
+      data: [
+        { appId: 7, uri: 'https://app.example.com/cb', kind: 'login' },
+        { appId: 7, uri: 'https://app.example.com/bye', kind: 'post_logout' },
+      ],
+    });
+  });
+
+  it('rejects a redirect URI that is not an absolute http(s) URL', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    await expect(
+      service.updateApp('admin-ba-id', 'a_7', {
+        redirectUris: [{ uri: 'javascript:alert(1)', kind: 'login' }],
+      }),
+    ).rejects.toThrow();
   });
 });

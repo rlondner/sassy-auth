@@ -63,11 +63,16 @@ export interface InvitationInfo {
   expired: boolean
 }
 
+export interface RedirectUri {
+  uri: string;
+  kind: 'login' | 'post_logout';
+}
+
 export interface App {
   publicId: string;
   name: string;
   url: string;
-  callbackUrl?: string | null;
+  redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
   requireTwoFactor: boolean;
@@ -76,7 +81,7 @@ export interface App {
 export interface CreateAppPayload {
   name: string;
   url: string;
-  callbackUrl?: string | null;
+  redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
 }
@@ -84,7 +89,7 @@ export interface CreateAppPayload {
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
-  callbackUrl?: string | null;
+  redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
 }

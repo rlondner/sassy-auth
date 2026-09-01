@@ -8,9 +8,37 @@ import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppDto } from './dto/update-app.dto';
 import { ListAppsQueryDto } from './dto/list-apps-query.dto';
 
-type AppRow = { publicId: string; name: string; url: string; isPlatform: boolean; twoFactorTrustDays: number | null; requireTwoFactor: boolean };
+type RedirectUriRow = { uri: string; kind: string };
+type AppRow = {
+  publicId: string; name: string; url: string; isPlatform: boolean;
+  twoFactorTrustDays: number | null; requireTwoFactor: boolean;
+  redirectUris?: RedirectUriRow[];
+};
 function formatApp(a: AppRow) {
-  return { publicId: a.publicId, name: a.name, url: a.url, isPlatform: a.isPlatform, twoFactorTrustDays: a.twoFactorTrustDays ?? null, requireTwoFactor: a.requireTwoFactor };
+  return {
+    publicId: a.publicId, name: a.name, url: a.url, isPlatform: a.isPlatform,
+    twoFactorTrustDays: a.twoFactorTrustDays ?? null,
+    requireTwoFactor: a.requireTwoFactor,
+    redirectUris: (a.redirectUris ?? []).map((r) => ({ uri: r.uri, kind: r.kind })),
+  };
+}
+
+/** Redirect URIs must be absolute http(s) URLs — no javascript:, data:, or relative paths. */
+function assertValidRedirectUris(uris: Array<{ uri: string; kind: string }>): void {
+  for (const r of uris) {
+    let parsed: URL;
+    try {
+      parsed = new URL(r.uri);
+    } catch {
+      throw new BadRequestException(`Invalid redirect URI: ${r.uri}`);
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new BadRequestException(`Redirect URI must be http(s): ${r.uri}`);
+    }
+    if (r.kind !== 'login' && r.kind !== 'post_logout') {
+      throw new BadRequestException(`Invalid redirect URI kind: ${r.kind}`);
+    }
+  }
 }
 
 function isPrismaCode(e: unknown, code: string): boolean {
@@ -40,7 +68,7 @@ export class AppsService {
       ? { OR: [{ name: { contains: escaped, mode: 'insensitive' as const } }, { url: { contains: escaped, mode: 'insensitive' as const } }] }
       : {};
     const [rows, total] = await Promise.all([
-      prisma.saApp.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { id: 'desc' } }),
+      prisma.saApp.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { id: 'desc' }, include: { redirectUris: true } }),
       prisma.saApp.count({ where }),
     ]);
     return { items: rows.map(formatApp), total, page, pageSize };
@@ -59,23 +87,31 @@ export class AppsService {
       'platform.permissions.manage',
       'platform.roles.manage',
     ]);
-    const app = await prisma.saApp.findUnique({ where: { publicId } });
+    const app = await prisma.saApp.findUnique({ where: { publicId }, include: { redirectUris: true } });
     if (!app) throw new NotFoundException();
     return formatApp(app);
   }
 
   async createApp(callerBaId: string, dto: CreateAppDto) {
     await checkPermission(callerBaId, 'platform.apps.manage');
+    if (dto.redirectUris) assertValidRedirectUris(dto.redirectUris);
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
           data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null, requireTwoFactor: dto.requireTwoFactor ?? false },
         });
-        return tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
+        const updated = await tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
+        if (dto.redirectUris) {
+          await tx.saAppRedirectUri.deleteMany({ where: { appId: draft.id } });
+          await tx.saAppRedirectUri.createMany({
+            data: dto.redirectUris.map((r) => ({ appId: draft.id, uri: r.uri, kind: r.kind })),
+          });
+        }
+        return updated;
       });
       this.logger.getWinstonLogger().info('App created', { context: 'AppsService', appId: created.publicId });
-      return formatApp(created);
+      return formatApp({ ...created, redirectUris: dto.redirectUris ?? [] });
     } catch (e: unknown) {
       if (isPrismaCode(e, 'P2002')) throw new ConflictException('App with this name already exists');
       throw e;
@@ -87,16 +123,18 @@ export class AppsService {
       dto.name === undefined &&
       dto.url === undefined &&
       dto.twoFactorTrustDays === undefined &&
-      dto.requireTwoFactor === undefined
+      dto.requireTwoFactor === undefined &&
+      dto.redirectUris === undefined
     ) {
       throw new BadRequestException(
-        'At least one of name, url, twoFactorTrustDays, or requireTwoFactor must be provided',
+        'At least one of name, url, twoFactorTrustDays, requireTwoFactor, or redirectUris must be provided',
       );
     }
     await checkPermission(callerBaId, 'platform.apps.manage');
-    const existing = await prisma.saApp.findUnique({ where: { publicId } });
+    const existing = await prisma.saApp.findUnique({ where: { publicId }, include: { redirectUris: true } });
     if (!existing) throw new NotFoundException();
     if (existing.isPlatform) throw new ForbiddenException('Platform app cannot be modified');
+    if (dto.redirectUris) assertValidRedirectUris(dto.redirectUris);
     try {
       const updated = await prisma.saApp.update({
         where: { publicId },
@@ -111,8 +149,14 @@ export class AppsService {
           }),
         },
       });
+      if (dto.redirectUris) {
+        await prisma.saAppRedirectUri.deleteMany({ where: { appId: existing.id } });
+        await prisma.saAppRedirectUri.createMany({
+          data: dto.redirectUris.map((r) => ({ appId: existing.id, uri: r.uri, kind: r.kind })),
+        });
+      }
       this.logger.getWinstonLogger().info('App updated', { context: 'AppsService', appId: publicId });
-      return formatApp(updated);
+      return formatApp({ ...updated, redirectUris: dto.redirectUris ?? existing.redirectUris });
     } catch (e: unknown) {
       if (isPrismaCode(e, 'P2002')) throw new ConflictException('App with this name already exists');
       throw e;

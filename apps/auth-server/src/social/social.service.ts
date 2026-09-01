@@ -69,7 +69,7 @@ export class SocialService {
    *
    * Mirrors AppsService.updateApp/deleteApp: the platform app's identity
    * providers cannot be repointed through this endpoint, exactly like its
-   * name/url/callbackUrl/2FA settings — same `ForbiddenException` message,
+   * name/url/redirectUris/2FA settings — same `ForbiddenException` message,
    * same reasoning (the console hides the Edit action for the platform app,
    * but that is only a UI nicety; the API must refuse the write directly so
    * a raw HTTP call can't bypass it).
