@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     PKCE_STATE_TTL_SECONDS: int = 600
     LOG_LEVEL: str = "info"
 
+    DD_API_KEY: str | None = None
+    DD_SITE: str = "datadoghq.com"
+    SENTRY_DSN_RESOURCE_SERVER: str | None = None
+    SENTRY_ENVIRONMENT: str | None = None
+    OTEL_SERVICE_NAME: str = "sassy-auth-resource-server"
+
     @property
     def issuer(self) -> str:
         return self.EXPECTED_ISSUER or self.AUTH_SERVER_URL

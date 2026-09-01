@@ -17,12 +17,6 @@ import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
 import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
 import { readIsPrivateEmail } from '../social/apple-private-relay-context';
-// task-15: the only Sentry import outside instrument.ts / this adapter's own
-// module. record-federation-event.ts's OTel-Logs default emit is a no-op on
-// this stack (see telemetry-sentry-adapter.ts's header comment for the
-// file:line trail), so production wiring injects this adapter explicitly
-// rather than relying on the default.
-import { emitFederationEventToSentry } from '../social/telemetry-sentry-adapter';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -213,7 +207,7 @@ export const auth = betterAuth({
       // regardless of whether the browser can actually be redirected to our
       // own error page (see the canRedirect note below).
       await recordFederationEvent(
-        { db: prisma, logger: authLogger, emit: emitFederationEventToSentry },
+        { db: prisma, logger: authLogger },
         {
           type: 'social.signin.rejected',
           provider: providerId ?? 'unknown',
@@ -263,6 +257,16 @@ export const auth = betterAuth({
     // RegistrationService checks for that explicitly — see its 409 path.
     autoSignIn: false,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
+    // Without this, BetterAuth's /reset-password endpoint changes the
+    // password but leaves every other active session untouched (see
+    // node_modules/better-auth/dist/api/routes/password.mjs — the
+    // deleteSessions(userId) call is gated behind this exact option,
+    // default off). Password reset is the standard incident-response step
+    // for a compromised account; if a stolen session survives it, the
+    // reset accomplishes nothing for that attacker. Mirrors the
+    // revoke-other-sessions fix already applied to 2FA enrollment
+    // (bug-0275, confirmEnable in apps/admin/app/account/security/actions.ts).
+    revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, token }: { user: { email: string; name?: string }; token: string }) => {
       const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
       const resetUrl = `${adminUrl}/reset-password?token=${token}`;

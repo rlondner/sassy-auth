@@ -81,6 +81,20 @@ describe('auth.config — emailAndPassword.autoSignIn', () => {
   });
 });
 
+// bug-0276: BetterAuth's /reset-password endpoint only revokes the user's
+// other sessions when this flag is explicitly set (see
+// node_modules/better-auth/dist/api/routes/password.mjs — the
+// deleteSessions(userId) call is gated behind it, default off). Without it,
+// a stolen session survives the account owner resetting their password.
+describe('auth.config — emailAndPassword.revokeSessionsOnPasswordReset (bug-0276)', () => {
+  it('revokes other sessions when a password is reset via the forgot-password token flow', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const eap = options['emailAndPassword'] as Record<string, unknown>;
+    expect(eap['revokeSessionsOnPasswordReset']).toBe(true);
+  });
+});
+
 // task-8: proves exactly one top-level `hooks.after` is wired (the HARD
 // CONSTRAINT — a second `hooks: { after: ... }` object literal elsewhere in
 // this config would silently overwrite this one, since BetterAuth reads

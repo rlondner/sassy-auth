@@ -15,6 +15,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import * as Sentry from '@sentry/nestjs';
+import { trace } from '@opentelemetry/api';
 import { Request } from 'express';
 import { prisma } from '@sassy-auth/db';
 import { detectIdentifierType, TokenErrorCode } from '@sassy-auth/types';
@@ -56,6 +57,9 @@ import {
 import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
 import { isTwoFactorRequired } from '../auth/two-factor-required';
 import { verifyUserTotp } from '../auth/verify-user-totp';
+import { record2faChallengeOutcome, recordSignInOutcome } from '../telemetry/auth-metrics';
+
+const tracer = trace.getTracer('sassy-auth.auth-server');
 
 @ApiTags('Token')
 @Controller(TOKEN_CONTROLLER_PATH)
@@ -360,6 +364,26 @@ export class TokenController {
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   @Post('direct/login')
   async directLogin(@Body() dto: DirectLoginDto) {
+    return tracer.startActiveSpan('auth.signin', async (span) => {
+      span.setAttribute('auth.method', 'password');
+      try {
+        const result = await this.directLoginInner(dto);
+        span.setAttribute('auth.outcome', 'ok');
+        recordSignInOutcome('ok');
+        return result;
+      } catch (err) {
+        const outcome =
+          err instanceof ForbiddenException ? 'two_factor_required' : 'invalid_credentials';
+        span.setAttribute('auth.outcome', outcome);
+        recordSignInOutcome(outcome);
+        throw err;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
+  private async directLoginInner(dto: DirectLoginDto) {
     // 1. Validate app exists
     let appNumericId: number;
     try {
@@ -525,18 +549,21 @@ export class TokenController {
     if (isTwoFactorRequired(app) || twoFactorEnabled) {
       if (!twoFactorEnabled) {
         // Required app, user not enrolled: cannot self-enroll non-interactively.
+        record2faChallengeOutcome('required_not_enrolled');
         this.logger.getWinstonLogger().warn('Direct login blocked: 2FA required, user not enrolled', {
           context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
         });
         throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
       }
       if (!dto.totpCode || !(await verifyUserTotp(saUser.betterAuthUserId, dto.totpCode))) {
+        record2faChallengeOutcome('missing_or_invalid_code');
         this.logger.getWinstonLogger().warn('Direct login blocked: missing/invalid 2FA code', {
           context: 'TokenController', appId: dto.appId, userId: saUser.publicId,
         });
         throw new ForbiddenException(TokenErrorCode.TWO_FACTOR_REQUIRED);
       }
       amr = ['pwd', 'otp', 'mfa'];
+      record2faChallengeOutcome('ok');
     }
 
     // bug-0186: record the login timestamp. This is the JWT-issuance

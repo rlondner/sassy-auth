@@ -1,4 +1,4 @@
-# Build context exclusions for the developer-preview image (Dockerfile).
+# Build context exclusions for Docker images (preview + production).
 #
 # Two of these matter for more than build speed:
 #   .env.local  — never bake a developer's real signing keys into an image

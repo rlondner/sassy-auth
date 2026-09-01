@@ -37,7 +37,12 @@ jobs:
       # can even read the directory tree, acting as a failsafe against misconfiguration.
       - name: Pre-scan Context Sanitization
         run: |
+          # "*.env" alone only matches names ending in .env (foo.env) — it misses
+          # this repo's actual dotenv convention (.env, .env.local, .env.production,
+          # .env.local.bak-*, see .gitignore), which is exactly the shape of file
+          # that has been accidentally committed here before.
           find . -name "*.env" -type f -delete
+          find . -name ".env*" -type f -delete
           find . -name "*.pem" -type f -delete
           find . -name "*_rsa" -type f -delete
 

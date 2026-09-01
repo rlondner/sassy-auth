@@ -1,0 +1,69 @@
+# syntax=docker/dockerfile:1
+#
+# Production auth-server image (compiled NestJS + BetterAuth).
+# Build from repo root:
+#   docker build -f docker/Dockerfile.auth-server -t sassy-auth-server .
+#
+# Requires DATABASE_URL, RSA keys, BETTER_AUTH_SECRET, and URL env vars at runtime.
+# See DEPLOYMENT.md.
+
+FROM node:24-bookworm-slim AS base
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get clean
+
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+WORKDIR /app
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+FROM base AS deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/auth-server/package.json apps/auth-server/
+COPY packages/db/package.json packages/db/
+COPY packages/db/schema.prisma packages/db/
+COPY packages/db/migrations packages/db/migrations
+COPY packages/db/tsconfig.json packages/db/
+COPY packages/types/package.json packages/types/
+COPY packages/types/tsconfig.json packages/types/
+
+ARG DATABASE_URL="postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder"
+
+RUN pnpm install --frozen-lockfile
+
+# ── Build ─────────────────────────────────────────────────────────────────────
+FROM deps AS build
+
+COPY apps/auth-server apps/auth-server
+COPY packages/db packages/db
+COPY packages/types packages/types
+
+RUN pnpm --filter @sassy-auth/db --filter @sassy-auth/types build \
+ && pnpm --filter @sassy-auth/auth-server build
+
+# ── Runtime ───────────────────────────────────────────────────────────────────
+FROM base AS runner
+
+ENV NODE_ENV=production
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=build /app/apps/auth-server/dist ./apps/auth-server/dist
+COPY --from=build /app/apps/auth-server/package.json ./apps/auth-server/package.json
+COPY --from=build /app/packages/db ./packages/db
+COPY --from=build /app/packages/types/dist ./packages/types/dist
+COPY --from=build /app/packages/types/package.json ./packages/types/package.json
+
+COPY docker/entrypoint-auth-server-prod.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 3000
+
+ENTRYPOINT ["/entrypoint.sh"]
