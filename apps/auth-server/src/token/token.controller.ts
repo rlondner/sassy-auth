@@ -249,6 +249,8 @@ export class TokenController {
             code_challenge_method: codeChallengeMethod,
           });
           if (state) query.set('state', state);
+          if (scope) query.set('scope', scope);
+          if (nonce) query.set('nonce', nonce);
           const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
           const loginUrl = `${adminUrl.replace(/\/$/, '')}/login?next=${encodeURIComponent(nextPath)}`;
           return { url: loginUrl, statusCode: 302 };

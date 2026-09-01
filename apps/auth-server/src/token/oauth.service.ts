@@ -124,7 +124,15 @@ export class OauthService {
     // caller (TokenController) is responsible for having authenticated them.
     // See the /token invariant test in Task 9.
     if (entry.codeChallenge) {
-      if (!codeVerifier || s256(codeVerifier) !== entry.codeChallenge) {
+      if (!codeVerifier) {
+        throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
+      }
+      const expected = Buffer.from(entry.codeChallenge, 'utf8');
+      const actual = Buffer.from(s256(codeVerifier), 'utf8');
+      if (
+        expected.length !== actual.length ||
+        !crypto.timingSafeEqual(expected, actual)
+      ) {
         throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
       }
     }

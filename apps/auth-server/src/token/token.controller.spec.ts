@@ -548,6 +548,39 @@ describe('TokenController', () => {
 
       delete process.env.ADMIN_URL;
     });
+
+    // bug-0149 — an unauthenticated browser hitting /authorize is bounced to
+    // the admin console's /login with the full authorize URL preserved as
+    // `next`. Task 6 review finding: this redirect must also carry scope/nonce
+    // through the round-trip, same as the forced-2FA enrollment redirect above,
+    // since nonce is load-bearing for OIDC replay protection once id_token
+    // issuance lands (Task 7).
+    it('carries scope and nonce through the bug-0149 login redirect next= round-trip', async () => {
+      process.env.ADMIN_URL = 'https://admin.example';
+      mockApp();
+      mockGetSession.mockResolvedValue(null);
+
+      const res = await controller.oauthAuthorize(
+        'sqid-10',
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        'csrf-state',
+        fakeReq,
+        'openid profile',
+        'n-login',
+      );
+
+      expect(res.url).toContain('/login?next=');
+      const nextParam = new URL(res.url).searchParams.get('next');
+      expect(nextParam).toBeTruthy();
+      const nextParams = new URLSearchParams((nextParam as string).split('?')[1]);
+      expect(nextParams.get('state')).toBe('csrf-state');
+      expect(nextParams.get('scope')).toBe('openid profile');
+      expect(nextParams.get('nonce')).toBe('n-login');
+
+      delete process.env.ADMIN_URL;
+    });
   });
 
   // ── POST /api/token/oauth/token ───────────────────────────────────────────
