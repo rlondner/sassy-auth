@@ -349,7 +349,7 @@ export class TokenController {
         context: 'TokenController',
         appId: dto.client_id,
       });
-      throw new UnauthorizedException(TokenErrorCode.UNAUTHORIZED_CLIENT);
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CLIENT);
     }
 
     let userPublicId: string;
@@ -390,7 +390,7 @@ export class TokenController {
         context: 'TokenController',
         appId: dto.client_id,
       });
-      throw new UnauthorizedException(TokenErrorCode.UNAUTHORIZED_CLIENT);
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CLIENT);
     }
 
     const saUser = await prisma.saUser.findFirst({

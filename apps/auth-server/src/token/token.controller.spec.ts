@@ -9,6 +9,7 @@ import { OauthService } from './oauth.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { TokenErrorCode } from '@sassy-auth/types';
 import { resolveIssuer } from './oauth-metadata';
 
 jest.mock('@sentry/nestjs', () => ({
@@ -1000,6 +1001,7 @@ describe('TokenController', () => {
 
       expect(res.status).toBe(401);
       expect(res.headers['www-authenticate']).toContain('Basic');
+      expect(res.body.message).toBe(TokenErrorCode.INVALID_CLIENT);
       expect(mockOauthService.exchangeCode).not.toHaveBeenCalled();
     });
 
