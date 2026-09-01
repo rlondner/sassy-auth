@@ -1,0 +1,12 @@
+-- bug-0269: nothing in the database prevented the same external identity
+-- (providerId + accountId, e.g. the same Google `sub`) from being linked to
+-- two different local users. The social-login feature's invite-only safety
+-- story rests entirely on BetterAuth's application-layer find-or-create
+-- logic never racing or having a bug; this backs it with a real constraint.
+--
+-- If this fails to apply because duplicate (providerId, accountId) rows
+-- already exist, that is a genuine data-integrity problem to resolve by
+-- hand (find and merge/remove the duplicates) before retrying — do not
+-- weaken this constraint to work around it.
+-- CreateIndex
+CREATE UNIQUE INDEX "Account_providerId_accountId_key" ON "Account"("providerId", "accountId");
