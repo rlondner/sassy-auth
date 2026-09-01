@@ -11,6 +11,9 @@
     "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
     "@sassy-auth/ui": "workspace:*",
     "@sentry/nextjs": "^10.54.0",
     "@tanstack/react-table": "^8.20.0",

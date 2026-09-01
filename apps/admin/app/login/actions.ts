@@ -3,11 +3,14 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
+import { trace } from '@opentelemetry/api'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
 import { forwardNamedCookie, forwardNamedCookieWithMaxAge } from '../account/security/actions'
 import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '@/lib/two-factor-prompt'
+
+const tracer = trace.getTracer('sassy-auth.admin')
 
 interface ParsedSessionCookie {
   value: string
@@ -118,7 +121,46 @@ async function forwardSessionCookie(res: Response): Promise<boolean> {
   return true
 }
 
+// Next.js signals a server-action redirect by throwing an error carrying a
+// `digest` string starting with `NEXT_REDIRECT` (see
+// next/dist/client/components/redirect-error.js:isRedirectError). signIn's
+// success paths call redirect() rather than returning, so the span wrapper
+// below must recognize this control-flow throw and record it as a normal
+// (successful) exit rather than an `auth.outcome: error`.
+function isNextRedirectError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'digest' in err &&
+    typeof (err as { digest?: unknown }).digest === 'string' &&
+    (err as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  )
+}
+
 export async function signIn(formData: FormData): Promise<{ error?: string } | { twoFactor: true }> {
+  return tracer.startActiveSpan('admin.login.submit', async (span) => {
+    try {
+      const result = await signInInner(formData)
+      if ('twoFactor' in result && result.twoFactor) {
+        span.setAttribute('auth.outcome', 'two_factor_required')
+      } else if ('error' in result && result.error) {
+        span.setAttribute('auth.outcome', result.error)
+      } else {
+        span.setAttribute('auth.outcome', 'ok')
+      }
+      return result
+    } catch (err) {
+      // redirect() throwing is the success path (plain sign-in or the
+      // optional 2FA-prompt interstitial) — not a real error.
+      span.setAttribute('auth.outcome', isNextRedirectError(err) ? 'ok' : 'error')
+      throw err
+    } finally {
+      span.end()
+    }
+  })
+}
+
+async function signInInner(formData: FormData): Promise<{ error?: string } | { twoFactor: true }> {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
