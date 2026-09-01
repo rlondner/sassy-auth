@@ -55,6 +55,12 @@ describe('AppsService', () => {
     service = module.get(AppsService);
     jest.clearAllMocks();
     (checkPermission as jest.Mock).mockResolvedValue(undefined);
+    // Default: run the transaction callback against the same mocked prisma
+    // client, so existing tests that stub saApp.update / saAppRedirectUri
+    // directly keep working now that updateApp (like createApp) writes
+    // through prisma.$transaction. Tests that care about transactional
+    // atomicity specifically override this with a distinct tx client.
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
   });
 
   it('listApps returns paginated items and total', async () => {
@@ -319,5 +325,83 @@ describe('AppsService', () => {
         redirectUris: [{ uri: 'javascript:alert(1)', kind: 'login' }],
       }),
     ).rejects.toThrow();
+  });
+
+  it('updateApp rejects a duplicate {uri, kind} pair with a distinct BadRequestException, not the app-name-conflict message, and never touches the DB', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    const call = service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+      ],
+    });
+
+    await expect(call).rejects.toBeInstanceOf(BadRequestException);
+    await expect(call).rejects.not.toBeInstanceOf(ConflictException);
+    await expect(call).rejects.toThrow(/duplicate/i);
+    // Validation happens before any write — the whole point is to make this
+    // P2002-shaped failure unreachable from user input.
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.createMany).not.toHaveBeenCalled();
+  });
+
+  it('createApp rejects a duplicate {uri, kind} pair before any write', async () => {
+    const call = service.createApp('ba-caller', {
+      name: 'X',
+      url: 'https://x.example',
+      redirectUris: [
+        { uri: 'https://x.example/cb', kind: 'post_logout' },
+        { uri: 'https://x.example/cb', kind: 'post_logout' },
+      ],
+    });
+
+    await expect(call).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('updateApp writes the app row and redirect URIs inside the same transaction, not against the outer prisma client', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    // Use a tx client distinct from mockPrisma so we can prove the app-row
+    // update and the redirect-URI writes both go through the callback's
+    // `tx` argument (i.e. one atomic transaction), not the top-level client.
+    const txClient = {
+      saApp: { update: jest.fn().mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false }) },
+      saAppRedirectUri: { deleteMany: jest.fn(), createMany: jest.fn() },
+    };
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof txClient) => unknown) => cb(txClient));
+
+    await service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+    });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(txClient.saApp.update).toHaveBeenCalledWith({ where: { publicId: 'a_7' }, data: {} });
+    expect(txClient.saAppRedirectUri.deleteMany).toHaveBeenCalledWith({ where: { appId: 7 } });
+    expect(txClient.saAppRedirectUri.createMany).toHaveBeenCalledWith({
+      data: [{ appId: 7, uri: 'https://app.example.com/cb', kind: 'login' }],
+    });
+    // Nothing should have been written via the outer (non-transactional) client.
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.createMany).not.toHaveBeenCalled();
+  });
+
+  it('updateApp rolls back the app-row update when the redirect-URI write fails (transaction rejects as a whole)', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+    // Simulate the transaction failing partway through (e.g. a DB-level
+    // unique-constraint race on saAppRedirectUri that in-memory validation
+    // didn't catch). Because the whole body runs inside prisma.$transaction,
+    // Prisma rolls back the app-row update too — the caller never observes
+    // a state where the app row changed but redirect URIs were wiped.
+    mockPrisma.$transaction.mockRejectedValue({ code: 'P2002', meta: { target: ['appId', 'uri', 'kind'] } });
+
+    await expect(
+      service.updateApp('admin-ba-id', 'a_7', {
+        redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
