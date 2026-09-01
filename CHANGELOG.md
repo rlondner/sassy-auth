@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-08-27
+
+No commits landed on `master` in the last 24 hours (`master` has been at `ea82b95` since 2026-08-25; the 08-25 review bundle and its two bug-fix PRs — #357, #358, #359 — are still open, as are seven earlier daily-review PRs going back to 2026-08-24). This is the recurring "review PRs never merge" pattern tracked since 2026-07-22: filing keeps working, merging is the bottleneck.
+
+With no new code to review, this run did a live CI-health check instead (the standing step added 2026-08-19 after the e2e suite was found silently red for 34 days) and found `master`'s `unit-tests` job has been red since 2026-08-25 04:33 UTC — invisible in the repo's normal PR/commit view because nothing has pushed since. Both root causes were found, fixed, and verified against a full local test run. See [BUGS_2026-08-27.md](./docs/history/bugs/BUGS_2026-08-27.md).
+
+### Fixed (2 bugs)
+
+- **bug-0273** (Critical) — `packages/ui`'s branch-coverage floor (51%, added 2026-08-24) has been unmet since PR #347 merged, driven by an untested first-party `FormField` component. Added direct coverage; package branches now 83.72%. PR #360.
+- **bug-0274** (Low) — `unit-tests.yml` was missed by the 2026-08-25 Node 24 migration and still ran on a deprecated Node 20 runner. Aligned with `e2e.yml`/`typecheck.yml`/`Dockerfile`/`engines`. PR #361.
+
+### Docs
+
+- README: `Node.js >= 20` → `>= 24` (Prerequisites section and badge) — stale since the Node 24 migration; a new dev following the README verbatim would provision the wrong runtime. Added a `unit-tests` CI badge alongside the existing `e2e`/`typecheck` ones.
+
 ## [Unreleased] — 2026-08-25
 
 Daily code review covering the last 24h of `master` activity. Quiet, high-quality day:
