@@ -33,7 +33,38 @@ See [BUGS_2026-08-30.md](./docs/history/bugs/BUGS_2026-08-30.md).
   added a `unit-tests` CI badge — both were already fixed once in the still-
   unmerged #362/#364, reapplied directly since this review branches from
   `master`.
+---
+## [Unreleased] — 2026-08-24
 
+> **Note:** this entry covers the reviewed window (2026-08-21→08-24) only.
+> `CHANGELOG.md` had been stuck at the 2026-07-08 entry below for 46 days —
+> see [TODO_2026-08-24.md](./docs/history/todo/TODO_2026-08-24.md) for why,
+> and why today's entry doesn't attempt to backfill the gap.
+
+The 34+ day `master` freeze (see the 2026-08-19/08-21 review history) held: this window's 30 commits landed a complete **invite-only social authentication feature** (Google, Microsoft, Apple) directly on `master`, plus a one-command Docker quickstart and two new CI security workflows (Trivy CVE scanning, AI-assisted PR security review). Open-PR backlog is down to 3 — the smallest since tracking began.
+
+### Added
+
+- **Invite-only social sign-in (Google, Microsoft, Apple).** Federated sign-in never creates a new user — it links to an existing active `SaUser` or refuses. Per-app opt-in of which provider buttons render (cosmetic, not a security boundary — the real gates are `disableSignUp`, the session-creation active-status gate, and org/app membership). New `SaSocialProvider`, `Session.signInMethod`, `SaOauthCode.idp`, and `SaAuditEvent` tables/columns. JWTs gain `amr: ["ext"]` + `idp: "google"|"microsoft"|"apple"` for federated sign-ins. See [`docs/social-auth-setup.md`](./docs/social-auth-setup.md) for operator setup.
+- **Docker quickstart.** `docker compose up` provisions Postgres, generates signing keys, migrates, and seeds — a preview/eval image, not a deployment artifact (see README's Known Limitations).
+- **Two new CI security workflows**: Trivy SCA/CVE scanning and an AI-assisted semantic security review on PRs. Both were non-functional as landed — see bug-0265/0266 below; today's review fixes both.
+
+### Fixed (admin)
+
+- Admin console no longer caches an auth-server 5xx as a negative session result, avoiding a spurious forced-logout on transient auth-server errors (`3f24e8c`).
+
+### New bugs found (6)
+
+See [BUGS_2026-08-24.md](./docs/history/bugs/BUGS_2026-08-24.md) and [TODO_2026-08-24.md](./docs/history/todo/TODO_2026-08-24.md). Every bug below already has a fix in its linked PR.
+
+- **bug-0265** (PR #349) — Trivy's SARIF-upload failure silently skipped the real CVE-blocking gate; also pinned `trivy-action` off the mutable `@master` ref.
+- **bug-0266** (PR #350) — AI security review workflow: nonexistent action tag plus every config key misspelled — the review has never once actually run.
+- **bug-0267** (PR #351) — README/`.env.example` advertised GitHub as a 4th social provider that was never implemented.
+- **bug-0268** (PR #354) — Federated sign-in audit trail recorded rejections only; successful sign-ins produced zero audit rows.
+- **bug-0269** (PR #353) — `Account` (BetterAuth's identity-linking table) had no DB-level unique constraint backing the invite-only linking guarantee.
+- **bug-0270** (PR #352, test-infrastructure only) — e2e stub-IdP's concurrent-identity-write guard had a check-then-act race.
+
+---
 ## [Unreleased] — 2026-07-08
 
 61 commits in the last 24 hours — the most productive day in the project's history. An overnight autonomous session closed ~76 bugs including **all 9 Critical-severity issues**. Today's post-fix regression scan found 15 new bugs (2 critical, 6 warning, 7 minor).
