@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import { prisma } from '@sassy-auth/db';
 import { TokenErrorCode } from '@sassy-auth/types';
 import { resolveIssuer } from './oauth-metadata';
+import { recordTokenIssueDuration } from '../telemetry/auth-metrics';
 
 interface IssueJwtParams {
   saUserId: number;
@@ -66,25 +67,33 @@ export class TokenService {
   }
 
   async issueJwt(params: IssueJwtParams): Promise<string> {
-    const permissions = await this.resolvePermissions(params.saUserId);
-    // Share normalization with the RFC 8414 discovery doc so the advertised
-    // `issuer` and the JWT `iss` claim cannot diverge on a trailing slash.
-    const issuer = resolveIssuer();
-    const now = Math.floor(Date.now() / 1000);
+    const start = Date.now();
+    try {
+      const permissions = await this.resolvePermissions(params.saUserId);
+      // Share normalization with the RFC 8414 discovery doc so the advertised
+      // `issuer` and the JWT `iss` claim cannot diverge on a trailing slash.
+      const issuer = resolveIssuer();
+      const now = Math.floor(Date.now() / 1000);
 
-    const payload = {
-      sub: params.userPublicId,
-      aud: params.appPublicId,
-      org: params.orgPublicId,
-      iss: issuer,
-      iat: now,
-      exp: now + 3600,
-      scope: permissions.join(' '),
-      ...(params.amr && params.amr.length ? { amr: params.amr } : {}),
-      ...(params.idp ? { idp: params.idp } : {}),
-    };
+      const payload = {
+        sub: params.userPublicId,
+        aud: params.appPublicId,
+        org: params.orgPublicId,
+        iss: issuer,
+        iat: now,
+        exp: now + 3600,
+        scope: permissions.join(' '),
+        ...(params.amr && params.amr.length ? { amr: params.amr } : {}),
+        ...(params.idp ? { idp: params.idp } : {}),
+      };
 
-    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
+      const token = jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
+      recordTokenIssueDuration(Date.now() - start, 'ok');
+      return token;
+    } catch (err) {
+      recordTokenIssueDuration(Date.now() - start, 'error');
+      throw err;
+    }
   }
 
   getJwks(): { keys: Record<string, unknown>[] } {
