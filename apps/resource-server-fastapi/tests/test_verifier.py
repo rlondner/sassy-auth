@@ -3,6 +3,10 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from app.oauth.verifier import verify
 
@@ -111,3 +115,32 @@ def test_verify_rejects_missing_scope(monkeypatch, rsa_keypair):
     with pytest.raises(HTTPException) as ei:
         verify(token)
     assert ei.value.status_code == 401
+
+
+def test_verify_emits_a_span_with_outcome_attribute(monkeypatch):
+    monkeypatch.delenv("OTEL_SDK_DISABLED", raising=False)
+    # The OTel API only allows the global TracerProvider to be set once per
+    # process. Other tests (e.g. test_telemetry.py) may have already set it,
+    # so reset the internal "set once" guard to allow this test's provider
+    # to take effect, regardless of test execution order.
+    monkeypatch.setattr(trace._TRACER_PROVIDER_SET_ONCE, "_done", False)
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
+
+    from app.oauth import verifier
+    import importlib
+    importlib.reload(verifier)  # re-bind verifier's module-level tracer to the new provider
+
+    from fastapi import HTTPException
+    try:
+        verifier.verify("not-a-real-jwt")
+    except HTTPException:
+        pass
+
+    spans = exporter.get_finished_spans()
+    assert len(spans) == 1
+    assert spans[0].name == "auth.token.verify"
+    assert spans[0].attributes["auth.outcome"] == "invalid_token"
