@@ -168,10 +168,12 @@ standard `http.*` semconv and are not hand-rolled.
 
 ### Cardinality
 
-`saUserId`/`saUserPublicId`, `appPublicId`, `providerSub`, IPs, and user agents are
-**span and log attributes only, never metric labels** — unbounded, and Datadog
-bills custom metrics by tag combination. Every metric label above is bounded:
-provider name (4-5 values), outcome (small enum), sign-in method (2 values).
+`saUserId`/`saUserPublicId`, `appPublicId`, IPs, and user agents are **span and
+log attributes only, never metric labels** — unbounded, and Datadog bills custom
+metrics by tag combination. Every metric label above is bounded: provider name
+(4-5 values), outcome (small enum), sign-in method (2 values). `providerSub` is
+never a metric label either, but per the Redaction section below it goes further:
+it is never emitted to any span, log, or metric attribute at all — persisted only.
 
 ---
 

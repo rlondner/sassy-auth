@@ -1,9 +1,29 @@
 /**
- * Skipped unless real Datadog and Sentry credentials are present and
- * resource-server-fastapi is reachable. Proves the one thing unit tests
- * structurally cannot: that a trace initiated by TokenController.directLogin
- * propagates over HTTP into resource-server-fastapi's auth.token.verify span,
- * and that both land in Datadog and Sentry. Run manually with:
+ * Skipped unless real credentials and a running resource-server-fastapi are
+ * present. This is an end-to-end FUNCTIONAL/AUTH check across two live
+ * services, NOT a telemetry-propagation check: it proves that a real
+ * password login via `TokenController.directLogin` issues a valid JWT, and
+ * that JWT is accepted (or correctly scope-rejected) by
+ * resource-server-fastapi's `/api/properties` endpoint.
+ *
+ * It does NOT prove a trace propagates across the HTTP call, for three
+ * reasons: (a) `package.json`'s `test:e2e` script sets
+ * `OTEL_SDK_DISABLED=true`, which disables the exporter regardless of
+ * `DD_API_KEY`; (b) this test imports `AppModule` directly rather than going
+ * through `main.ts`, so `src/instrument.ts` (which calls `Sentry.init`,
+ * `setupOtel()`, `setupLogging()`) never runs in this test process — no
+ * tracer/meter is ever initialized here; (c) the outbound `fetch()` call to
+ * resource-server-fastapi below is a bare Node `fetch` with no
+ * instrumentation, so no `traceparent` header is ever sent — even with a
+ * real tracer running in this process, resource-server-fastapi's span would
+ * start a fresh root trace, not a child of this test's trace.
+ *
+ * A real telemetry-propagation check would require running auth-server via
+ * its normal `main.ts` entrypoint (not this Jest harness) with
+ * `OTEL_SDK_DISABLED` unset and an instrumented HTTP client; that is not
+ * currently automated anywhere in this repo.
+ *
+ * Run manually with:
  *   DD_API_KEY=... SENTRY_DSN=... RUN_OTEL_E2E=1 RS_E2E_URL=http://localhost:8010 pnpm test:e2e -- otel-thin-slice
  */
 import request from 'supertest';
@@ -31,7 +51,7 @@ describeOrSkip('OTel thin slice: password login -> token issuance -> resource ve
     await app.close();
   });
 
-  it('issues a JWT, gets it verified by resource-server-fastapi, and (manually) confirms the joined trace in Datadog/Sentry', async () => {
+  it('issues a JWT via directLogin and gets it verified (or scope-rejected) by resource-server-fastapi', async () => {
     const loginResponse = await request(app.getHttpServer())
       .post('/api/token/direct/login')
       .send({
@@ -54,13 +74,9 @@ describeOrSkip('OTel thin slice: password login -> token issuance -> resource ve
     });
     expect([200, 403]).toContain(verifyResponse.status);
 
-    // This test cannot assert on Datadog/Sentry's ingestion API from here —
-    // it only proves the request path that should have produced spans 1-7 of
-    // the thin slice completed successfully, with the same trace context
-    // carried across the HTTP call to resource-server-fastapi. Checking the
-    // trace actually arrived intact and joined in both backends is a manual
-    // step: search Datadog APM / Sentry Performance for the resulting trace
-    // ID (logged by the auth.signin span's `auth.method: password` attribute)
-    // within a minute of running this test.
+    // This test only proves the functional request path (issue JWT, present
+    // it to resource-server-fastapi, get a valid auth decision back)
+    // completed successfully. See the file header for why it does not — and
+    // is not intended to — prove telemetry propagation across the call.
   });
 });
