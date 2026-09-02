@@ -177,7 +177,7 @@ Verify it in your resource server against `http://localhost:3000/api/token/jwks`
 
 Knowing the boundaries up front will save you an afternoon:
 
-- **Not a certified OpenID Connect provider.** It is an OAuth 2.0 authorization server (it publishes RFC 8414 metadata), but there is no `id_token`, no `/userinfo` endpoint, and no OIDC certification. Consumers read identity from the JWT's `sub` / `org` / `aud` claims, or call `/api/me`.
+- **Not a certified OpenID Connect provider.** It publishes RFC 8414 metadata and a `/.well-known/openid-configuration` discovery document, issues a signed `id_token` when the `openid` scope is granted, and serves `/userinfo` — see [OIDC support](#oidc-support). There is no OIDC certification, no RP-Initiated Logout endpoint yet (`end_session_endpoint` is deliberately not advertised — see bug-0277), and no dynamic client registration. Consumers that don't need OIDC can keep reading identity from the JWT's `sub` / `org` / `aud` claims, or call `/api/me`.
 - **No refresh tokens.** Access tokens live one hour and there is no refresh grant, no token introspection, and no revocation endpoint. Re-run the flow when a token expires.
 - **No SAML, LDAP, or SCIM.** Social login is limited to the three providers this repo wires up (Google, Microsoft, Apple) — see [Social Sign-In](#social-sign-in).
 - **Not horizontally scalable as shipped.** Rate limiting keeps its counters in process, so each pod enforces its own budget. See [Known Limitations](#known-limitations).
@@ -226,6 +226,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
   - [Environment Variables](#environment-variables)
     - [Required](#required)
     - [Admin console](#admin-console)
+    - [Rate limiting (optional)](#rate-limiting-optional)
     - [Observability (optional)](#observability-optional)
     - [Email (optional)](#email-optional)
     - [Test credentials (optional)](#test-credentials-optional)
@@ -234,6 +235,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
     - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
     - [Flow B: Direct Login](#flow-b-direct-login)
     - [Flow C: Invite + Accept](#flow-c-invite--accept)
+    - [OIDC support](#oidc-support)
   - [JWKS and Token Verification](#jwks-and-token-verification)
   - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
   - [Social Sign-In](#social-sign-in)
@@ -465,6 +467,19 @@ Copy the two output lines directly into your `.env.local` file.
 | `PLATFORM_REQUIRE_2FA` | Set to exactly `true` to require 2FA for all platform operators. See [Two-Factor Authentication](#two-factor-authentication-2fa). Default: unset |
 | `TWO_FACTOR_TRUST_DAYS` | System-wide default for the "trust this device" cookie lifetime and the 2FA re-prompt threshold, in days. Falls back to 14 if unset, empty, zero, negative, or not an integer. An individual app can override this via its `twoFactorTrustDays` field. |
 
+### Rate limiting (optional)
+
+Two NestJS throttler buckets (`@nestjs/throttler`), applied globally, keyed per-client-IP. `default` covers every route that doesn't opt into a tighter bucket; `auth` covers the endpoints where brute-forcing a credential, code, or token is the risk (currently `POST /api/token/direct/login` and `GET /api/token/oauth/authorize`). Both buckets are forced to a 10,000/min limit when `NODE_ENV=test` so the e2e suite doesn't trip them. Like `REGISTER_RATE_LIMIT` below, these counters are in-process — a multi-instance deployment needs a shared store (Redis, etc.) for consistent enforcement across pods. Unlike `REGISTER_RATE_LIMIT`, `0` here does **not** mean unlimited: unset, blank, zero, negative, or non-numeric values all fall back to the hardcoded default, so misconfiguration fails toward "still rate-limited," not "wide open."
+
+| Variable                | Description                                                              | Default |
+|--------------------------|--------------------------------------------------------------------------|---------|
+| `DEFAULT_RATE_LIMIT`     | Max requests per IP per window for the `default` bucket.                 | `120`   |
+| `DEFAULT_RATE_WINDOW_MS` | Window length in milliseconds for `DEFAULT_RATE_LIMIT`.                  | `60000` (1 min) |
+| `AUTH_RATE_LIMIT`        | Max requests per IP per window for the `auth` bucket.                    | `10`    |
+| `AUTH_RATE_WINDOW_MS`    | Window length in milliseconds for `AUTH_RATE_LIMIT`.                     | `60000` (1 min) |
+
+See also [Self-serve Registration rate limiting](#rate-limiting) for the separate, differently-defaulted `REGISTER_RATE_LIMIT`/`REGISTER_RATE_WINDOW_MS` pair that guards `POST /api/register`.
+
 ### Observability (optional)
 
 Leave blank to disable. See [Observability](#observability) for behavior.
@@ -571,12 +586,12 @@ After successful authentication, SassyAuth validates that the user's org is asso
 <redirect_uri>?code=<code>&state=<state>
 ```
 
-How the `redirect_uri` is validated depends on the app's `sa_app` row:
+How the `redirect_uri` is validated depends on whether the app has any registered `login`-kind redirect URIs (`SaAppRedirectUri` table):
 
-- **Default (no `callbackUrl` set):** the `redirect_uri` must share an origin (scheme + host + port) with the app's registered `url`. Any path under that origin is accepted.
-- **With `callbackUrl` set:** the `redirect_uri` must equal the configured `callbackUrl` exactly. A trailing-slash difference is tolerated; scheme, host, port, path, and query string must otherwise match.
+- **Default (no `login` URI registered for the app):** the `redirect_uri` must share an origin (scheme + host + port) with the app's registered `url`. Any path under that origin is accepted. This is the pre-OIDC behavior, preserved so existing apps keep working unchanged.
+- **One or more `login` URIs registered:** the `redirect_uri` must exactly match one of them (scheme + host + port + path + query). A single trailing-slash difference in the path is tolerated; everything else must match byte-for-byte.
 
-A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_redirect_uri`. Note that registering an app whose `url` or `callbackUrl` uses `http` or a `localhost`/loopback host requires the auth server to run with `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true`; by default both must be `https` with a public host (see [Environment Variables](#environment-variables)).
+A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_redirect_uri`. Note that registering an app whose `url` or a registered redirect URI uses `http` or a `localhost`/loopback host requires the auth server to run with `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true`; by default both must be `https` with a public host (see [Environment Variables](#environment-variables)).
 
 **Step 4 — Exchange the code + verifier for a JWT**
 
@@ -649,6 +664,41 @@ POST /api/users/:id/resend-invitation  → admin reissues invitation for a pendi
 ```
 
 Invitations expire after 7 days. See `apps/auth-server/src/invitations/` and `apps/admin/app/accept-invite/`.
+
+### OIDC support
+
+SassyAuth layers a minimal OpenID Connect surface on top of Flow A. It is not a certified OIDC provider (see [What SassyAuth is not](#what-sassyauth-is-not)), but the pieces below interoperate with a standard OIDC relying-party library.
+
+**Discovery.** `GET /.well-known/openid-configuration` (served at the host root, not under `/api`) returns the standard OIDC discovery document — `issuer`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`, `jwks_uri`, and the supported scopes/claims/algorithms. An RFC 8414 OAuth-only variant is also served at `/.well-known/oauth-authorization-server` for clients that only need the OAuth subset. Neither doc advertises `end_session_endpoint` — RP-Initiated Logout is not implemented yet.
+
+**`id_token` issuance.** Include `openid` in the `scope` parameter at the authorize step (`&scope=openid+profile+email`) and the token response includes a signed `id_token` alongside the access token:
+
+```
+GET /api/token/oauth/authorize?...&scope=openid+profile+email&nonce=<client-generated-nonce>
+```
+
+```json
+{
+  "access_token": "<RS256 JWT>",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "openid profile email",
+  "id_token": "<RS256 JWT>"
+}
+```
+
+The `id_token` is RS256-signed with the same key as the access token and JWKS doc, and includes `sub`, `aud`, `iss`, `org`, `auth_time`, `amr`, `at_hash`, and — only when granted — `name`/`given_name`/`family_name` (from `profile`) and `email`/`email_verified` (from `email`). If a `nonce` was sent at the authorize step, it is echoed back in the `id_token`; **the relying party is responsible for validating it** (compare the returned `nonce` against the one it generated and stored before redirecting) — this server carries `nonce` through the flow but does not validate it itself, per the OIDC Core spec.
+
+**`/userinfo`.** `GET /api/token/oauth/userinfo` with `Authorization: Bearer <access_token>` returns the same scope-gated identity claims as the `id_token`, derived from the presented token's own `scope` claim — it can never return more than the token was granted:
+
+```bash
+curl http://localhost:3000/api/token/oauth/userinfo \
+  -H "Authorization: Bearer <access_token>"
+```
+
+```json
+{ "sub": "<userPublicId>", "email": "user@example.com", "email_verified": true }
+```
 
 ---
 

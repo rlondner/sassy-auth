@@ -4,6 +4,67 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-02
+
+The first substantial `dev` diff since 2026-08-25: OIDC compatibility
+landed in full (RFC 8414 + OIDC discovery, `id_token` issuance,
+`/userinfo`, nonce/scope carried on authorization codes, PKCE
+timing-safe comparison restored, `redirect_uri` matched against a
+registered per-app set), followed same-day by a two-commit fix for the
+login `next=` redirect and a new configurable-rate-limits feature. Also
+in this window: the long-stuck daily-review PR backlog (`#349`–`#365`,
+tracked since 2026-08-24) finally merged into `master`, and two Sentry
+bugs were fixed directly. See
+[BUGS_2026-09-02.md](./docs/history/bugs/BUGS_2026-09-02.md) and
+[TODO_2026-09-02.md](./docs/history/todo/TODO_2026-09-02.md).
+
+### Added
+
+- **OIDC compatibility**: `/.well-known/openid-configuration` discovery
+  document; RS256-signed `id_token` issuance when the `openid` scope is
+  granted (with `at_hash`, `auth_time`, `amr`, and `nonce` carried
+  through from the authorization request); a `/userinfo` endpoint gated
+  by the presented access token's own `scope` claim; `nonce` and granted
+  `scope` now persist on `SaOauthCode` end-to-end. `redirect_uri` is now
+  matched against a registered per-app set (`SaAppRedirectUri`) with a
+  same-origin fallback preserved for apps with none registered.
+- **Configurable rate limits**: `DEFAULT_RATE_LIMIT`/
+  `DEFAULT_RATE_WINDOW_MS` and `AUTH_RATE_LIMIT`/`AUTH_RATE_WINDOW_MS`
+  now control the two NestJS throttler buckets via `.env`, instead of
+  being hardcoded. Misconfiguration (unset, blank, zero, negative,
+  non-numeric) falls back to the previous hardcoded defaults rather than
+  disabling the limiter.
+
+### Fixed (2 bugs from Sentry + 1 from this review)
+
+- **Sentry-reported issues** — two bugs found via Sentry error tracking
+  and a broken Sentry instrumentation setup were fixed directly on
+  `dev` (`f270388`, `82123e4`).
+- **OAuth login `next=` redirect** — the admin-console login/enrollment
+  redirect's `next=` value was built from a bare route fragment
+  (`oauth/authorize?...`), which the admin app's `validateNextUrl`
+  rejects, silently falling back to `/users` instead of resuming the
+  OAuth flow after sign-in. Fixed in two steps: first to the full
+  site-relative path, then to a fully absolute URL back to this auth
+  server's own origin (the admin console runs on a different origin, so
+  a relative path 404s against the wrong host).
+- **bug-0277** (Medium) — `/.well-known/openid-configuration` advertised
+  an `end_session_endpoint` at `/api/token/oauth/logout` with no
+  controller route behind it (RP-Initiated Logout was speced but never
+  implemented). Removed the false advertisement. PR #370.
+
+### Found (1 bug)
+
+- **bug-0277** — see Fixed above.
+
+### Docs
+
+- The daily-review backlog merge, README OIDC section, and rate-limit
+  env var docs are covered in this same review cycle's docs PR — see
+  the README diff for the new "OIDC support" subsection and updated
+  "What SassyAuth is not" wording (id_token/`/userinfo`/discovery are no
+  longer accurate to describe as absent).
+
 ## [Unreleased] — 2026-08-28
 
 No commits landed on `master` in the last 24 hours (`master` has been at
