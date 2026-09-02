@@ -26,14 +26,30 @@ import { SocialModule } from './social/social.module';
 // e2e runs (which hammer the same endpoints repeatedly) don't trip
 // the limiter.
 const isTest = process.env.NODE_ENV === 'test';
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 const throttlerConfig = isTest
   ? [
       { name: 'default', ttl: 60_000, limit: 10_000 },
       { name: 'auth', ttl: 60_000, limit: 10_000 },
     ]
   : [
-      { name: 'default', ttl: 60_000, limit: 120 }, // 2 req/s sustained per IP
-      { name: 'auth', ttl: 60_000, limit: 10 },    // 10 attempts/min per IP on sensitive paths
+      {
+        name: 'default',
+        ttl: envInt('DEFAULT_RATE_WINDOW_MS', 60_000),
+        limit: envInt('DEFAULT_RATE_LIMIT', 120), // 2 req/s sustained per IP
+      },
+      {
+        name: 'auth',
+        ttl: envInt('AUTH_RATE_WINDOW_MS', 60_000),
+        limit: envInt('AUTH_RATE_LIMIT', 10), // attempts/window per IP on sensitive paths
+      },
     ];
 
 @Module({
