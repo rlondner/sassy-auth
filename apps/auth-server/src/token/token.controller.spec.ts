@@ -601,11 +601,11 @@ describe('TokenController', () => {
 
       const nextParam = new URL(res.url).searchParams.get('next');
       expect(nextParam).toBeTruthy();
-      // The next value must be a same-origin path the admin app's
-      // validateNextUrl will actually accept (starts with "/" and resolves
-      // back to the real authorize endpoint) — not just carry the right
-      // query params on some arbitrary string.
-      expect((nextParam as string).startsWith(`${OAUTH_AUTHORIZE_PATH}?`)).toBe(true);
+      // The next value must be an absolute URL pointing back at this auth
+      // server's own origin: it's handed to the admin app, which runs on a
+      // different origin, and ultimately becomes a browser redirect. A bare
+      // path resolves against the admin app's origin and 404s there.
+      expect((nextParam as string).startsWith(`${resolveIssuer()}${OAUTH_AUTHORIZE_PATH}?`)).toBe(true);
       const nextParams = new URLSearchParams((nextParam as string).split('?')[1]);
       expect(nextParams.get('scope')).toBe('openid profile');
       expect(nextParams.get('nonce')).toBe('n-abc');
@@ -638,10 +638,10 @@ describe('TokenController', () => {
       expect(res.url).toContain('/login?next=');
       const nextParam = new URL(res.url).searchParams.get('next');
       expect(nextParam).toBeTruthy();
-      // Must be a same-origin path validateNextUrl (apps/admin/lib/safe-next.ts)
-      // will accept — a bare route fragment like "oauth/authorize?..." fails
-      // that check and silently falls back to /users after login.
-      expect((nextParam as string).startsWith(`${OAUTH_AUTHORIZE_PATH}?`)).toBe(true);
+      // Must be an absolute URL pointing at this auth server's own origin —
+      // apps/admin runs on a different origin, so a bare path here resolves
+      // against the admin app instead and 404s once the browser follows it.
+      expect((nextParam as string).startsWith(`${resolveIssuer()}${OAUTH_AUTHORIZE_PATH}?`)).toBe(true);
       const nextParams = new URLSearchParams((nextParam as string).split('?')[1]);
       expect(nextParams.get('state')).toBe('csrf-state');
       expect(nextParams.get('scope')).toBe('openid profile');

@@ -54,6 +54,7 @@ import {
   OAUTH_AUTHORIZE_ROUTE,
   OAUTH_TOKEN_ROUTE,
   OAUTH_USERINFO_ROUTE,
+  resolveIssuer,
   TOKEN_CONTROLLER_PATH,
 } from './oauth-metadata';
 import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
@@ -201,7 +202,12 @@ export class TokenController {
           if (state) query.set('state', state);
           if (scope) query.set('scope', scope);
           if (nonce) query.set('nonce', nonce);
-          const nextPath = `${OAUTH_AUTHORIZE_PATH}?${query.toString()}`;
+          // Absolute URL, not a bare path: `next` is handed to the admin
+          // app (a different origin from this auth server) and ultimately
+          // becomes a browser-side redirect. A relative path resolves
+          // against the admin app's own origin and 404s there instead of
+          // reaching this server.
+          const nextPath = `${resolveIssuer()}${OAUTH_AUTHORIZE_PATH}?${query.toString()}`;
           const enrollUrl = `${adminUrl.replace(/\/$/, '')}/account/security?enroll=1&next=${encodeURIComponent(nextPath)}`;
           this.logger.getWinstonLogger().info('OAuth authorize: forced 2FA enrollment', {
             context: 'TokenController', appId: clientId, userId: saUser.publicId,
@@ -267,7 +273,9 @@ export class TokenController {
           if (state) query.set('state', state);
           if (scope) query.set('scope', scope);
           if (nonce) query.set('nonce', nonce);
-          const nextPath = `${OAUTH_AUTHORIZE_PATH}?${query.toString()}`;
+          // Absolute URL — see the same-shaped comment on the forced-2FA
+          // enrollment redirect above.
+          const nextPath = `${resolveIssuer()}${OAUTH_AUTHORIZE_PATH}?${query.toString()}`;
           const loginUrl = `${adminUrl.replace(/\/$/, '')}/login?next=${encodeURIComponent(nextPath)}`;
           return { url: loginUrl, statusCode: 302 };
         }
