@@ -9,7 +9,7 @@ import { OauthService } from './oauth.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { resolveIssuer } from './oauth-metadata';
+import { OAUTH_AUTHORIZE_PATH, resolveIssuer } from './oauth-metadata';
 
 jest.mock('@sentry/nestjs', () => ({
   setTag: jest.fn(),
@@ -601,6 +601,11 @@ describe('TokenController', () => {
 
       const nextParam = new URL(res.url).searchParams.get('next');
       expect(nextParam).toBeTruthy();
+      // The next value must be a same-origin path the admin app's
+      // validateNextUrl will actually accept (starts with "/" and resolves
+      // back to the real authorize endpoint) — not just carry the right
+      // query params on some arbitrary string.
+      expect((nextParam as string).startsWith(`${OAUTH_AUTHORIZE_PATH}?`)).toBe(true);
       const nextParams = new URLSearchParams((nextParam as string).split('?')[1]);
       expect(nextParams.get('scope')).toBe('openid profile');
       expect(nextParams.get('nonce')).toBe('n-abc');
@@ -633,6 +638,10 @@ describe('TokenController', () => {
       expect(res.url).toContain('/login?next=');
       const nextParam = new URL(res.url).searchParams.get('next');
       expect(nextParam).toBeTruthy();
+      // Must be a same-origin path validateNextUrl (apps/admin/lib/safe-next.ts)
+      // will accept — a bare route fragment like "oauth/authorize?..." fails
+      // that check and silently falls back to /users after login.
+      expect((nextParam as string).startsWith(`${OAUTH_AUTHORIZE_PATH}?`)).toBe(true);
       const nextParams = new URLSearchParams((nextParam as string).split('?')[1]);
       expect(nextParams.get('state')).toBe('csrf-state');
       expect(nextParams.get('scope')).toBe('openid profile');

@@ -50,6 +50,7 @@ import { buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error
 import { LoggerService } from '../common/logger/logger.service';
 import {
   JWKS_ROUTE,
+  OAUTH_AUTHORIZE_PATH,
   OAUTH_AUTHORIZE_ROUTE,
   OAUTH_TOKEN_ROUTE,
   OAUTH_USERINFO_ROUTE,
@@ -195,7 +196,7 @@ export class TokenController {
           if (state) query.set('state', state);
           if (scope) query.set('scope', scope);
           if (nonce) query.set('nonce', nonce);
-          const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
+          const nextPath = `${OAUTH_AUTHORIZE_PATH}?${query.toString()}`;
           const enrollUrl = `${adminUrl.replace(/\/$/, '')}/account/security?enroll=1&next=${encodeURIComponent(nextPath)}`;
           this.logger.getWinstonLogger().info('OAuth authorize: forced 2FA enrollment', {
             context: 'TokenController', appId: clientId, userId: saUser.publicId,
@@ -261,7 +262,7 @@ export class TokenController {
           if (state) query.set('state', state);
           if (scope) query.set('scope', scope);
           if (nonce) query.set('nonce', nonce);
-          const nextPath = `${OAUTH_AUTHORIZE_ROUTE}?${query.toString()}`;
+          const nextPath = `${OAUTH_AUTHORIZE_PATH}?${query.toString()}`;
           const loginUrl = `${adminUrl.replace(/\/$/, '')}/login?next=${encodeURIComponent(nextPath)}`;
           return { url: loginUrl, statusCode: 302 };
         }

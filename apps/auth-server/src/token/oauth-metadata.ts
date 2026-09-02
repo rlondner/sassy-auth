@@ -16,6 +16,16 @@ export const JWKS_ROUTE = 'jwks';
 // discovery URLs from it) so the two cannot drift.
 export const NEST_GLOBAL_PREFIX = 'api';
 
+// The site-relative path (leading slash, full mount prefix) of the authorize
+// endpoint, as actually served. OAUTH_AUTHORIZE_ROUTE alone is only the
+// per-controller route fragment Nest's @Get() decorator takes — it omits the
+// global prefix and the controller path, so it is NOT a valid `next` value
+// for a same-origin redirect back into this endpoint (the admin app's
+// validateNextUrl rejects anything that doesn't start with "/" or match an
+// allowlisted absolute origin). Use this constant wherever the authorize
+// endpoint is referenced as a redirect target.
+export const OAUTH_AUTHORIZE_PATH = `/${NEST_GLOBAL_PREFIX}/${TOKEN_CONTROLLER_PATH}/${OAUTH_AUTHORIZE_ROUTE}`;
+
 // RFC 8414 well-known URI. Must be served at the host root, not under /api.
 export const OAUTH_AS_METADATA_PATH = '.well-known/oauth-authorization-server';
 
