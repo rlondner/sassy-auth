@@ -108,6 +108,18 @@ describe('SignupForm', () => {
     )
   })
 
+  it('shows an error and clears the loading state when registerAction rejects', async () => {
+    mockRegisterAction.mockRejectedValue(new Error('boom'))
+    render(<SignupForm clientId="sq_1" next="" />)
+    fillValidForm()
+    fireEvent.click(screen.getByText('signup.submit'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('signup-error')).toHaveTextContent('signup.errors.validationError'),
+    )
+    expect(screen.getByText('signup.submit').closest('button')).not.toBeDisabled()
+  })
+
   it('shows the success state and a link to /login after a successful submit', async () => {
     render(<SignupForm clientId="sq_1" next="" />)
     fillValidForm()

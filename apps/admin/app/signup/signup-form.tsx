@@ -41,14 +41,19 @@ export function SignupForm({ clientId, next }: SignupFormProps) {
     }
     setError(null)
     setSubmitting(true)
-    const result = await registerAction({ clientId, firstName, lastName, companyName, email, password })
-    setSubmitting(false)
-    if ('error' in result) {
-      const key = (KNOWN_ERRORS as readonly string[]).includes(result.error) ? result.error : 'validationError'
-      setError(t(`signup.errors.${key as (typeof KNOWN_ERRORS)[number]}`))
-      return
+    try {
+      const result = await registerAction({ clientId, firstName, lastName, companyName, email, password })
+      if ('error' in result) {
+        const key = (KNOWN_ERRORS as readonly string[]).includes(result.error) ? result.error : 'validationError'
+        setError(t(`signup.errors.${key as (typeof KNOWN_ERRORS)[number]}`))
+        return
+      }
+      setSuccess(true)
+    } catch {
+      setError(t('signup.errors.validationError'))
+    } finally {
+      setSubmitting(false)
     }
-    setSuccess(true)
   }
 
   if (success) {
