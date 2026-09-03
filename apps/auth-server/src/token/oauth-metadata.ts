@@ -85,7 +85,13 @@ function stripTrailingSlash(s: string): string {
 }
 
 export const OAUTH_USERINFO_ROUTE = 'oauth/userinfo';
-export const OAUTH_LOGOUT_ROUTE = 'oauth/logout';
+// NOTE: there is deliberately no OAUTH_LOGOUT_ROUTE / end_session_endpoint here.
+// RP-Initiated Logout (OIDC front-channel logout) is not implemented — no
+// controller route exists for it (see bug-0277) — so it must not be advertised
+// in the discovery doc below. `assertPostLogoutRedirectUriAllowed` in
+// redirect-uri.ts and the 'post_logout' SaAppRedirectUri kind exist ahead of
+// that future endpoint; wire OAUTH_LOGOUT_ROUTE + this field back in together
+// when that endpoint actually ships.
 
 // OIDC Discovery well-known URI. Like RFC 8414, served at the host root.
 export const OIDC_METADATA_PATH = '.well-known/openid-configuration';
@@ -103,7 +109,6 @@ export interface OpenIdConfiguration {
   authorization_endpoint: string;
   token_endpoint: string;
   userinfo_endpoint: string;
-  end_session_endpoint: string;
   jwks_uri: string;
   scopes_supported: readonly string[];
   response_types_supported: readonly string[];
@@ -125,7 +130,6 @@ export function buildOpenIdConfiguration(issuer: string): OpenIdConfiguration {
     token_endpoint: oauth.token_endpoint,
     jwks_uri: oauth.jwks_uri,
     userinfo_endpoint: `${tokenRoot}/${OAUTH_USERINFO_ROUTE}`,
-    end_session_endpoint: `${tokenRoot}/${OAUTH_LOGOUT_ROUTE}`,
     scopes_supported: [...SCOPES_SUPPORTED],
     response_types_supported: oauth.response_types_supported,
     grant_types_supported: oauth.grant_types_supported,
