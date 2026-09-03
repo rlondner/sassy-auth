@@ -16,41 +16,28 @@ import { MeModule } from './me/me.module';
 import { RegistrationModule } from './registration/registration.module';
 import { TestSupportModule } from './test-support/test-support.module';
 import { SocialModule } from './social/social.module';
+import { DEFAULT_THROTTLE, AUTH_THROTTLE } from './common/config/rate-limit-config';
 
 // bug-0080: Two throttler buckets — a generous `default` for the
 // general API surface and a tight `auth` bucket for endpoints where
 // brute-forcing a credential is the risk (direct login, invitation
-// validation, invitation accept). `@Throttle({ auth: { ... } })` on
+// validation, invitation accept). `@Throttle({ auth: AUTH_THROTTLE })` on
 // those handlers narrows the limit; everything else falls back to
 // `default`. In `test` mode both buckets are effectively disabled so
 // e2e runs (which hammer the same endpoints repeatedly) don't trip
 // the limiter.
+//
+// bug-0278: DEFAULT_THROTTLE / AUTH_THROTTLE (common/config/rate-limit-config.ts)
+// are the single source of truth for these numbers — every per-route
+// @Throttle() override below imports the same constants instead of
+// re-hardcoding them, so AUTH_RATE_LIMIT / AUTH_RATE_WINDOW_MS actually
+// take effect everywhere the `auth` bucket is used.
 const isTest = process.env.NODE_ENV === 'test';
 
-function envInt(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-const throttlerConfig = isTest
-  ? [
-      { name: 'default', ttl: 60_000, limit: 10_000 },
-      { name: 'auth', ttl: 60_000, limit: 10_000 },
-    ]
-  : [
-      {
-        name: 'default',
-        ttl: envInt('DEFAULT_RATE_WINDOW_MS', 60_000),
-        limit: envInt('DEFAULT_RATE_LIMIT', 120), // 2 req/s sustained per IP
-      },
-      {
-        name: 'auth',
-        ttl: envInt('AUTH_RATE_WINDOW_MS', 60_000),
-        limit: envInt('AUTH_RATE_LIMIT', 10), // attempts/window per IP on sensitive paths
-      },
-    ];
+const throttlerConfig = [
+  { name: 'default', ...DEFAULT_THROTTLE },
+  { name: 'auth', ...AUTH_THROTTLE },
+];
 
 @Module({
   imports: [
