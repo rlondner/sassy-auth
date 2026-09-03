@@ -131,6 +131,28 @@ describe('LoginForm', () => {
 
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument()
   })
+
+  it('shows a signup link when next carries a client_id', () => {
+    wrap(<LoginForm next="/api/token/oauth/authorize?client_id=sq_1&redirect_uri=x" authServerUrl="https://auth.test" />)
+
+    const link = screen.getByText(messages.login.signupLink).closest('a')
+    expect(link).toHaveAttribute(
+      'href',
+      '/signup?client_id=sq_1&next=%2Fapi%2Ftoken%2Foauth%2Fauthorize%3Fclient_id%3Dsq_1%26redirect_uri%3Dx',
+    )
+  })
+
+  it('hides the signup link when next has no client_id', () => {
+    wrap(<LoginForm next="/orgs" authServerUrl="https://auth.test" />)
+
+    expect(screen.queryByText(messages.login.signupLink)).not.toBeInTheDocument()
+  })
+
+  it('hides the signup link when there is no next at all', () => {
+    wrap(<LoginForm next="" authServerUrl="https://auth.test" />)
+
+    expect(screen.queryByText(messages.login.signupLink)).not.toBeInTheDocument()
+  })
 })
 
 describe('LoginOtpForm', () => {
