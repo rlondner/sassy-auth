@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { RegistrationService } from './registration.service';
 import { RegisterDto } from './register.dto';
-import { RateLimitGuard } from './rate-limit.guard';
+import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
 
 /**
  * Public (no BetterAuthGuard) self-serve signup endpoint.
@@ -34,11 +34,15 @@ export class RegistrationController {
    * distinguishable response is unavoidable here since the whole point is
    * to surface the app's name. bug-0279: that made it an unauthenticated,
    * unrate-limited enumeration surface for appPublicId, unlike POST
-   * /api/register right above it. Reuse the same RateLimitGuard so a caller
-   * can't sweep the appPublicId space at will.
+   * /api/register right above it. Uses AppLookupRateLimitGuard — a
+   * separate DI singleton subclass of RateLimitGuard with its own
+   * independent budget/counter — so this route (called on every /signup
+   * page load) can't sweep the appPublicId space at will, while also not
+   * sharing (and thus exhausting) the POST /api/register budget just from
+   * page views.
    */
   @Get('app')
-  @UseGuards(RateLimitGuard)
+  @UseGuards(AppLookupRateLimitGuard)
   getAppName(@Query('appPublicId') appPublicId: string) {
     return this.service.getAppName(appPublicId);
   }

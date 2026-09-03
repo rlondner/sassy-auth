@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { RegistrationController } from './registration.controller';
 import { RegistrationService } from './registration.service';
-import { RateLimitGuard } from './rate-limit.guard';
+import { AppLookupRateLimitGuard } from './rate-limit.guard';
 
 describe('RegistrationController', () => {
   let controller: RegistrationController;
@@ -32,11 +32,13 @@ describe('RegistrationController', () => {
 
     // bug-0279: this route responds 200/404 distinguishably (unlike its
     // documented sibling GET /api/social-providers), making it an
-    // enumeration oracle for appPublicId. It must carry the same
-    // RateLimitGuard as POST /api/register so it can't be swept at will.
-    it('carries RateLimitGuard, same as POST /api/register', () => {
+    // enumeration oracle for appPublicId. It must carry a rate-limit guard
+    // so it can't be swept at will. It uses AppLookupRateLimitGuard — a
+    // separate DI singleton from RateLimitGuard (see rate-limit.guard.ts)
+    // so this route's budget doesn't share state with POST /api/register.
+    it('carries AppLookupRateLimitGuard, a rate limiter independent of POST /api/register', () => {
       const guards = Reflect.getMetadata(GUARDS_METADATA, RegistrationController.prototype.getAppName);
-      expect(guards).toContain(RateLimitGuard);
+      expect(guards).toContain(AppLookupRateLimitGuard);
     });
   });
 });
