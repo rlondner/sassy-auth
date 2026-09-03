@@ -3,7 +3,7 @@ name: AI Semantic Security Review
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main, master]
+    branches: [main, master, dev]
 
 # 1. HARDENING: Restrict permissions globally.
 # Actions default to broad access. This limits the token to read-only code access

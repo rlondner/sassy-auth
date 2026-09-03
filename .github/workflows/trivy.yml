@@ -2,7 +2,7 @@ name: Dependency & CVE Scan (Trivy)
 
 on:
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
   schedule:
     # Daily at midnight UTC. CVE databases update constantly;
     # this catches new vulnerabilities even if no code changes occur.
