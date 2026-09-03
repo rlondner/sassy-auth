@@ -15,6 +15,12 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Dummy value only: packages/db/index.ts fails fast if DATABASE_URL is
+      # unset, and apps/auth-server imports it transitively in several suites
+      # without mocking it. Nothing in these unit suites actually queries a
+      # database, so an unreachable-but-valid connection string is sufficient.
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
 
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +39,7 @@ jobs:
       # @sassy-auth/db and @sassy-auth/types through their built output, and
       # `prisma generate` is what produces the db package's types.
       - name: Generate Prisma client
-        run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
+        run: pnpm --filter @sassy-auth/db exec prisma generate
 
       - name: Build shared packages
         run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
