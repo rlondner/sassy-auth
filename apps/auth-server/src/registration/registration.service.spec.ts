@@ -203,4 +203,27 @@ describe('RegistrationService', () => {
     });
   });
 
+  describe('getAppName', () => {
+    it('returns the app name for a known appPublicId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp' });
+
+      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp' });
+      expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        select: { name: true },
+      });
+    });
+
+    it('throws NotFoundException for an unknown appPublicId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+
+      await expect(service.getAppName('nope')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException for an empty appPublicId without querying the database', async () => {
+      await expect(service.getAppName('')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockPrisma.saApp.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
 });

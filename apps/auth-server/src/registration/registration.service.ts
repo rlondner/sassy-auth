@@ -91,4 +91,14 @@ export class RegistrationService {
       throw e;
     }
   }
+
+  async getAppName(appPublicId: string): Promise<{ name: string }> {
+    if (!appPublicId) throw new NotFoundException('App not found');
+    const app = await prisma.saApp.findUnique({
+      where: { publicId: appPublicId },
+      select: { name: true },
+    });
+    if (!app) throw new NotFoundException('App not found');
+    return { name: app.name };
+  }
 }
