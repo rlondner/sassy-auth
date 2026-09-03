@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-03
+
+`feat/oidc-compatibility` finished merging into `dev` (`8db2fd7`),
+including RP-Initiated Logout — resolving the "speced but not implemented"
+gap flagged 2026-09-02. Also landed: two vibecast seed-permission commits
+and an app-vs-org settings-permission split. Reviewed in full but not
+merged anywhere: `feature/admin-signup` (12 commits, self-serve signup end
+to end — admin console `/signup` page, `POST /api/register`
+firstName/lastName support, a public app-name lookup, a signup link on
+`/login`); two bugs found on it were fixed directly on the branch. One bug
+found on `dev` itself has a normal fix PR. See
+[BUGS_2026-09-03.md](./docs/history/bugs/BUGS_2026-09-03.md) and
+[TODO_2026-09-03.md](./docs/history/todo/TODO_2026-09-03.md).
+
+### Fixed (1 bug)
+
+- **bug-0278** (High) — `@Throttle({ auth: { limit: 10, ttl: 60_000 } })`
+  on `POST /api/token/direct/login`, `GET /api/token/oauth/authorize`, and
+  every `InvitationsController` route hardcoded literal numbers instead of
+  reading `AUTH_RATE_LIMIT` / `AUTH_RATE_WINDOW_MS` — the env vars
+  yesterday's `a259450` added specifically to make these limits
+  configurable had zero effect on any of them, since an explicit
+  `{ limit, ttl }` on a route's `@Throttle()` overrides the named bucket's
+  module config rather than just selecting it. Extracted a shared
+  `common/config/rate-limit-config.ts` so the module-level throttler config
+  and every per-route override read the same values. PR #372.
+
+### Found (1 bug on `dev`, 2 on the unmerged `feature/admin-signup` branch)
+
+- **bug-0278** — see Fixed above.
+- **bug-0279** (Medium, `feature/admin-signup` only) — the new
+  `GET /api/register/app` app-name lookup carried no rate limiting and is a
+  distinguishable-response enumeration oracle for `appPublicId`, unlike the
+  sibling endpoint its own docstring claims parity with. Fixed directly on
+  the branch (`RateLimitGuard` reused from `POST /api/register`).
+- **bug-0280** (High, `feature/admin-signup` only) — the new
+  `RegisterDto.password` only required 8 characters with no complexity
+  check, regressing the 12-char + upper/lower/digit policy `bug-0007`
+  established elsewhere. Fixed directly on the branch (same
+  `MinLength`/`Matches` pattern as `AcceptInvitationDto`).
+
+### Docs
+
+- Daily code review bundle for 2026-09-03 (this entry, plus
+  `TODO_2026-09-03.md` and `BUGS_2026-09-03.md`).
+
 ## [Unreleased] — 2026-09-02
 
 The first substantial `dev` diff since 2026-08-25: OIDC compatibility

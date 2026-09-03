@@ -177,7 +177,7 @@ Verify it in your resource server against `http://localhost:3000/api/token/jwks`
 
 Knowing the boundaries up front will save you an afternoon:
 
-- **Not a certified OpenID Connect provider.** It publishes RFC 8414 metadata and a `/.well-known/openid-configuration` discovery document, issues a signed `id_token` when the `openid` scope is granted, and serves `/userinfo` — see [OIDC support](#oidc-support). There is no OIDC certification, no RP-Initiated Logout endpoint yet (`end_session_endpoint` is deliberately not advertised — see bug-0277), and no dynamic client registration. Consumers that don't need OIDC can keep reading identity from the JWT's `sub` / `org` / `aud` claims, or call `/api/me`.
+- **Not a certified OpenID Connect provider.** It publishes RFC 8414 metadata and a `/.well-known/openid-configuration` discovery document, issues a signed `id_token` when the `openid` scope is granted, serves `/userinfo`, and supports RP-Initiated Logout (`end_session_endpoint`) — see [OIDC support](#oidc-support). There is no OIDC certification and no dynamic client registration. Consumers that don't need OIDC can keep reading identity from the JWT's `sub` / `org` / `aud` claims, or call `/api/me`.
 - **No refresh tokens.** Access tokens live one hour and there is no refresh grant, no token introspection, and no revocation endpoint. Re-run the flow when a token expires.
 - **No SAML, LDAP, or SCIM.** Social login is limited to the three providers this repo wires up (Google, Microsoft, Apple) — see [Social Sign-In](#social-sign-in).
 - **Not horizontally scalable as shipped.** Rate limiting keeps its counters in process, so each pod enforces its own budget. See [Known Limitations](#known-limitations).
@@ -669,7 +669,13 @@ Invitations expire after 7 days. See `apps/auth-server/src/invitations/` and `ap
 
 SassyAuth layers a minimal OpenID Connect surface on top of Flow A. It is not a certified OIDC provider (see [What SassyAuth is not](#what-sassyauth-is-not)), but the pieces below interoperate with a standard OIDC relying-party library.
 
-**Discovery.** `GET /.well-known/openid-configuration` (served at the host root, not under `/api`) returns the standard OIDC discovery document — `issuer`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`, `jwks_uri`, and the supported scopes/claims/algorithms. An RFC 8414 OAuth-only variant is also served at `/.well-known/oauth-authorization-server` for clients that only need the OAuth subset. Neither doc advertises `end_session_endpoint` — RP-Initiated Logout is not implemented yet.
+**Discovery.** `GET /.well-known/openid-configuration` (served at the host root, not under `/api`) returns the standard OIDC discovery document — `issuer`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`, `jwks_uri`, `end_session_endpoint`, and the supported scopes/claims/algorithms. An RFC 8414 OAuth-only variant (without `end_session_endpoint`, which is OIDC-specific) is also served at `/.well-known/oauth-authorization-server` for clients that only need the OAuth subset.
+
+**RP-Initiated Logout.** `GET /api/token/oauth/logout` always terminates the SassyAuth session first, unconditionally — a failed or missing hint never leaves the caller signed in. It then redirects: to `${ADMIN_URL}/logged-out` by default, or to the caller-supplied `post_logout_redirect_uri` only when `id_token_hint` verifies and names an app (`aud`) that has that exact URI registered (`assertPostLogoutRedirectUriAllowed`) — otherwise it silently falls back to `/logged-out` rather than treating an unvalidated redirect target as an open redirect. An optional `state` is echoed back as a query param on the redirect target.
+
+```
+GET /api/token/oauth/logout?id_token_hint=<id_token>&post_logout_redirect_uri=<registered-uri>&state=<opaque>
+```
 
 **`id_token` issuance.** Include `openid` in the `scope` parameter at the authorize step (`&scope=openid+profile+email`) and the token response includes a signed `id_token` alongside the access token:
 
@@ -874,6 +880,7 @@ The endpoints you will use from a resource server:
 | GET    | `/api/token/jwks`                             | JWKS document with RS256 public key              |
 | GET    | `/api/token/oauth/authorize`                  | OAuth2 authorization — initiates login flow      |
 | POST   | `/api/token/oauth/token`                      | Exchange authorization code for JWT              |
+| GET    | `/api/token/oauth/logout`                     | OIDC RP-Initiated Logout — terminates the session and redirects ([details](#oidc-support)) |
 | POST   | `/api/token/direct/login`                     | Direct credential login — returns JWT            |
 | GET    | `/api/me`                                     | Caller's profile: org, app context, effective permissions |
 | POST   | `/api/register`                               | **Self-serve signup** — atomically create org + user + org↔app association ([details](#self-serve-registration-post-apiregister)) |
