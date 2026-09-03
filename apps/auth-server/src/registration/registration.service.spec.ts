@@ -44,6 +44,8 @@ const sqidFake: Pick<SqidService, 'encode' | 'decode'> = {
 const baseDto: RegisterDto = {
   email: 'alice@example.com',
   password: 'password123',
+  firstName: 'Alice',
+  lastName: 'Wonder',
   companyName: 'Acme Inc',
   appPublicId: 'sq_1',
 };
