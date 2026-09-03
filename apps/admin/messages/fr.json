@@ -483,6 +483,8 @@
     "password": "Mot de passe",
     "submit": "Se connecter",
     "forgotPassword": "Mot de passe oublié ?",
+    "signupPrompt": "Vous n'avez pas de compte ?",
+    "signupLink": "S'inscrire",
     "useCode": "Se connecter avec un code",
     "socialDivider": "ou continuer avec",
     "socialGoogle": "Continuer avec Google",
@@ -522,6 +524,32 @@
       "passwordTooShort": "Le mot de passe doit contenir au moins 12 caractères.",
       "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
       "genericError": "Une erreur est survenue."
+    }
+  },
+  "signup": {
+    "title": "Créez votre compte",
+    "titleWithApp": "Inscription à {appName}",
+    "subtitle": "Configurez votre organisation pour commencer.",
+    "invalidLink": "Ce lien d'inscription n'est pas valide. Demandez-en un nouveau à l'application concernée.",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "companyName": "Nom de l'entreprise",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "submit": "Créer le compte",
+    "success": "Compte créé ! Vous pouvez maintenant vous connecter.",
+    "continueToLogin": "Continuer vers la connexion",
+    "backToLogin": "Retour à la connexion",
+    "errors": {
+      "passwordMismatch": "Les mots de passe ne correspondent pas.",
+      "passwordTooShort": "Le mot de passe doit comporter au moins 12 caractères.",
+      "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
+      "appNotFound": "Nous n'avons pas trouvé l'application pour ce lien d'inscription.",
+      "emailTaken": "Un compte existe déjà avec cette adresse e-mail.",
+      "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
+      "serverUnavailable": "Impossible de joindre le serveur. Veuillez réessayer dans un instant.",
+      "validationError": "Impossible de créer votre compte. Vérifiez vos informations et réessayez."
     }
   },
   "security": {
