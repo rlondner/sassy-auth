@@ -20,9 +20,20 @@ const RESOURCE_ACTIONS: Record<(typeof RESOURCES)[number], readonly string[]> = 
   settings: BASE_ACTIONS,
 };
 
-const VIBECAST_PERMISSIONS: readonly string[] = RESOURCES.flatMap((resource) =>
-  RESOURCE_ACTIONS[resource].map((action) => `${APP_NAME}.${resource}.${action}`),
-);
+// Scoped app/org-level settings permissions, outside the resource.action combination matrix.
+const EXTRA_PERMISSIONS = [
+  'vibecast.app.settings.write',
+  'vibecast.app.settings.read',
+  'vibecast.org.settings.write',
+  'vibecast.org.settings.read',
+] as const;
+
+const VIBECAST_PERMISSIONS: readonly string[] = [
+  ...RESOURCES.flatMap((resource) =>
+    RESOURCE_ACTIONS[resource].map((action) => `${APP_NAME}.${resource}.${action}`),
+  ),
+  ...EXTRA_PERMISSIONS,
+];
 
 async function main() {
   const app = await prisma.saApp.findUnique({ where: { name: APP_NAME } });
