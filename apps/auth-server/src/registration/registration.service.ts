@@ -36,7 +36,7 @@ export class RegistrationService {
     let baUserId: string;
     try {
       const signUp = await auth.api.signUpEmail({
-        body: { email: dto.email, password: dto.password, name: dto.companyName },
+        body: { email: dto.email, password: dto.password, name: `${dto.firstName} ${dto.lastName}`.trim() },
       });
       baUserId = signUp.user.id;
     } catch (e: unknown) {
@@ -74,8 +74,8 @@ export class RegistrationService {
             publicId: baUserId.slice(0, 12),
             betterAuthUserId: baUserId,
             orgId: created.id,
-            firstName: dto.companyName,
-            lastName: '',
+            firstName: dto.firstName,
+            lastName: dto.lastName,
             status: 'active',
           },
         });

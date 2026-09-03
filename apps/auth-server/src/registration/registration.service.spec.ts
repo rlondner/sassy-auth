@@ -95,7 +95,7 @@ describe('RegistrationService', () => {
       const result = await service.register(baseDto);
 
       expect(mockSignUpEmail).toHaveBeenCalledWith({
-        body: { email: baseDto.email, password: baseDto.password, name: baseDto.companyName },
+        body: { email: baseDto.email, password: baseDto.password, name: 'Alice Wonder' },
       });
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
@@ -111,8 +111,8 @@ describe('RegistrationService', () => {
           publicId: baUserId.slice(0, 12),
           betterAuthUserId: baUserId,
           orgId: finalOrgRow.id,
-          firstName: baseDto.companyName,
-          lastName: '',
+          firstName: baseDto.firstName,
+          lastName: baseDto.lastName,
           status: 'active',
         },
       });
