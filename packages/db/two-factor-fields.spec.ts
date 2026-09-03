@@ -1,6 +1,6 @@
 // Smoke test: verify the Prisma client exposes the new 2FA fields
 // at the TypeScript level. This does NOT require a live database.
-import { Prisma } from '@prisma/client';
+import { Prisma } from './generated/prisma/client';
 
 describe('2FA schema additions', () => {
   it('User model has twoFactorEnabled field', () => {

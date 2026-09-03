@@ -33,7 +33,7 @@ jobs:
       # built output, so the workspace libraries must exist before tsc can
       # resolve them. `prisma generate` is what produces the db package's types.
       - name: Generate Prisma client
-        run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
+        run: pnpm --filter @sassy-auth/db exec prisma generate
 
       - name: Build shared packages
         run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build

@@ -48,6 +48,9 @@ apps/auth-server/.env
 .worktrees/
 .claude/worktrees/
 
+# Prisma
+packages/db/generated/
+
 .gstack/
 /tmp
 .claude/scheduled_tasks.lock

@@ -59,10 +59,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter @sassy-auth/db exec prisma generate --schema=schema.prisma
+        run: pnpm --filter @sassy-auth/db exec prisma generate
 
       - name: Apply migrations
-        run: pnpm --filter @sassy-auth/db exec prisma migrate deploy --schema=schema.prisma
+        run: pnpm --filter @sassy-auth/db exec prisma migrate deploy
 
       # The auth-server and admin apps import the workspace libraries via
       # their built output (`main: ./dist/index.js`). Compile them so the
