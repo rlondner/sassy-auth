@@ -528,9 +528,9 @@
   },
   "signup": {
     "title": "Créez votre compte",
-    "titleWithApp": "Inscription à {appName}",
+    "titleWithApp": "Créez votre compte pour {appName}",
     "subtitle": "Configurez votre organisation pour commencer.",
-    "invalidLink": "Ce lien d'inscription n'est pas valide. Demandez-en un nouveau à l'application concernée.",
+    "invalidLink": "Ce lien d'inscription a expiré ou est invalide. Contactez l'application concernée pour en obtenir un nouveau.",
     "firstName": "Prénom",
     "lastName": "Nom",
     "companyName": "Nom de l'entreprise",

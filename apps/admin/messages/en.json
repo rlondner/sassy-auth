@@ -528,9 +528,9 @@
   },
   "signup": {
     "title": "Create your account",
-    "titleWithApp": "Register with {appName}",
+    "titleWithApp": "Create your account with {appName}",
     "subtitle": "Set up your organization to get started.",
-    "invalidLink": "This signup link isn't valid. Ask the app you're signing up for a new one.",
+    "invalidLink": "This signup link has expired or is invalid. Contact the app you're signing up for to get a new one.",
     "firstName": "First Name",
     "lastName": "Last Name",
     "companyName": "Company Name",
