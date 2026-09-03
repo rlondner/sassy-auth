@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, Button, ButtonGroup, Badge } from '@sassy-auth/ui'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
-import type { App } from '@/lib/types'
+import type { App, RedirectUri } from '@/lib/types'
 
 interface Props {
   app: App
@@ -53,26 +53,22 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             copied={copied === 'url'}
             copyLabel={t('apps.actions.copy')}
           />
-          {app.callbackUrl ? (
-            <DetailRow
-              label={t('apps.fields.callbackUrl')}
-              value={app.callbackUrl}
-              onCopy={() => copy(app.callbackUrl as string, 'callbackUrl')}
-              copied={copied === 'callbackUrl'}
-              copyLabel={t('apps.actions.copy')}
-            />
-          ) : (
-            <div>
-              <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">
-                {t('apps.fields.callbackUrl')}
-              </p>
-              <div className="mt-1 rounded border border-border bg-card px-3 py-2">
-                <span className="text-body-sm text-muted-foreground">
-                  {t('apps.fields.callbackUrlDefault')}
-                </span>
-              </div>
-            </div>
-          )}
+          <RedirectUriGroup
+            label={t('apps.fields.loginRedirectUris')}
+            uris={(app.redirectUris ?? []).filter((r) => r.kind === 'login')}
+            copy={copy}
+            copied={copied}
+            copyLabel={t('apps.actions.copy')}
+            emptyLabel={t('apps.fields.noRedirectUris')}
+          />
+          <RedirectUriGroup
+            label={t('apps.fields.postLogoutRedirectUris')}
+            uris={(app.redirectUris ?? []).filter((r) => r.kind === 'post_logout')}
+            copy={copy}
+            copied={copied}
+            copyLabel={t('apps.actions.copy')}
+            emptyLabel={t('apps.fields.noRedirectUris')}
+          />
           <DetailRow
             label={t('apps.fields.publicId')}
             value={app.publicId}
@@ -99,6 +95,42 @@ function DetailRow({
           <span className="material-symbols-outlined text-[16px]">{copied ? 'check' : 'content_copy'}</span>
         </button>
       </div>
+    </div>
+  )
+}
+
+function RedirectUriGroup({
+  label, uris, copy, copied, copyLabel, emptyLabel,
+}: {
+  label: string
+  uris: RedirectUri[]
+  copy: (text: string, key: string) => void
+  copied: string | null
+  copyLabel: string
+  emptyLabel: string
+}) {
+  return (
+    <div>
+      <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+      {uris.length === 0 ? (
+        <div className="mt-1 rounded border border-border bg-card px-3 py-2">
+          <span className="text-body-sm text-muted-foreground">{emptyLabel}</span>
+        </div>
+      ) : (
+        <div className="mt-1 space-y-1">
+          {uris.map((r, idx) => {
+            const key = `${label}-${idx}`
+            return (
+              <div key={key} className="flex items-center justify-between rounded border border-border bg-card px-3 py-2">
+                <code className="text-body-sm">{r.uri}</code>
+                <button type="button" aria-label={copyLabel} onClick={() => copy(r.uri, key)} className="text-muted-foreground hover:text-primary">
+                  <span className="material-symbols-outlined text-[16px]">{copied === key ? 'check' : 'content_copy'}</span>
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

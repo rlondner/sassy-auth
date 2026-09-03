@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { isRedirectSentinel } from '@/lib/redirect-sentinel'
-import { createApp, updateApp, deleteApp, getApps, getSocialProviderSettings, setSocialProviders } from '@/lib/api'
+import { createApp, updateApp, deleteApp, getApps, getSocialProviderSettings, setSocialProviders, rotateClientSecret } from '@/lib/api'
 import type {
   App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse,
 } from '@/lib/types'
@@ -88,6 +88,22 @@ export async function updateSocialProvidersAction(
 ): Promise<{ providers: string[] } | ErrorResult> {
   try {
     return { providers: await setSocialProviders(clientId, providers) }
+  } catch (err) {
+    if (isRedirectSentinel(err)) throw err
+    return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
+  }
+}
+
+// Used by the edit drawer's "Generate client secret" button. The plaintext
+// is only ever returned by this one call — the drawer must show it once and
+// then discard it; there's no way to fetch it again afterwards.
+export async function rotateClientSecretAction(
+  publicId: string,
+): Promise<{ clientSecret: string } | ErrorResult> {
+  try {
+    const result = await rotateClientSecret(publicId)
+    revalidatePath('/apps')
+    return result
   } catch (err) {
     if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }

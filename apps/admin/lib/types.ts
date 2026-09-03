@@ -63,20 +63,29 @@ export interface InvitationInfo {
   expired: boolean
 }
 
+export interface RedirectUri {
+  uri: string;
+  kind: 'login' | 'post_logout';
+}
+
 export interface App {
   publicId: string;
   name: string;
   url: string;
-  callbackUrl?: string | null;
+  redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
   requireTwoFactor: boolean;
+  // Client type is derived from whether a secret hash exists server-side —
+  // the hash itself is never sent to the admin console.
+  isConfidential?: boolean;
+  clientSecretUpdatedAt?: string | null;
 }
 
 export interface CreateAppPayload {
   name: string;
   url: string;
-  callbackUrl?: string | null;
+  redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
 }
@@ -84,7 +93,7 @@ export interface CreateAppPayload {
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
-  callbackUrl?: string | null;
+  redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
 }

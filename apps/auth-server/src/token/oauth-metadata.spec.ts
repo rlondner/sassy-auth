@@ -74,6 +74,7 @@ describe('buildOpenIdConfiguration', () => {
     expect(doc.authorization_endpoint).toBe('http://localhost:3000/api/token/oauth/authorize');
     expect(doc.token_endpoint).toBe('http://localhost:3000/api/token/oauth/token');
     expect(doc.userinfo_endpoint).toBe('http://localhost:3000/api/token/oauth/userinfo');
+    expect(doc.end_session_endpoint).toBe('http://localhost:3000/api/token/oauth/logout');
     expect(doc.jwks_uri).toBe('http://localhost:3000/api/token/jwks');
   });
 
@@ -92,10 +93,6 @@ describe('buildOpenIdConfiguration', () => {
   it('does not advertise offline_access — refresh tokens are unsupported', () => {
     expect(doc.scopes_supported).not.toContain('offline_access');
     expect(doc.grant_types_supported).not.toContain('refresh_token');
-  });
-
-  it('does not advertise end_session_endpoint — RP-Initiated Logout is not implemented (bug-0277)', () => {
-    expect(doc).not.toHaveProperty('end_session_endpoint');
   });
 
   it('shares endpoint URLs with the RFC 8414 document', () => {

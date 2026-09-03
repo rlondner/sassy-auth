@@ -28,6 +28,7 @@ export enum TokenErrorCode {
   INVALID_REQUEST = 'invalid_request',
   INVALID_REDIRECT_URI = 'invalid_redirect_uri',
   INVALID_GRANT = 'invalid_grant',
+  INVALID_CLIENT = 'invalid_client',
   UNAUTHORIZED_CLIENT = 'unauthorized_client',
   TWO_FACTOR_REQUIRED = 'TWO_FACTOR_REQUIRED',
 }

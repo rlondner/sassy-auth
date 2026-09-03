@@ -14,9 +14,10 @@ import {
   Input,
   Label,
 } from '@sassy-auth/ui'
-import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction } from '@/app/(admin)/apps/actions'
+import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction } from '@/app/(admin)/apps/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
-import type { App } from '@/lib/types'
+import type { App, RedirectUri } from '@/lib/types'
+import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 
 interface Props {
   app: App
@@ -29,13 +30,23 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
-  const [callbackUrl, setCallbackUrl] = React.useState(app.callbackUrl ?? '')
+  const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
   const { copiedKey, copy } = useCopyFeedback()
   const copied = copiedKey !== null
   const [pending, startTransition] = React.useTransition()
+
+  // Client secret: rotation is a separate, immediate call (not part of the
+  // dirty/save flow below) because the plaintext only ever comes back once,
+  // at the moment of rotation — there is nothing to "save" afterwards, only
+  // to display and let the admin copy.
+  const [newClientSecret, setNewClientSecret] = React.useState<string | null>(null)
+  const [clientSecretUpdatedAt, setClientSecretUpdatedAt] = React.useState<string | null>(
+    app.clientSecretUpdatedAt ?? null,
+  )
+  const [rotatingSecret, setRotatingSecret] = React.useState(false)
 
   // The checkbox universe is `available` — every provider this deployment
   // has credentials for, from GET /api/social-providers/:clientId/settings
@@ -51,10 +62,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   React.useEffect(() => {
     setName(app.name)
     setUrl(app.url)
-    setCallbackUrl(app.callbackUrl ?? '')
+    setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
     setErrorKey(null)
+    setNewClientSecret(null)
+    setClientSecretUpdatedAt(app.clientSecretUpdatedAt ?? null)
     // Gate the authenticated social-providers fetch on the drawer actually
     // being open: AppsTable keeps this component mounted (with `open`
     // toggling) for every selected row, including View and Delete, so an
@@ -86,11 +99,29 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     })
   }
 
+  function handleRotateClientSecret() {
+    setRotatingSecret(true)
+    startTransition(async () => {
+      const result = await rotateClientSecretAction(app.publicId)
+      setRotatingSecret(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      // Shown exactly once — the server never returns the plaintext again
+      // after this response.
+      setNewClientSecret(result.clientSecret)
+      setClientSecretUpdatedAt(new Date().toISOString())
+      toast.success(t('apps.toast.updated'))
+    })
+  }
+
   const socialDirty =
     checkedProviders.size !== initialProviders.length ||
     initialProviders.some((p) => !checkedProviders.has(p))
 
-  const dirty = name !== app.name || url !== app.url || callbackUrl !== (app.callbackUrl ?? '') || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty
+  const redirectUrisDirty = JSON.stringify(redirectUris) !== JSON.stringify(app.redirectUris ?? [])
+  const dirty = name !== app.name || url !== app.url || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -103,10 +134,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; callbackUrl?: string | null; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean } = {}
+    const patch: { name?: string; url?: string; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
-    if (callbackUrl !== (app.callbackUrl ?? '')) patch.callbackUrl = callbackUrl.trim() || null
+    if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
     startTransition(async () => {
@@ -163,17 +194,13 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               />
             </div>
             <div>
-              <Label htmlFor="appCallbackUrl">{t('apps.fields.callbackUrl')}</Label>
-              <Input
-                id="appCallbackUrl"
-                type="url"
-                value={callbackUrl}
-                onChange={(e) => setCallbackUrl(e.target.value)}
-                placeholder="https://app.example.com/auth/callback"
-              />
+              <Label>{t('apps.fields.redirectUris')}</Label>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.callbackUrlHint')}
+                {t('apps.fields.redirectUrisHint')}
               </p>
+              <div className="mt-2">
+                <RedirectUriRowsEditor rows={redirectUris} onRowsChange={setRedirectUris} />
+              </div>
             </div>
             <div>
               <Label htmlFor="appTrustDays">{t('apps.fields.twoFactorTrustDays')}</Label>
@@ -259,6 +286,58 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 <p className="mt-1 text-label-sm text-primary">
                   {t('apps.actions.copied')}
                 </p>
+              )}
+            </div>
+            <div>
+              <Label>{t('apps.fields.clientSecret')}</Label>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.clientSecretHint')}
+              </p>
+              {newClientSecret ? (
+                <div className="mt-2">
+                  <div className="flex gap-2">
+                    <Input
+                      id="newClientSecret"
+                      value={newClientSecret}
+                      readOnly
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={t('apps.actions.copy')}
+                      onClick={() => void copy(newClientSecret, 'clientSecret')}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        {copiedKey === 'clientSecret' ? 'check' : 'content_copy'}
+                      </span>
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-label-sm text-destructive">
+                    {t('apps.fields.clientSecretWarning')}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <p className="text-body-sm text-muted-foreground">
+                    {clientSecretUpdatedAt
+                      ? t('apps.fields.clientSecretUpdatedAt', {
+                          date: new Date(clientSecretUpdatedAt).toLocaleString(),
+                        })
+                      : t('apps.fields.noClientSecret')}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2"
+                    loading={rotatingSecret}
+                    onClick={handleRotateClientSecret}
+                  >
+                    {clientSecretUpdatedAt
+                      ? t('apps.fields.regenerateClientSecret')
+                      : t('apps.fields.generateClientSecret')}
+                  </Button>
+                </div>
               )}
             </div>
             {errorKey && (

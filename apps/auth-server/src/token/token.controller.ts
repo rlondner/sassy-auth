@@ -10,13 +10,15 @@ import {
   Query,
   Redirect,
   Req,
+  Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import * as Sentry from '@sentry/nestjs';
 import { trace } from '@opentelemetry/api';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+import { extractClientSecret, verifyClientSecret } from './client-auth';
 import { prisma } from '@sassy-auth/db';
 import { detectIdentifierType, TokenErrorCode } from '@sassy-auth/types';
 import { auth } from '../auth/auth.config';
@@ -45,13 +47,14 @@ import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
-import { assertRedirectUriAllowed } from './redirect-uri';
-import { buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
+import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed } from './redirect-uri';
+import { buildClientErrorRedirectUrl, buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { LoggerService } from '../common/logger/logger.service';
 import {
   JWKS_ROUTE,
   OAUTH_AUTHORIZE_PATH,
   OAUTH_AUTHORIZE_ROUTE,
+  OAUTH_LOGOUT_ROUTE,
   OAUTH_TOKEN_ROUTE,
   OAUTH_USERINFO_ROUTE,
   resolveIssuer,
@@ -128,12 +131,17 @@ export class TokenController {
     @Req() req: Request,
     @Query('scope') scope: string = '',
     @Query('nonce') nonce: string = '',
+    @Query('prompt') prompt: string = '',
+    @Query('max_age') maxAge: string = '',
   ) {
+    // Tracks whether redirect_uri has passed assertRedirectUriAllowed. Once
+    // true, errors below (including the prompt=none client-facing errors)
+    // may be redirected to the client itself. An unvalidated redirect_uri
+    // must never receive a redirect — that's the open redirect the
+    // assertRedirectUriAllowed gate exists to prevent — so it always falls
+    // through to the admin's own error page/JSON instead.
+    let redirectUriValidated = false;
     try {
-      if (!codeChallenge || codeChallengeMethod !== 'S256') {
-        throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
-      }
-
       let numericId: number;
       try {
         numericId = this.sqidService.decode(clientId);
@@ -148,8 +156,22 @@ export class TokenController {
         throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
       }
 
+      // PKCE is mandatory for public clients. Confidential clients may omit it —
+      // the client secret provides the same protection — but a challenge, when
+      // sent, must still be S256. This must run after the app lookup, since
+      // whether PKCE can be omitted depends on the app's client type.
+      const isConfidential = app.clientSecretHash !== null;
+      if (codeChallenge) {
+        if (codeChallengeMethod !== 'S256') {
+          throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
+        }
+      } else if (!isConfidential) {
+        throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
+      }
+
       try {
         assertRedirectUriAllowed(redirectUri, app);
+        redirectUriValidated = true;
       } catch (err) {
         this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
           context: 'TokenController',
@@ -162,8 +184,51 @@ export class TokenController {
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
-      if (!session) {
-        throw new UnauthorizedException();
+
+      // prompt / max_age (OIDC): prompt=login or a session older than
+      // max_age forces re-authentication even if a session already exists.
+      // prompt=none forbids ANY interactive bounce here — it must report the
+      // failure back to the client as an OAuth error (login_required)
+      // instead, never redirect to the admin login page.
+      const promptValues = new Set(prompt.split(/\s+/).filter(Boolean));
+      const sessionAge = session?.session?.createdAt
+        ? (Date.now() - new Date(session.session.createdAt).getTime()) / 1000
+        : Infinity;
+      const maxAgeSeconds = maxAge ? Number(maxAge) : null;
+      const staleForMaxAge =
+        maxAgeSeconds !== null && Number.isFinite(maxAgeSeconds) && sessionAge > maxAgeSeconds;
+
+      const mustReauthenticate = !session || promptValues.has('login') || staleForMaxAge;
+
+      if (mustReauthenticate) {
+        if (promptValues.has('none')) {
+          return {
+            url: buildClientErrorRedirectUrl(
+              redirectUri, 'login_required', 'No active session satisfying the request', state,
+            ),
+            statusCode: 302,
+          };
+        }
+        const adminUrl = process.env.ADMIN_URL;
+        if (!adminUrl) throw new UnauthorizedException();
+        const query = new URLSearchParams({
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          scope,
+          ...(nonce ? { nonce } : {}),
+          ...(codeChallenge ? { code_challenge: codeChallenge, code_challenge_method: 'S256' } : {}),
+        });
+        if (state) query.set('state', state);
+        // Deliberately drop prompt/max_age from `next`: carrying prompt=login
+        // would loop forever, and the fresh session satisfies max_age by
+        // construction.
+        // Absolute path — see the same-shaped comment on the forced-2FA
+        // enrollment redirect below.
+        const nextPath = `${resolveIssuer()}${OAUTH_AUTHORIZE_PATH}?${query.toString()}`;
+        return {
+          url: `${adminUrl.replace(/\/$/, '')}/login?next=${encodeURIComponent(nextPath)}`,
+          statusCode: 302,
+        };
       }
 
       const saUser = await prisma.saUser.findFirst({
@@ -191,6 +256,16 @@ export class TokenController {
       // full authorize URL as `next`, so they return here and get a code only
       // after enrolling. `enroll=1` puts the page in forced (no-skip) mode.
       if (isTwoFactorRequired(app) && !(session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled) {
+        // prompt=none forbids this interactive bounce too: report back to
+        // the client rather than sending the user to the enrollment page.
+        if (promptValues.has('none')) {
+          return {
+            url: buildClientErrorRedirectUrl(
+              redirectUri, 'interaction_required', 'Two-factor enrollment required', state,
+            ),
+            statusCode: 302,
+          };
+        }
         const adminUrl = process.env.ADMIN_URL;
         if (adminUrl) {
           const query = new URLSearchParams({
@@ -255,39 +330,38 @@ export class TokenController {
 
       return { url: url.toString(), statusCode: 302 };
     } catch (err) {
-      // bug-0149: a browser hitting /authorize without a session
-      // previously got JSON 401 — confusing for a top-level nav.
-      // Redirect to the admin console's /login and preserve the
-      // full authorize URL as `next` so the user lands back here
-      // after signing in. Only when ADMIN_URL is set (dev without
-      // it still falls through to the JSON path below).
-      if (err instanceof UnauthorizedException) {
-        const adminUrl = process.env.ADMIN_URL;
-        if (adminUrl) {
-          const query = new URLSearchParams({
-            client_id: clientId,
-            redirect_uri: redirectUri,
-            code_challenge: codeChallenge,
-            code_challenge_method: codeChallengeMethod,
-          });
-          if (state) query.set('state', state);
-          if (scope) query.set('scope', scope);
-          if (nonce) query.set('nonce', nonce);
-          // Absolute URL — see the same-shaped comment on the forced-2FA
-          // enrollment redirect above.
-          const nextPath = `${resolveIssuer()}${OAUTH_AUTHORIZE_PATH}?${query.toString()}`;
-          const loginUrl = `${adminUrl.replace(/\/$/, '')}/login?next=${encodeURIComponent(nextPath)}`;
-          return { url: loginUrl, statusCode: 302 };
-        }
-        throw err;
-      }
+      // bug-0149: a browser hitting /authorize without a session used to get
+      // a bare JSON 401 — confusing for a top-level nav. That "no session"
+      // bounce to the admin's /login is now handled inline above and never
+      // throws; UnauthorizedException reaching this catch only happens via
+      // the fail-closed path (ADMIN_URL unset), so just fall through to
+      // Nest's default JSON 401 in that case.
+      if (err instanceof UnauthorizedException) throw err;
       if (!(err instanceof HttpException)) throw err;
       const status = err.getStatus();
       if (status < 400 || status >= 500) throw err;
 
-      const adminUrl = process.env.ADMIN_URL;
       const code = extractTokenErrorCode(err);
-      if (!adminUrl || !code) throw err; // fall back to JSON
+      if (!code) throw err; // fall back to JSON
+
+      // Once redirect_uri has been validated, prefer sending the error back
+      // to the client (RFC 6749 §4.1.2.1) — an OIDC/OAuth library sitting on
+      // that callback needs an `error` response, not a dead end on the admin
+      // console. An unvalidated redirect_uri must never be redirected to at
+      // all, so that branch keeps going to the admin's own error page below.
+      if (redirectUriValidated) {
+        const oauthError =
+          code === TokenErrorCode.USER_ORG_MISMATCH || code === TokenErrorCode.USER_NOT_FOUND
+            ? 'access_denied'
+            : 'invalid_request';
+        return {
+          url: buildClientErrorRedirectUrl(redirectUri, oauthError, code, state),
+          statusCode: 302,
+        };
+      }
+
+      const adminUrl = process.env.ADMIN_URL;
+      if (!adminUrl) throw err; // fall back to JSON
 
       return {
         url: buildOauthErrorRedirectUrl(adminUrl, code, clientId),
@@ -302,7 +376,11 @@ export class TokenController {
    * Exchanges an authorization code for a signed RS256 JWT.
    */
   @Post(OAUTH_TOKEN_ROUTE)
-  async oauthToken(@Body() dto: OauthTokenExchangeDto) {
+  async oauthToken(
+    @Body() dto: OauthTokenExchangeDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     let numericId: number;
     try {
       numericId = this.sqidService.decode(dto.client_id);
@@ -316,6 +394,7 @@ export class TokenController {
     if (!app) {
       throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
     }
+    const appClientSecretHash = app.clientSecretHash;
 
     try {
       assertRedirectUriAllowed(dto.redirect_uri, app);
@@ -326,6 +405,28 @@ export class TokenController {
         attemptedOrigin: (() => { try { return new URL(dto.redirect_uri).origin; } catch { return '<unparseable>'; } })(),
       });
       throw err;
+    }
+
+    // Client authentication (RFC 6749 §2.3): client_secret_basic (Authorization
+    // header) or client_secret_post (body). Basic wins if both are present.
+    // Checked once here; the result feeds both halves of the §2 invariant
+    // below and (for a confidential client) gates the exchange itself.
+    const presentedSecret = extractClientSecret(req, dto);
+    const clientAuthenticated = await verifyClientSecret(presentedSecret, appClientSecretHash ?? null);
+
+    // A confidential client must authenticate. Public clients must not present
+    // a secret they were never issued — but we don't need to reject that case
+    // specially: verifyClientSecret already returns false when the app has no
+    // secret configured, and a public app's `appClientSecretHash` check below
+    // never fires, so an unauthenticated public client falls through here as
+    // intended.
+    if (appClientSecretHash && !clientAuthenticated) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="sassy-auth"');
+      this.logger.getWinstonLogger().warn('oauth.client_auth.failed', {
+        context: 'TokenController',
+        appId: dto.client_id,
+      });
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CLIENT);
     }
 
     let userPublicId: string;
@@ -351,6 +452,22 @@ export class TokenController {
         reason: err instanceof Error ? err.message : String(err),
       });
       throw err;
+    }
+
+    // §2 invariant, enforced independently of /authorize: a code carrying no
+    // PKCE challenge is only exchangeable by an authenticated client. This is
+    // the second line of defense — it still applies even if the app is not
+    // (or is no longer) confidential, catching a challenge-less code that
+    // should never have existed for a public client. The code has already
+    // been consumed (single-use) by this point, so this cannot be bypassed
+    // by retrying with a secret.
+    if (!exchanged.hadChallenge && !clientAuthenticated) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="sassy-auth"');
+      this.logger.getWinstonLogger().warn('oauth.client_auth.required_for_challengeless_code', {
+        context: 'TokenController',
+        appId: dto.client_id,
+      });
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CLIENT);
     }
 
     const saUser = await prisma.saUser.findFirst({
@@ -695,5 +812,64 @@ export class TokenController {
 
     const scoped = await this.tokenService.buildScopedClaims(saUser.id, claims.scope ?? '');
     return { sub: claims.sub, ...scoped };
+  }
+
+  /**
+   * GET /api/token/oauth/logout — OIDC RP-Initiated Logout.
+   *
+   * Always terminates the SassyAuth session. Only redirects when the hint
+   * identifies a client that has registered the requested URI: an unvalidated
+   * post-logout redirect is an open redirect by another name.
+   */
+  @Get(OAUTH_LOGOUT_ROUTE)
+  @Redirect()
+  async oauthLogout(
+    @Query('id_token_hint') idTokenHint: string = '',
+    @Query('post_logout_redirect_uri') postLogoutRedirectUri: string = '',
+    @Query('state') state: string = '',
+    @Req() req: Request,
+  ) {
+    // Terminate first, unconditionally. A failure to validate the hint must
+    // never leave the user still signed in.
+    try {
+      await auth.api.signOut({ headers: fromNodeHeaders(req.headers) });
+    } catch {
+      // Already signed out, or no session — logout is idempotent.
+    }
+
+    const adminUrl = (process.env.ADMIN_URL ?? '').replace(/\/$/, '');
+    const loggedOut = `${adminUrl}/logged-out`;
+
+    if (!idTokenHint || !postLogoutRedirectUri) {
+      return { url: loggedOut, statusCode: 302 };
+    }
+
+    let audience: string;
+    try {
+      const claims = this.tokenService.verifyAccessToken(idTokenHint);
+      if (!claims.aud) return { url: loggedOut, statusCode: 302 };
+      audience = claims.aud;
+    } catch {
+      return { url: loggedOut, statusCode: 302 };
+    }
+
+    const app = await prisma.saApp.findUnique({
+      where: { publicId: audience },
+      include: { redirectUris: true },
+    });
+    if (!app) return { url: loggedOut, statusCode: 302 };
+
+    try {
+      assertPostLogoutRedirectUriAllowed(postLogoutRedirectUri, app);
+    } catch {
+      this.logger.getWinstonLogger().warn('oauth.post_logout_redirect_uri.rejected', {
+        context: 'TokenController', appId: audience,
+      });
+      return { url: loggedOut, statusCode: 302 };
+    }
+
+    const target = new URL(postLogoutRedirectUri);
+    if (state) target.searchParams.set('state', state);
+    return { url: target.toString(), statusCode: 302 };
   }
 }

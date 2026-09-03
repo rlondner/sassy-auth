@@ -10,6 +10,9 @@ jest.mock('@sassy-auth/db', () => ({
       findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn(),
       create: jest.fn(), update: jest.fn(), delete: jest.fn(),
     },
+    saAppRedirectUri: {
+      deleteMany: jest.fn(), createMany: jest.fn(),
+    },
     $transaction: jest.fn(),
   },
   Prisma: {},
@@ -21,6 +24,7 @@ jest.mock('../common/permissions/check-permission', () => ({
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saApp: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
+  saAppRedirectUri: { deleteMany: jest.Mock; createMany: jest.Mock };
   $transaction: jest.Mock;
 };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -51,6 +55,12 @@ describe('AppsService', () => {
     service = module.get(AppsService);
     jest.clearAllMocks();
     (checkPermission as jest.Mock).mockResolvedValue(undefined);
+    // Default: run the transaction callback against the same mocked prisma
+    // client, so existing tests that stub saApp.update / saAppRedirectUri
+    // directly keep working now that updateApp (like createApp) writes
+    // through prisma.$transaction. Tests that care about transactional
+    // atomicity specifically override this with a distinct tx client.
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
   });
 
   it('listApps returns paginated items and total', async () => {
@@ -58,7 +68,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -78,10 +88,11 @@ describe('AppsService', () => {
   it('getApp returns the formatted row when found', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     const result = await service.getApp('ba-caller', 'sq_1');
-    expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
+    expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' }, include: { redirectUris: true } });
     expect(result).toEqual({
       publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
-      isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false,
+      isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [],
+      isConfidential: false, clientSecretUpdatedAt: null,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -122,7 +133,7 @@ describe('AppsService', () => {
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -284,6 +295,154 @@ describe('AppsService', () => {
       const unexpected = new Error('Network failure');
       mockPrisma.saApp.delete.mockRejectedValueOnce(unexpected);
       await expect(service.deleteApp('ba-caller', 'sq_1')).rejects.toThrow('Network failure');
+    });
+  });
+
+  it('replaces the redirect URI set on update', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+    mockPrisma.saApp.update.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    await service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://app.example.com/bye', kind: 'post_logout' },
+      ],
+    });
+
+    expect(mockPrisma.saAppRedirectUri.deleteMany).toHaveBeenCalledWith({ where: { appId: 7 } });
+    expect(mockPrisma.saAppRedirectUri.createMany).toHaveBeenCalledWith({
+      data: [
+        { appId: 7, uri: 'https://app.example.com/cb', kind: 'login' },
+        { appId: 7, uri: 'https://app.example.com/bye', kind: 'post_logout' },
+      ],
+    });
+  });
+
+  it('rejects a redirect URI that is not an absolute http(s) URL', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    await expect(
+      service.updateApp('admin-ba-id', 'a_7', {
+        redirectUris: [{ uri: 'javascript:alert(1)', kind: 'login' }],
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('updateApp rejects a duplicate {uri, kind} pair with a distinct BadRequestException, not the app-name-conflict message, and never touches the DB', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    const call = service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+      ],
+    });
+
+    await expect(call).rejects.toBeInstanceOf(BadRequestException);
+    await expect(call).rejects.not.toBeInstanceOf(ConflictException);
+    await expect(call).rejects.toThrow(/duplicate/i);
+    // Validation happens before any write — the whole point is to make this
+    // P2002-shaped failure unreachable from user input.
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.createMany).not.toHaveBeenCalled();
+  });
+
+  it('createApp rejects a duplicate {uri, kind} pair before any write', async () => {
+    const call = service.createApp('ba-caller', {
+      name: 'X',
+      url: 'https://x.example',
+      redirectUris: [
+        { uri: 'https://x.example/cb', kind: 'post_logout' },
+        { uri: 'https://x.example/cb', kind: 'post_logout' },
+      ],
+    });
+
+    await expect(call).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('updateApp writes the app row and redirect URIs inside the same transaction, not against the outer prisma client', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    // Use a tx client distinct from mockPrisma so we can prove the app-row
+    // update and the redirect-URI writes both go through the callback's
+    // `tx` argument (i.e. one atomic transaction), not the top-level client.
+    const txClient = {
+      saApp: { update: jest.fn().mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false }) },
+      saAppRedirectUri: { deleteMany: jest.fn(), createMany: jest.fn() },
+    };
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof txClient) => unknown) => cb(txClient));
+
+    await service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+    });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(txClient.saApp.update).toHaveBeenCalledWith({ where: { publicId: 'a_7' }, data: {} });
+    expect(txClient.saAppRedirectUri.deleteMany).toHaveBeenCalledWith({ where: { appId: 7 } });
+    expect(txClient.saAppRedirectUri.createMany).toHaveBeenCalledWith({
+      data: [{ appId: 7, uri: 'https://app.example.com/cb', kind: 'login' }],
+    });
+    // Nothing should have been written via the outer (non-transactional) client.
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.createMany).not.toHaveBeenCalled();
+  });
+
+  it('updateApp rolls back the app-row update when the redirect-URI write fails (transaction rejects as a whole)', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+    // Simulate the transaction failing partway through (e.g. a DB-level
+    // unique-constraint race on saAppRedirectUri that in-memory validation
+    // didn't catch). Because the whole body runs inside prisma.$transaction,
+    // Prisma rolls back the app-row update too — the caller never observes
+    // a state where the app row changed but redirect URIs were wiped.
+    mockPrisma.$transaction.mockRejectedValue({ code: 'P2002', meta: { target: ['appId', 'uri', 'kind'] } });
+
+    await expect(
+      service.updateApp('admin-ba-id', 'a_7', {
+        redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  // ── Task 9: confidential clients — rotateClientSecret ────────────────────
+
+  describe('rotateClientSecret', () => {
+    it('generates a new secret, hashes it, stores the hash, and returns the plaintext once', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.saApp.update.mockResolvedValue({ ...appRow, clientSecretHash: 'hashed', clientSecretUpdatedAt: new Date() });
+
+      const result = await service.rotateClientSecret('ba-caller', 'sq_1');
+
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.apps.manage');
+      expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        data: { clientSecretHash: expect.any(String), clientSecretUpdatedAt: expect.any(Date) },
+      });
+      // The plaintext returned to the caller must be exactly what was hashed
+      // and stored — not, say, the stored hash itself (which would leak the
+      // hash to an admin-console response and defeat its purpose).
+      expect(typeof result.clientSecret).toBe('string');
+      expect(result.clientSecret.length).toBeGreaterThan(20);
+      const storedHash = mockPrisma.saApp.update.mock.calls[0][0].data.clientSecretHash;
+      expect(storedHash).not.toBe(result.clientSecret);
+    });
+
+    it('throws NotFoundException when the app does not exist', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+      await expect(service.rotateClientSecret('ba-caller', 'nope')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('returns a different secret on each call (no reuse)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.saApp.update.mockResolvedValue(appRow);
+
+      const first = await service.rotateClientSecret('ba-caller', 'sq_1');
+      const second = await service.rotateClientSecret('ba-caller', 'sq_1');
+
+      expect(first.clientSecret).not.toBe(second.clientSecret);
     });
   });
 });

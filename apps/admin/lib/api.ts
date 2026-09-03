@@ -246,6 +246,16 @@ export async function deleteApp(publicId: string): Promise<void> {
   Sentry.addBreadcrumb({ category: 'admin.action', message: `App deleted: ${publicId}`, level: 'info' });
 }
 
+// Returns the new client secret in plaintext — the auth-server only ever
+// hands it back this once, at rotation time. There is no way to retrieve it
+// again afterwards, only to rotate it once more.
+export async function rotateClientSecret(publicId: string): Promise<{ clientSecret: string }> {
+  const res = await apiFetch(`/api/apps/${publicId}/client-secret`, { method: 'POST' });
+  const result: { clientSecret: string } = await res.json();
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Client secret rotated: ${publicId}`, level: 'info' });
+  return result;
+}
+
 // Backs the admin console's checkbox group: `available` is every provider
 // this deployment has credentials for (so an app that has opted a provider
 // off still shows a checkbox for it — see GET /api/social-providers above,

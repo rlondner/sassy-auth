@@ -11,6 +11,7 @@ const mockAppsService = {
   createApp: jest.fn(),
   updateApp: jest.fn(),
   deleteApp: jest.fn(),
+  rotateClientSecret: jest.fn(),
 };
 
 function makeReq(baUserId = 'ba-caller') {
@@ -63,6 +64,15 @@ describe('AppsController', () => {
       mockAppsService.deleteApp.mockResolvedValue(undefined);
       await controller.remove(makeReq('ba-4'), 'sq_1');
       expect(mockAppsService.deleteApp).toHaveBeenCalledWith('ba-4', 'sq_1');
+    });
+  });
+
+  describe('rotateClientSecret', () => {
+    it('forwards caller id and publicId to AppsService.rotateClientSecret', async () => {
+      mockAppsService.rotateClientSecret.mockResolvedValue({ clientSecret: 'plaintext-secret' });
+      const result = await controller.rotateClientSecret(makeReq('ba-5'), 'sq_1');
+      expect(mockAppsService.rotateClientSecret).toHaveBeenCalledWith('ba-5', 'sq_1');
+      expect(result).toEqual({ clientSecret: 'plaintext-secret' });
     });
   });
 });
