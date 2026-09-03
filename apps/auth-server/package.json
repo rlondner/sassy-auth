@@ -8,7 +8,8 @@
     "dev": "nest start --watch",
     "test": "OTEL_SDK_DISABLED=true node ../../scripts/log-test.mjs auth-server jest",
     "test:e2e": "OTEL_SDK_DISABLED=true node ../../scripts/log-test.mjs auth-server-e2e jest --config ./test/jest-e2e.json --verbose",
-    "seed": "ts-node -r tsconfig-paths/register src/seed/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register src/seed/seed.ts",
+    "seed:vibecast-permissions": "ts-node -r tsconfig-paths/register src/seed/vibecast-permissions.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
