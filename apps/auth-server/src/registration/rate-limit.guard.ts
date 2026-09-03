@@ -58,3 +58,19 @@ export class RateLimitGuard implements CanActivate {
     throw new HttpException('Too many requests', 429);
   }
 }
+
+/**
+ * A separate DI singleton from RateLimitGuard, sharing all its logic via
+ * inheritance but with its own independent in-memory budget (its own
+ * `store` Map). GET /api/register/app (the app-name lookup /signup calls
+ * on every page load) must not share a rate-limit budget with POST
+ * /api/register (the actual registration submission) — see the review
+ * finding this fixes: a visitor reloading the signup page a few times, or
+ * multiple visitors behind one shared IP, could otherwise exhaust the
+ * budget before anyone submits the form. Both still read the same
+ * REGISTER_RATE_LIMIT / REGISTER_RATE_WINDOW_MS env vars (via the
+ * inherited getters), so they share the same LIMIT VALUE but never the
+ * same COUNTER.
+ */
+@Injectable()
+export class AppLookupRateLimitGuard extends RateLimitGuard {}

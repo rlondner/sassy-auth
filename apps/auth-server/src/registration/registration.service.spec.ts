@@ -44,6 +44,8 @@ const sqidFake: Pick<SqidService, 'encode' | 'decode'> = {
 const baseDto: RegisterDto = {
   email: 'alice@example.com',
   password: 'password123',
+  firstName: 'Alice',
+  lastName: 'Wonder',
   companyName: 'Acme Inc',
   appPublicId: 'sq_1',
 };
@@ -93,7 +95,7 @@ describe('RegistrationService', () => {
       const result = await service.register(baseDto);
 
       expect(mockSignUpEmail).toHaveBeenCalledWith({
-        body: { email: baseDto.email, password: baseDto.password, name: baseDto.companyName },
+        body: { email: baseDto.email, password: baseDto.password, name: 'Alice Wonder' },
       });
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
@@ -109,8 +111,8 @@ describe('RegistrationService', () => {
           publicId: baUserId.slice(0, 12),
           betterAuthUserId: baUserId,
           orgId: finalOrgRow.id,
-          firstName: baseDto.companyName,
-          lastName: '',
+          firstName: baseDto.firstName,
+          lastName: baseDto.lastName,
           status: 'active',
         },
       });
@@ -198,6 +200,29 @@ describe('RegistrationService', () => {
       mockPrisma.saUser.create.mockResolvedValue({ id: 1 });
 
       await expect(service.register(baseDto)).resolves.toEqual({ ok: true, orgPublicId: finalOrgRow.publicId });
+    });
+  });
+
+  describe('getAppName', () => {
+    it('returns the app name for a known appPublicId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp' });
+
+      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp' });
+      expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        select: { name: true },
+      });
+    });
+
+    it('throws NotFoundException for an unknown appPublicId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+
+      await expect(service.getAppName('nope')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException for an empty appPublicId without querying the database', async () => {
+      await expect(service.getAppName('')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockPrisma.saApp.findUnique).not.toHaveBeenCalled();
     });
   });
 

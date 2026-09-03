@@ -36,7 +36,7 @@ export class RegistrationService {
     let baUserId: string;
     try {
       const signUp = await auth.api.signUpEmail({
-        body: { email: dto.email, password: dto.password, name: dto.companyName },
+        body: { email: dto.email, password: dto.password, name: `${dto.firstName} ${dto.lastName}`.trim() },
       });
       baUserId = signUp.user.id;
     } catch (e: unknown) {
@@ -74,8 +74,8 @@ export class RegistrationService {
             publicId: baUserId.slice(0, 12),
             betterAuthUserId: baUserId,
             orgId: created.id,
-            firstName: dto.companyName,
-            lastName: '',
+            firstName: dto.firstName,
+            lastName: dto.lastName,
             status: 'active',
           },
         });
@@ -90,5 +90,15 @@ export class RegistrationService {
       });
       throw e;
     }
+  }
+
+  async getAppName(appPublicId: string): Promise<{ name: string }> {
+    if (!appPublicId) throw new NotFoundException('App not found');
+    const app = await prisma.saApp.findUnique({
+      where: { publicId: appPublicId },
+      select: { name: true },
+    });
+    if (!app) throw new NotFoundException('App not found');
+    return { name: app.name };
   }
 }

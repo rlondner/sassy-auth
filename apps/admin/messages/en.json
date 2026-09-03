@@ -499,6 +499,8 @@
     "password": "Password",
     "submit": "Sign In",
     "forgotPassword": "Forgot password?",
+    "signupPrompt": "Don't have an account?",
+    "signupLink": "Sign up",
     "useCode": "Sign in with a code instead",
     "socialDivider": "or continue with",
     "socialGoogle": "Continue with Google",
@@ -538,6 +540,32 @@
       "passwordTooShort": "Password must be at least 12 characters.",
       "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
       "genericError": "Something went wrong."
+    }
+  },
+  "signup": {
+    "title": "Create your account",
+    "titleWithApp": "Create your account with {appName}",
+    "subtitle": "Set up your organization to get started.",
+    "invalidLink": "This signup link has expired or is invalid. Contact the app you're signing up for to get a new one.",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "companyName": "Company Name",
+    "email": "Email Address",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "submit": "Create account",
+    "success": "Account created! You can now sign in.",
+    "continueToLogin": "Continue to sign in",
+    "backToLogin": "Back to sign in",
+    "errors": {
+      "passwordMismatch": "Passwords do not match.",
+      "passwordTooShort": "Password must be at least 12 characters.",
+      "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
+      "appNotFound": "We couldn't find the app for this signup link.",
+      "emailTaken": "An account with this email already exists.",
+      "tooManyRequests": "Too many attempts. Please wait a minute and try again.",
+      "serverUnavailable": "We could not reach the server. Please try again in a moment.",
+      "validationError": "We couldn't create your account. Please check your details and try again."
     }
   },
   "security": {

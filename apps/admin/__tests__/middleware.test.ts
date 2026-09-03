@@ -123,7 +123,7 @@ describe('admin middleware routing', () => {
     global.fetch = fetchMock as unknown as typeof fetch
   })
 
-  it.each(['/login', '/accept-invite', '/oauth-error', '/forgot-password', '/reset-password'])(
+  it.each(['/login', '/accept-invite', '/signup', '/oauth-error', '/forgot-password', '/reset-password'])(
     'lets %s through without validating a session',
     async (path) => {
       const middleware = await loadMiddleware()

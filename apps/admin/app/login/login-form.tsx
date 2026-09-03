@@ -8,6 +8,21 @@ import { Button } from '@sassy-auth/ui'
 import { signIn } from './actions'
 import { SocialButtons } from './social-buttons'
 
+/**
+ * `next` may be a relative or absolute authorize URL carrying `client_id` —
+ * the same shape `applyPerAppTrustCookie` (app/login/actions.ts) already
+ * parses for trust-day lookups. A placeholder base lets a relative `next`
+ * parse without throwing.
+ */
+function clientIdFromNext(next: string): string | null {
+  if (!next) return null
+  try {
+    return new URL(next, 'http://placeholder.invalid').searchParams.get('client_id')
+  } catch {
+    return null
+  }
+}
+
 export function LoginForm({
   next,
   providers = [],
@@ -19,6 +34,7 @@ export function LoginForm({
 }) {
   const t = useTranslations('login')
   const router = useRouter()
+  const clientId = clientIdFromNext(next)
 
   const [state, formAction, isPending] = useActionState(
     async (
@@ -97,6 +113,18 @@ export function LoginForm({
             {t('submit')}
           </Button>
         </form>
+
+        {clientId && (
+          <p className="mt-4 text-center text-label-md text-[var(--muted-foreground)]">
+            {t('signupPrompt')}{' '}
+            <Link
+              href={`/signup?client_id=${encodeURIComponent(clientId)}${next ? `&next=${encodeURIComponent(next)}` : ''}`}
+              className="text-[var(--primary)] hover:underline"
+            >
+              {t('signupLink')}
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   )
