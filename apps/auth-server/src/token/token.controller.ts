@@ -49,6 +49,7 @@ import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
 import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed } from './redirect-uri';
 import { buildClientErrorRedirectUrl, buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
+import { AUTH_THROTTLE } from '../common/config/rate-limit-config';
 import { LoggerService } from '../common/logger/logger.service';
 import {
   JWKS_ROUTE,
@@ -121,7 +122,7 @@ export class TokenController {
    */
   @Get(OAUTH_AUTHORIZE_ROUTE)
   @Redirect()
-  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
+  @Throttle({ auth: AUTH_THROTTLE })
   async oauthAuthorize(
     @Query('client_id') clientId: string,
     @Query('redirect_uri') redirectUri: string,
@@ -538,7 +539,7 @@ export class TokenController {
   // `auth` throttler bucket so a single-source brute-force is bounded
   // to 10 attempts/min per IP (see AppModule config). The generic
   // `default` bucket still applies elsewhere on this controller.
-  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
+  @Throttle({ auth: AUTH_THROTTLE })
   @Post('direct/login')
   async directLogin(@Body() dto: DirectLoginDto) {
     return tracer.startActiveSpan('auth.signin', async (span) => {
