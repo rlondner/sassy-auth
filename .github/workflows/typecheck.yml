@@ -15,6 +15,15 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # bug-0280: prisma.config.ts (packages/db) now fails fast if
+      # DATABASE_URL is unset, same as packages/db/index.ts already did.
+      # `pnpm install`'s postinstall (`prisma generate`) and the explicit
+      # "Generate Prisma client" step below both load that config, and
+      # nothing in this job connects to a database — an
+      # unreachable-but-valid connection string is sufficient (same value
+      # unit-tests.yml already uses for the same reason).
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
 
     steps:
       - uses: actions/checkout@v4
