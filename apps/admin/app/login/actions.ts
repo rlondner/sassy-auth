@@ -170,6 +170,7 @@ const ERROR_CODE_TO_OUTCOME: Record<string, string> = {
   tooManyRequests: 'too_many_requests',
   serverUnavailable: 'server_unavailable',
   inactive: 'inactive',
+  unverified: 'unverified',
 }
 
 function normalizeAuthOutcome(error: string): string {

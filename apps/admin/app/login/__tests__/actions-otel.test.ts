@@ -28,6 +28,16 @@ describe('signIn span', () => {
   let exporter: InMemorySpanExporter;
 
   beforeEach(() => {
+    // The OpenTelemetry trace API only accepts one global provider
+    // registration; without disabling the previous test's provider first,
+    // every test after the first silently exports into a stale provider and
+    // exporter.getFinishedSpans() here always returns []. Also reset the
+    // module registry so `actions.ts`'s module-scoped `tracer` (captured via
+    // `trace.getTracer(...)` at import time) is re-created against the fresh
+    // provider registered below, rather than staying bound to a prior test's
+    // now-disabled one.
+    trace.disable();
+    jest.resetModules();
     exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
     trace.setGlobalTracerProvider(provider);
@@ -59,5 +69,33 @@ describe('signIn span', () => {
     // normalized snake_case outcome shared with the other services, not the
     // raw camelCase code.
     expect(loginSpan?.attributes['auth.outcome']).toBe('invalid_credentials');
+  });
+
+  it('traces an unverified-account rejection with its own outcome, not validation_error', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      headers: new Headers(),
+      json: async () => ({ code: 'ACCOUNT_UNVERIFIED' }),
+      clone() {
+        return this;
+      },
+    }) as unknown as typeof fetch;
+
+    const { signIn } = await import('../actions');
+    const formData = new FormData();
+    formData.set('email', 'a@example.com');
+    formData.set('password', 'wrong-password');
+    await signIn(formData);
+
+    const spans = exporter.getFinishedSpans();
+    const loginSpan = spans.find((s) => s.name === 'admin.login.submit');
+    expect(loginSpan).toBeDefined();
+    // The session-create gate's 403 with code ACCOUNT_UNVERIFIED maps to the
+    // `unverified` error code, which must carry its own outcome — the same
+    // account-state family as `inactive` — rather than falling through to
+    // the `validation_error` default that `normalizeAuthOutcome` uses for
+    // unmapped codes.
+    expect(loginSpan?.attributes['auth.outcome']).toBe('unverified');
   });
 });
