@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { AUTH_THROTTLE } from '../common/config/rate-limit-config';
 
 // bug-0232: BetterAuth is mounted straight onto the Express app in
 // `main.ts` (`expressApp.all('/api/auth/*', toNodeHandler(auth))`),
@@ -142,13 +143,16 @@ export function createAuthRateLimiter(options: AuthRateLimitOptions): AuthRateLi
 
 /**
  * Bucket sizes mirror the Nest `auth` throttler bucket from bug-0080
- * (10/min/IP). Disabled under `NODE_ENV=test` for the same reason the Nest
- * buckets are: the e2e suite hammers sign-in repeatedly.
+ * (10/min/IP by default). Reads the same AUTH_THROTTLE config (backed by
+ * AUTH_RATE_LIMIT / AUTH_RATE_WINDOW_MS, and disabled under `NODE_ENV=test`
+ * for the same reason the Nest buckets are: the e2e suite hammers sign-in
+ * repeatedly) rather than hardcoding its own numbers — this middleware sits
+ * in front of BetterAuth and previously ignored those env vars entirely,
+ * so raising AUTH_RATE_LIMIT for local e2e runs had no effect here.
  */
 export function createDefaultAuthRateLimiter(): AuthRateLimiter {
-  const isTest = process.env.NODE_ENV === 'test';
   return createAuthRateLimiter({
-    windowMs: 60_000,
-    max: isTest ? 10_000 : 10,
+    windowMs: AUTH_THROTTLE.ttl,
+    max: AUTH_THROTTLE.limit,
   });
 }
