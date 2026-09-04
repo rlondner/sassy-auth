@@ -99,8 +99,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setSocialLoading(false)
     })
     Promise.all([
-      listOrgsAction({ appId: app.publicId, pageSize: 100 }),
-      listRolesAction({ appId: app.publicId, pageSize: 100 }),
+      listOrgsAction({ appId: app.publicId, pageSize: 200 }),
+      listRolesAction({ appId: app.publicId, pageSize: 200 }),
     ]).then(([orgsResult, rolesResult]) => {
       if (cancelled) return
       setAppOrgs('items' in orgsResult ? orgsResult.items : [])

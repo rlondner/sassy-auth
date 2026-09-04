@@ -128,8 +128,8 @@ describe('AppEditDrawer', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({ available: [], enabled: [] })
-    ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 })
-    ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 })
+    ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
+    ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
   })
 
   it('renders the publicId as read-only and copies on click', async () => {
@@ -357,20 +357,20 @@ describe('AppEditDrawer', () => {
       items: [{ publicId: 'org1', name: 'Citadel', isPlatform: false, userCount: 0, app: { publicId: 'sq_1', name: 'App' } }],
       total: 1,
       page: 1,
-      pageSize: 100,
+      pageSize: 200,
     })
     ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({
       items: [{ publicId: 'role1', name: 'Managers', app: { publicId: 'sq_1', name: 'App' }, permissionCount: 0, userCount: 0 }],
       total: 1,
       page: 1,
-      pageSize: 100,
+      pageSize: 200,
     })
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
 
     await waitFor(() => expect(screen.getAllByText('Citadel').length).toBeGreaterThan(0))
     expect(screen.getAllByText('Managers').length).toBeGreaterThan(0)
-    expect(orgsActions.listOrgsAction).toHaveBeenCalledWith({ appId: 'sq_1', pageSize: 100 })
-    expect(rolesActions.listRolesAction).toHaveBeenCalledWith({ appId: 'sq_1', pageSize: 100 })
+    expect(orgsActions.listOrgsAction).toHaveBeenCalledWith({ appId: 'sq_1', pageSize: 200 })
+    expect(rolesActions.listRolesAction).toHaveBeenCalledWith({ appId: 'sq_1', pageSize: 200 })
   })
 
   it('includes defaultOrgId/defaultRoleId in the PATCH payload when changed', async () => {
@@ -378,13 +378,13 @@ describe('AppEditDrawer', () => {
       items: [{ publicId: 'org1', name: 'Citadel', isPlatform: false, userCount: 0, app: { publicId: 'sq_1', name: 'App' } }],
       total: 1,
       page: 1,
-      pageSize: 100,
+      pageSize: 200,
     })
     ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({
       items: [{ publicId: 'role1', name: 'Managers', app: { publicId: 'sq_1', name: 'App' }, permissionCount: 0, userCount: 0 }],
       total: 1,
       page: 1,
-      pageSize: 100,
+      pageSize: 200,
     })
     ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app })
     const onOpenChange = jest.fn()
