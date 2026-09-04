@@ -3,6 +3,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { magicLink, emailOTP, openAPI, twoFactor, genericOAuth } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
+import { verificationEmail } from '../email/templates/verify-email.template';
 import { getEmailer } from '../email/email.singleton';
 import { captureResetUrl } from './reset-url-context';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
@@ -141,6 +142,7 @@ export const auth = betterAuth({
             });
             throw new APIError('FORBIDDEN', {
               message: 'This account is not active.',
+              code: gate.status === 'unverified' ? 'ACCOUNT_UNVERIFIED' : 'ACCOUNT_INACTIVE',
             });
           }
           // task-4: gate runs first — a blocked user never reaches here. Only
@@ -295,6 +297,22 @@ export const auth = betterAuth({
       const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
       await getEmailer().send({ to: user.email, ...passwordResetEmail({ firstName, resetUrl }) });
     },
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }: { user: { email: string; name?: string }; url: string }) => {
+      const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
+      await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url }) });
+    },
+    afterEmailVerification: async (updatedUser: { id: string }) => {
+      // No-op for any status other than 'unverified' — a 'pending' user
+      // (invitation, no credential) or an already-'active' user verifying an
+      // email through some future path must not be silently promoted.
+      await prisma.saUser.updateMany({
+        where: { betterAuthUserId: updatedUser.id, status: 'unverified' },
+        data: { status: 'active' },
+      });
+    },
+    autoSignInAfterVerification: false, // consistent with emailAndPassword.autoSignIn: false above
   },
   // Social providers are built from env by build-social-providers.ts, which
   // keeps the bug-0175 both-halves guard, sets disableSignUp (invite-only),
