@@ -162,6 +162,13 @@ export class OrgsService {
       this.logger.getWinstonLogger().info('Org deleted', { context: 'OrgsService', orgId: publicId });
     } catch (e: unknown) {
       if (isPrismaCode(e, 'P2003')) {
+        const defaultForApp = await prisma.saApp.findFirst({
+          where: { defaultOrgId: existing.id },
+          select: { name: true },
+        });
+        if (defaultForApp) {
+          throw new ConflictException(`Org is the default org for app "${defaultForApp.name}"`);
+        }
         throw new ConflictException('Org has dependent users');
       }
       throw e;

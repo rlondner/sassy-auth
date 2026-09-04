@@ -10,7 +10,7 @@ jest.mock('@sassy-auth/db', () => ({
       findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn(),
       create: jest.fn(), update: jest.fn(), delete: jest.fn(),
     },
-    saApp: { findUnique: jest.fn() },
+    saApp: { findUnique: jest.fn(), findFirst: jest.fn() },
     $transaction: jest.fn(),
   },
   Prisma: {},
@@ -30,7 +30,7 @@ const ORG_INCLUDE_FOR_TEST = {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saOrg: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
-  saApp: { findUnique: jest.Mock };
+  saApp: { findUnique: jest.Mock; findFirst: jest.Mock };
   $transaction: jest.Mock;
 };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -316,6 +316,16 @@ describe('OrgsService', () => {
       mockPrisma.saOrg.findUnique.mockResolvedValue(existing);
       mockPrisma.saOrg.delete.mockRejectedValueOnce(new Error('Unexpected DB error'));
       await expect(service.deleteOrg('ba-caller', 'sq_10')).rejects.toThrow('Unexpected DB error');
+    });
+
+    it('reports the app name when the org is that app\'s default (not "has dependent users")', async () => {
+      mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 5, publicId: 'org5', isPlatform: false });
+      const p2003 = Object.assign(new Error('FK violation'), { code: 'P2003' });
+      mockPrisma.saOrg.delete.mockRejectedValue(p2003);
+      mockPrisma.saApp.findFirst.mockResolvedValue({ name: 'Resource Server' });
+      await expect(service.deleteOrg('ba-caller', 'org5')).rejects.toThrow(
+        /default org for app "Resource Server"/,
+      );
     });
   });
 });
