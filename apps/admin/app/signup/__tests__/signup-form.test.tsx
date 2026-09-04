@@ -26,6 +26,14 @@ function fillValidForm() {
   fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'SecurePass1!' } })
 }
 
+function fillValidFormWithoutCompanyName() {
+  fireEvent.change(screen.getByLabelText('signup.firstName'), { target: { value: 'Alice' } })
+  fireEvent.change(screen.getByLabelText('signup.lastName'), { target: { value: 'Wonder' } })
+  fireEvent.change(screen.getByLabelText('signup.email'), { target: { value: 'alice@example.com' } })
+  fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'SecurePass1!' } })
+  fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'SecurePass1!' } })
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   mockRegisterAction.mockResolvedValue({ ok: true })
@@ -33,7 +41,7 @@ beforeEach(() => {
 
 describe('SignupForm', () => {
   it('renders all fields', () => {
-    render(<SignupForm clientId="sq_1" next="" />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
     expect(screen.getByLabelText('signup.firstName')).toBeInTheDocument()
     expect(screen.getByLabelText('signup.lastName')).toBeInTheDocument()
     expect(screen.getByLabelText('signup.companyName')).toBeInTheDocument()
@@ -43,7 +51,7 @@ describe('SignupForm', () => {
   })
 
   it('shows an error when passwords do not match, without submitting', async () => {
-    render(<SignupForm clientId="sq_1" next="" />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'Different1!' } })
     fireEvent.click(screen.getByText('signup.submit'))
@@ -55,7 +63,7 @@ describe('SignupForm', () => {
   })
 
   it('shows an error for a password under 12 characters', async () => {
-    render(<SignupForm clientId="sq_1" next="" />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'Short1!' } })
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'Short1!' } })
@@ -68,7 +76,7 @@ describe('SignupForm', () => {
   })
 
   it('shows an error for a password missing complexity', async () => {
-    render(<SignupForm clientId="sq_1" next="" />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'lowercaseonly1' } })
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'lowercaseonly1' } })
@@ -81,7 +89,7 @@ describe('SignupForm', () => {
   })
 
   it('calls registerAction with the mapped fields on valid submit', async () => {
-    render(<SignupForm clientId="sq_1" next="" />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -99,7 +107,7 @@ describe('SignupForm', () => {
 
   it('shows a translated error returned by registerAction', async () => {
     mockRegisterAction.mockResolvedValue({ error: 'emailTaken' })
-    render(<SignupForm clientId="sq_1" next="" />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -110,7 +118,7 @@ describe('SignupForm', () => {
 
   it('shows an error and clears the loading state when registerAction rejects', async () => {
     mockRegisterAction.mockRejectedValue(new Error('boom'))
-    render(<SignupForm clientId="sq_1" next="" />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -121,7 +129,7 @@ describe('SignupForm', () => {
   })
 
   it('shows the success state and a link to /login after a successful submit', async () => {
-    render(<SignupForm clientId="sq_1" next="" />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -130,7 +138,7 @@ describe('SignupForm', () => {
   })
 
   it('carries next forward into the post-signup login link', async () => {
-    render(<SignupForm clientId="sq_1" next="/orgs" />)
+    render(<SignupForm clientId="sq_1" next="/orgs" hasDefaultOrg={false} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -139,5 +147,30 @@ describe('SignupForm', () => {
       'href',
       '/login?next=%2Forgs',
     )
+  })
+
+  it('hides the Company name field when hasDefaultOrg is true, and omits it from the submit payload', async () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg />)
+    expect(screen.queryByLabelText('signup.companyName')).not.toBeInTheDocument()
+
+    fillValidFormWithoutCompanyName()
+    fireEvent.click(screen.getByText('signup.submit'))
+
+    await waitFor(() =>
+      expect(mockRegisterAction).toHaveBeenCalledWith({
+        clientId: 'sq_1',
+        firstName: 'Alice',
+        lastName: 'Wonder',
+        email: 'alice@example.com',
+        password: 'SecurePass1!',
+      }),
+    )
+    const payload = mockRegisterAction.mock.calls[0][0]
+    expect(payload).not.toHaveProperty('companyName')
+  })
+
+  it('shows the Company name field when hasDefaultOrg is false', () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+    expect(screen.getByLabelText('signup.companyName')).toBeInTheDocument()
   })
 })

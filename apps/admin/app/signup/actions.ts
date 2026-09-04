@@ -9,7 +9,7 @@ export interface RegisterInput {
   clientId: string
   firstName: string
   lastName: string
-  companyName: string
+  companyName?: string
   email: string
   password: string
 }
@@ -28,7 +28,7 @@ export async function registerAction(
         password: input.password,
         firstName: input.firstName,
         lastName: input.lastName,
-        companyName: input.companyName,
+        ...(input.companyName !== undefined && { companyName: input.companyName }),
         appPublicId: input.clientId,
       }),
     })

@@ -6,16 +6,19 @@ const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
 export const dynamic = 'force-dynamic'
 
-async function fetchAppName(clientId: string): Promise<string | null> {
+async function fetchAppInfo(clientId: string): Promise<{ name: string | null; hasDefaultOrg: boolean }> {
   try {
     const res = await fetch(`${AUTH_SERVER}/api/register/app?appPublicId=${encodeURIComponent(clientId)}`, {
       cache: 'no-store',
     })
-    if (!res.ok) return null
-    const body = (await res.json()) as { name?: string }
-    return typeof body.name === 'string' ? body.name : null
+    if (!res.ok) return { name: null, hasDefaultOrg: false }
+    const body = (await res.json()) as { name?: string; hasDefaultOrg?: boolean }
+    return {
+      name: typeof body.name === 'string' ? body.name : null,
+      hasDefaultOrg: body.hasDefaultOrg === true,
+    }
   } catch {
-    return null
+    return { name: null, hasDefaultOrg: false }
   }
 }
 
@@ -38,7 +41,7 @@ export default async function SignupPage({
     )
   }
 
-  const appName = await fetchAppName(clientId)
+  const { name: appName, hasDefaultOrg } = await fetchAppInfo(clientId)
   const nextSafe = next ?? ''
 
   return (
@@ -50,7 +53,7 @@ export default async function SignupPage({
           </h1>
           <p className="mt-1 text-body-sm text-[var(--muted-foreground)]">{t('signup.subtitle')}</p>
         </div>
-        <SignupForm clientId={clientId} next={nextSafe} />
+        <SignupForm clientId={clientId} next={nextSafe} hasDefaultOrg={hasDefaultOrg} />
         <div className="mt-4 text-center">
           <Link
             href={nextSafe ? `/login?next=${encodeURIComponent(nextSafe)}` : '/login'}
