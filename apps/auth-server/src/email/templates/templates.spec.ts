@@ -1,7 +1,7 @@
 import { invitationEmail } from './invitation.template';
 import { passwordResetEmail } from './password-reset.template';
 import { signInCodeEmail } from './sign-in-code.template';
-import { verifyEmailTemplate } from './verify-email.template';
+import { verificationEmail } from './verify-email.template';
 
 describe('email templates', () => {
   it('invitationEmail embeds the invite URL and name in html + text', () => {
@@ -30,8 +30,8 @@ describe('email templates', () => {
     expect(parts.html).toContain('5');
   });
 
-  it('verifyEmailTemplate embeds the verification URL and name in html + text', () => {
-    const out = verifyEmailTemplate({ firstName: 'Jane', verifyUrl: 'https://x/verify-email?token=abc' });
+  it('verificationEmail embeds the verification URL and name in html + text', () => {
+    const out = verificationEmail({ firstName: 'Jane', verifyUrl: 'https://x/verify-email?token=abc' });
     expect(out.subject).toMatch(/verif/i);
     expect(out.html).toContain('https://x/verify-email?token=abc');
     expect(out.text).toContain('https://x/verify-email?token=abc');

@@ -1,6 +1,6 @@
 import type { EmailMessageParts } from '../email.types';
 
-export function verifyEmailTemplate(args: { firstName: string; verifyUrl: string }): EmailMessageParts {
+export function verificationEmail(args: { firstName: string; verifyUrl: string }): EmailMessageParts {
   const { firstName, verifyUrl } = args;
   return {
     subject: 'Verify your Sassy Auth email address',
