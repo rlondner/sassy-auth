@@ -4,6 +4,8 @@ import { NextIntlClientProvider } from 'next-intl'
 import en from '@/messages/en.json'
 import { AppEditDrawer } from '../app-edit-drawer'
 import * as actions from '@/app/(admin)/apps/actions'
+import * as orgsActions from '@/app/(admin)/orgs/actions'
+import * as rolesActions from '@/app/(admin)/roles/actions'
 
 jest.mock('@/app/(admin)/apps/actions', () => ({
   updateAppAction: jest.fn(),
@@ -11,6 +13,105 @@ jest.mock('@/app/(admin)/apps/actions', () => ({
   updateSocialProvidersAction: jest.fn(),
   rotateClientSecretAction: jest.fn(),
 }))
+jest.mock('@/app/(admin)/orgs/actions', () => ({
+  listOrgsAction: jest.fn(),
+}))
+jest.mock('@/app/(admin)/roles/actions', () => ({
+  listRolesAction: jest.fn(),
+}))
+
+// Radix Select is awkward to drive in JSDOM (it relies on pointer events that
+// JSDOM does not implement). Swap it for a thin native <select> shim so tests
+// can call fireEvent.change to pick an org/role. Other primitives are
+// re-exported from the real package. Mirrors the shim in
+// user-create-drawer.test.tsx.
+jest.mock('@sassy-auth/ui', () => {
+  const actual = jest.requireActual('@sassy-auth/ui')
+  type ChildrenProps = { children?: React.ReactNode }
+  type SelectProps = ChildrenProps & {
+    value?: string
+    onValueChange?: (value: string) => void
+  }
+  type SelectItemProps = ChildrenProps & { value: string }
+  type SelectValueProps = { placeholder?: string }
+  const SelectContext = React.createContext<{
+    value: string
+    onValueChange: (value: string) => void
+    placeholder: string
+  }>({ value: '', onValueChange: () => undefined, placeholder: '' })
+
+  function Select({ value = '', onValueChange = () => undefined, children }: SelectProps) {
+    const [placeholder, setPlaceholder] = React.useState('')
+    return (
+      <SelectContext.Provider value={{ value, onValueChange, placeholder }}>
+        <select
+          aria-label={placeholder || 'select'}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        >
+          <option value="" disabled>{placeholder || 'Select'}</option>
+          {React.Children.toArray(children).flatMap((child) => {
+            if (!React.isValidElement(child)) return []
+            // <SelectContent> wraps the items.
+            const grandchildren = (child.props as ChildrenProps).children
+            return React.Children.toArray(grandchildren)
+          })}
+        </select>
+        {/* render hidden helpers so SelectValue can set the placeholder via effect */}
+        <div hidden>{children}</div>
+        <SelectPlaceholderSink onPlaceholder={setPlaceholder}>{children}</SelectPlaceholderSink>
+      </SelectContext.Provider>
+    )
+  }
+
+  function SelectPlaceholderSink({
+    children,
+    onPlaceholder,
+  }: {
+    children?: React.ReactNode
+    onPlaceholder: (value: string) => void
+  }) {
+    React.useEffect(() => {
+      let found = ''
+      const walk = (nodes: React.ReactNode) => {
+        React.Children.forEach(nodes, (node) => {
+          if (!React.isValidElement(node)) return
+          const props = node.props as Record<string, unknown> | undefined
+          if (props && typeof props.placeholder === 'string') {
+            found = props.placeholder
+          }
+          if (props && props.children) walk(props.children as React.ReactNode)
+        })
+      }
+      walk(children)
+      onPlaceholder(found)
+    }, [children, onPlaceholder])
+    return null
+  }
+
+  function SelectTrigger({ children }: ChildrenProps) {
+    return <>{children}</>
+  }
+  function SelectContent({ children }: ChildrenProps) {
+    return <>{children}</>
+  }
+  function SelectValue(_props: SelectValueProps) {
+    return null
+  }
+  function SelectItem({ value, children }: SelectItemProps) {
+    return <option value={value}>{children}</option>
+  }
+
+  return {
+    ...actual,
+    Select,
+    SelectTrigger,
+    SelectContent,
+    SelectValue,
+    SelectItem,
+  }
+})
+
 Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } })
 
 const app = { publicId: 'sq_1', name: 'Old', url: 'https://old.example', isPlatform: false, requireTwoFactor: false }
@@ -27,6 +128,8 @@ describe('AppEditDrawer', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({ available: [], enabled: [] })
+    ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 })
+    ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 })
   })
 
   it('renders the publicId as read-only and copies on click', async () => {
@@ -244,5 +347,62 @@ describe('AppEditDrawer', () => {
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('plaintext-secret-value'),
     )
+  })
+
+  // Task 13: default org / default role selects, populated from this app's
+  // own orgs/roles.
+
+  it("renders Default organization and Default role selects populated from this app's orgs/roles", async () => {
+    ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({
+      items: [{ publicId: 'org1', name: 'Citadel', isPlatform: false, userCount: 0, app: { publicId: 'sq_1', name: 'App' } }],
+      total: 1,
+      page: 1,
+      pageSize: 100,
+    })
+    ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({
+      items: [{ publicId: 'role1', name: 'Managers', app: { publicId: 'sq_1', name: 'App' }, permissionCount: 0, userCount: 0 }],
+      total: 1,
+      page: 1,
+      pageSize: 100,
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    await waitFor(() => expect(screen.getAllByText('Citadel').length).toBeGreaterThan(0))
+    expect(screen.getAllByText('Managers').length).toBeGreaterThan(0)
+    expect(orgsActions.listOrgsAction).toHaveBeenCalledWith({ appId: 'sq_1', pageSize: 100 })
+    expect(rolesActions.listRolesAction).toHaveBeenCalledWith({ appId: 'sq_1', pageSize: 100 })
+  })
+
+  it('includes defaultOrgId/defaultRoleId in the PATCH payload when changed', async () => {
+    ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({
+      items: [{ publicId: 'org1', name: 'Citadel', isPlatform: false, userCount: 0, app: { publicId: 'sq_1', name: 'App' } }],
+      total: 1,
+      page: 1,
+      pageSize: 100,
+    })
+    ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({
+      items: [{ publicId: 'role1', name: 'Managers', app: { publicId: 'sq_1', name: 'App' }, permissionCount: 0, userCount: 0 }],
+      total: 1,
+      page: 1,
+      pageSize: 100,
+    })
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    await waitFor(() => expect(screen.getAllByText('Citadel').length).toBeGreaterThan(0))
+
+    fireEvent.change(screen.getByLabelText(en.apps.fields.defaultOrgNone), { target: { value: 'org1' } })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.defaultRoleNone), { target: { value: 'role1' } })
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ defaultOrgId: 'org1', defaultRoleId: 'role1' }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 })

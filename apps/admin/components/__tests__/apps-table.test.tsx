@@ -18,6 +18,17 @@ jest.mock('@/app/(admin)/apps/actions', () => ({
   updateSocialProvidersAction: jest.fn(),
 }))
 
+// AppEditDrawer also fetches this app's orgs/roles for the default-org/role
+// selects, gated the same way behind `open` (see comment above). None of
+// these tests open the edit drawer, so these are never resolved — just
+// present so the module shape matches actions.ts's exports.
+jest.mock('@/app/(admin)/orgs/actions', () => ({
+  listOrgsAction: jest.fn(),
+}))
+jest.mock('@/app/(admin)/roles/actions', () => ({
+  listRolesAction: jest.fn(),
+}))
+
 // Radix DropdownMenu does not open in jsdom (it depends on pointer-events
 // detection which jsdom does not implement). Replace it with a trivial
 // always-open passthrough so menu items are queryable. This preserves the
