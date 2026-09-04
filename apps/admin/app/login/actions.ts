@@ -12,6 +12,22 @@ import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '@/lib/two-facto
 
 const tracer = trace.getTracer('sassy-auth.admin')
 
+/**
+ * The session-create gate (auth.config.ts's databaseHooks.session.create.before)
+ * throws FORBIDDEN with `code: 'ACCOUNT_UNVERIFIED' | 'ACCOUNT_INACTIVE'` in its
+ * body — read it so the UI can tell "verify your email" apart from "deactivated"
+ * instead of collapsing every 403 into one generic message.
+ */
+async function classifyForbidden(res: Response): Promise<'unverified' | 'inactive'> {
+  try {
+    const body = (await res.clone().json()) as { code?: string }
+    if (body.code === 'ACCOUNT_UNVERIFIED') return 'unverified'
+  } catch {
+    // Non-JSON or empty body — fall through to the generic case.
+  }
+  return 'inactive'
+}
+
 interface ParsedSessionCookie {
   value: string
   httpOnly: boolean
@@ -233,7 +249,7 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
   if (!res.ok) {
     Sentry.addBreadcrumb({ category: 'auth', message: 'Admin login failed', level: 'warning' })
     if (res.status === 401) return { error: 'invalidCredentials' }
-    if (res.status === 403) return { error: 'inactive' }
+    if (res.status === 403) return { error: await classifyForbidden(res) }
     // Rate-limited, not wrong. The auth server applies a 10/min/IP budget to
     // credential-bearing paths; without this branch the catch-all below told a
     // throttled operator their password was wrong, which is both untrue and
@@ -377,8 +393,9 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
 
   if (!res.ok) {
     Sentry.addBreadcrumb({ category: 'auth', message: 'Admin OTP login failed', level: 'warning' })
-    // The session-creation gate rejects non-active users with 403 → inactive.
-    if (res.status === 403) return { error: 'inactive' }
+    // The session-creation gate rejects non-active users with 403 → inactive
+    // (or unverified, per the response body's `code`).
+    if (res.status === 403) return { error: await classifyForbidden(res) }
     // Same rate-limit budget as the password path — report it as throttling
     // rather than as a bad code.
     if (res.status === 429) return { error: 'tooManyRequests' }

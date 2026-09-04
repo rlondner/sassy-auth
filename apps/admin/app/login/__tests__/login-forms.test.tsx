@@ -86,6 +86,7 @@ describe('LoginForm', () => {
   it.each([
     ['invalidCredentials', messages.login.error.invalidCredentials],
     ['inactive', messages.login.error.inactive],
+    ['unverified', messages.login.error.unverified],
     ['serverUnavailable', messages.login.error.serverUnavailable],
     ['tooManyRequests', messages.login.error.tooManyRequests],
   ])('renders the translated message for %s', async (code, text) => {
