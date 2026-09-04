@@ -8,8 +8,9 @@ import { RegisterDto } from './register.dto';
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
     saApp: { findUnique: jest.fn() },
-    saOrg: { create: jest.fn(), update: jest.fn() },
+    saOrg: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     saUser: { create: jest.fn() },
+    saUserRole: { create: jest.fn() },
     user: { delete: jest.fn(), findUnique: jest.fn() },
     $transaction: jest.fn(),
   },
@@ -20,6 +21,7 @@ jest.mock('../auth/auth.config', () => ({
   auth: {
     api: {
       signUpEmail: jest.fn(),
+      sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
     },
   },
 }));
@@ -27,14 +29,17 @@ jest.mock('../auth/auth.config', () => ({
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saApp: { findUnique: jest.Mock };
-  saOrg: { create: jest.Mock; update: jest.Mock };
+  saOrg: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
   saUser: { create: jest.Mock };
+  saUserRole: { create: jest.Mock };
   user: { delete: jest.Mock; findUnique: jest.Mock };
   $transaction: jest.Mock;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockSignUpEmail = require('../auth/auth.config').auth.api.signUpEmail as jest.Mock;
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockSendVerificationEmail = require('../auth/auth.config').auth.api.sendVerificationEmail as jest.Mock;
 
 const sqidFake: Pick<SqidService, 'encode' | 'decode'> = {
   encode: (n: number) => `sq_${n}`,
@@ -113,8 +118,11 @@ describe('RegistrationService', () => {
           orgId: finalOrgRow.id,
           firstName: baseDto.firstName,
           lastName: baseDto.lastName,
-          status: 'active',
+          status: 'unverified',
         },
+      });
+      expect(mockSendVerificationEmail).toHaveBeenCalledWith({
+        body: { email: baseDto.email, callbackURL: expect.stringContaining('/signup/verified') },
       });
 
       expect(result).toEqual({ ok: true, orgPublicId: finalOrgRow.publicId });
@@ -153,6 +161,84 @@ describe('RegistrationService', () => {
       mockPrisma.user.delete.mockRejectedValue(new Error('Delete also failed'));
 
       await expect(service.register(baseDto)).rejects.toThrow('TX failure');
+    });
+  });
+
+  describe('register — app with defaultOrgId', () => {
+    const appWithDefaultOrg = { ...appRow, defaultOrgId: 99, defaultRoleId: null };
+    const defaultOrgRow = { id: 99, publicId: 'sq_99', name: 'Citadel', appId: 1, isPlatform: false };
+
+    it('joins the default org and ignores companyName, without creating a new org', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appWithDefaultOrg);
+      mockPrisma.saOrg.findUnique.mockResolvedValue(defaultOrgRow);
+      mockSignUpEmail.mockResolvedValue({ token: 'tok', user: { id: baUserId, email: baseDto.email } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+      mockPrisma.saUser.create.mockResolvedValue({ id: 1, publicId: baUserId.slice(0, 12) });
+
+      const result = await service.register({ ...baseDto, companyName: undefined });
+
+      expect(mockPrisma.saOrg.create).not.toHaveBeenCalled();
+      expect(mockPrisma.saUser.create).toHaveBeenCalledWith({
+        data: {
+          publicId: baUserId.slice(0, 12),
+          betterAuthUserId: baUserId,
+          orgId: defaultOrgRow.id,
+          firstName: baseDto.firstName,
+          lastName: baseDto.lastName,
+          status: 'unverified',
+        },
+      });
+      expect(result).toEqual({ ok: true, orgPublicId: defaultOrgRow.publicId });
+    });
+
+    it('throws BadRequestException when companyName is missing and the app has no defaultOrgId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow); // no defaultOrgId
+      mockSignUpEmail.mockResolvedValue({ token: 'tok', user: { id: baUserId, email: baseDto.email } });
+
+      await expect(service.register({ ...baseDto, companyName: undefined })).rejects.toThrow(
+        /companyName is required/,
+      );
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('register — app with defaultRoleId', () => {
+    it('assigns the default role in the same transaction, for a founder-path signup too', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, defaultOrgId: null, defaultRoleId: 7 });
+      mockSignUpEmail.mockResolvedValue({ token: 'tok', user: { id: baUserId, email: baseDto.email } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockPrisma.saUser.create.mockResolvedValue({ id: 1, publicId: baUserId.slice(0, 12) });
+
+      await service.register(baseDto);
+
+      expect(mockPrisma.saUserRole.create).toHaveBeenCalledWith({ data: { userId: 1, roleId: 7 } });
+    });
+
+    it('does not assign a role when defaultRoleId is not set', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockSignUpEmail.mockResolvedValue({ token: 'tok', user: { id: baUserId, email: baseDto.email } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockPrisma.saUser.create.mockResolvedValue({ id: 1, publicId: baUserId.slice(0, 12) });
+
+      await service.register(baseDto);
+
+      expect(mockPrisma.saUserRole.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAppName — hasDefaultOrg', () => {
+    it('reports hasDefaultOrg: true when the app has a defaultOrgId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99 });
+      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp', hasDefaultOrg: true });
+    });
+
+    it('reports hasDefaultOrg: false when the app has no defaultOrgId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null });
+      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp', hasDefaultOrg: false });
     });
   });
 
@@ -205,12 +291,12 @@ describe('RegistrationService', () => {
 
   describe('getAppName', () => {
     it('returns the app name for a known appPublicId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null });
 
-      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp' });
+      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp', hasDefaultOrg: false });
       expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
         where: { publicId: 'sq_1' },
-        select: { name: true },
+        select: { name: true, defaultOrgId: true },
       });
     });
 
