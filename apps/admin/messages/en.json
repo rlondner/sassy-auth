@@ -58,6 +58,12 @@
       "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server.",
       "requireTwoFactor": "Require two-factor authentication",
       "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue.",
+      "defaultOrg": "Default organization",
+      "defaultOrgHint": "New self-serve sign-ups on this app automatically join this org instead of founding a new one. Leave unset to let each sign-up create its own org.",
+      "defaultOrgNone": "None — sign-ups create a new org",
+      "defaultRole": "Default role",
+      "defaultRoleHint": "Automatically assigned to every self-serve sign-up on this app, whether they join the default org or found a new one.",
+      "defaultRoleNone": "None — no role assigned",
       "socialProviders": "Social sign-in",
       "socialProvidersHint": "Choose which social identity providers this app's login screen offers.",
       "socialProviderNames": {
@@ -375,6 +381,7 @@
     "status": {
       "active": "Active",
       "pending": "Pending",
+      "unverified": "Unverified",
       "inactive": "Inactive"
     },
     "noResults": "No users found.",
@@ -522,6 +529,7 @@
     "error": {
       "invalidCredentials": "Invalid email or password.",
       "inactive": "This account has been deactivated.",
+      "unverified": "Please check your email and click the verification link before signing in.",
       "serverUnavailable": "Sign-in service is unavailable. Please try again in a moment.",
       "tooManyRequests": "Too many sign-in attempts. Please wait a minute and try again.",
       "invalidCode": "Invalid or expired code."
@@ -554,7 +562,7 @@
     "password": "Password",
     "confirmPassword": "Confirm Password",
     "submit": "Create account",
-    "success": "Account created! You can now sign in.",
+    "success": "Account created! Check your email for a verification link before you can sign in.",
     "continueToLogin": "Continue to sign in",
     "backToLogin": "Back to sign in",
     "errors": {
