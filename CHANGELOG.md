@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-04
+
+CI now runs on PRs targeting `dev`, not just `master` (`33e074c`). The
+big landing of the window: `prisma-7-migration` (7 commits, Prisma
+5→6→7 — `prisma-client` generator with CJS output, mandatory
+`@prisma/adapter-pg` driver adapter, new `packages/db/prisma.config.ts`
+replacing the CLI's removed implicit env/schema resolution, plus Docker
+and CI updates) merged into `dev` as PR #374 partway through this
+review. This run re-verified the merged result directly rather than the
+stale unmerged-branch diff it was originally briefed on, and found two
+bugs in it — both fixed with normal PRs against `dev`. See
+[BUGS_2026-09-04.md](./docs/history/bugs/BUGS_2026-09-04.md) and
+[TODO_2026-09-04.md](./docs/history/todo/TODO_2026-09-04.md).
+
+### Fixed (2 bugs)
+
+- **bug-0280** (Medium) — `packages/db/prisma.config.ts` had no
+  equivalent to `index.ts`'s fail-fast `DATABASE_URL` guard, so a missing
+  env var surfaced as an opaque Prisma CLI error at `generate`/`migrate
+  deploy` time instead. Mirrored the guard; `typecheck.yml` (which builds
+  `packages/db` but never previously needed a database) now sets a dummy
+  `DATABASE_URL` for the same reason `unit-tests.yml` already does. PR
+  #375.
+- **bug-0281** (High) — the e2e workflow's FastAPI RS dependency install
+  step hand-listed a stale package subset instead of installing from
+  `pyproject.toml`, missing `opentelemetry` entirely. Live-broken: this
+  is what actually failed the `prisma-7-migration` PR's `e2e` check
+  (`ModuleNotFoundError: No module named 'opentelemetry'`) — unrelated to
+  that PR's own changes, and merged anyway since `dev` has no branch
+  protection (see TODO). Fixed by installing from `pyproject.toml`
+  directly (`pip install .`), matching what local dev's `uv sync` already
+  does. PR #376.
+
+### Docs
+
+- Daily code review bundle for 2026-09-04 (this entry, plus
+  `TODO_2026-09-04.md`, `BUGS_2026-09-04.md`, and a `Makefile` shortcuts
+  callout added to the root README's "Running Tests" section).
+
 ## [Unreleased] — 2026-09-03
 
 `feat/oidc-compatibility` finished merging into `dev` (`8db2fd7`),
