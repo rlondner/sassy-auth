@@ -180,6 +180,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { twoFactorTrustDays: 30 },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });
 
@@ -190,6 +191,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { twoFactorTrustDays: null },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });
 
@@ -200,6 +202,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { name: 'Renamed' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });
 
@@ -218,7 +221,11 @@ describe('AppsService', () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     mockPrisma.saApp.update.mockResolvedValue({ ...appRow, name: 'Renamed' });
     const result = await service.updateApp('ba-caller', 'sq_1', { name: 'Renamed' });
-    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { publicId: 'sq_1' }, data: { name: 'Renamed' } });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { name: 'Renamed' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
     expect(result.name).toBe('Renamed');
   });
 
@@ -231,7 +238,7 @@ describe('AppsService', () => {
   it('sets defaultOrgId when the org belongs to this app', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 50, appId: appRow.id });
-    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultOrgId: 50 });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultOrgId: 50, defaultOrg: { publicId: 'org_pub_50' } });
     const result = await service.updateApp('ba-caller', 'sq_1', { defaultOrgId: 'org_pub_50' });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ defaultOrgId: 50 }) }),
@@ -269,7 +276,7 @@ describe('AppsService', () => {
   it('sets defaultRoleId when the role belongs to this app', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     mockPrisma.saRole.findUnique.mockResolvedValue({ id: 7, appId: appRow.id });
-    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultRoleId: 7 });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultRoleId: 7, defaultRole: { publicId: 'role_pub_7' } });
     const result = await service.updateApp('ba-caller', 'sq_1', { defaultRoleId: 'role_pub_7' });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ defaultRoleId: 7 }) }),
@@ -283,6 +290,24 @@ describe('AppsService', () => {
     await expect(
       service.updateApp('ba-caller', 'sq_1', { defaultRoleId: 'role_pub_7' }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects defaultRoleId that does not exist', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saRole.findUnique.mockResolvedValue(null);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { defaultRoleId: 'nope' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('clears defaultRoleId when explicitly set to null', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultRoleId: null });
+    await service.updateApp('ba-caller', 'sq_1', { defaultRoleId: null });
+    expect(mockPrisma.saRole.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ defaultRoleId: null }) }),
+    );
   });
 
   it('deleteApp rejects platform apps with ForbiddenException', async () => {
@@ -327,6 +352,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { requireTwoFactor: false },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });
 
@@ -443,7 +469,11 @@ describe('AppsService', () => {
     });
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(txClient.saApp.update).toHaveBeenCalledWith({ where: { publicId: 'a_7' }, data: {} });
+    expect(txClient.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'a_7' },
+      data: {},
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
     expect(txClient.saAppRedirectUri.deleteMany).toHaveBeenCalledWith({ where: { appId: 7 } });
     expect(txClient.saAppRedirectUri.createMany).toHaveBeenCalledWith({
       data: [{ appId: 7, uri: 'https://app.example.com/cb', kind: 'login' }],
