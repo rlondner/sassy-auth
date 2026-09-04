@@ -1120,6 +1120,8 @@ pnpm --filter @sassy-auth/admin-e2e test:e2e:ui
 
 Tests are in `apps/admin-e2e/tests/`. In CI, the Playwright config automatically starts both servers. Locally, start `pnpm dev` first. See `apps/admin-e2e/README.md` for details.
 
+**Shortcuts (root `Makefile`):** `make migrate` / `make migrate-deploy` wrap the `db:migrate` / `db:migrate:deploy` scripts above, and `make e2e-tests` wraps the admin E2E command. Assumes the stack is already running and seeded — see the sequence above or `apps/admin-e2e/README.md`.
+
 ---
 
 ## Local email testing (Mailpit)
