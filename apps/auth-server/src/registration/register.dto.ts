@@ -1,4 +1,4 @@
-import { IsEmail, IsString, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 // bug-0280: mirrors the policy bug-0007 established for AcceptInvitationDto
 // (apps/auth-server/src/invitations/dto/accept-invitation.dto.ts) — at least
@@ -20,6 +20,6 @@ export class RegisterDto {
   password!: string;
   @IsString() @MinLength(1) firstName!: string;
   @IsString() @MinLength(1) lastName!: string;
-  @IsString() @MinLength(1) companyName!: string;
+  @IsString() @IsOptional() @MinLength(1) companyName?: string;
   @IsString() @MinLength(1) appPublicId!: string;
 }
