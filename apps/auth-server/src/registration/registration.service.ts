@@ -38,12 +38,16 @@ export class RegistrationService {
     // before this feature existed.
     let defaultOrg: { id: number; publicId: string } | null = null;
     if (app.defaultOrgId) {
-      // Guaranteed to exist by the FK (Restrict on delete) — no defensive
-      // null-check needed beyond satisfying the type checker.
+      // The FK (Restrict on delete) makes this unreachable in normal
+      // operation, but a loud 404 here is cheap insurance against silently
+      // creating an org named "undefined" if that invariant is ever violated.
       defaultOrg = await prisma.saOrg.findUnique({
         where: { id: app.defaultOrgId },
         select: { id: true, publicId: true },
       });
+      if (!defaultOrg) {
+        throw new NotFoundException('Default org not found');
+      }
     } else if (!dto.companyName?.trim()) {
       throw new BadRequestException('companyName is required');
     }

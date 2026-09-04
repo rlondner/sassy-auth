@@ -191,6 +191,15 @@ describe('RegistrationService', () => {
       expect(result).toEqual({ ok: true, orgPublicId: defaultOrgRow.publicId });
     });
 
+    it('throws NotFoundException if the default org row is missing despite defaultOrgId being set', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appWithDefaultOrg);
+      mockPrisma.saOrg.findUnique.mockResolvedValue(null);
+      mockSignUpEmail.mockResolvedValue({ token: 'tok', user: { id: baUserId, email: baseDto.email } });
+
+      await expect(service.register({ ...baseDto, companyName: undefined })).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockSignUpEmail).not.toHaveBeenCalled();
+    });
+
     it('throws BadRequestException when companyName is missing and the app has no defaultOrgId', async () => {
       mockPrisma.saApp.findUnique.mockResolvedValue(appRow); // no defaultOrgId
       mockSignUpEmail.mockResolvedValue({ token: 'tok', user: { id: baUserId, email: baseDto.email } });
