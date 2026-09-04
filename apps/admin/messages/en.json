@@ -565,6 +565,11 @@
     "success": "Account created! Check your email for a verification link before you can sign in.",
     "continueToLogin": "Continue to sign in",
     "backToLogin": "Back to sign in",
+    "verified": {
+      "title": "Email verified",
+      "subtitle": "Your account is ready. You can now sign in.",
+      "continueToLogin": "Continue to sign in"
+    },
     "errors": {
       "passwordMismatch": "Passwords do not match.",
       "passwordTooShort": "Password must be at least 12 characters.",
