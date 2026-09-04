@@ -27,5 +27,6 @@ describe('StatusChip', () => {
   it('renders the unverified variant with its label', () => {
     render(<StatusChip variant="unverified" label="Unverified" />)
     expect(screen.getByText('Unverified')).toBeInTheDocument()
+    expect(screen.getByText('Unverified').closest('span')).toHaveClass('bg-sky-100')
   })
 })
