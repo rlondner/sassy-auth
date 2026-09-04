@@ -4,7 +4,12 @@
 
 // Mock the heavy dependencies so we can import auth.config in jest.
 jest.mock('@sassy-auth/db', () => ({
-  prisma: { saUser: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } },
+  prisma: {
+    saUser: {
+      findUnique: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+  },
 }));
 jest.mock('better-auth/adapters/prisma', () => ({
   prismaAdapter: () => ({}),
@@ -237,6 +242,11 @@ describe('auth.config — hooks.after handler body (task-8 fix round 1, review f
 });
 
 describe('auth.config — emailVerification', () => {
+  afterEach(() => {
+    jest.dontMock('../email/email.singleton');
+    jest.resetModules();
+  });
+
   it('disables auto sign-in after verification, consistent with autoSignIn: false', async () => {
     const { auth } = await import('./auth.config');
     const options = (auth as unknown as { options: Record<string, unknown> }).options;
@@ -272,11 +282,27 @@ describe('auth.config — emailVerification', () => {
   });
 });
 
-describe('auth.config — session gate FORBIDDEN code', () => {
-  it('the FORBIDDEN throw distinguishes unverified from other inactive statuses', async () => {
-    // evaluateSessionGate itself is unit-tested in session-gate.spec.ts; this
-    // just proves the throw site reads gate.status into the error body.
-    const src = require('fs').readFileSync(require.resolve('./auth.config.ts'), 'utf8');
-    expect(src).toMatch(/code:\s*gate\.status === 'unverified' \? 'ACCOUNT_UNVERIFIED' : 'ACCOUNT_INACTIVE'/);
+describe('auth.config — session gate FORBIDDEN code (real invocation)', () => {
+  async function loadSessionCreateBefore() {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const databaseHooks = options['databaseHooks'] as {
+      session: { create: { before: (session: { userId: string }, ctx?: unknown) => Promise<unknown> } };
+    };
+    return databaseHooks.session.create.before;
+  }
+
+  it('throws code: ACCOUNT_UNVERIFIED when the SaUser status is unverified', async () => {
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique = jest.fn().mockResolvedValue({ status: 'unverified' });
+    const before = await loadSessionCreateBefore();
+    await expect(before({ userId: 'ba-1' })).rejects.toMatchObject({ body: { code: 'ACCOUNT_UNVERIFIED' } });
+  });
+
+  it('throws code: ACCOUNT_INACTIVE when the SaUser status is inactive', async () => {
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique = jest.fn().mockResolvedValue({ status: 'inactive' });
+    const before = await loadSessionCreateBefore();
+    await expect(before({ userId: 'ba-1' })).rejects.toMatchObject({ body: { code: 'ACCOUNT_INACTIVE' } });
   });
 });
