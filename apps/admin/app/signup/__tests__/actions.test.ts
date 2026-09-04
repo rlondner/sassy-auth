@@ -51,6 +51,24 @@ describe('registerAction', () => {
     )
   })
 
+  it('omits companyName from the request body when not provided', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(201))
+    const { companyName: _companyName, ...inputWithoutCompanyName } = INPUT
+
+    await registerAction(inputWithoutCompanyName)
+
+    const call = (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0]
+    const body = JSON.parse(call[1]!.body as string)
+    expect(body).toEqual({
+      email: INPUT.email,
+      password: INPUT.password,
+      firstName: INPUT.firstName,
+      lastName: INPUT.lastName,
+      appPublicId: INPUT.clientId,
+    })
+    expect(body).not.toHaveProperty('companyName')
+  })
+
   it('returns ok on a 2xx response', async () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(201))
 
