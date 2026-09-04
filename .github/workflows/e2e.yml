@@ -113,10 +113,21 @@ jobs:
         with:
           python-version: '3.11'
 
+      # bug-0281: this used to hand-list a subset of packages instead of
+      # installing from pyproject.toml, so it silently drifted out of sync
+      # with the app's actual dependencies. app/telemetry.py and
+      # app/oauth/verifier.py import `opentelemetry` unconditionally (added
+      # for the Sentry/OTel observability work), which was never in this
+      # list — the FastAPI RS process has been failing to start in CI with
+      # `ModuleNotFoundError: No module named 'opentelemetry'` ever since,
+      # taking the whole e2e job down with it. Installing from
+      # pyproject.toml directly keeps this in sync by construction, the
+      # same way `uv sync` already does for local dev
+      # (package.json's `setup:resource-server-fastapi` script).
       - name: Install FastAPI RS dependencies
         working-directory: apps/resource-server-fastapi
         run: |
-          pip install fastapi "uvicorn[standard]" httpx "pyjwt[crypto]" pydantic-settings jinja2
+          pip install .
 
       - name: Seed RS app and write publicId
         env:
