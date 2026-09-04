@@ -129,9 +129,9 @@ model SaApp {
   redirectUris    SaAppRedirectUri[]
   socialProviders SaSocialProvider[]
   defaultOrgId    Int?
-  defaultOrg      SaOrg?  @relation("AppDefaultOrg", fields: [defaultOrgId], references: [id])
+  defaultOrg      SaOrg?  @relation("AppDefaultOrg", fields: [defaultOrgId], references: [id], onDelete: Restrict)
   defaultRoleId   Int?
-  defaultRole     SaRole? @relation("AppDefaultRole", fields: [defaultRoleId], references: [id])
+  defaultRole     SaRole? @relation("AppDefaultRole", fields: [defaultRoleId], references: [id], onDelete: Restrict)
 }
 
 model SaAppRedirectUri {
