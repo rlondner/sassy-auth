@@ -282,6 +282,59 @@ describe('auth.config — emailVerification', () => {
   });
 });
 
+jest.mock('./resolve-app-for-reset-token', () => ({
+  resolveAppForResetToken: jest.fn(),
+}));
+
+describe('auth.config — hooks.before (reset-password policy enforcement)', () => {
+  async function loadBeforeHook() {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const hooks = options['hooks'] as Record<string, unknown>;
+    return hooks['before'] as (ctx: {
+      path?: string;
+      body?: { token?: string; newPassword?: string };
+      query?: { token?: string };
+    }) => Promise<void>;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('ignores a non-reset-password path', async () => {
+    const before = await loadBeforeHook();
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    await before({ path: '/sign-in/email' });
+    expect(resolveAppForResetToken).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the token resolves to no app (defers to BetterAuth\'s own INVALID_TOKEN)', async () => {
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    resolveAppForResetToken.mockResolvedValue(null);
+    const before = await loadBeforeHook();
+    await expect(before({ path: '/reset-password', body: { token: 'tok', newPassword: 'x' } })).resolves.toBeUndefined();
+  });
+
+  it('throws when the new password violates the resolved app\'s policy', async () => {
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    resolveAppForResetToken.mockResolvedValue({ id: 1, passwordPolicyOverride: null });
+    const before = await loadBeforeHook();
+    await expect(
+      before({ path: '/reset-password', body: { token: 'tok', newPassword: 'short' } }),
+    ).rejects.toMatchObject({ body: { code: 'PASSWORD_POLICY_VIOLATION' } });
+  });
+
+  it('does not throw when the new password satisfies the resolved policy', async () => {
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    resolveAppForResetToken.mockResolvedValue({ id: 1, passwordPolicyOverride: null });
+    const before = await loadBeforeHook();
+    await expect(
+      before({ path: '/reset-password', body: { token: 'tok', newPassword: 'Str0ngPassword' } }),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('auth.config — session gate FORBIDDEN code (real invocation)', () => {
   async function loadSessionCreateBefore() {
     const { auth } = await import('./auth.config');

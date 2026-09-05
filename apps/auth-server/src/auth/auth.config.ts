@@ -18,6 +18,9 @@ import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
 import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
 import { readIsPrivateEmail } from '../social/apple-private-relay-context';
+import { resolveAppForResetToken } from './resolve-app-for-reset-token';
+import { getGlobalPasswordPolicy, resolvePasswordPolicy, MAX_PASSWORD_LENGTH } from './password-policy';
+import { evaluatePasswordPolicy } from '@sassy-auth/types';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -202,6 +205,33 @@ export const auth = betterAuth({
   // needs its own after-matcher MUST add another `if (...)` branch inside
   // this same handler, not a second `hooks` block.
   hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      // task-7: /reset-password has no server-side complexity check by
+      // default — BetterAuth only enforces minPasswordLength/
+      // maxPasswordLength (the top-level `password` option above). This
+      // matcher resolves the app that owns the reset token (via the
+      // Verification row BetterAuth itself wrote — see
+      // resolve-app-for-reset-token.ts) and enforces that app's full
+      // PasswordPolicy before BetterAuth's own handler ever runs.
+      if (ctx.path !== '/reset-password') return;
+      const token = (ctx.body as { token?: string } | undefined)?.token
+        ?? (ctx.query as { token?: string } | undefined)?.token;
+      if (!token) return; // BetterAuth's own handler throws INVALID_TOKEN for this
+      const app = await resolveAppForResetToken(prisma, token);
+      if (!app) return; // defer to BetterAuth's own token-validity check
+      const newPassword = (ctx.body as { newPassword?: string } | undefined)?.newPassword ?? '';
+      const policy = resolvePasswordPolicy(app);
+      const failedRules = evaluatePasswordPolicy(newPassword, policy)
+        .filter((r) => !r.met)
+        .map((r) => r.rule);
+      if (newPassword.length > MAX_PASSWORD_LENGTH) failedRules.push('maxLength' as never);
+      if (failedRules.length > 0) {
+        throw new APIError('BAD_REQUEST', {
+          message: 'Password does not meet the required policy.',
+          code: 'PASSWORD_POLICY_VIOLATION',
+        });
+      }
+    }),
     after: createAuthMiddleware(async (ctx) => {
       // task-8: only the OAuth callback route is in scope here. Matched by
       // route TEMPLATE + params, same reconstruction task-4 already
@@ -279,6 +309,16 @@ export const auth = betterAuth({
     // (never-persisted) user so sign-up cannot be used to enumerate accounts.
     // RegistrationService checks for that explicitly — see its 409 path.
     autoSignIn: false,
+    // Belt-and-braces baseline matching the global policy's length bounds.
+    // BetterAuth reads these two options into ctx.context.password.config
+    // (dist/context/create-context.mjs) and enforces them natively on
+    // sign-up/update-user/reset-password (defaults would otherwise be 8/128
+    // — too permissive for this policy). The hooks.before matcher below is
+    // the actual complexity enforcement for /reset-password; this covers
+    // any other BetterAuth-native path that consults these two options
+    // directly.
+    minPasswordLength: getGlobalPasswordPolicy(process.env).minLength,
+    maxPasswordLength: MAX_PASSWORD_LENGTH,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
     // Without this, BetterAuth's /reset-password endpoint changes the
     // password but leaves every other active session untouched (see
