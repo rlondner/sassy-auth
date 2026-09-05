@@ -1,5 +1,6 @@
 import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { PasswordPolicy } from '@sassy-auth/types';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 
 // "At least one of name / url" is enforced server-side in
@@ -46,4 +47,15 @@ export class UpdateAppDto {
   @IsOptional()
   @IsArray()
   redirectUris?: Array<{ uri: string; kind: 'login' | 'post_logout' }>;
+
+  /**
+   * Complete PasswordPolicy override for this app's users (register,
+   * accept-invite, forgot-password reset). null clears the override,
+   * reverting to the global env-derived policy. Deep-validated in
+   * AppsService.assertValidPasswordPolicyOverride, following the same
+   * manual-validation-in-service pattern as redirectUris above.
+   */
+  @ApiPropertyOptional({ type: Object })
+  @IsOptional()
+  passwordPolicyOverride?: PasswordPolicy | null;
 }

@@ -3,6 +3,12 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { AppsService } from './apps.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
+import { getGlobalPasswordPolicy } from '../auth/password-policy';
+
+// The env-derived global default policy — used to assert `effectivePasswordPolicy`
+// on apps that have no passwordPolicyOverride set, without hardcoding values
+// that would drift from password-policy.ts's own defaults.
+const globalPasswordPolicy = getGlobalPasswordPolicy(process.env);
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -17,7 +23,11 @@ jest.mock('@sassy-auth/db', () => ({
     saRole: { findUnique: jest.fn() },
     $transaction: jest.fn(),
   },
-  Prisma: {},
+  // Real Prisma.JsonNull is a branded sentinel object distinguishing "set
+  // this JSON column to SQL NULL" from "field omitted" (undefined). Mocked
+  // here as a distinct object so assertValidPasswordPolicyOverride-adjacent
+  // update-data assertions can check for it by reference.
+  Prisma: { JsonNull: { __prismaJsonNull: true } },
 }));
 jest.mock('../common/permissions/check-permission', () => ({
   checkPermission: jest.fn().mockResolvedValue(undefined),
@@ -72,7 +82,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -100,6 +110,7 @@ describe('AppsService', () => {
       publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
       isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [],
       isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null,
+      passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -140,7 +151,7 @@ describe('AppsService', () => {
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -537,6 +548,77 @@ describe('AppsService', () => {
       const second = await service.rotateClientSecret('ba-caller', 'sq_1');
 
       expect(first.clientSecret).not.toBe(second.clientSecret);
+    });
+  });
+
+  // ── Task 8: per-app password policy override ─────────────────────────────
+
+  describe('updateApp — passwordPolicyOverride', () => {
+    const VALID_OVERRIDE = {
+      minLength: 16, requireUppercase: true, requireLowercase: true,
+      requireNumber: true, requireSpecial: true, minNumbers: 2, minSpecial: 1,
+    };
+
+    it('rejects minLength below 8', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: { ...VALID_OVERRIDE, minLength: 4 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects minLength above 128', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: { ...VALID_OVERRIDE, minLength: 200 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects minNumbers greater than minLength', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: { ...VALID_OVERRIDE, minLength: 8, minNumbers: 20 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a negative minSpecial', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: { ...VALID_OVERRIDE, minSpecial: -1 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('persists a valid override and returns it in the formatted app', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.saApp.update.mockResolvedValue({ ...appRow, passwordPolicyOverride: VALID_OVERRIDE });
+
+      const result = await service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: VALID_OVERRIDE });
+
+      expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        data: { passwordPolicyOverride: VALID_OVERRIDE },
+        include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+      });
+      expect(result.passwordPolicyOverride).toEqual(VALID_OVERRIDE);
+      expect(result.effectivePasswordPolicy).toEqual(VALID_OVERRIDE);
+    });
+
+    it('clears an existing override when passed null', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, passwordPolicyOverride: VALID_OVERRIDE });
+      mockPrisma.saApp.update.mockResolvedValue({ ...appRow, passwordPolicyOverride: null });
+
+      const result = await service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: null });
+
+      expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        data: { passwordPolicyOverride: { __prismaJsonNull: true } },
+        include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+      });
+      expect(result.passwordPolicyOverride).toBeNull();
+      expect(result.effectivePasswordPolicy.minLength).toBe(12); // global default
     });
   });
 });
