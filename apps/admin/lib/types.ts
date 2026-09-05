@@ -2,6 +2,20 @@ import type { PasswordPolicy } from '@sassy-auth/types'
 
 export type { PasswordPolicy }
 
+// Matches the server's global default password policy. Used by signup and
+// reset-password forms when a per-app/per-request policy hasn't been
+// resolved yet (or its fetch failed), so the live checklist still has
+// something sane to render instead of crashing.
+export const FALLBACK_PASSWORD_POLICY: PasswordPolicy = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecial: false,
+  minNumbers: 1,
+  minSpecial: 0,
+}
+
 export interface User {
   id: string
   firstName: string

@@ -6,23 +6,9 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
 import { getPasswordPolicyForResetToken } from '@/lib/api-public'
-import type { PasswordPolicy } from '@/lib/types'
+import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
 import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
 import { resetPasswordSubmitAction } from './actions'
-
-// Matches the server's global default password policy. Used until the
-// client-side policy fetch resolves, and kept on fetch failure — the
-// server-side hooks.before enforcement (Task 7) is the real gate regardless
-// of what this checklist shows.
-const FALLBACK_POLICY: PasswordPolicy = {
-  minLength: 12,
-  requireUppercase: true,
-  requireLowercase: true,
-  requireNumber: true,
-  requireSpecial: false,
-  minNumbers: 1,
-  minSpecial: 0,
-}
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const t = useTranslations('resetPassword')
@@ -31,7 +17,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
-  const [policy, setPolicy] = React.useState<PasswordPolicy>(FALLBACK_POLICY)
+  // FALLBACK_PASSWORD_POLICY: used until the client-side policy fetch
+  // resolves, and kept on fetch failure — the server-side hooks.before
+  // enforcement (Task 7) is the real gate regardless of what this checklist
+  // shows.
+  const [policy, setPolicy] = React.useState<PasswordPolicy>(FALLBACK_PASSWORD_POLICY)
 
   React.useEffect(() => {
     let cancelled = false

@@ -34,6 +34,13 @@ function renderForm() {
   )
 }
 
+// Ensure the mounting effect's getPasswordPolicyForResetToken call has
+// resolved (or rejected) and its state update has settled before any
+// assertions run, so React doesn't warn about updates outside act().
+async function waitForPolicyFetch() {
+  await waitFor(() => expect(mockGetPolicy).toHaveBeenCalledWith('tok'))
+}
+
 function fillAndSubmit(password: string, confirm = password) {
   fireEvent.change(screen.getByLabelText(messages.resetPassword.password), {
     target: { value: password },
@@ -59,6 +66,7 @@ beforeEach(() => {
 describe('ResetPasswordForm client-side validation', () => {
   it('rejects mismatched passwords without calling the action', async () => {
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID, 'Different123')
 
@@ -70,6 +78,7 @@ describe('ResetPasswordForm client-side validation', () => {
 
   it('rejects a password under 12 characters without calling the action', async () => {
     renderForm()
+    await waitForPolicyFetch()
 
     // Too short now folds into the single policy-complexity check rather
     // than its own dedicated error key.
@@ -83,7 +92,7 @@ describe('ResetPasswordForm client-side validation', () => {
 
   it('disables the submit button for a weak password and enables it for a strong matching one', async () => {
     renderForm()
-    await waitFor(() => expect(mockGetPolicy).toHaveBeenCalledWith('tok'))
+    await waitForPolicyFetch()
 
     fireEvent.change(screen.getByLabelText(messages.resetPassword.password), {
       target: { value: 'weakpassword' },
@@ -106,6 +115,7 @@ describe('ResetPasswordForm client-side validation', () => {
     mockGetPolicy.mockRejectedValue(new Error('network error'))
     mockSubmit.mockResolvedValue({ ok: true })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 
@@ -116,6 +126,7 @@ describe('ResetPasswordForm client-side validation', () => {
 
   it('rejects a password missing a character class without calling the action', async () => {
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit('alllowercaseletters')
 
@@ -130,6 +141,7 @@ describe('ResetPasswordForm submission', () => {
   it('shows the success panel when the action succeeds', async () => {
     mockSubmit.mockResolvedValue({ ok: true })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 
@@ -142,6 +154,7 @@ describe('ResetPasswordForm submission', () => {
   it('shows the invalid-link message when the token is rejected', async () => {
     mockSubmit.mockResolvedValue({ error: 'invalidToken' })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 
@@ -155,6 +168,7 @@ describe('ResetPasswordForm submission', () => {
   it('does not blame the link when the request was throttled', async () => {
     mockSubmit.mockResolvedValue({ error: 'tooManyRequests' })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 
@@ -172,6 +186,7 @@ describe('ResetPasswordForm submission', () => {
   it('does not blame the link when the server is unreachable', async () => {
     mockSubmit.mockResolvedValue({ error: 'serverUnavailable' })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 

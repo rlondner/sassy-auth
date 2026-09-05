@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
-import type { PasswordPolicy } from '@/lib/types'
+import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
 import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
 import { registerAction } from './actions'
 
@@ -14,19 +14,6 @@ interface SignupFormProps {
   next: string
   hasDefaultOrg: boolean
   passwordPolicy: PasswordPolicy | null
-}
-
-// Matches the server's global default password policy. Used when the
-// app-info fetch failed (passwordPolicy is null) so the live checklist still
-// has something sane to render instead of crashing.
-const FALLBACK_POLICY: PasswordPolicy = {
-  minLength: 12,
-  requireUppercase: true,
-  requireLowercase: true,
-  requireNumber: true,
-  requireSpecial: false,
-  minNumbers: 1,
-  minSpecial: 0,
 }
 
 const KNOWN_ERRORS = [
@@ -49,7 +36,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
 
-  const policy = passwordPolicy ?? FALLBACK_POLICY
+  const policy = passwordPolicy ?? FALLBACK_PASSWORD_POLICY
   const policyMet = evaluatePasswordPolicy(password, policy).every((r) => r.met)
 
   async function handleSubmit(e: React.FormEvent) {
