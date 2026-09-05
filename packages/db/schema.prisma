@@ -119,6 +119,9 @@ model SaApp {
   twoFactorTrustDays Int?
   requireTwoFactor   Boolean        @default(false)
   isPlatform         Boolean        @default(false)
+  /// Complete PasswordPolicy JSON override (see @sassy-auth/types). null
+  /// means "inherit the global env-derived policy" — never partial.
+  passwordPolicyOverride Json?
   // Presence of a secret hash is what makes a client confidential. There is no
   // separate client-type flag, so the two cannot contradict each other.
   clientSecretHash      String?
