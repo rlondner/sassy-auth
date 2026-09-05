@@ -53,16 +53,27 @@ export function resolvePasswordPolicy(
   return getGlobalPasswordPolicy(env);
 }
 
-/** Throws BadRequestException({ errorKey, failedRules }) listing every
- * violated rule (plus 'maxLength' as a synthetic rule key) if the password
- * fails. Every password-setting surface calls this exactly once. */
-export function validatePasswordOrThrow(password: string, policy: PasswordPolicy): void {
+/** Every rule in `policy` that `password` violates, plus the synthetic
+ * 'maxLength' rule key if it exceeds MAX_PASSWORD_LENGTH. Shared by every
+ * password-setting surface (NestJS-owned services via validatePasswordOrThrow
+ * below, and the BetterAuth hooks.before matcher in auth.config.ts, which
+ * isn't NestJS-owned and can't use a NestJS exception) so the "what counts as
+ * a violation" logic exists in exactly one place. */
+export function getFailedPasswordRules(password: string, policy: PasswordPolicy): Array<PasswordRuleKey | 'maxLength'> {
   const failedRules: Array<PasswordRuleKey | 'maxLength'> = evaluatePasswordPolicy(password, policy)
     .filter((r) => !r.met)
     .map((r) => r.rule);
   if (password.length > MAX_PASSWORD_LENGTH) {
     failedRules.push('maxLength');
   }
+  return failedRules;
+}
+
+/** Throws BadRequestException({ errorKey, failedRules }) listing every
+ * violated rule (plus 'maxLength' as a synthetic rule key) if the password
+ * fails. Every password-setting surface calls this exactly once. */
+export function validatePasswordOrThrow(password: string, policy: PasswordPolicy): void {
+  const failedRules = getFailedPasswordRules(password, policy);
   if (failedRules.length > 0) {
     throw new BadRequestException({ errorKey: 'password.policyViolation', failedRules });
   }

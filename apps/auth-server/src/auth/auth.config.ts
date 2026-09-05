@@ -19,8 +19,7 @@ import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
 import { readIsPrivateEmail } from '../social/apple-private-relay-context';
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
-import { getGlobalPasswordPolicy, resolvePasswordPolicy, MAX_PASSWORD_LENGTH } from './password-policy';
-import { evaluatePasswordPolicy } from '@sassy-auth/types';
+import { getGlobalPasswordPolicy, resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH } from './password-policy';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -221,10 +220,7 @@ export const auth = betterAuth({
       if (!app) return; // defer to BetterAuth's own token-validity check
       const newPassword = (ctx.body as { newPassword?: string } | undefined)?.newPassword ?? '';
       const policy = resolvePasswordPolicy(app);
-      const failedRules = evaluatePasswordPolicy(newPassword, policy)
-        .filter((r) => !r.met)
-        .map((r) => r.rule);
-      if (newPassword.length > MAX_PASSWORD_LENGTH) failedRules.push('maxLength' as never);
+      const failedRules = getFailedPasswordRules(newPassword, policy);
       if (failedRules.length > 0) {
         throw new APIError('BAD_REQUEST', {
           message: 'Password does not meet the required policy.',
