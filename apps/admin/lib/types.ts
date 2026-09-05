@@ -1,3 +1,7 @@
+import type { PasswordPolicy } from '@sassy-auth/types'
+
+export type { PasswordPolicy }
+
 export interface User {
   id: string
   firstName: string
@@ -61,6 +65,7 @@ export interface InvitationInfo {
   firstName: string
   email: string
   expired: boolean
+  passwordPolicy: PasswordPolicy
 }
 
 export interface RedirectUri {
@@ -82,6 +87,8 @@ export interface App {
   clientSecretUpdatedAt?: string | null;
   defaultOrgId?: string | null;
   defaultRoleId?: string | null;
+  passwordPolicyOverride: PasswordPolicy | null;
+  effectivePasswordPolicy: PasswordPolicy;
 }
 
 export interface CreateAppPayload {
@@ -100,6 +107,7 @@ export interface UpdateAppPayload {
   requireTwoFactor?: boolean;
   defaultOrgId?: string | null;
   defaultRoleId?: string | null;
+  passwordPolicyOverride?: PasswordPolicy | null;
 }
 
 export interface ListAppsParams {
