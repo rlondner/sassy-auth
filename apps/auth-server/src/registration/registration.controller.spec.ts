@@ -22,12 +22,21 @@ describe('RegistrationController', () => {
 
   describe('getAppName', () => {
     it('delegates to the service with the query param', async () => {
-      mockService.getAppName.mockResolvedValue({ name: 'MyApp' });
+      const passwordPolicy = {
+        minLength: 12,
+        requireUppercase: true,
+        requireLowercase: true,
+        requireNumber: true,
+        requireSpecial: false,
+        minNumbers: 1,
+        minSpecial: 0,
+      };
+      mockService.getAppName.mockResolvedValue({ name: 'MyApp', hasDefaultOrg: false, passwordPolicy });
 
       const result = await controller.getAppName('sq_1');
 
       expect(mockService.getAppName).toHaveBeenCalledWith('sq_1');
-      expect(result).toEqual({ name: 'MyApp' });
+      expect(result).toEqual({ name: 'MyApp', hasDefaultOrg: false, passwordPolicy });
     });
 
     // bug-0279: this route responds 200/404 distinguishably (unlike its
