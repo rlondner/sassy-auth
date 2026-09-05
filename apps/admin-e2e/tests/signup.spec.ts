@@ -14,6 +14,7 @@
  */
 import { test, expect } from '../lib/fixtures'
 import { SignupPage } from '../pages/signup.page'
+import { createAppWithPasswordPolicyOverride } from '../lib/app-fixtures'
 
 const RS_CLIENT_ID = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
 
@@ -44,5 +45,49 @@ test.describe('Signup', () => {
 
     await signup.continueToLoginLink.click()
     await expect(page).toHaveURL(/\/login$/)
+  })
+})
+
+test.describe('Signup — per-app password policy override', () => {
+  // Unlike the describe block above, this doesn't need RS_CLIENT_ID: it
+  // provisions its own SaApp via the admin API (createAppWithPasswordPolicyOverride)
+  // rather than borrowing the FastAPI RS client, so it isn't gated on
+  // rsIsConfigured().
+
+  test('a per-app password policy override changes what password signup accepts', async ({ page }) => {
+    // task-14: prove the override actually changes what signup accepts, not
+    // just what AppsService persists/returns. minLength is floored at 8 by
+    // AppsService.assertValidPasswordPolicyOverride (apps.service.ts), so 8
+    // is the most relaxed minLength an override can express — still well
+    // under the global default's minLength: 12 (password-policy.ts), so an
+    // 8-char, no-complexity password is a clean "fails global, passes
+    // override" probe.
+    const app = await createAppWithPasswordPolicyOverride({
+      minLength: 8,
+      requireUppercase: false,
+      requireLowercase: false,
+      requireNumber: false,
+      requireSpecial: false,
+      minNumbers: 0,
+      minSpecial: 0,
+    })
+
+    const signup = new SignupPage(page)
+    const uniqueEmail = `e2e-policy-${Date.now()}@example.com`
+
+    await signup.goto(app.publicId)
+
+    // 8-char, all-lowercase-and-digits password: fails the global default
+    // (minLength 12, requireUppercase, requireNumber) but satisfies this
+    // app's relaxed override.
+    await signup.fillAndSubmit({
+      firstName: 'Test',
+      lastName: 'User',
+      companyName: 'Acme',
+      email: uniqueEmail,
+      password: 'abcd1234',
+    })
+
+    await expect(signup.successMessage).toBeVisible()
   })
 })
