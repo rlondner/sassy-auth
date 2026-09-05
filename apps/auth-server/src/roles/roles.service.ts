@@ -234,6 +234,13 @@ export class RolesService {
       this.logger.getWinstonLogger().info('Role deleted', { context: 'RolesService', roleId: publicId });
     } catch (e: unknown) {
       if (isPrismaCode(e, 'P2003')) {
+        const defaultForApp = await prisma.saApp.findFirst({
+          where: { defaultRoleId: existing.id },
+          select: { name: true },
+        });
+        if (defaultForApp) {
+          throw new ConflictException(`Role is the default role for app "${defaultForApp.name}"`);
+        }
         const userCount = await prisma.saUserRole.count({ where: { roleId: existing.id } });
         throw new ConflictException(`Role is assigned to ${userCount} users`);
       }

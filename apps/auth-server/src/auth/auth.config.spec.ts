@@ -4,7 +4,12 @@
 
 // Mock the heavy dependencies so we can import auth.config in jest.
 jest.mock('@sassy-auth/db', () => ({
-  prisma: {},
+  prisma: {
+    saUser: {
+      findUnique: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+  },
 }));
 jest.mock('better-auth/adapters/prisma', () => ({
   prismaAdapter: () => ({}),
@@ -233,5 +238,71 @@ describe('auth.config — hooks.after handler body (task-8 fix round 1, review f
         reason: 'private_relay',
       }),
     );
+  });
+});
+
+describe('auth.config — emailVerification', () => {
+  afterEach(() => {
+    jest.dontMock('../email/email.singleton');
+    jest.resetModules();
+  });
+
+  it('disables auto sign-in after verification, consistent with autoSignIn: false', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as Record<string, unknown>;
+    expect(ev['autoSignInAfterVerification']).toBe(false);
+  });
+
+  it('sendVerificationEmail sends via the emailer with the verify URL', async () => {
+    const sendMock = jest.fn().mockResolvedValue({ sent: true });
+    jest.doMock('../email/email.singleton', () => ({ getEmailer: () => ({ send: sendMock }) }));
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as {
+      sendVerificationEmail: (args: { user: { email: string; name?: string }; url: string }) => Promise<void>;
+    };
+    await ev.sendVerificationEmail({ user: { email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'jane@example.com', html: expect.stringContaining('https://x/verify-email?token=abc') }),
+    );
+  });
+
+  it('afterEmailVerification flips a matching unverified SaUser to active', async () => {
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
+    await ev.afterEmailVerification({ id: 'ba-user-1' });
+    expect(prisma.saUser.updateMany).toHaveBeenCalledWith({
+      where: { betterAuthUserId: 'ba-user-1', status: 'unverified' },
+      data: { status: 'active' },
+    });
+  });
+});
+
+describe('auth.config — session gate FORBIDDEN code (real invocation)', () => {
+  async function loadSessionCreateBefore() {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const databaseHooks = options['databaseHooks'] as {
+      session: { create: { before: (session: { userId: string }, ctx?: unknown) => Promise<unknown> } };
+    };
+    return databaseHooks.session.create.before;
+  }
+
+  it('throws code: ACCOUNT_UNVERIFIED when the SaUser status is unverified', async () => {
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique = jest.fn().mockResolvedValue({ status: 'unverified' });
+    const before = await loadSessionCreateBefore();
+    await expect(before({ userId: 'ba-1' })).rejects.toMatchObject({ body: { code: 'ACCOUNT_UNVERIFIED' } });
+  });
+
+  it('throws code: ACCOUNT_INACTIVE when the SaUser status is inactive', async () => {
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique = jest.fn().mockResolvedValue({ status: 'inactive' });
+    const before = await loadSessionCreateBefore();
+    await expect(before({ userId: 'ba-1' })).rejects.toMatchObject({ body: { code: 'ACCOUNT_INACTIVE' } });
   });
 });

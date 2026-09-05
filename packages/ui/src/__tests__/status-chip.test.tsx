@@ -23,4 +23,10 @@ describe('StatusChip', () => {
     expect(el).toBeInTheDocument()
     expect(el).toHaveClass('bg-slate-100')
   })
+
+  it('renders the unverified variant with its label', () => {
+    render(<StatusChip variant="unverified" label="Unverified" />)
+    expect(screen.getByText('Unverified')).toBeInTheDocument()
+    expect(screen.getByText('Unverified').closest('span')).toHaveClass('bg-sky-100')
+  })
 })

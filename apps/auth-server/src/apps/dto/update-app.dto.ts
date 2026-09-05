@@ -24,6 +24,20 @@ export class UpdateAppDto {
   @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
 
   /**
+   * publicId of an existing org under this app to auto-join self-serve
+   * sign-ups into. Must belong to the same app — validated in AppsService
+   * (not expressible as a schema-level FK constraint). `null` clears it.
+   */
+  @IsOptional() @IsString() defaultOrgId?: string | null;
+
+  /**
+   * publicId of an existing role under this app to auto-assign to self-serve
+   * sign-ups. Must belong to the same app — validated in AppsService.
+   * `null` clears it.
+   */
+  @IsOptional() @IsString() defaultRoleId?: string | null;
+
+  /**
    * Registered login / post_logout redirect URIs for this app. When present,
    * replaces the app's entire redirect URI set. Validated as absolute
    * http(s) URLs in AppsService — see assertValidRedirectUris.

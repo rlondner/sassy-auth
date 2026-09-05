@@ -13,10 +13,17 @@ import {
   ButtonGroup,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@sassy-auth/ui'
 import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction } from '@/app/(admin)/apps/actions'
+import { listOrgsAction } from '@/app/(admin)/orgs/actions'
+import { listRolesAction } from '@/app/(admin)/roles/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
-import type { App, RedirectUri } from '@/lib/types'
+import type { App, RedirectUri, OrgRow, RoleRow } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 
 interface Props {
@@ -33,6 +40,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
+  const [defaultOrgId, setDefaultOrgId] = React.useState<string | null>(app.defaultOrgId ?? null)
+  const [defaultRoleId, setDefaultRoleId] = React.useState<string | null>(app.defaultRoleId ?? null)
+  const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
+  const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
   const { copiedKey, copy } = useCopyFeedback()
   const copied = copiedKey !== null
@@ -65,6 +76,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
+    setDefaultOrgId(app.defaultOrgId ?? null)
+    setDefaultRoleId(app.defaultRoleId ?? null)
     setErrorKey(null)
     setNewClientSecret(null)
     setClientSecretUpdatedAt(app.clientSecretUpdatedAt ?? null)
@@ -84,6 +97,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setCheckedProviders(new Set(enabled))
       setInitialProviders(enabled)
       setSocialLoading(false)
+    })
+    Promise.all([
+      listOrgsAction({ appId: app.publicId, pageSize: 200 }),
+      listRolesAction({ appId: app.publicId, pageSize: 200 }),
+    ]).then(([orgsResult, rolesResult]) => {
+      if (cancelled) return
+      setAppOrgs('items' in orgsResult ? orgsResult.items : [])
+      setAppRoles('items' in rolesResult ? rolesResult.items : [])
     })
     return () => {
       cancelled = true
@@ -121,7 +142,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     initialProviders.some((p) => !checkedProviders.has(p))
 
   const redirectUrisDirty = JSON.stringify(redirectUris) !== JSON.stringify(app.redirectUris ?? [])
-  const dirty = name !== app.name || url !== app.url || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty
+  const dirty = name !== app.name || url !== app.url || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -134,12 +155,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean } = {}
+    const patch: { name?: string; url?: string; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
+    if (defaultOrgId !== (app.defaultOrgId ?? null)) patch.defaultOrgId = defaultOrgId
+    if (defaultRoleId !== (app.defaultRoleId ?? null)) patch.defaultRoleId = defaultRoleId
     startTransition(async () => {
       // Two independent endpoints: /api/apps for the core fields, and
       // /api/social-providers/:clientId for the checkbox group — the
@@ -232,6 +255,36 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               </label>
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.requireTwoFactorHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="defaultOrgId">{t('apps.fields.defaultOrg')}</Label>
+              <Select value={defaultOrgId ?? '__none__'} onValueChange={(v) => setDefaultOrgId(v === '__none__' ? null : v)}>
+                <SelectTrigger id="defaultOrgId">
+                  <SelectValue placeholder={t('apps.fields.defaultOrgNone')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('apps.fields.defaultOrgNone')}</SelectItem>
+                  {appOrgs.map((o) => <SelectItem key={o.publicId} value={o.publicId}>{o.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.defaultOrgHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="defaultRoleId">{t('apps.fields.defaultRole')}</Label>
+              <Select value={defaultRoleId ?? '__none__'} onValueChange={(v) => setDefaultRoleId(v === '__none__' ? null : v)}>
+                <SelectTrigger id="defaultRoleId">
+                  <SelectValue placeholder={t('apps.fields.defaultRoleNone')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('apps.fields.defaultRoleNone')}</SelectItem>
+                  {appRoles.map((r) => <SelectItem key={r.publicId} value={r.publicId}>{r.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.defaultRoleHint')}
               </p>
             </div>
             <div>

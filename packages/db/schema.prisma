@@ -108,6 +108,7 @@ enum UserStatus {
   active
   pending
   inactive
+  unverified
 }
 
 model SaApp {
@@ -127,6 +128,10 @@ model SaApp {
   roles       SaRole[]
   redirectUris    SaAppRedirectUri[]
   socialProviders SaSocialProvider[]
+  defaultOrgId    Int?
+  defaultOrg      SaOrg?  @relation("AppDefaultOrg", fields: [defaultOrgId], references: [id], onDelete: Restrict)
+  defaultRoleId   Int?
+  defaultRole     SaRole? @relation("AppDefaultRole", fields: [defaultRoleId], references: [id], onDelete: Restrict)
 }
 
 model SaAppRedirectUri {
@@ -149,6 +154,7 @@ model SaOrg {
   app        SaApp    @relation(fields: [appId], references: [id])
   isPlatform Boolean  @default(false)
   users      SaUser[]
+  defaultForApps SaApp[] @relation("AppDefaultOrg")
 
   @@unique([appId, name])
 }
@@ -237,6 +243,7 @@ model SaRole {
   app         SaApp              @relation(fields: [appId], references: [id])
   permissions SaRolePermission[]
   users       SaUserRole[]
+  defaultForApps SaApp[] @relation("AppDefaultRole")
 
   @@unique([appId, name])
   @@index([appId])

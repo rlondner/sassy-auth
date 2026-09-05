@@ -9,6 +9,7 @@ import { registerAction } from './actions'
 interface SignupFormProps {
   clientId: string
   next: string
+  hasDefaultOrg: boolean
 }
 
 const KNOWN_ERRORS = [
@@ -19,7 +20,7 @@ const KNOWN_ERRORS = [
   'validationError',
 ] as const
 
-export function SignupForm({ clientId, next }: SignupFormProps) {
+export function SignupForm({ clientId, next, hasDefaultOrg }: SignupFormProps) {
   const t = useTranslations()
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
@@ -42,7 +43,10 @@ export function SignupForm({ clientId, next }: SignupFormProps) {
     setError(null)
     setSubmitting(true)
     try {
-      const result = await registerAction({ clientId, firstName, lastName, companyName, email, password })
+      const result = await registerAction({
+        clientId, firstName, lastName, email, password,
+        ...(hasDefaultOrg ? {} : { companyName }),
+      })
       if ('error' in result) {
         const key = (KNOWN_ERRORS as readonly string[]).includes(result.error) ? result.error : 'validationError'
         setError(t(`signup.errors.${key as (typeof KNOWN_ERRORS)[number]}`))
@@ -97,16 +101,18 @@ export function SignupForm({ clientId, next }: SignupFormProps) {
           />
         </div>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="companyName" className="text-label-md font-semibold">{t('signup.companyName')}</label>
-        <input
-          id="companyName"
-          value={companyName}
-          onChange={(e) => setCompanyName(e.target.value)}
-          required
-          className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        />
-      </div>
+      {!hasDefaultOrg && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="companyName" className="text-label-md font-semibold">{t('signup.companyName')}</label>
+          <input
+            id="companyName"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            required
+            className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          />
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-label-md font-semibold">{t('signup.email')}</label>
         <input

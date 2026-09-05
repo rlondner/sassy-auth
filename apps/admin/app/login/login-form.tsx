@@ -92,6 +92,7 @@ export function LoginForm({
             <p data-testid="login-error" className="text-label-md text-[var(--destructive)]">
               {state.error === 'invalidCredentials' ||
               state.error === 'inactive' ||
+              state.error === 'unverified' ||
               state.error === 'serverUnavailable' ||
               state.error === 'tooManyRequests'
                 ? t(`error.${state.error}`)

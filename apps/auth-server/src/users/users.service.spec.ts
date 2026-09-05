@@ -401,6 +401,13 @@ describe('UsersService', () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(null);
       await expect(service.updateUser('ba-caller', 'usr1', {})).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('allows an admin to flip an unverified user to active (unlike pending, bug-0152)', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'unverified' }));
+      mockPrisma.saUser.update.mockResolvedValue(makeSaUser({ status: 'active' }));
+      const result = await service.updateUser('ba-caller', 'usr1', { status: 'active' });
+      expect(result.status).toBe('active');
+    });
   });
 
   describe('deleteUser', () => {

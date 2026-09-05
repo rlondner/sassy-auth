@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import en from '@/messages/en.json'
 import { UsersTable } from '../users-table'
 import type { User, Org } from '@/lib/types'
+import { setUserStatusAction } from '@/app/(admin)/users/actions'
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
@@ -11,6 +12,7 @@ jest.mock('next/navigation', () => ({
 
 jest.mock('@/app/(admin)/users/actions', () => ({
   deleteUserAction: jest.fn().mockResolvedValue({ ok: true }),
+  setUserStatusAction: jest.fn().mockResolvedValue({ ok: true }),
 }))
 
 // Render just enough of the drawer to observe which snapshot of the user it
@@ -131,6 +133,23 @@ describe('UsersTable', () => {
   it('exposes the search box with an accessible name', () => {
     render(withIntl(<UsersTable users={mockUsers} orgs={mockOrgs} />))
     expect(screen.getByRole('searchbox', { name: en.users.search })).toBeInTheDocument()
+  })
+
+  // Task 14: an unverified user should be manually activatable from the row
+  // menu, the same way an inactive user is — the backend already allows the
+  // admin to PATCH status: 'active' onto an unverified user.
+  it('shows an Activate item for an unverified user and calls setUserStatusAction on click', async () => {
+    const unverifiedUsers: User[] = [
+      { id: '3', firstName: 'Cara', lastName: 'Diaz', email: 'cara@example.com', status: 'unverified', orgId: 'org1', phoneNumber: null, username: null },
+    ]
+    render(withIntl(<UsersTable users={unverifiedUsers} orgs={mockOrgs} />))
+
+    const activateItems = await screen.findAllByRole('menuitem', { name: en.users.actions.activate })
+    expect(activateItems).toHaveLength(1)
+
+    fireEvent.click(activateItems[0])
+
+    expect(setUserStatusAction).toHaveBeenCalledWith('3', 'active')
   })
 
 })

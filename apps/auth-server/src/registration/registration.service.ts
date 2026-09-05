@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 import { auth } from '../auth/auth.config';
 import { SqidService } from '../common/sqid/sqid.service';
@@ -32,6 +32,26 @@ export class RegistrationService {
     const app = await prisma.saApp.findUnique({ where: { publicId: dto.appPublicId } });
     if (!app) throw new NotFoundException('App not found');
 
+    // An app with a defaultOrgId places every self-serve signup into that
+    // existing org — companyName is irrelevant and never read in that case.
+    // Otherwise companyName is required to found a brand-new org, same as
+    // before this feature existed.
+    let defaultOrg: { id: number; publicId: string } | null = null;
+    if (app.defaultOrgId) {
+      // The FK (Restrict on delete) makes this unreachable in normal
+      // operation, but a loud 404 here is cheap insurance against silently
+      // creating an org named "undefined" if that invariant is ever violated.
+      defaultOrg = await prisma.saOrg.findUnique({
+        where: { id: app.defaultOrgId },
+        select: { id: true, publicId: true },
+      });
+      if (!defaultOrg) {
+        throw new NotFoundException('Default org not found');
+      }
+    } else if (!dto.companyName?.trim()) {
+      throw new BadRequestException('companyName is required');
+    }
+
     // 2. Create the BetterAuth credential account (user row + scrypt-hashed password)
     let baUserId: string;
     try {
@@ -58,28 +78,47 @@ export class RegistrationService {
       throw new ConflictException('email already registered');
     }
 
-    // 3. Atomically create saOrg (with publicId) + saUser linked to the BA user
+    // 3. Atomically create/resolve the org, create the saUser (always
+    // 'unverified' — see auth.config.ts's emailVerification block), and
+    // assign the app's default role if one is set.
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const org = await prisma.$transaction(async (tx: Tx) => {
-        const draft = await tx.saOrg.create({
-          data: { publicId: generatePendingPublicId(), name: dto.companyName, appId: app.id, isPlatform: false },
-        });
-        const created = await tx.saOrg.update({
-          where: { id: draft.id },
-          data: { publicId: this.sqids.encode(draft.id) },
-        });
-        await tx.saUser.create({
+        let targetOrg: { id: number; publicId: string };
+        if (defaultOrg) {
+          targetOrg = defaultOrg;
+        } else {
+          const draft = await tx.saOrg.create({
+            // Non-null: reaching this branch means defaultOrg is null, which
+            // only happens after the companyName presence check above threw
+            // when it was missing — TS narrowing doesn't cross the closure
+            // boundary into this transaction callback, so assert here.
+            data: { publicId: generatePendingPublicId(), name: dto.companyName!, appId: app.id, isPlatform: false },
+          });
+          targetOrg = await tx.saOrg.update({
+            where: { id: draft.id },
+            data: { publicId: this.sqids.encode(draft.id) },
+          });
+        }
+        const createdSaUser = await tx.saUser.create({
           data: {
             publicId: baUserId.slice(0, 12),
             betterAuthUserId: baUserId,
-            orgId: created.id,
+            orgId: targetOrg.id,
             firstName: dto.firstName,
             lastName: dto.lastName,
-            status: 'active',
+            status: 'unverified',
           },
         });
-        return created;
+        if (app.defaultRoleId) {
+          await tx.saUserRole.create({ data: { userId: createdSaUser.id, roleId: app.defaultRoleId } });
+        }
+        return targetOrg;
+      });
+
+      const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+      await auth.api.sendVerificationEmail({
+        body: { email: dto.email, callbackURL: `${adminUrl}/signup/verified` },
       });
 
       return { ok: true as const, orgPublicId: org.publicId };
@@ -92,13 +131,13 @@ export class RegistrationService {
     }
   }
 
-  async getAppName(appPublicId: string): Promise<{ name: string }> {
+  async getAppName(appPublicId: string): Promise<{ name: string; hasDefaultOrg: boolean }> {
     if (!appPublicId) throw new NotFoundException('App not found');
     const app = await prisma.saApp.findUnique({
       where: { publicId: appPublicId },
-      select: { name: true },
+      select: { name: true, defaultOrgId: true },
     });
     if (!app) throw new NotFoundException('App not found');
-    return { name: app.name };
+    return { name: app.name, hasDefaultOrg: app.defaultOrgId !== null };
   }
 }

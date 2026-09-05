@@ -6,7 +6,7 @@ export interface User {
   phoneNumber: string | null
   username: string | null
   orgId: string
-  status: 'active' | 'pending' | 'inactive'
+  status: 'active' | 'pending' | 'inactive' | 'unverified'
   // bug-0186: both fields are now real. The API always returns them:
   // `createdAt` is a NOT-NULL DB column; `lastLoginAt` is nullable in
   // the DB (null means "never signed in") and preserved as such over
@@ -80,6 +80,8 @@ export interface App {
   // the hash itself is never sent to the admin console.
   isConfidential?: boolean;
   clientSecretUpdatedAt?: string | null;
+  defaultOrgId?: string | null;
+  defaultRoleId?: string | null;
 }
 
 export interface CreateAppPayload {
@@ -96,6 +98,8 @@ export interface UpdateAppPayload {
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
+  defaultOrgId?: string | null;
+  defaultRoleId?: string | null;
 }
 
 export interface ListAppsParams {

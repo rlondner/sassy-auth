@@ -162,7 +162,7 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
                 >
                   {t('users.actions.deactivate')}
                 </DropdownMenuItem>
-              ) : u.status === 'inactive' ? (
+              ) : u.status === 'inactive' || u.status === 'unverified' ? (
                 <DropdownMenuItem
                   onClick={async (e) => {
                     e.stopPropagation()
