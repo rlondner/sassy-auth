@@ -591,6 +591,28 @@ describe('AppsService', () => {
       expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
     });
 
+    it('rejects a policy missing required fields (would silently reject every password if stored)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', {
+          // @ts-expect-error — intentionally incomplete to test the shape guard
+          passwordPolicyOverride: { minLength: 16 },
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a policy with a wrong-typed field', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', {
+          // @ts-expect-error — intentionally wrong-typed to test the shape guard
+          passwordPolicyOverride: { ...VALID_OVERRIDE, requireSpecial: 'false' },
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
     it('persists a valid override and returns it in the formatted app', async () => {
       mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
       mockPrisma.saApp.update.mockResolvedValue({ ...appRow, passwordPolicyOverride: VALID_OVERRIDE });
