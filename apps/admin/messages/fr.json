@@ -696,5 +696,16 @@
         "hint": "Reconnectez-vous avec Apple et choisissez « Partager mon adresse e-mail »."
       }
     }
+  },
+  "password": {
+    "rules": {
+      "minLength": "Au moins {count} caractères",
+      "requireUppercase": "Au moins une lettre majuscule",
+      "requireLowercase": "Au moins une lettre minuscule",
+      "requireNumber": "Au moins un chiffre",
+      "requireSpecial": "Au moins un caractère spécial",
+      "minNumbers": "Au moins {count} chiffres",
+      "minSpecial": "Au moins {count} caractères spéciaux"
+    }
   }
 }

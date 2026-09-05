@@ -709,5 +709,16 @@
         "hint": "Sign in with Apple again and choose \"Share My Email\"."
       }
     }
+  },
+  "password": {
+    "rules": {
+      "minLength": "At least {count} characters",
+      "requireUppercase": "At least one uppercase letter",
+      "requireLowercase": "At least one lowercase letter",
+      "requireNumber": "At least one number",
+      "requireSpecial": "At least one special character",
+      "minNumbers": "At least {count} numbers",
+      "minSpecial": "At least {count} special characters"
+    }
   }
 }
