@@ -4,12 +4,29 @@ import * as React from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
+import { evaluatePasswordPolicy } from '@sassy-auth/types'
+import type { PasswordPolicy } from '@/lib/types'
+import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
 import { registerAction } from './actions'
 
 interface SignupFormProps {
   clientId: string
   next: string
   hasDefaultOrg: boolean
+  passwordPolicy: PasswordPolicy | null
+}
+
+// Matches the server's global default password policy. Used when the
+// app-info fetch failed (passwordPolicy is null) so the live checklist still
+// has something sane to render instead of crashing.
+const FALLBACK_POLICY: PasswordPolicy = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecial: false,
+  minNumbers: 1,
+  minSpecial: 0,
 }
 
 const KNOWN_ERRORS = [
@@ -20,7 +37,7 @@ const KNOWN_ERRORS = [
   'validationError',
 ] as const
 
-export function SignupForm({ clientId, next, hasDefaultOrg }: SignupFormProps) {
+export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: SignupFormProps) {
   const t = useTranslations()
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
@@ -32,14 +49,13 @@ export function SignupForm({ clientId, next, hasDefaultOrg }: SignupFormProps) {
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
 
+  const policy = passwordPolicy ?? FALLBACK_POLICY
+  const policyMet = evaluatePasswordPolicy(password, policy).every((r) => r.met)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (password !== confirm) { setError(t('signup.errors.passwordMismatch')); return }
-    if (password.length < 12) { setError(t('signup.errors.passwordTooShort')); return }
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(password)) {
-      setError(t('signup.errors.passwordComplexity'))
-      return
-    }
+    if (!policyMet) { setError(t('signup.errors.passwordComplexity')); return }
     setError(null)
     setSubmitting(true)
     try {
@@ -133,9 +149,9 @@ export function SignupForm({ clientId, next, hasDefaultOrg }: SignupFormProps) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          minLength={12}
           className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         />
+        <PasswordRequirementsChecklist password={password} policy={policy} />
       </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="confirm-password" className="text-label-md font-semibold">{t('signup.confirmPassword')}</label>
@@ -149,7 +165,12 @@ export function SignupForm({ clientId, next, hasDefaultOrg }: SignupFormProps) {
         />
       </div>
       {error && <p data-testid="signup-error" className="text-label-md text-[var(--destructive)]">{error}</p>}
-      <Button type="submit" className="w-full" loading={submitting}>
+      <Button
+        type="submit"
+        className="w-full"
+        loading={submitting}
+        disabled={submitting || !policyMet || password !== confirm || password.length === 0}
+      >
         {t('signup.submit')}
       </Button>
     </form>

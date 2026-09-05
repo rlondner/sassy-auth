@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 import { validateInvitation } from '@/lib/api-public'
+import type { PasswordPolicy } from '@/lib/types'
 import { AcceptInviteForm } from './accept-invite-form'
 
 interface Props {
@@ -14,7 +15,7 @@ export default async function AcceptInvitePage({ searchParams }: Props) {
     return <ErrorState message={t('acceptInvite.expired')} />
   }
 
-  let info: { firstName: string; email: string; expired: boolean } | null = null
+  let info: { firstName: string; email: string; expired: boolean; passwordPolicy: PasswordPolicy } | null = null
   try {
     info = await validateInvitation(token)
   } catch {
@@ -34,7 +35,12 @@ export default async function AcceptInvitePage({ searchParams }: Props) {
             {t('acceptInvite.subtitle', { firstName: info.firstName })}
           </p>
         </div>
-        <AcceptInviteForm token={token} firstName={info.firstName} email={info.email} />
+        <AcceptInviteForm
+          token={token}
+          firstName={info.firstName}
+          email={info.email}
+          passwordPolicy={info.passwordPolicy}
+        />
       </div>
     </div>
   )

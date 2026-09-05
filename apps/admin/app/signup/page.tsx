@@ -1,12 +1,15 @@
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
+import type { PasswordPolicy } from '@/lib/types'
 import { SignupForm } from './signup-form'
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
 
 export const dynamic = 'force-dynamic'
 
-export async function fetchAppInfo(clientId: string): Promise<{ name: string | null; hasDefaultOrg: boolean }> {
+export async function fetchAppInfo(
+  clientId: string,
+): Promise<{ name: string | null; hasDefaultOrg: boolean; passwordPolicy: PasswordPolicy | null }> {
   try {
     const res = await fetch(`${AUTH_SERVER}/api/register/app?appPublicId=${encodeURIComponent(clientId)}`, {
       cache: 'no-store',
@@ -15,16 +18,17 @@ export async function fetchAppInfo(clientId: string): Promise<{ name: string | n
       // Fail toward hasDefaultOrg: false, not true: a Company name field shown
       // but ignored by the server is harmless, whereas defaulting to true could
       // hide a required field and produce a signup-blocking dead end.
-      return { name: null, hasDefaultOrg: false }
+      return { name: null, hasDefaultOrg: false, passwordPolicy: null }
     }
-    const body = (await res.json()) as { name?: string; hasDefaultOrg?: boolean }
+    const body = (await res.json()) as { name?: string; hasDefaultOrg?: boolean; passwordPolicy?: PasswordPolicy }
     return {
       name: typeof body.name === 'string' ? body.name : null,
       hasDefaultOrg: body.hasDefaultOrg === true,
+      passwordPolicy: body.passwordPolicy ?? null,
     }
   } catch {
     // Same reasoning as the !res.ok branch above: fail toward false.
-    return { name: null, hasDefaultOrg: false }
+    return { name: null, hasDefaultOrg: false, passwordPolicy: null }
   }
 }
 
@@ -47,7 +51,7 @@ export default async function SignupPage({
     )
   }
 
-  const { name: appName, hasDefaultOrg } = await fetchAppInfo(clientId)
+  const { name: appName, hasDefaultOrg, passwordPolicy } = await fetchAppInfo(clientId)
   const nextSafe = next ?? ''
 
   return (
@@ -59,7 +63,7 @@ export default async function SignupPage({
           </h1>
           <p className="mt-1 text-body-sm text-[var(--muted-foreground)]">{t('signup.subtitle')}</p>
         </div>
-        <SignupForm clientId={clientId} next={nextSafe} hasDefaultOrg={hasDefaultOrg} />
+        <SignupForm clientId={clientId} next={nextSafe} hasDefaultOrg={hasDefaultOrg} passwordPolicy={passwordPolicy} />
         <div className="mt-4 text-center">
           <Link
             href={nextSafe ? `/login?next=${encodeURIComponent(nextSafe)}` : '/login'}

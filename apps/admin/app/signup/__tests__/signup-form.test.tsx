@@ -26,6 +26,25 @@ function fillValidForm() {
   fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'SecurePass1!' } })
 }
 
+const POLICY = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecial: false,
+  minNumbers: 1,
+  minSpecial: 0,
+}
+
+// The submit button is now disabled whenever the live policy check fails or
+// the passwords don't match, so a plain button click can't reach
+// handleSubmit's own checks in those cases. Submit the form directly to
+// exercise those checks, matching the established convention in
+// reset-password-form.test.tsx.
+function submitForm() {
+  fireEvent.submit(screen.getByText('signup.submit').closest('form')!)
+}
+
 function fillValidFormWithoutCompanyName() {
   fireEvent.change(screen.getByLabelText('signup.firstName'), { target: { value: 'Alice' } })
   fireEvent.change(screen.getByLabelText('signup.lastName'), { target: { value: 'Wonder' } })
@@ -41,7 +60,7 @@ beforeEach(() => {
 
 describe('SignupForm', () => {
   it('renders all fields', () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     expect(screen.getByLabelText('signup.firstName')).toBeInTheDocument()
     expect(screen.getByLabelText('signup.lastName')).toBeInTheDocument()
     expect(screen.getByLabelText('signup.companyName')).toBeInTheDocument()
@@ -51,10 +70,12 @@ describe('SignupForm', () => {
   })
 
   it('shows an error when passwords do not match, without submitting', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'Different1!' } })
-    fireEvent.click(screen.getByText('signup.submit'))
+    // The mismatch also disables the submit button, so submit the form
+    // directly to exercise handleSubmit's own mismatch check.
+    submitForm()
 
     await waitFor(() =>
       expect(screen.getByTestId('signup-error')).toHaveTextContent('signup.errors.passwordMismatch'),
@@ -62,25 +83,23 @@ describe('SignupForm', () => {
     expect(mockRegisterAction).not.toHaveBeenCalled()
   })
 
-  it('shows an error for a password under 12 characters', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+  it('disables the submit button for a password under 12 characters', () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'Short1!' } })
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'Short1!' } })
-    fireEvent.click(screen.getByText('signup.submit'))
 
-    await waitFor(() =>
-      expect(screen.getByTestId('signup-error')).toHaveTextContent('signup.errors.passwordTooShort'),
-    )
+    expect(screen.getByText('signup.submit').closest('button')).toBeDisabled()
     expect(mockRegisterAction).not.toHaveBeenCalled()
   })
 
-  it('shows an error for a password missing complexity', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+  it('shows an error for a password missing complexity when the form is submitted directly', async () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'lowercaseonly1' } })
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'lowercaseonly1' } })
-    fireEvent.click(screen.getByText('signup.submit'))
+    expect(screen.getByText('signup.submit').closest('button')).toBeDisabled()
+    submitForm()
 
     await waitFor(() =>
       expect(screen.getByTestId('signup-error')).toHaveTextContent('signup.errors.passwordComplexity'),
@@ -88,8 +107,20 @@ describe('SignupForm', () => {
     expect(mockRegisterAction).not.toHaveBeenCalled()
   })
 
+  it('disables the submit button for a weak password and enables it for a strong matching one', () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    fillValidForm()
+    fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'weakpassword' } })
+    fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'weakpassword' } })
+    expect(screen.getByText('signup.submit').closest('button')).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'SecurePass1!' } })
+    fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'SecurePass1!' } })
+    expect(screen.getByText('signup.submit').closest('button')).not.toBeDisabled()
+  })
+
   it('calls registerAction with the mapped fields on valid submit', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -107,7 +138,7 @@ describe('SignupForm', () => {
 
   it('shows a translated error returned by registerAction', async () => {
     mockRegisterAction.mockResolvedValue({ error: 'emailTaken' })
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -118,7 +149,7 @@ describe('SignupForm', () => {
 
   it('shows an error and clears the loading state when registerAction rejects', async () => {
     mockRegisterAction.mockRejectedValue(new Error('boom'))
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -129,7 +160,7 @@ describe('SignupForm', () => {
   })
 
   it('shows the success state and a link to /login after a successful submit', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -138,7 +169,7 @@ describe('SignupForm', () => {
   })
 
   it('carries next forward into the post-signup login link', async () => {
-    render(<SignupForm clientId="sq_1" next="/orgs" hasDefaultOrg={false} />)
+    render(<SignupForm clientId="sq_1" next="/orgs" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -150,7 +181,7 @@ describe('SignupForm', () => {
   })
 
   it('hides the Company name field when hasDefaultOrg is true, and omits it from the submit payload', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg passwordPolicy={POLICY} />)
     expect(screen.queryByLabelText('signup.companyName')).not.toBeInTheDocument()
 
     fillValidFormWithoutCompanyName()
@@ -170,7 +201,7 @@ describe('SignupForm', () => {
   })
 
   it('shows the Company name field when hasDefaultOrg is false', () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     expect(screen.getByLabelText('signup.companyName')).toBeInTheDocument()
   })
 })
