@@ -1,8 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
+import { PasswordPolicy } from '@sassy-auth/types';
 import { auth } from '../auth/auth.config';
 import { SqidService } from '../common/sqid/sqid.service';
 import { generatePendingPublicId } from '../common/pending-public-id';
+import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password-policy';
 import { RegisterDto } from './register.dto';
 
 /**
@@ -31,6 +33,10 @@ export class RegistrationService {
     // 1. Resolve the app — 404 if unknown
     const app = await prisma.saApp.findUnique({ where: { publicId: dto.appPublicId } });
     if (!app) throw new NotFoundException('App not found');
+
+    // Resolve and enforce the app's effective password policy before ever
+    // touching BetterAuth — a rejected password must not create any account.
+    validatePasswordOrThrow(dto.password, resolvePasswordPolicy(app));
 
     // An app with a defaultOrgId places every self-serve signup into that
     // existing org — companyName is irrelevant and never read in that case.
@@ -131,13 +137,19 @@ export class RegistrationService {
     }
   }
 
-  async getAppName(appPublicId: string): Promise<{ name: string; hasDefaultOrg: boolean }> {
+  async getAppName(
+    appPublicId: string,
+  ): Promise<{ name: string; hasDefaultOrg: boolean; passwordPolicy: PasswordPolicy }> {
     if (!appPublicId) throw new NotFoundException('App not found');
     const app = await prisma.saApp.findUnique({
       where: { publicId: appPublicId },
-      select: { name: true, defaultOrgId: true },
+      select: { name: true, defaultOrgId: true, passwordPolicyOverride: true },
     });
     if (!app) throw new NotFoundException('App not found');
-    return { name: app.name, hasDefaultOrg: app.defaultOrgId !== null };
+    return {
+      name: app.name,
+      hasDefaultOrg: app.defaultOrgId !== null,
+      passwordPolicy: resolvePasswordPolicy(app),
+    };
   }
 }

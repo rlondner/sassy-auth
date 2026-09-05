@@ -48,14 +48,16 @@ const sqidFake: Pick<SqidService, 'encode' | 'decode'> = {
 
 const baseDto: RegisterDto = {
   email: 'alice@example.com',
-  password: 'password123',
+  // Satisfies the default global policy resolved by resolvePasswordPolicy:
+  // minLength 12, upper, lower, and at least one number required.
+  password: 'StrongPass123',
   firstName: 'Alice',
   lastName: 'Wonder',
   companyName: 'Acme Inc',
   appPublicId: 'sq_1',
 };
 
-const appRow = { id: 1, publicId: 'sq_1', name: 'MyApp', isPlatform: false };
+const appRow = { id: 1, publicId: 'sq_1', name: 'MyApp', isPlatform: false, passwordPolicyOverride: null };
 const draftOrgRow = { id: 10, publicId: 'placeholder', name: 'Acme Inc', appId: 1, isPlatform: false };
 const finalOrgRow = { id: 10, publicId: 'sq_10', name: 'Acme Inc', appId: 1, isPlatform: false };
 const baUserId = 'ba-user-id-abc123';
@@ -164,6 +166,50 @@ describe('RegistrationService', () => {
     });
   });
 
+  describe('register — password policy', () => {
+    it('rejects a password that fails the resolved policy before creating any account', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+
+      await expect(
+        service.register({ ...baseDto, password: 'short' }),
+      ).rejects.toMatchObject({ response: { errorKey: 'password.policyViolation' } });
+
+      expect(mockSignUpEmail).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('accepts a password satisfying an app-level override that the global policy would reject', async () => {
+      const appWithOverride = {
+        ...appRow,
+        passwordPolicyOverride: {
+          minLength: 6,
+          requireUppercase: false,
+          requireLowercase: false,
+          requireNumber: false,
+          requireSpecial: false,
+          minNumbers: 0,
+          minSpecial: 0,
+        },
+      };
+      mockPrisma.saApp.findUnique.mockResolvedValue(appWithOverride);
+      mockSignUpEmail.mockResolvedValue({ token: 'tok', user: { id: baUserId, email: baseDto.email } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockPrisma.saUser.create.mockResolvedValue({ id: 1, publicId: baUserId.slice(0, 12) });
+
+      // 6 chars — satisfies the override's minLength:6 but would fail the
+      // global default (minLength 12, uppercase/number required).
+      await expect(service.register({ ...baseDto, password: 'abcdef' })).resolves.toEqual({
+        ok: true,
+        orgPublicId: finalOrgRow.publicId,
+      });
+      expect(mockSignUpEmail).toHaveBeenCalledWith({
+        body: { email: baseDto.email, password: 'abcdef', name: 'Alice Wonder' },
+      });
+    });
+  });
+
   describe('register — app with defaultOrgId', () => {
     const appWithDefaultOrg = { ...appRow, defaultOrgId: 99, defaultRoleId: null };
     const defaultOrgRow = { id: 99, publicId: 'sq_99', name: 'Citadel', appId: 1, isPlatform: false };
@@ -241,13 +287,21 @@ describe('RegistrationService', () => {
 
   describe('getAppName — hasDefaultOrg', () => {
     it('reports hasDefaultOrg: true when the app has a defaultOrgId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99 });
-      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp', hasDefaultOrg: true });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99, passwordPolicyOverride: null });
+      await expect(service.getAppName('sq_1')).resolves.toEqual({
+        name: 'MyApp',
+        hasDefaultOrg: true,
+        passwordPolicy: expect.any(Object),
+      });
     });
 
     it('reports hasDefaultOrg: false when the app has no defaultOrgId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null });
-      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp', hasDefaultOrg: false });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null });
+      await expect(service.getAppName('sq_1')).resolves.toEqual({
+        name: 'MyApp',
+        hasDefaultOrg: false,
+        passwordPolicy: expect.any(Object),
+      });
     });
   });
 
@@ -300,12 +354,16 @@ describe('RegistrationService', () => {
 
   describe('getAppName', () => {
     it('returns the app name for a known appPublicId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null });
 
-      await expect(service.getAppName('sq_1')).resolves.toEqual({ name: 'MyApp', hasDefaultOrg: false });
+      await expect(service.getAppName('sq_1')).resolves.toEqual({
+        name: 'MyApp',
+        hasDefaultOrg: false,
+        passwordPolicy: expect.any(Object),
+      });
       expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
         where: { publicId: 'sq_1' },
-        select: { name: true, defaultOrgId: true },
+        select: { name: true, defaultOrgId: true, passwordPolicyOverride: true },
       });
     });
 
