@@ -23,7 +23,7 @@ import { updateAppAction, getSocialProviderSettingsAction, updateSocialProviders
 import { listOrgsAction } from '@/app/(admin)/orgs/actions'
 import { listRolesAction } from '@/app/(admin)/roles/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
-import type { App, RedirectUri, OrgRow, RoleRow } from '@/lib/types'
+import type { App, RedirectUri, OrgRow, RoleRow, PasswordPolicy } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 
 interface Props {
@@ -42,6 +42,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
   const [defaultOrgId, setDefaultOrgId] = React.useState<string | null>(app.defaultOrgId ?? null)
   const [defaultRoleId, setDefaultRoleId] = React.useState<string | null>(app.defaultRoleId ?? null)
+  const [passwordPolicyOverrideEnabled, setPasswordPolicyOverrideEnabled] = React.useState(
+    app.passwordPolicyOverride !== null,
+  )
+  const [passwordPolicy, setPasswordPolicy] = React.useState<PasswordPolicy>(
+    app.passwordPolicyOverride ?? app.effectivePasswordPolicy,
+  )
   const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
   const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -78,6 +84,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setRequireTwoFactor(app.requireTwoFactor ?? false)
     setDefaultOrgId(app.defaultOrgId ?? null)
     setDefaultRoleId(app.defaultRoleId ?? null)
+    setPasswordPolicyOverrideEnabled(app.passwordPolicyOverride !== null)
+    setPasswordPolicy(app.passwordPolicyOverride ?? app.effectivePasswordPolicy)
     setErrorKey(null)
     setNewClientSecret(null)
     setClientSecretUpdatedAt(app.clientSecretUpdatedAt ?? null)
@@ -142,7 +150,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     initialProviders.some((p) => !checkedProviders.has(p))
 
   const redirectUrisDirty = JSON.stringify(redirectUris) !== JSON.stringify(app.redirectUris ?? [])
-  const dirty = name !== app.name || url !== app.url || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null)
+  const passwordPolicyDirty =
+    passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
+    || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
+  const dirty = name !== app.name || url !== app.url || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -155,7 +166,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null } = {}
+    const patch: { name?: string; url?: string; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (redirectUrisDirty) patch.redirectUris = redirectUris
@@ -163,6 +174,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
     if (defaultOrgId !== (app.defaultOrgId ?? null)) patch.defaultOrgId = defaultOrgId
     if (defaultRoleId !== (app.defaultRoleId ?? null)) patch.defaultRoleId = defaultRoleId
+    if (passwordPolicyDirty) {
+      patch.passwordPolicyOverride = passwordPolicyOverrideEnabled ? passwordPolicy : null
+    }
     startTransition(async () => {
       // Two independent endpoints: /api/apps for the core fields, and
       // /api/social-providers/:clientId for the checkbox group — the
@@ -256,6 +270,100 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.requireTwoFactorHint')}
               </p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                <input
+                  type="checkbox"
+                  aria-label={t('apps.fields.passwordPolicyOverrideToggle')}
+                  checked={passwordPolicyOverrideEnabled}
+                  onChange={(e) => setPasswordPolicyOverrideEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                />
+                {t('apps.fields.passwordPolicyOverrideToggle')}
+              </label>
+              {!passwordPolicyOverrideEnabled && (
+                <p className="mt-1 text-body-sm text-muted-foreground">
+                  {t('apps.fields.passwordPolicyInherited', {
+                    summary: `${app.effectivePasswordPolicy.minLength}+ chars`,
+                  })}
+                </p>
+              )}
+              {passwordPolicyOverrideEnabled && (
+                <div className="mt-3 space-y-3 rounded border border-[var(--border)] p-3">
+                  <div>
+                    <Label htmlFor="pwMinLength">{t('apps.fields.passwordPolicyMinLength')}</Label>
+                    <Input
+                      id="pwMinLength"
+                      type="number"
+                      min={8}
+                      max={128}
+                      value={passwordPolicy.minLength}
+                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, minLength: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={passwordPolicy.requireUppercase}
+                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, requireUppercase: e.target.checked }))}
+                      className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                    />
+                    {t('apps.fields.passwordPolicyRequireUppercase')}
+                  </label>
+                  <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={passwordPolicy.requireLowercase}
+                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, requireLowercase: e.target.checked }))}
+                      className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                    />
+                    {t('apps.fields.passwordPolicyRequireLowercase')}
+                  </label>
+                  <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={passwordPolicy.requireNumber}
+                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, requireNumber: e.target.checked }))}
+                      className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                    />
+                    {t('apps.fields.passwordPolicyRequireNumber')}
+                  </label>
+                  <div>
+                    <Label htmlFor="pwMinNumbers">{t('apps.fields.passwordPolicyMinNumbers')}</Label>
+                    <Input
+                      id="pwMinNumbers"
+                      type="number"
+                      min={0}
+                      max={passwordPolicy.minLength}
+                      disabled={!passwordPolicy.requireNumber}
+                      value={passwordPolicy.minNumbers}
+                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, minNumbers: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={passwordPolicy.requireSpecial}
+                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, requireSpecial: e.target.checked }))}
+                      className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                    />
+                    {t('apps.fields.passwordPolicyRequireSpecial')}
+                  </label>
+                  <div>
+                    <Label htmlFor="pwMinSpecial">{t('apps.fields.passwordPolicyMinSpecial')}</Label>
+                    <Input
+                      id="pwMinSpecial"
+                      type="number"
+                      min={0}
+                      max={passwordPolicy.minLength}
+                      disabled={!passwordPolicy.requireSpecial}
+                      value={passwordPolicy.minSpecial}
+                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, minSpecial: Number(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <Label htmlFor="defaultOrgId">{t('apps.fields.defaultOrg')}</Label>

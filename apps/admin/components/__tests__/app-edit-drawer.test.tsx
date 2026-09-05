@@ -6,6 +6,7 @@ import { AppEditDrawer } from '../app-edit-drawer'
 import * as actions from '@/app/(admin)/apps/actions'
 import * as orgsActions from '@/app/(admin)/orgs/actions'
 import * as rolesActions from '@/app/(admin)/roles/actions'
+import type { PasswordPolicy } from '@/lib/types'
 
 jest.mock('@/app/(admin)/apps/actions', () => ({
   updateAppAction: jest.fn(),
@@ -114,7 +115,25 @@ jest.mock('@sassy-auth/ui', () => {
 
 Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } })
 
-const app = { publicId: 'sq_1', name: 'Old', url: 'https://old.example', isPlatform: false, requireTwoFactor: false }
+const EFFECTIVE_PASSWORD_POLICY: PasswordPolicy = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecial: false,
+  minNumbers: 1,
+  minSpecial: 0,
+}
+
+const app = {
+  publicId: 'sq_1',
+  name: 'Old',
+  url: 'https://old.example',
+  isPlatform: false,
+  requireTwoFactor: false,
+  passwordPolicyOverride: null,
+  effectivePasswordPolicy: EFFECTIVE_PASSWORD_POLICY,
+}
 
 function withIntl(node: React.ReactNode) {
   return (
@@ -404,5 +423,83 @@ describe('AppEditDrawer', () => {
       ),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  // Task 12: collapsible per-app password policy section.
+
+  describe('password policy section', () => {
+    it('renders collapsed with the override toggle off by default', () => {
+      render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      const toggle = screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle) as HTMLInputElement
+      expect(toggle.checked).toBe(false)
+      expect(screen.queryByLabelText(en.apps.fields.passwordPolicyMinLength)).not.toBeInTheDocument()
+    })
+
+    it('expands the policy fields when the override toggle is turned on', () => {
+      render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle))
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinLength)).toBeInTheDocument()
+    })
+
+    it('marks the form dirty and includes passwordPolicyOverride in the save payload when enabled and edited', async () => {
+      ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app })
+      const onOpenChange = jest.fn()
+      render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+      const save = screen.getByRole('button', { name: en.apps.drawer.save })
+      expect(save).toBeDisabled()
+
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle))
+      expect(save).toBeEnabled()
+
+      const minLength = screen.getByLabelText(en.apps.fields.passwordPolicyMinLength)
+      fireEvent.change(minLength, { target: { value: '16' } })
+
+      fireEvent.click(save)
+
+      await waitFor(() =>
+        expect(actions.updateAppAction).toHaveBeenCalledWith(
+          'sq_1',
+          expect.objectContaining({
+            passwordPolicyOverride: expect.objectContaining({ minLength: 16 }),
+          }),
+        ),
+      )
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    })
+
+    it('sends null to clear an existing override when the toggle is turned back off', async () => {
+      const appWithOverride = {
+        ...app,
+        passwordPolicyOverride: {
+          minLength: 16,
+          requireUppercase: true,
+          requireLowercase: true,
+          requireNumber: true,
+          requireSpecial: true,
+          minNumbers: 2,
+          minSpecial: 1,
+        },
+      }
+      ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: appWithOverride })
+      const onOpenChange = jest.fn()
+      render(withIntl(<AppEditDrawer app={appWithOverride} open onOpenChange={onOpenChange} />))
+
+      const toggle = screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle) as HTMLInputElement
+      expect(toggle.checked).toBe(true)
+
+      fireEvent.click(toggle)
+      expect(screen.queryByLabelText(en.apps.fields.passwordPolicyMinLength)).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+      await waitFor(() =>
+        expect(actions.updateAppAction).toHaveBeenCalledWith(
+          'sq_1',
+          expect.objectContaining({ passwordPolicyOverride: null }),
+        ),
+      )
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    })
   })
 })
