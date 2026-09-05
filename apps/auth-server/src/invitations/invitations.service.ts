@@ -10,11 +10,16 @@ import { prisma } from '@sassy-auth/db';
 // verifyPassword and surface as 500s on /api/auth/sign-in/email.
 import { hashPassword } from 'better-auth/crypto';
 import * as crypto from 'crypto';
+import { PasswordPolicy } from '@sassy-auth/types';
+import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password-policy';
 import { LoggerService } from '../common/logger/logger.service';
 
 const INVITATION_INCLUDE = {
   user: {
-    include: { betterAuthUser: { select: { id: true, email: true } } },
+    include: {
+      betterAuthUser: { select: { id: true, email: true } },
+      org: { select: { appId: true } },
+    },
   },
 } as const;
 
@@ -22,7 +27,12 @@ const INVITATION_INCLUDE = {
 export class InvitationsService {
   constructor(private readonly logger: LoggerService) {}
 
-  async validateToken(token: string) {
+  async validateToken(token: string): Promise<{
+    firstName: string;
+    email: string;
+    expired: boolean;
+    passwordPolicy: PasswordPolicy;
+  }> {
     const inv = await prisma.saInvitation.findUnique({
       where: { token },
       include: INVITATION_INCLUDE,
@@ -35,10 +45,15 @@ export class InvitationsService {
     // or invalid"). Without this, revisiting a used link still renders the
     // password form and the user only learns it's stale after submitting.
     const expired = inv.usedAt !== null || inv.expiresAt < new Date();
+    const app = await prisma.saApp.findUnique({
+      where: { id: inv.user.org.appId },
+      select: { passwordPolicyOverride: true },
+    });
     return {
       firstName: inv.user.firstName,
       email: inv.user.betterAuthUser.email,
       expired,
+      passwordPolicy: resolvePasswordPolicy(app ?? { passwordPolicyOverride: null }),
     };
   }
 
@@ -50,6 +65,12 @@ export class InvitationsService {
     if (!inv) throw new NotFoundException('Invitation not found');
     if (inv.usedAt) throw new BadRequestException('Invitation already used');
     if (inv.expiresAt < new Date()) throw new BadRequestException('Invitation expired');
+
+    const app = await prisma.saApp.findUnique({
+      where: { id: inv.user.org.appId },
+      select: { passwordPolicyOverride: true },
+    });
+    validatePasswordOrThrow(password, resolvePasswordPolicy(app ?? { passwordPolicyOverride: null }));
 
     const hashed = await hashPassword(password);
     const now = new Date();
