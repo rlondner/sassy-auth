@@ -272,7 +272,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               </p>
             </div>
             <div>
-              <label className="flex items-center gap-2 text-label-md cursor-pointer">
+              <Label>{t('apps.fields.passwordPolicy')}</Label>
+              <label className="mt-2 flex items-center gap-2 text-label-md cursor-pointer">
                 <input
                   type="checkbox"
                   aria-label={t('apps.fields.passwordPolicyOverrideToggle')}
@@ -299,7 +300,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                       min={8}
                       max={128}
                       value={passwordPolicy.minLength}
-                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, minLength: Number(e.target.value) }))}
+                      onChange={(e) =>
+                        setPasswordPolicy((p) => ({
+                          ...p,
+                          minLength: e.target.value === '' ? p.minLength : Number(e.target.value),
+                        }))
+                      }
                     />
                   </div>
                   <label className="flex items-center gap-2 text-label-md cursor-pointer">
@@ -338,7 +344,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                       max={passwordPolicy.minLength}
                       disabled={!passwordPolicy.requireNumber}
                       value={passwordPolicy.minNumbers}
-                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, minNumbers: Number(e.target.value) }))}
+                      onChange={(e) =>
+                        setPasswordPolicy((p) => ({
+                          ...p,
+                          minNumbers: e.target.value === '' ? p.minNumbers : Number(e.target.value),
+                        }))
+                      }
                     />
                   </div>
                   <label className="flex items-center gap-2 text-label-md cursor-pointer">
@@ -359,7 +370,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                       max={passwordPolicy.minLength}
                       disabled={!passwordPolicy.requireSpecial}
                       value={passwordPolicy.minSpecial}
-                      onChange={(e) => setPasswordPolicy((p) => ({ ...p, minSpecial: Number(e.target.value) }))}
+                      onChange={(e) =>
+                        setPasswordPolicy((p) => ({
+                          ...p,
+                          minSpecial: e.target.value === '' ? p.minSpecial : Number(e.target.value),
+                        }))
+                      }
                     />
                   </div>
                 </div>

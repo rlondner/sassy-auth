@@ -441,6 +441,21 @@ describe('AppEditDrawer', () => {
       expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinLength)).toBeInTheDocument()
     })
 
+    it('disables minNumbers/minSpecial inputs when their require-* checkbox is unchecked', () => {
+      render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle))
+
+      // Base fixture's effective policy has requireNumber: true, requireSpecial: false.
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinNumbers)).toBeEnabled()
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinSpecial)).toBeDisabled()
+
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyRequireNumber))
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinNumbers)).toBeDisabled()
+
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyRequireSpecial))
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinSpecial)).toBeEnabled()
+    })
+
     it('marks the form dirty and includes passwordPolicyOverride in the save payload when enabled and edited', async () => {
       ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app })
       const onOpenChange = jest.fn()
