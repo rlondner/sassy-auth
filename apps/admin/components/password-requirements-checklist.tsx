@@ -15,7 +15,7 @@ export function PasswordRequirementsChecklist({ password, policy }: Props) {
   const results = evaluatePasswordPolicy(password, policy)
 
   return (
-    <ul className="mt-2 space-y-1">
+    <ul className="mt-2 space-y-1" aria-live="polite" aria-atomic="false">
       {results.map(({ rule, met }) => {
         const count = rule === 'minLength' ? policy.minLength
           : rule === 'minNumbers' ? policy.minNumbers

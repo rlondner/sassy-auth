@@ -38,4 +38,11 @@ describe('PasswordRequirementsChecklist', () => {
     render(withIntl(<PasswordRequirementsChecklist password="alllowercase" policy={POLICY} />))
     expect(screen.getByTestId('rule-requireUppercase')).toHaveAttribute('data-met', 'false')
   })
+
+  it('interpolates the count for minNumbers/minSpecial sub-rules', () => {
+    const policy: PasswordPolicy = { ...POLICY, requireSpecial: true, minNumbers: 2, minSpecial: 2 }
+    render(withIntl(<PasswordRequirementsChecklist password="" policy={policy} />))
+    expect(screen.getByTestId('rule-minNumbers')).toHaveTextContent('2')
+    expect(screen.getByTestId('rule-minSpecial')).toHaveTextContent('2')
+  })
 })
