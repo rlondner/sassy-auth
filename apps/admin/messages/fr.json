@@ -72,7 +72,17 @@
       "regenerateClientSecret": "Régénérer le secret client",
       "clientSecretWarning": "Copiez ce secret maintenant — il ne sera plus affiché.",
       "clientSecretUpdatedAt": "Secret régénéré le {date}",
-      "noClientSecret": "Aucun secret client configuré — il s'agit d'un client public."
+      "noClientSecret": "Aucun secret client configuré — il s'agit d'un client public.",
+      "passwordPolicy": "Politique de mot de passe",
+      "passwordPolicyOverrideToggle": "Remplacer la politique globale pour cette application",
+      "passwordPolicyInherited": "Politique globale héritée : {summary}",
+      "passwordPolicyMinLength": "Longueur minimale",
+      "passwordPolicyRequireUppercase": "Exiger une lettre majuscule",
+      "passwordPolicyRequireLowercase": "Exiger une lettre minuscule",
+      "passwordPolicyRequireNumber": "Exiger un chiffre",
+      "passwordPolicyRequireSpecial": "Exiger un caractère spécial",
+      "passwordPolicyMinNumbers": "Nombre minimum de chiffres",
+      "passwordPolicyMinSpecial": "Nombre minimum de caractères spéciaux"
     },
     "actions": {
       "view": "Voir",

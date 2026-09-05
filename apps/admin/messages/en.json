@@ -78,7 +78,17 @@
       "regenerateClientSecret": "Regenerate client secret",
       "clientSecretWarning": "Copy this secret now — it will not be shown again.",
       "clientSecretUpdatedAt": "Secret last rotated {date}",
-      "noClientSecret": "No client secret configured — this is a public client."
+      "noClientSecret": "No client secret configured — this is a public client.",
+      "passwordPolicy": "Password Policy",
+      "passwordPolicyOverrideToggle": "Override global password policy for this app",
+      "passwordPolicyInherited": "Inheriting the global policy: {summary}",
+      "passwordPolicyMinLength": "Minimum length",
+      "passwordPolicyRequireUppercase": "Require an uppercase letter",
+      "passwordPolicyRequireLowercase": "Require a lowercase letter",
+      "passwordPolicyRequireNumber": "Require a number",
+      "passwordPolicyRequireSpecial": "Require a special character",
+      "passwordPolicyMinNumbers": "Minimum numbers",
+      "passwordPolicyMinSpecial": "Minimum special characters"
     },
     "actions": {
       "view": "View",
