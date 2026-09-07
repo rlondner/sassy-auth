@@ -7,6 +7,7 @@ import { Button } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
 import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
 import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
+import { Turnstile } from '@marsidev/react-turnstile'
 import { registerAction } from './actions'
 
 interface SignupFormProps {
@@ -19,6 +20,7 @@ interface SignupFormProps {
 const KNOWN_ERRORS = [
   'appNotFound',
   'emailTaken',
+  'captchaFailed',
   'tooManyRequests',
   'serverUnavailable',
   'validationError',
@@ -35,6 +37,13 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+      console.warn('NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set; the signup captcha widget will not function.')
+    }
+  }, [])
 
   const policy = passwordPolicy ?? FALLBACK_PASSWORD_POLICY
   const policyMet = evaluatePasswordPolicy(password, policy).every((r) => r.met)
@@ -43,11 +52,12 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
     e.preventDefault()
     if (password !== confirm) { setError(t('signup.errors.passwordMismatch')); return }
     if (!policyMet) { setError(t('signup.errors.passwordComplexity')); return }
+    if (!captchaToken) { setError(t('signup.errors.captchaRequired')); return }
     setError(null)
     setSubmitting(true)
     try {
       const result = await registerAction({
-        clientId, firstName, lastName, email, password,
+        clientId, firstName, lastName, email, password, turnstileToken: captchaToken,
         ...(hasDefaultOrg ? {} : { companyName }),
       })
       if ('error' in result) {
@@ -152,6 +162,11 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
         />
       </div>
       {error && <p data-testid="signup-error" className="text-label-md text-[var(--destructive)]">{error}</p>}
+      <Turnstile
+        siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''}
+        onSuccess={setCaptchaToken}
+        onExpire={() => setCaptchaToken(null)}
+      />
       <Button
         type="submit"
         className="w-full"

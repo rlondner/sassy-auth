@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 import { PasswordPolicy } from '@sassy-auth/types';
 import { auth } from '../auth/auth.config';
@@ -6,6 +12,7 @@ import { SqidService } from '../common/sqid/sqid.service';
 import { generatePendingPublicId } from '../common/pending-public-id';
 import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password-policy';
 import { RegisterDto } from './register.dto';
+import { TurnstileService } from './turnstile.service';
 
 /**
  * BetterAuth (v1.6.x) throws an APIError instance when sign-up fails.
@@ -27,9 +34,18 @@ function isDuplicateEmailError(e: unknown): boolean {
 
 @Injectable()
 export class RegistrationService {
-  constructor(private readonly sqids: SqidService) {}
+  constructor(
+    private readonly sqids: SqidService,
+    private readonly turnstile: TurnstileService,
+  ) {}
 
   async register(dto: RegisterDto): Promise<{ ok: true; orgPublicId: string }> {
+    // 0. Verify the captcha before any app lookup or DB work
+    const captchaOk = await this.turnstile.verify(dto.turnstileToken);
+    if (!captchaOk) {
+      throw new UnprocessableEntityException('captcha verification failed');
+    }
+
     // 1. Resolve the app — 404 if unknown
     const app = await prisma.saApp.findUnique({ where: { publicId: dto.appPublicId } });
     if (!app) throw new NotFoundException('App not found');
