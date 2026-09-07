@@ -22,4 +22,5 @@ export class RegisterDto {
   @IsString() @MinLength(1) lastName!: string;
   @IsString() @MinLength(1) companyName!: string;
   @IsString() @MinLength(1) appPublicId!: string;
+  @IsString() @MinLength(1) turnstileToken!: string;
 }

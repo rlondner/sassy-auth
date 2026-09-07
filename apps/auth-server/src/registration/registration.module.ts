@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { RegistrationService } from './registration.service';
 import { RegistrationController } from './registration.controller';
 import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
+import { TurnstileService } from './turnstile.service';
 
 /**
  * SqidService and LoggerService are provided globally via CommonModule
@@ -9,6 +10,6 @@ import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
  */
 @Module({
   controllers: [RegistrationController],
-  providers: [RegistrationService, RateLimitGuard, AppLookupRateLimitGuard],
+  providers: [RegistrationService, RateLimitGuard, AppLookupRateLimitGuard, TurnstileService],
 })
 export class RegistrationModule {}

@@ -1,7 +1,8 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { RegistrationService } from './registration.service';
 import { SqidService } from '../common/sqid/sqid.service';
+import { TurnstileService } from './turnstile.service';
 import { RegisterDto } from './register.dto';
 
 // Mock @sassy-auth/db
@@ -48,6 +49,7 @@ const baseDto: RegisterDto = {
   lastName: 'Wonder',
   companyName: 'Acme Inc',
   appPublicId: 'sq_1',
+  turnstileToken: 'valid-captcha-token',
 };
 
 const appRow = { id: 1, publicId: 'sq_1', name: 'MyApp', isPlatform: false };
@@ -58,15 +60,20 @@ const baUserId = 'ba-user-id-abc123';
 describe('RegistrationService', () => {
   let service: RegistrationService;
 
+  let mockVerify: jest.Mock;
+
   beforeEach(async () => {
+    mockVerify = jest.fn().mockResolvedValue(true);
     const module = await Test.createTestingModule({
       providers: [
         RegistrationService,
         { provide: SqidService, useValue: sqidFake },
+        { provide: TurnstileService, useValue: { verify: mockVerify } },
       ],
     }).compile();
     service = module.get(RegistrationService);
     jest.clearAllMocks();
+    mockVerify.mockResolvedValue(true);
     // Default: the id signUpEmail returned really was persisted. The
     // synthetic-duplicate cases below override this with null (see
     // auth.config.ts autoSignIn).
@@ -74,6 +81,22 @@ describe('RegistrationService', () => {
   });
 
   describe('register', () => {
+    it('throws UnprocessableEntityException when captcha verification fails, before any app lookup', async () => {
+      mockVerify.mockResolvedValue(false);
+
+      await expect(service.register(baseDto)).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(mockPrisma.saApp.findUnique).not.toHaveBeenCalled();
+      expect(mockSignUpEmail).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('calls TurnstileService.verify with the dto token', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+
+      await expect(service.register(baseDto)).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockVerify).toHaveBeenCalledWith('valid-captcha-token');
+    });
+
     it('throws NotFoundException when appPublicId is not found', async () => {
       mockPrisma.saApp.findUnique.mockResolvedValue(null);
 
