@@ -169,4 +169,39 @@ describe('SignupForm', () => {
     )
     expect(mockRegisterAction).not.toHaveBeenCalled()
   })
+
+  describe('missing NEXT_PUBLIC_TURNSTILE_SITE_KEY diagnostic', () => {
+    const originalSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    let warnSpy: jest.SpyInstance
+
+    beforeEach(() => {
+      warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      warnSpy.mockRestore()
+      if (originalSiteKey === undefined) {
+        delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+      } else {
+        process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = originalSiteKey
+      }
+    })
+
+    it('warns once on mount when the site key is unset', () => {
+      delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+      render(<SignupForm clientId="sq_1" next="" />)
+
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('NEXT_PUBLIC_TURNSTILE_SITE_KEY'),
+      )
+    })
+
+    it('does not warn when the site key is set', () => {
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = 'test-site-key'
+      render(<SignupForm clientId="sq_1" next="" />)
+
+      expect(warnSpy).not.toHaveBeenCalled()
+    })
+  })
 })

@@ -34,6 +34,12 @@ export function SignupForm({ clientId, next }: SignupFormProps) {
   const [success, setSuccess] = React.useState(false)
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
 
+  React.useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+      console.warn('NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set; the signup captcha widget will not function.')
+    }
+  }, [])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (password !== confirm) { setError(t('signup.errors.passwordMismatch')); return }
