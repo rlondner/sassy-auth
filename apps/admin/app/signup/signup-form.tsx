@@ -4,6 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
+import { Turnstile } from '@marsidev/react-turnstile'
 import { registerAction } from './actions'
 
 interface SignupFormProps {
@@ -14,6 +15,7 @@ interface SignupFormProps {
 const KNOWN_ERRORS = [
   'appNotFound',
   'emailTaken',
+  'captchaFailed',
   'tooManyRequests',
   'serverUnavailable',
   'validationError',
@@ -30,6 +32,7 @@ export function SignupForm({ clientId, next }: SignupFormProps) {
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -39,10 +42,14 @@ export function SignupForm({ clientId, next }: SignupFormProps) {
       setError(t('signup.errors.passwordComplexity'))
       return
     }
+    if (!captchaToken) {
+      setError(t('signup.errors.captchaRequired'))
+      return
+    }
     setError(null)
     setSubmitting(true)
     try {
-      const result = await registerAction({ clientId, firstName, lastName, companyName, email, password })
+      const result = await registerAction({ clientId, firstName, lastName, companyName, email, password, turnstileToken: captchaToken })
       if ('error' in result) {
         const key = (KNOWN_ERRORS as readonly string[]).includes(result.error) ? result.error : 'validationError'
         setError(t(`signup.errors.${key as (typeof KNOWN_ERRORS)[number]}`))
@@ -143,6 +150,11 @@ export function SignupForm({ clientId, next }: SignupFormProps) {
         />
       </div>
       {error && <p data-testid="signup-error" className="text-label-md text-[var(--destructive)]">{error}</p>}
+      <Turnstile
+        siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''}
+        onSuccess={setCaptchaToken}
+        onExpire={() => setCaptchaToken(null)}
+      />
       <Button type="submit" className="w-full" loading={submitting}>
         {t('signup.submit')}
       </Button>

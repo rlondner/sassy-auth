@@ -561,6 +561,8 @@
       "passwordMismatch": "Passwords do not match.",
       "passwordTooShort": "Password must be at least 12 characters.",
       "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
+      "captchaRequired": "Please complete the captcha before submitting.",
+      "captchaFailed": "We couldn't verify you're not a robot. Please try the captcha again.",
       "appNotFound": "We couldn't find the app for this signup link.",
       "emailTaken": "An account with this email already exists.",
       "tooManyRequests": "Too many attempts. Please wait a minute and try again.",

@@ -10,6 +10,14 @@ jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+jest.mock('@marsidev/react-turnstile', () => ({
+  Turnstile: ({ onSuccess }: { onSuccess: (token: string) => void }) => (
+    <button type="button" data-testid="mock-turnstile-success" onClick={() => onSuccess('test-captcha-token')}>
+      Complete captcha
+    </button>
+  ),
+}))
+
 jest.mock('../actions', () => ({
   registerAction: jest.fn(),
 }))
@@ -24,6 +32,10 @@ function fillValidForm() {
   fireEvent.change(screen.getByLabelText('signup.email'), { target: { value: 'alice@example.com' } })
   fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'SecurePass1!' } })
   fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'SecurePass1!' } })
+}
+
+function completeCaptcha() {
+  fireEvent.click(screen.getByTestId('mock-turnstile-success'))
 }
 
 beforeEach(() => {
@@ -83,6 +95,7 @@ describe('SignupForm', () => {
   it('calls registerAction with the mapped fields on valid submit', async () => {
     render(<SignupForm clientId="sq_1" next="" />)
     fillValidForm()
+    completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() =>
@@ -93,6 +106,7 @@ describe('SignupForm', () => {
         companyName: 'Acme Inc',
         email: 'alice@example.com',
         password: 'SecurePass1!',
+        turnstileToken: 'test-captcha-token',
       }),
     )
   })
@@ -101,6 +115,7 @@ describe('SignupForm', () => {
     mockRegisterAction.mockResolvedValue({ error: 'emailTaken' })
     render(<SignupForm clientId="sq_1" next="" />)
     fillValidForm()
+    completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() =>
@@ -112,6 +127,7 @@ describe('SignupForm', () => {
     mockRegisterAction.mockRejectedValue(new Error('boom'))
     render(<SignupForm clientId="sq_1" next="" />)
     fillValidForm()
+    completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() =>
@@ -123,6 +139,7 @@ describe('SignupForm', () => {
   it('shows the success state and a link to /login after a successful submit', async () => {
     render(<SignupForm clientId="sq_1" next="" />)
     fillValidForm()
+    completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() => expect(screen.getByText('signup.success')).toBeInTheDocument())
@@ -132,6 +149,7 @@ describe('SignupForm', () => {
   it('carries next forward into the post-signup login link', async () => {
     render(<SignupForm clientId="sq_1" next="/orgs" />)
     fillValidForm()
+    completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() => expect(screen.getByText('signup.success')).toBeInTheDocument())
@@ -139,5 +157,16 @@ describe('SignupForm', () => {
       'href',
       '/login?next=%2Forgs',
     )
+  })
+
+  it('shows a captchaRequired error and does not submit when the captcha has not been completed', async () => {
+    render(<SignupForm clientId="sq_1" next="" />)
+    fillValidForm()
+    fireEvent.click(screen.getByText('signup.submit'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('signup-error')).toHaveTextContent('signup.errors.captchaRequired'),
+    )
+    expect(mockRegisterAction).not.toHaveBeenCalled()
   })
 })
