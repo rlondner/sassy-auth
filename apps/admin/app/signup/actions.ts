@@ -12,6 +12,7 @@ export interface RegisterInput {
   companyName: string
   email: string
   password: string
+  turnstileToken: string
 }
 
 export async function registerAction(
@@ -30,6 +31,7 @@ export async function registerAction(
         lastName: input.lastName,
         companyName: input.companyName,
         appPublicId: input.clientId,
+        turnstileToken: input.turnstileToken,
       }),
     })
   } catch (err) {
@@ -40,6 +42,7 @@ export async function registerAction(
   if (res.ok) return { ok: true }
   if (res.status === 404) return { error: 'appNotFound' }
   if (res.status === 409) return { error: 'emailTaken' }
+  if (res.status === 422) return { error: 'captchaFailed' }
   if (res.status === 429) return { error: 'tooManyRequests' }
   return { error: 'validationError' }
 }

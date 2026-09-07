@@ -18,6 +18,7 @@ const INPUT = {
   companyName: 'Acme Inc',
   email: 'alice@example.com',
   password: 'SecurePass1!',
+  turnstileToken: 'test-captcha-token',
 }
 
 beforeEach(async () => {
@@ -46,6 +47,7 @@ describe('registerAction', () => {
           lastName: INPUT.lastName,
           companyName: INPUT.companyName,
           appPublicId: INPUT.clientId,
+          turnstileToken: INPUT.turnstileToken,
         }),
       }),
     )
@@ -60,6 +62,7 @@ describe('registerAction', () => {
   it.each([
     [404, 'appNotFound'],
     [409, 'emailTaken'],
+    [422, 'captchaFailed'],
     [429, 'tooManyRequests'],
     [400, 'validationError'],
     [500, 'validationError'],
