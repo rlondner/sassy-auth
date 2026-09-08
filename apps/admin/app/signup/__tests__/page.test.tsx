@@ -1,4 +1,4 @@
-import { fetchAppInfo } from '../page'
+import { fetchAppInfo } from '../fetch-app-info'
 
 beforeEach(() => {
   jest.clearAllMocks()
