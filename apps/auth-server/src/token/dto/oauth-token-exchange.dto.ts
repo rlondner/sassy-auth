@@ -1,6 +1,15 @@
-import { IsString, IsNotEmpty, IsUrl, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsUrl, IsOptional, IsIn } from 'class-validator';
 
 export class OauthTokenExchangeDto {
+  /** RFC 6749 §4.1.3 requires every token request to name its grant type.
+   *  The global ValidationPipe's `forbidNonWhitelisted` rejected this field
+   *  outright until it was declared here — any spec-compliant client sends
+   *  it, so every real client's exchange was a 400 (found by Task 12's e2e
+   *  proof). This server supports exactly one grant, matching
+   *  `grant_types_supported` in both discovery documents. */
+  @IsIn(['authorization_code'])
+  grant_type!: string;
+
   @IsString()
   @IsNotEmpty()
   code!: string;

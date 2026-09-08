@@ -25,6 +25,11 @@ export function configureNestApp(app: INestApplication, loggerService: LoggerSer
   app.use(helmet());
   // RFC 8414 and OIDC Discovery mandate their well-known docs be served at
   // the host root, so exclude them from the /api global prefix.
+  // bug (found by Task 12's e2e proof): OIDC_METADATA_PATH was added in
+  // Task 5 but never actually excluded here, so /.well-known/openid-configuration
+  // was silently served at /api/.well-known/openid-configuration instead —
+  // unit/controller tests never caught it because they don't apply the
+  // bootstrapped app's global prefix the way main.ts does.
   app.setGlobalPrefix(NEST_GLOBAL_PREFIX, { exclude: WELL_KNOWN_METADATA_PATHS });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),

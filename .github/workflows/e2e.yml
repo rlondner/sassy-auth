@@ -139,6 +139,18 @@ jobs:
           pnpm --filter @sassy-auth/auth-server seed
           pnpm --filter @sassy-auth/db exec node scripts/print-app-public-id.cjs
 
+      # task-12: provisions the confidential "E2E OIDC Client" app that
+      # oidc-round-trip.spec.ts drives with a stock openid-client. Same
+      # seed-then-print-publicId convention as the RS step above.
+      - name: Seed E2E OIDC client and write publicId
+        env:
+          SEED_E2E_OIDC: '1'
+          APP_NAME: 'E2E OIDC Client'
+          OUT_FILE: /tmp/sassy-e2e-oidc-client-id.txt
+        run: |
+          pnpm --filter @sassy-auth/auth-server seed
+          pnpm --filter @sassy-auth/db exec node scripts/print-app-public-id.cjs
+
       - name: Install Playwright browsers
         run: pnpm --filter @sassy-auth/admin-e2e exec playwright install --with-deps chromium
 
@@ -150,6 +162,9 @@ jobs:
           test -s /tmp/sassy-e2e-rs-client-id.txt || { echo "ERROR: /tmp/sassy-e2e-rs-client-id.txt is missing or empty"; exit 1; }
           RS_CLIENT_ID=$(cat /tmp/sassy-e2e-rs-client-id.txt)
           export RS_CLIENT_ID
+          test -s /tmp/sassy-e2e-oidc-client-id.txt || { echo "ERROR: /tmp/sassy-e2e-oidc-client-id.txt is missing or empty"; exit 1; }
+          E2E_OIDC_CLIENT_ID=$(cat /tmp/sassy-e2e-oidc-client-id.txt)
+          export E2E_OIDC_CLIENT_ID
           pnpm --filter @sassy-auth/admin-e2e test:e2e
 
       # Only on failure, and only briefly. Uploading a ~15-30MB report for every
