@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpCode,
   HttpException,
   NotFoundException,
   Post,
@@ -361,6 +362,10 @@ export class TokenController {
    *
    * Exchanges an authorization code for a signed RS256 JWT.
    */
+  // RFC 6749 §5.1: a successful token response is 200 OK, not Nest's default
+  // 201 for POST. oauth4webapi (which openid-client wraps) enforces this
+  // strictly and rejects a 201 outright — found by Task 12's e2e proof.
+  @HttpCode(200)
   @Post(OAUTH_TOKEN_ROUTE)
   async oauthToken(
     @Body() dto: OauthTokenExchangeDto,

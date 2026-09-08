@@ -275,6 +275,13 @@ async function main() {
     await seedDemoMultitenant();
   }
 
+  // task-12: the confidential OIDC client apps/admin-e2e's
+  // oidc-round-trip.spec.ts drives end-to-end with a stock openid-client.
+  if (process.env.SEED_E2E_OIDC === '1') {
+    const { seedE2eOidcClient } = await import('./e2e-oidc-client');
+    await seedE2eOidcClient();
+  }
+
   console.log('Seed complete.');
 }
 

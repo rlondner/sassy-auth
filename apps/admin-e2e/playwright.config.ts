@@ -34,6 +34,27 @@ if (RS_CLIENT_ID) {
   process.env.RS_CLIENT_ID = RS_CLIENT_ID
 }
 
+// task-12: the "E2E OIDC Client" app's publicId, written by
+// packages/db/scripts/print-app-public-id.cjs (APP_NAME='E2E OIDC Client')
+// after `pnpm --filter @sassy-auth/auth-server seed` runs with
+// SEED_E2E_OIDC=1 — same convention as RS_CLIENT_ID above. Read here so
+// oidc-round-trip.spec.ts can consume it as process.env.E2E_OIDC_CLIENT_ID
+// without every environment having to export it by hand.
+let E2E_OIDC_CLIENT_ID = process.env.E2E_OIDC_CLIENT_ID ?? ''
+if (!E2E_OIDC_CLIENT_ID) {
+  try {
+    E2E_OIDC_CLIENT_ID = readFileSync('/tmp/sassy-e2e-oidc-client-id.txt', 'utf8').trim()
+  } catch { /* file not written; oidc-round-trip.spec.ts fails loudly (client_id is required) */ }
+}
+if (E2E_OIDC_CLIENT_ID) {
+  process.env.E2E_OIDC_CLIENT_ID = E2E_OIDC_CLIENT_ID
+}
+// The client secret is a fixed dev value (apps/auth-server/src/seed/seed-client-secret.ts,
+// DEV_SEED_CLIENT_SECRET) rather than something generated at seed time and
+// read back — unlike the publicId, nothing else needs to look it up.
+process.env.E2E_OIDC_CLIENT_SECRET =
+  process.env.E2E_OIDC_CLIENT_SECRET ?? 'e2e-oidc-dev-secret-CHANGE-ME'
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -141,6 +162,18 @@ export default defineConfig({
             STUB_IDP_PORT: new URL(STUB_IDP_URL).port || '9099',
             STUB_IDP_ISSUER: STUB_IDP_URL,
           },
+        },
+        {
+          // task-12: the RP redirect target for oidc-round-trip.spec.ts (see
+          // fixtures/oidc-test-client/server.mjs for why this needs to exist
+          // at all — the browser's final redirect from the auth-server lands
+          // here, and nothing listening there means net::ERR_CONNECTION_REFUSED).
+          command: 'node fixtures/oidc-test-client/server.mjs',
+          url: 'http://localhost:3002/callback',
+          reuseExistingServer: false,
+          timeout: 30_000,
+          stdout: 'pipe',
+          stderr: 'pipe',
         },
         {
           // `next start`, not `next dev`. In dev mode Next compiles each route
