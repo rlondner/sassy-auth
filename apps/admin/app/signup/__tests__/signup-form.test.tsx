@@ -10,6 +10,11 @@ jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
 
+const mockPush = jest.fn()
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}))
+
 jest.mock('@marsidev/react-turnstile', () => ({
   Turnstile: ({ onSuccess }: { onSuccess: (token: string) => void }) => (
     <button type="button" data-testid="mock-turnstile-success" onClick={() => onSuccess('test-captcha-token')}>
@@ -175,26 +180,27 @@ describe('SignupForm', () => {
     expect(screen.getByText('signup.submit').closest('button')).not.toBeDisabled()
   })
 
-  it('shows the success state and a link to /login after a successful submit', async () => {
+  it('navigates to /signup/check-email with the submitted address after a successful submit', async () => {
     render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
 
-    await waitFor(() => expect(screen.getByText('signup.success')).toBeInTheDocument())
-    expect(screen.getByText('signup.continueToLogin').closest('a')).toHaveAttribute('href', '/login')
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith('/signup/check-email?email=alice%40example.com'),
+    )
   })
 
-  it('carries next forward into the post-signup login link', async () => {
+  it('carries next forward into the check-email redirect', async () => {
     render(<SignupForm clientId="sq_1" next="/orgs" hasDefaultOrg={false} passwordPolicy={POLICY} />)
     fillValidForm()
     completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
 
-    await waitFor(() => expect(screen.getByText('signup.success')).toBeInTheDocument())
-    expect(screen.getByText('signup.continueToLogin').closest('a')).toHaveAttribute(
-      'href',
-      '/login?next=%2Forgs',
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        '/signup/check-email?email=alice%40example.com&next=%2Forgs',
+      ),
     )
   })
 

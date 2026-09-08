@@ -572,9 +572,17 @@
     "password": "Password",
     "confirmPassword": "Confirm Password",
     "submit": "Create account",
-    "success": "Account created! Check your email for a verification link before you can sign in.",
-    "continueToLogin": "Continue to sign in",
     "backToLogin": "Back to sign in",
+    "checkEmail": {
+      "title": "Check your email",
+      "subtitle": "We sent a verification link to {email}.",
+      "missingEmail": "We couldn't tell which address to check. Start the signup process again.",
+      "resendButton": "Resend email",
+      "resendCooldown": "Resend in {seconds}s",
+      "resendSent": "Verification email sent.",
+      "resendError": "We couldn't resend the email. Please try again in a moment.",
+      "backToLogin": "Back to sign in"
+    },
     "verified": {
       "title": "Email verified",
       "subtitle": "Your account is ready. You can now sign in.",

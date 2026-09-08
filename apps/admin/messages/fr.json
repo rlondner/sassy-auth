@@ -564,9 +564,17 @@
     "password": "Mot de passe",
     "confirmPassword": "Confirmer le mot de passe",
     "submit": "Créer le compte",
-    "success": "Compte créé ! Vous pouvez maintenant vous connecter.",
-    "continueToLogin": "Continuer vers la connexion",
     "backToLogin": "Retour à la connexion",
+    "checkEmail": {
+      "title": "Vérifiez votre e-mail",
+      "subtitle": "Nous avons envoyé un lien de vérification à {email}.",
+      "missingEmail": "Nous n'avons pas pu déterminer quelle adresse vérifier. Recommencez l'inscription.",
+      "resendButton": "Renvoyer l'e-mail",
+      "resendCooldown": "Renvoyer dans {seconds}s",
+      "resendSent": "E-mail de vérification envoyé.",
+      "resendError": "Impossible de renvoyer l'e-mail. Veuillez réessayer dans un instant.",
+      "backToLogin": "Retour à la connexion"
+    },
     "errors": {
       "passwordMismatch": "Les mots de passe ne correspondent pas.",
       "passwordTooShort": "Le mot de passe doit comporter au moins 12 caractères.",
