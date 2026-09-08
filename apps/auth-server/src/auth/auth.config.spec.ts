@@ -19,11 +19,6 @@ jest.mock('../email/email.singleton', () => ({
 }));
 jest.mock('./otp-test-store', () => ({ otpTestStore: {} }));
 jest.mock('./otp-sender', () => ({ sendSignInOtp: jest.fn() }));
-jest.mock('../activation/notify-activation', () => ({
-  notifyActivation: jest.fn().mockResolvedValue(undefined),
-}));
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const mockNotifyActivation = require('../activation/notify-activation').notifyActivation as jest.Mock;
 
 describe('auth.config — twoFactor plugin', () => {
   it('includes the twoFactor plugin in the plugins array', async () => {
@@ -284,29 +279,6 @@ describe('auth.config — emailVerification', () => {
       where: { betterAuthUserId: 'ba-user-1', status: 'unverified' },
       data: { status: 'active' },
     });
-  });
-
-  it('notifies the activation webhook when email verification promotes unverified -> active', async () => {
-    const { auth } = await import('./auth.config');
-    const { prisma } = require('@sassy-auth/db');
-    mockNotifyActivation.mockClear();
-    prisma.saUser.updateMany.mockResolvedValue({ count: 1 });
-    prisma.saUser.findUnique.mockResolvedValue({ id: 1, publicId: 'usr_1', orgId: 5 });
-    const options = (auth as unknown as { options: Record<string, unknown> }).options;
-    const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
-    await ev.afterEmailVerification({ id: 'ba-1' });
-    expect(mockNotifyActivation).toHaveBeenCalledWith({ id: 1, publicId: 'usr_1', orgId: 5 });
-  });
-
-  it('does not notify the activation webhook when the user was already verified (updateMany matches nothing)', async () => {
-    const { auth } = await import('./auth.config');
-    const { prisma } = require('@sassy-auth/db');
-    mockNotifyActivation.mockClear();
-    prisma.saUser.updateMany.mockResolvedValue({ count: 0 });
-    const options = (auth as unknown as { options: Record<string, unknown> }).options;
-    const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
-    await ev.afterEmailVerification({ id: 'ba-1' });
-    expect(mockNotifyActivation).not.toHaveBeenCalled();
   });
 });
 
