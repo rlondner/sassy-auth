@@ -521,6 +521,19 @@ Only needed to run the E2E suites; irrelevant to normal app usage.
 | `E2E_ADMIN_EMAIL`    | Super-admin email the Playwright/Jest E2E suites sign in as. Default: `s@sa.io` |
 | `E2E_ADMIN_PASSWORD` | Password for that account, and the fallback source for `SEED_ADMIN_PASSWORD`. Default: `Pass@word1234` |
 
+### Signup captcha (optional)
+
+Cloudflare Turnstile verification on the admin console's `/signup` form.
+Leave both unset to disable — the widget won't render and the auth server
+skips verification. Get test keys from the
+[Turnstile dashboard](https://developers.cloudflare.com/turnstile/) (the
+always-passing test site key is `1x00000000000000000000AA`).
+
+| Variable                       | Description                                                          |
+|---------------------------------|------------------------------------------------------------------------|
+| `TURNSTILE_SECRET_KEY`          | Server-side secret used by `auth-server` to verify submitted tokens. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Site key rendered by the admin signup form. Must be set for the widget to appear; the `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
+
 ### Social providers (optional)
 
 Omit the vars for any provider you do not want to enable — a provider is only

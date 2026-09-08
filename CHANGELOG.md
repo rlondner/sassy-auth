@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-08
+
+Two features landed on `dev`: signup captcha (Cloudflare Turnstile, 6
+commits — `TurnstileService` verification in `RegistrationService`, admin
+signup-form widget, 422→`captchaFailed` mapping) and OIDC spec-correctness
+fixes (exact `redirect_uri` matching, consolidated well-known path
+exclusion, an e2e round-trip test against a stock `openid-client` that
+found and fixed 3 spec bugs), both merged via `feat/oidc-compatibility` →
+`dev` (`e4d4510`). A third feature, activation webhooks + pending-account
+signup (10 commits — `SaApp.webhookUrl`/`webhookSecret` columns, webhook
+delivery on email verification/invitation-accept/admin-reactivation, a
+signup-flow code that lets pending users redeem tokens), is open as PR
+#378 against `dev`, not yet merged.
+
+Reviewing PR #378 surfaced that its `typecheck` and `admin-e2e` CI checks
+were both failing — not from anything in the PR's own diff, but from two
+pre-existing defects already on `dev` that had zero CI signal because
+`typecheck`/`unit-tests`/`e2e` only ran on push to `master`, never `dev`.
+Filed and fixed all three: the two silent build breaks plus the CI-trigger
+gap that hid them. See
+[BUGS_2026-09-08.md](./docs/history/bugs/BUGS_2026-09-08.md) and
+[TODO_2026-09-08.md](./docs/history/todo/TODO_2026-09-08.md).
+
+### Fixed (3 bugs)
+
+- **bug-0282** (High) — `app/signup/page.tsx` exported `fetchAppInfo` as a
+  named export alongside its default page component. Next's App Router
+  rejects any `page.tsx` export outside its recognized allow-list, so
+  `next build` has failed since the function landed 2026-09-05 —
+  invisible for 3 days for the CI-trigger reason above. Extracted the
+  function to `fetch-app-info.ts`. PR #379.
+- **bug-0283** (High) — `app/(admin)/roles/page.tsx`'s non-platform app
+  picker builds an `App[]` by hand and never picked up
+  `passwordPolicyOverride`/`effectivePasswordPolicy` after they became
+  required `App` fields (`430f870`, 2026-09-05). Broke `typecheck` (and
+  therefore `next build`) on `dev` since before 2026-09-01, same
+  invisibility. Filled in with the existing `FALLBACK_PASSWORD_POLICY`
+  constant. PR #380.
+- **bug-0284** (Medium, root cause of the two above) —
+  `typecheck.yml`/`unit-tests.yml`/`e2e.yml` triggered on `push` only to
+  `master`, not `dev`, despite already running on PRs against `dev`. Added
+  `dev` to each workflow's push branches so it gets the same direct CI
+  signal `master` has. PR #381.
+
+### Docs
+
+- Daily code review bundle for 2026-09-08 (this entry, plus
+  `TODO_2026-09-08.md`, `BUGS_2026-09-08.md`, and a README refresh
+  documenting local dev setup and required env vars).
+
 ## [Unreleased] — 2026-09-04
 
 CI now runs on PRs targeting `dev`, not just `master` (`33e074c`). The
