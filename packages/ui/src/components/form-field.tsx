@@ -31,7 +31,7 @@ export function FormField({ label, error, hint, required, className, id, ...prop
     <div className={cn('flex flex-col gap-1.5', className)}>
       <Label htmlFor={fieldId}>
         {label}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
+        {required && <span aria-hidden="true" className="ml-0.5 text-destructive">*</span>}
       </Label>
       <Input id={fieldId} required={required} aria-invalid={!!error} aria-describedby={describedBy} {...props} />
       {hint && !error && (
