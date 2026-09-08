@@ -10,11 +10,6 @@ function reject(): never {
   throw new BadRequestException(TokenErrorCode.INVALID_REDIRECT_URI);
 }
 
-/** Trim a single trailing slash from a non-root path so `/cb` == `/cb/`. */
-function normalizePath(pathname: string): string {
-  return pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
-}
-
 function isExactMatch(redirectUri: string, callbackUrl: string): boolean {
   let a: URL;
   let b: URL;
@@ -27,7 +22,7 @@ function isExactMatch(redirectUri: string, callbackUrl: string): boolean {
   return (
     a.protocol === b.protocol &&
     a.host === b.host && // host includes port
-    normalizePath(a.pathname) === normalizePath(b.pathname) &&
+    a.pathname === b.pathname &&
     a.search === b.search
   );
 }
@@ -39,7 +34,7 @@ function registered(app: RedirectUriApp, kind: string): string[] {
 /**
  * Validates a login `redirect_uri` against an app.
  * - One or more registered `login` URIs: require an exact match against the set
- *   (protocol + host + port + path + query), tolerant of a single trailing slash.
+ *   (protocol + host + port + path + query), per RFC 6749 §3.1.2.3.
  * - None registered: require the same origin as `app.url` (any path). This is the
  *   pre-OIDC fallback, preserved so the migration changes no app's behaviour.
  */
