@@ -850,6 +850,112 @@ describe('TokenController', () => {
         ),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('allows a signup-amr code to redeem for a pending user', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        scope: '',
+        amr: ['signup'],
+        hadChallenge: false,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'pending',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 10, publicId: 'sqid-10', url: 'https://app.example.com', clientSecretHash: 'hashed',
+      });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+
+      const result = await controller.oauthToken(
+        {
+          grant_type: 'authorization_code',
+          code: 'valid-signup-code',
+          client_id: 'sqid-10',
+          client_secret: 'the-real-secret',
+          redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq,
+        fakeTokenRes,
+      );
+
+      expect(result).toEqual({
+        access_token: 'oauth.jwt.token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: '',
+      });
+    });
+
+    it('rejects a signup-amr code for an inactive user', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        scope: 'openid',
+        amr: ['signup'],
+        hadChallenge: false,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'inactive',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 10, publicId: 'sqid-10', url: 'https://app.example.com', clientSecretHash: 'hashed',
+      });
+
+      await expect(
+        controller.oauthToken(
+          {
+            grant_type: 'authorization_code',
+            code: 'valid-signup-code',
+            client_id: 'sqid-10',
+            client_secret: 'the-real-secret',
+            redirect_uri: 'https://app.example.com/callback',
+          },
+          fakeTokenReq,
+          fakeTokenRes,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('still requires active status for a non-signup code even when the user is pending', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        scope: 'openid',
+        amr: ['pwd'],
+        hadChallenge: true,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'pending',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+
+      await expect(
+        controller.oauthToken(
+          {
+            grant_type: 'authorization_code',
+            code: 'valid-code',
+            client_id: 'sqid-10',
+            code_verifier: 'a'.repeat(64),
+            redirect_uri: 'https://app.example.com/callback',
+          },
+          fakeTokenReq,
+          fakeTokenRes,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
   // ── Task 9: confidential clients — §2 invariant ──────────────────────────
