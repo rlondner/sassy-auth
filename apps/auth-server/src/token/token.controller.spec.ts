@@ -1291,6 +1291,32 @@ describe('TokenController', () => {
       expect(res.body.name).toBe('Ada Lovelace');
     });
 
+    it('returns status:pending for a signup-flow token instead of rejecting', async () => {
+      const token = signTestToken({ sub: 'u_2', aud: 'a_7', scope: 'openid' });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ id: 2, publicId: 'u_2', status: 'pending' });
+      mockTokenService.buildScopedClaims.mockResolvedValue({});
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ sub: 'u_2', status: 'pending' });
+    });
+
+    it('returns status:unverified for a just-registered user', async () => {
+      const token = signTestToken({ sub: 'u_3', aud: 'a_7', scope: 'openid' });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ id: 3, publicId: 'u_3', status: 'unverified' });
+      mockTokenService.buildScopedClaims.mockResolvedValue({});
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ sub: 'u_3', status: 'unverified' });
+    });
+
     it('cannot return a claim the token did not grant', async () => {
       const token = signTestToken({ sub: 'u_1', aud: 'a_7', scope: 'openid' });
       mockPrisma.saUser.findFirst.mockResolvedValue({ id: 1, publicId: 'u_1', status: 'active' });
@@ -1301,7 +1327,7 @@ describe('TokenController', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ sub: 'u_1' });
+      expect(res.body).toEqual({ sub: 'u_1', status: 'active' });
       expect(mockTokenService.buildScopedClaims).toHaveBeenCalledWith(expect.any(Number), 'openid');
     });
 

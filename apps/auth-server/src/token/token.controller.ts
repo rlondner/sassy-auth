@@ -823,12 +823,12 @@ export class TokenController {
     }
 
     const saUser = await prisma.saUser.findFirst({ where: { publicId: claims.sub } });
-    if (!saUser || saUser.status !== 'active') {
+    if (!saUser || saUser.status === 'inactive') {
       throw new UnauthorizedException(TokenErrorCode.USER_NOT_FOUND);
     }
 
     const scoped = await this.tokenService.buildScopedClaims(saUser.id, claims.scope ?? '');
-    return { sub: claims.sub, ...scoped };
+    return { sub: claims.sub, status: saUser.status, ...scoped };
   }
 
   /**
