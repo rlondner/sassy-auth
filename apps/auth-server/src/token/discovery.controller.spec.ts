@@ -3,8 +3,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { DiscoveryController } from './discovery.controller';
 import {
-  OAUTH_AS_METADATA_PATH,
-  OIDC_METADATA_PATH,
+  WELL_KNOWN_METADATA_PATHS,
   buildOAuthAuthorizationServerMetadata,
 } from './oauth-metadata';
 
@@ -29,10 +28,10 @@ describe('DiscoveryController', () => {
       controllers: [DiscoveryController],
     }).compile();
     const instance = moduleRef.createNestApplication();
-    // Mirror the production wiring in configure-nest-app.ts: the /api global
-    // prefix applies to everything EXCEPT the well-known discovery docs, which
-    // RFC 8414 and OIDC mandate be served at the host root.
-    instance.setGlobalPrefix('api', { exclude: [OAUTH_AS_METADATA_PATH, OIDC_METADATA_PATH] });
+    // Uses the same exported constant configure-nest-app.ts applies in
+    // production, rather than a locally-duplicated list, so this test can't
+    // silently drift from what's actually excluded from the /api prefix.
+    instance.setGlobalPrefix('api', { exclude: WELL_KNOWN_METADATA_PATHS });
     await instance.init();
     return instance;
   }

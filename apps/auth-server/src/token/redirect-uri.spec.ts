@@ -80,6 +80,17 @@ describe('assertRedirectUriAllowed — set-valued matching', () => {
     expect(() => assertRedirectUriAllowed('https://app.example.com/anything', app)).not.toThrow();
     expect(() => assertRedirectUriAllowed('https://evil.example.com/cb', app)).toThrow();
   });
+
+  it('rejects a trailing-slash variant of a registered URI — RFC 6749 §3.1.2.3 requires exact string matching', () => {
+    const app = {
+      url: 'https://app.example.com',
+      redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+    };
+
+    expect(() => assertRedirectUriAllowed('https://app.example.com/cb/', app)).toThrow(
+      BadRequestException,
+    );
+  });
 });
 
 describe('assertPostLogoutRedirectUriAllowed', () => {
