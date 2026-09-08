@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Button } from '@sassy-auth/ui'
+import { Button, Separator } from '@sassy-auth/ui'
 
 const LABEL_KEY: Record<string, string> = {
   google: 'socialGoogle',
@@ -117,9 +117,9 @@ export function SocialButtons({
         ))}
       </div>
       <div className="flex items-center gap-3">
-        <span className="h-px flex-1 bg-[var(--border)]" />
-        <span className="text-body-sm text-[var(--muted-foreground)]">{t('socialDivider')}</span>
-        <span className="h-px flex-1 bg-[var(--border)]" />
+        <Separator className="flex-1" />
+        <span className="text-body-sm text-muted-foreground">{t('socialDivider')}</span>
+        <Separator className="flex-1" />
       </div>
     </div>
   )
