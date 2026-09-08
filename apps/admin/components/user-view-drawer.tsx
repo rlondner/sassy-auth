@@ -260,7 +260,7 @@ export function UserViewDrawer({ user, orgs, open, onOpenChange, onSuccess }: Us
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
+      <SheetContent size="xl">
         <SheetHeader>
           <div>
             <SheetTitle>{user.firstName} {user.lastName}</SheetTitle>

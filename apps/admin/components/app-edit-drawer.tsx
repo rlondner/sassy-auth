@@ -205,7 +205,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
+      <SheetContent size="xl">
         <SheetHeader>
           <SheetTitle>{t('apps.drawer.editTitle')}</SheetTitle>
         </SheetHeader>

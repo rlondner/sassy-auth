@@ -136,7 +136,7 @@ export function UserCreateDrawer({ orgs, open, onOpenChange, onSuccess }: UserCr
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
+      <SheetContent size="lg">
         <SheetHeader>
           <div>
             <SheetTitle>{t('users.drawer.createTitle')}</SheetTitle>
