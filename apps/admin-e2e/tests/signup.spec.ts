@@ -41,9 +41,10 @@ test.describe('Signup', () => {
       password: 'Corr3ctHorseBattery!',
     })
 
-    await expect(signup.successMessage).toBeVisible()
+    await expect(page).toHaveURL(/\/signup\/check-email/)
+    await expect(signup.checkEmailTitle).toBeVisible()
 
-    await signup.continueToLoginLink.click()
+    await signup.backToLoginLink.click()
     await expect(page).toHaveURL(/\/login$/)
   })
 })
@@ -88,6 +89,7 @@ test.describe('Signup — per-app password policy override', () => {
       password: 'abcd1234',
     })
 
-    await expect(signup.successMessage).toBeVisible()
+    await expect(page).toHaveURL(/\/signup\/check-email/)
+    await expect(signup.checkEmailTitle).toBeVisible()
   })
 })
