@@ -14,6 +14,10 @@ jest.mock('@sassy-auth/db', () => ({
   },
 }));
 
+jest.mock('../activation/notify-activation', () => ({
+  notifyActivation: jest.fn().mockResolvedValue(undefined),
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saInvitation: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
@@ -23,6 +27,9 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saApp: { findUnique: jest.Mock };
   $transaction: jest.Mock;
 };
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockNotifyActivation = require('../activation/notify-activation').notifyActivation as jest.Mock;
 
 const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 const pastDate = new Date(Date.now() - 1000);
@@ -38,6 +45,7 @@ const validInvitation = {
     firstName: 'Jane',
     status: 'pending',
     betterAuthUserId: 'ba-jane',
+    orgId: 3,
     betterAuthUser: { id: 'ba-jane', email: 'jane@example.com' },
     org: { appId: 1 },
   },
@@ -124,6 +132,31 @@ describe('InvitationsService', () => {
       expect(mockPrisma.saUser.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'active' } }),
       );
+    });
+
+    it('notifies the activation webhook after the transaction commits', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(validInvitation);
+      mockPrisma.saInvitation.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.account.create.mockResolvedValue(undefined);
+      mockPrisma.saUser.update.mockResolvedValue(undefined);
+      mockPrisma.user.update.mockResolvedValue(undefined);
+
+      await service.acceptInvitation('abc123', 'NewPassword123!');
+
+      expect(mockNotifyActivation).toHaveBeenCalledWith({
+        id: validInvitation.user.id,
+        publicId: validInvitation.user.publicId,
+        orgId: validInvitation.user.orgId,
+      });
+    });
+
+    it('does not notify the activation webhook when the invitation claim loses the race', async () => {
+      mockPrisma.saInvitation.findUnique.mockResolvedValue(validInvitation);
+      mockPrisma.saInvitation.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.acceptInvitation('abc123', 'NewPassword123!')).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mockNotifyActivation).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when the atomic claim finds zero rows (lost race)', async () => {
