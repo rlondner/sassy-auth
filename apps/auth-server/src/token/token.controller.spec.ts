@@ -707,6 +707,7 @@ describe('TokenController', () => {
 
       const result = await controller.oauthToken(
         {
+          grant_type: 'authorization_code',
           code: 'valid-code',
           client_id: 'sqid-10',
           code_verifier: 'a'.repeat(64),
@@ -748,6 +749,7 @@ describe('TokenController', () => {
 
       const result = await controller.oauthToken(
         {
+          grant_type: 'authorization_code',
           code: 'valid-code',
           client_id: 'sqid-10',
           code_verifier: 'a'.repeat(64),
@@ -801,6 +803,7 @@ describe('TokenController', () => {
 
       await controller.oauthToken(
         {
+          grant_type: 'authorization_code',
           code: 'valid-code',
           client_id: 'sqid-10',
           code_verifier: 'a'.repeat(64),
@@ -836,6 +839,7 @@ describe('TokenController', () => {
       await expect(
         controller.oauthToken(
           {
+            grant_type: 'authorization_code',
             code: 'valid-code',
             client_id: 'sqid-10',
             code_verifier: 'a'.repeat(64),
@@ -1017,7 +1021,7 @@ describe('TokenController', () => {
           client_secret: 'right',
         });
 
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(200);
       expect(res.body.access_token).toBe('jwt-token');
     });
 
@@ -1060,7 +1064,7 @@ describe('TokenController', () => {
           client_secret: 'right', code_verifier: 'v'.repeat(64),
         });
 
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(200);
       // Both credentials were checked: the secret via verifyPassword, the
       // verifier via exchangeCode (PKCE lives inside OauthService).
       expect(mockVerifyPassword).toHaveBeenCalled();

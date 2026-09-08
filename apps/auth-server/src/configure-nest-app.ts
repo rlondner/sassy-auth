@@ -3,7 +3,7 @@ import helmet from 'helmet';
 import { TRUSTED_ORIGINS } from './auth/auth.config';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 import { LoggerService } from './common/logger/logger.service';
-import { NEST_GLOBAL_PREFIX, OAUTH_AS_METADATA_PATH } from './token/oauth-metadata';
+import { NEST_GLOBAL_PREFIX, WELL_KNOWN_METADATA_PATHS } from './token/oauth-metadata';
 
 // Shared Nest wiring used by main.ts and the e2e harness so the global prefix,
 // pipes, filters, and CORS allow-list can never drift between them. CORS is
@@ -23,9 +23,14 @@ export function configureNestApp(app: INestApplication, loggerService: LoggerSer
   // the strict CSP is only in effect in prod, where Swagger UI isn't
   // mounted anyway.
   app.use(helmet());
-  // RFC 8414 mandates the OAuth discovery doc be served at the host root, so
-  // exclude it from the /api global prefix.
-  app.setGlobalPrefix(NEST_GLOBAL_PREFIX, { exclude: [OAUTH_AS_METADATA_PATH] });
+  // RFC 8414 and OIDC Discovery mandate their well-known docs be served at
+  // the host root, so exclude them from the /api global prefix.
+  // bug (found by Task 12's e2e proof): OIDC_METADATA_PATH was added in
+  // Task 5 but never actually excluded here, so /.well-known/openid-configuration
+  // was silently served at /api/.well-known/openid-configuration instead —
+  // unit/controller tests never caught it because they don't apply the
+  // bootstrapped app's global prefix the way main.ts does.
+  app.setGlobalPrefix(NEST_GLOBAL_PREFIX, { exclude: WELL_KNOWN_METADATA_PATHS });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );

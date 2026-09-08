@@ -1,5 +1,10 @@
 {
   "mcpServers": {
+    "grove": {
+      "type": "stdio",
+      "command": "/home/raphael/.local/grove/bin/grove-mcp",
+      "args": ["--root=/home/raphael/github/sassy-auth"]
+    },
     "github": {
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp",

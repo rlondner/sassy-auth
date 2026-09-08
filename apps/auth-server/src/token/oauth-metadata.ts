@@ -90,6 +90,12 @@ export const OAUTH_LOGOUT_ROUTE = 'oauth/logout';
 // OIDC Discovery well-known URI. Like RFC 8414, served at the host root.
 export const OIDC_METADATA_PATH = '.well-known/openid-configuration';
 
+// Single source of truth for which well-known paths must bypass the /api
+// global prefix, consumed by both configure-nest-app.ts (which enforces it)
+// and discovery.controller.spec.ts (which verifies it) so the two cannot
+// silently drift apart again.
+export const WELL_KNOWN_METADATA_PATHS = [OAUTH_AS_METADATA_PATH, OIDC_METADATA_PATH];
+
 const SCOPES_SUPPORTED = ['openid', 'profile', 'email'] as const;
 const SUBJECT_TYPES_SUPPORTED = ['public'] as const;
 const ID_TOKEN_SIGNING_ALGS = ['RS256'] as const;

@@ -11,6 +11,7 @@
     "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.1.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
     "@opentelemetry/sdk-trace-base": "^2.11.0",
@@ -51,7 +52,8 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts",
-      "^server-only$": "<rootDir>/__mocks__/server-only.ts"
+      "^server-only$": "<rootDir>/__mocks__/server-only.ts",
+      "^@marsidev/react-turnstile$": "<rootDir>/__mocks__/turnstile.tsx"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(@sassy-auth)/)"
