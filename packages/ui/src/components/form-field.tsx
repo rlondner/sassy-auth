@@ -29,10 +29,14 @@ export function FormField({ label, error, hint, required, className, id, ...prop
   const describedBy = errorId ?? hintId
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <Label htmlFor={fieldId}>
-        {label}
-        {required && <span aria-hidden="true" className="ml-0.5 text-destructive">*</span>}
-      </Label>
+      <div className="flex items-center gap-0.5">
+        <Label htmlFor={fieldId}>{label}</Label>
+        {required && (
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        )}
+      </div>
       <Input id={fieldId} required={required} aria-invalid={!!error} aria-describedby={describedBy} {...props} />
       {hint && !error && (
         <p id={hintId} className="text-label-md text-muted-foreground">
