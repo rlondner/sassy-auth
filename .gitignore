@@ -58,3 +58,5 @@ packages/db/generated/
 /.roborev/
 # Local Claude Code settings (machine-specific)
 .claude/settings.local.json
+apps/admin/certificates/
+apps/admin/mkcert/
