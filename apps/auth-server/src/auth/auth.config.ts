@@ -116,6 +116,12 @@ export const auth = betterAuth({
     customRules: {
       '/two-factor/verify-totp': { window: 10, max: 3 },
       '/two-factor/verify-backup-code': { window: 10, max: 3 },
+      // The admin console's /signup/check-email page calls this endpoint
+      // directly from the browser (unauthenticated — see check-email-card.tsx)
+      // to resend the verification email. Without an explicit limit it falls
+      // back to better-auth's generic default, which is generous enough to
+      // let a client hammer an arbitrary inbox with verification emails.
+      '/send-verification-email': { window: 60, max: 3 },
     },
   },
   // bug-0186: BetterAuth creates a Session row on every successful
