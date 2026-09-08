@@ -575,6 +575,11 @@
       "resendError": "Impossible de renvoyer l'e-mail. Veuillez réessayer dans un instant.",
       "backToLogin": "Retour à la connexion"
     },
+    "verified": {
+      "title": "Adresse e-mail vérifiée",
+      "subtitle": "Votre compte est prêt. Vous pouvez maintenant vous connecter.",
+      "continueToLogin": "Continuer vers la connexion"
+    },
     "errors": {
       "passwordMismatch": "Les mots de passe ne correspondent pas.",
       "passwordTooShort": "Le mot de passe doit comporter au moins 12 caractères.",
