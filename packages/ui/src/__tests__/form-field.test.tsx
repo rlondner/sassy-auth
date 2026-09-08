@@ -25,6 +25,16 @@ describe('FormField', () => {
     expect(screen.queryByText('*')).not.toBeInTheDocument()
   })
 
+  it('forwards required to the underlying input element', () => {
+    render(<FormField label="Name" required />)
+    expect(screen.getByLabelText(/Name/)).toBeRequired()
+  })
+
+  it('does not mark the input required by default', () => {
+    render(<FormField label="Name" />)
+    expect(screen.getByLabelText('Name')).not.toBeRequired()
+  })
+
   it('shows the hint and links it via aria-describedby when there is no error', () => {
     render(<FormField label="Name" hint="Your full legal name" />)
     const input = screen.getByLabelText('Name')

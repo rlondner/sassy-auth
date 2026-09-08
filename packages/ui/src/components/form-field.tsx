@@ -33,7 +33,7 @@ export function FormField({ label, error, hint, required, className, id, ...prop
         {label}
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
-      <Input id={fieldId} aria-invalid={!!error} aria-describedby={describedBy} {...props} />
+      <Input id={fieldId} required={required} aria-invalid={!!error} aria-describedby={describedBy} {...props} />
       {hint && !error && (
         <p id={hintId} className="text-label-md text-muted-foreground">
           {hint}
