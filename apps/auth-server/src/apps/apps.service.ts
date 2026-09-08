@@ -104,6 +104,27 @@ function assertValidPasswordPolicyOverride(policy: PasswordPolicy): void {
   }
 }
 
+/**
+ * `notifyActivation`'s resolveDeliveryConfig requires BOTH webhookUrl and
+ * webhookSecret to be present before it will deliver anything — if only one
+ * is set, delivery silently no-ops forever with no error to the admin. This
+ * checks the *merged* post-PATCH state (existing stored values overlaid with
+ * whatever this DTO would change), since a PATCH might only touch one field
+ * while the other was already set (or left unset) by a previous PATCH.
+ */
+function assertWebhookConfigNotHalfSet(
+  existing: { webhookUrl: string | null | undefined; webhookSecret: string | null | undefined },
+  dto: { webhookUrl?: string | null; webhookSecret?: string | null },
+): void {
+  const finalUrl = dto.webhookUrl !== undefined ? dto.webhookUrl : (existing.webhookUrl ?? null);
+  const finalSecret = dto.webhookSecret !== undefined ? dto.webhookSecret : (existing.webhookSecret ?? null);
+  if (Boolean(finalUrl) !== Boolean(finalSecret)) {
+    throw new BadRequestException(
+      'webhookUrl and webhookSecret must both be set, or both cleared — a webhook cannot be configured with only one of the two',
+    );
+  }
+}
+
 function isPrismaCode(e: unknown, code: string): boolean {
   return typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === code;
 }
@@ -235,6 +256,10 @@ export class AppsService {
     if (existing.isPlatform) throw new ForbiddenException('Platform app cannot be modified');
     if (dto.redirectUris) assertValidRedirectUris(dto.redirectUris);
     if (dto.passwordPolicyOverride) assertValidPasswordPolicyOverride(dto.passwordPolicyOverride);
+    assertWebhookConfigNotHalfSet(
+      { webhookUrl: existing.webhookUrl, webhookSecret: existing.webhookSecret },
+      { webhookUrl: dto.webhookUrl, webhookSecret: dto.webhookSecret },
+    );
     // Validation must happen before any write, so this runs before the
     // transaction starts.
     const resolvedDefaultOrgId = await resolveDefaultOrgId(existing.id, dto.defaultOrgId);

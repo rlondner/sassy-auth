@@ -279,6 +279,41 @@ describe('AppsService', () => {
     expect(result.hasWebhookSecret).toBe(false);
   });
 
+  it('updateApp throws BadRequestException when setting only webhookUrl (webhookSecret still unset)', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, webhookUrl: null, webhookSecret: null });
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { webhookUrl: 'https://relying-party.example.com/webhooks/activation' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp throws BadRequestException when setting only webhookSecret (webhookUrl still unset)', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, webhookUrl: null, webhookSecret: null });
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { webhookSecret: 'whsec_abc123' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp succeeds setting only webhookUrl when webhookSecret was already set from a prior update', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, webhookUrl: null, webhookSecret: 'already-set-secret' });
+    mockPrisma.saApp.update.mockResolvedValue({
+      ...appRow,
+      webhookUrl: 'https://relying-party.example.com/webhooks/activation',
+      webhookSecret: 'already-set-secret',
+    });
+    const result = await service.updateApp('ba-caller', 'sq_1', {
+      webhookUrl: 'https://relying-party.example.com/webhooks/activation',
+    });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { webhookUrl: 'https://relying-party.example.com/webhooks/activation' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+    expect(result.webhookUrl).toBe('https://relying-party.example.com/webhooks/activation');
+    expect(result.hasWebhookSecret).toBe(true);
+  });
+
   it('getApp reports hasWebhookSecret without exposing the plaintext secret', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue({
       ...appRow,

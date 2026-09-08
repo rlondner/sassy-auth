@@ -347,6 +347,8 @@ export class UsersService {
       await prisma.session.deleteMany({ where: { userId: existing.betterAuthUserId } });
     }
 
+    // Only fire the activation webhook on a genuine transition into 'active'
+    // — guard against re-firing on a no-op re-save of an already-active user.
     if (dto.status === 'active' && existing.status !== 'active') {
       await notifyActivation({ id: existing.id, publicId: existing.publicId, orgId: existing.orgId });
     }

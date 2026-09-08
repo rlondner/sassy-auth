@@ -2,7 +2,6 @@ import * as crypto from 'crypto';
 import { prisma } from '@sassy-auth/db';
 
 const WEBHOOK_TIMEOUT_MS = 5000;
-const MAX_ATTEMPTS = 2;
 
 interface DeliveryConfig {
   webhookUrl: string;
@@ -28,6 +27,12 @@ async function postOnce(url: string, body: string, signature: string): Promise<{
       headers: { 'Content-Type': 'application/json', 'X-Sassy-Signature': `sha256=${signature}` },
       body,
       signal: controller.signal,
+      // SSRF: a webhook URL that later 302-redirects must not cause the
+      // signed request to be silently re-POSTed to wherever the redirect
+      // points (potentially an internal/private address). `redirect: 'error'`
+      // makes fetch reject instead of following it — handled below by the
+      // same catch block as any other network failure.
+      redirect: 'error',
     });
     if (res.ok) return { ok: true, error: null };
     return { ok: false, error: `HTTP ${res.status}` };

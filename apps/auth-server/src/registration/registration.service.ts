@@ -154,6 +154,9 @@ export class RegistrationService {
       // refuses a challenge-less code from a public client.
       let redirectUrl: string | undefined;
       if (app.clientSecretHash) {
+        // When an app has multiple registered login redirect URIs, there's no
+        // per-request way to indicate which one signup should target — pick
+        // the oldest-registered one deterministically.
         const loginRedirect = await prisma.saAppRedirectUri.findFirst({
           where: { appId: app.id, kind: 'login' },
           orderBy: { id: 'asc' },

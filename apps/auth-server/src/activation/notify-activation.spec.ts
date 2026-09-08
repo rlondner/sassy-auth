@@ -128,6 +128,28 @@ describe('notifyActivation', () => {
     await expect(notifyActivation(saUser)).resolves.toBeUndefined();
   });
 
+  it('logs activation_webhook_failed and never throws when fetch rejects on a redirect (redirect: "error")', async () => {
+    mockPrisma.saOrg.findUnique.mockResolvedValue({
+      app: { publicId: 'app_1', webhookUrl: 'https://rp.example.com/hooks', webhookSecret: 'whsec_test' },
+    });
+    // Simulates the fetch spec's behavior for `redirect: 'error'`: rather
+    // than returning a response, fetch rejects when the server answers with
+    // a redirect.
+    (global.fetch as jest.Mock).mockRejectedValue(new TypeError('unexpected redirect'));
+
+    await expect(notifyActivation(saUser)).resolves.toBeUndefined();
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    const [, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(options.redirect).toBe('error');
+    expect(mockPrisma.saAuditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: 'activation_webhook_failed',
+        reason: 'unexpected redirect',
+      }),
+    });
+  });
+
   it('never throws if the org/app lookup itself fails', async () => {
     mockPrisma.saOrg.findUnique.mockRejectedValue(new Error('db down'));
 
