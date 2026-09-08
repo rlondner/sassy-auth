@@ -13,6 +13,7 @@ import { generatePendingPublicId } from '../common/pending-public-id';
 import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password-policy';
 import { RegisterDto } from './register.dto';
 import { TurnstileService } from './turnstile.service';
+import { OauthService } from '../token/oauth.service';
 
 /**
  * BetterAuth (v1.6.x) throws an APIError instance when sign-up fails.
@@ -37,9 +38,10 @@ export class RegistrationService {
   constructor(
     private readonly sqids: SqidService,
     private readonly turnstile: TurnstileService,
+    private readonly oauthService: OauthService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<{ ok: true; orgPublicId: string }> {
+  async register(dto: RegisterDto): Promise<{ ok: true; orgPublicId: string; redirectUrl?: string }> {
     // 0. Verify the captcha before any app lookup or DB work
     const captchaOk = await this.turnstile.verify(dto.turnstileToken);
     if (!captchaOk) {
@@ -105,7 +107,7 @@ export class RegistrationService {
     // assign the app's default role if one is set.
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-      const org = await prisma.$transaction(async (tx: Tx) => {
+      const { org, saUserPublicId } = await prisma.$transaction(async (tx: Tx) => {
         let targetOrg: { id: number; publicId: string };
         if (defaultOrg) {
           targetOrg = defaultOrg;
@@ -135,7 +137,7 @@ export class RegistrationService {
         if (app.defaultRoleId) {
           await tx.saUserRole.create({ data: { userId: createdSaUser.id, roleId: app.defaultRoleId } });
         }
-        return targetOrg;
+        return { org: targetOrg, saUserPublicId: createdSaUser.publicId };
       });
 
       const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
@@ -143,7 +145,38 @@ export class RegistrationService {
         body: { email: dto.email, callbackURL: `${adminUrl}/signup/verified` },
       });
 
-      return { ok: true as const, orgPublicId: org.publicId };
+      // Authenticate the new (still-pending) user against the target app
+      // immediately, so it can redirect back with a working access token
+      // instead of waiting for email verification. Only possible when the
+      // app is confidential (has a client secret) and has a registered
+      // login redirect URI: a code minted here carries no PKCE challenge
+      // (there was no /authorize request to negotiate one), and /api/token
+      // refuses a challenge-less code from a public client.
+      let redirectUrl: string | undefined;
+      if (app.clientSecretHash) {
+        const loginRedirect = await prisma.saAppRedirectUri.findFirst({
+          where: { appId: app.id, kind: 'login' },
+          orderBy: { id: 'asc' },
+        });
+        if (loginRedirect) {
+          const code = await this.oauthService.generateCode(
+            saUserPublicId,
+            app.publicId,
+            loginRedirect.uri,
+            null,
+            null,
+            ['signup'],
+            null,
+            'openid profile email',
+            new Date(),
+          );
+          const url = new URL(loginRedirect.uri);
+          url.searchParams.set('code', code);
+          redirectUrl = url.toString();
+        }
+      }
+
+      return { ok: true as const, orgPublicId: org.publicId, ...(redirectUrl !== undefined && { redirectUrl }) };
     } catch (e: unknown) {
       // Compensation: delete the BetterAuth user so the email can be re-used
       await prisma.user.delete({ where: { id: baUserId } }).catch(() => {
