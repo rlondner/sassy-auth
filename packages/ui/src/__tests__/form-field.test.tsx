@@ -27,7 +27,7 @@ describe('FormField', () => {
 
   it('forwards required to the underlying input element', () => {
     render(<FormField label="Name" required />)
-    expect(screen.getByLabelText(/Name/)).toBeRequired()
+    expect(screen.getByLabelText('Name', { exact: false })).toBeRequired()
   })
 
   it('does not mark the input required by default', () => {
