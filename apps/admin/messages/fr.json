@@ -58,6 +58,12 @@
       "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système.",
       "requireTwoFactor": "Exiger l'authentification à deux facteurs",
       "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer.",
+      "defaultOrg": "Organisation par défaut",
+      "defaultOrgHint": "Les nouvelles inscriptions en libre-service sur cette application rejoignent automatiquement cette organisation au lieu d’en créer une nouvelle. Laissez vide pour que chaque inscription crée sa propre organisation.",
+      "defaultOrgNone": "Aucune — les inscriptions créent une nouvelle organisation",
+      "defaultRole": "Rôle par défaut",
+      "defaultRoleHint": "Attribué automatiquement à chaque inscription en libre-service sur cette application, qu’elle rejoigne l’organisation par défaut ou en crée une nouvelle.",
+      "defaultRoleNone": "Aucun — aucun rôle attribué",
       "socialProviders": "Connexion sociale",
       "socialProvidersHint": "Choisissez les fournisseurs d’identité sociale proposés sur l’écran de connexion de cette application.",
       "socialProviderNames": {
@@ -385,6 +391,7 @@
     "status": {
       "active": "Actif",
       "pending": "En attente",
+      "unverified": "Non vérifié",
       "inactive": "Inactif"
     },
     "noResults": "Aucun utilisateur trouvé.",
@@ -532,6 +539,7 @@
     "error": {
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
       "inactive": "Ce compte a été désactivé.",
+      "unverified": "Veuillez vérifier votre e-mail et cliquer sur le lien de vérification avant de vous connecter.",
       "serverUnavailable": "Le service de connexion est indisponible. Veuillez réessayer dans un instant.",
       "tooManyRequests": "Trop de tentatives de connexion. Veuillez patienter une minute et réessayer.",
       "invalidCode": "Code invalide ou expiré."
@@ -584,6 +592,8 @@
       "passwordMismatch": "Les mots de passe ne correspondent pas.",
       "passwordTooShort": "Le mot de passe doit comporter au moins 12 caractères.",
       "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
+      "captchaRequired": "Veuillez compléter le captcha avant de valider.",
+      "captchaFailed": "Nous n'avons pas pu vérifier que vous n'êtes pas un robot. Veuillez réessayer le captcha.",
       "appNotFound": "Nous n'avons pas trouvé l'application pour ce lien d'inscription.",
       "emailTaken": "Un compte existe déjà avec cette adresse e-mail.",
       "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
