@@ -227,6 +227,8 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
     - [Required](#required)
     - [Admin console](#admin-console)
     - [Rate limiting (optional)](#rate-limiting-optional)
+    - [Password policy (optional)](#password-policy-optional)
+    - [Signup captcha (optional)](#signup-captcha-optional)
     - [Observability (optional)](#observability-optional)
     - [Email (optional)](#email-optional)
     - [Test credentials (optional)](#test-credentials-optional)
@@ -460,6 +462,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `ADMIN_URL`           | Public URL of the admin console, used by the API to build invitation links. Default: `http://localhost:3001` |
 | `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `http://localhost:3000`      |
 | `PUBLIC_AUTH_SERVER_URL` | Optional. URL of the auth server as seen by the BROWSER, used to build the social sign-in redirect on the login page. Defaults to `AUTH_SERVER_URL`. Set separately when `AUTH_SERVER_URL` is an internal address (e.g. a docker-network hostname) the browser cannot resolve. |
+| `NEXT_PUBLIC_AUTH_SERVER_URL` | Same origin as `PUBLIC_AUTH_SERVER_URL`, but readable from CLIENT COMPONENT code — the `NEXT_PUBLIC_` prefix is required for Next.js to inline it into the browser bundle (plain server-only vars like `AUTH_SERVER_URL`/`PUBLIC_AUTH_SERVER_URL` are always `undefined` there). Used by the accept-invite and reset-password forms, which call the auth server directly from the browser. Default: `http://localhost:3000` |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | Comma-separated origins allowed by `/login?next=` redirect validation (in addition to `AUTH_SERVER_URL`). Default: empty |
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
 | `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
@@ -479,6 +482,29 @@ Two NestJS throttler buckets (`@nestjs/throttler`), applied globally, keyed per-
 | `AUTH_RATE_WINDOW_MS`    | Window length in milliseconds for `AUTH_RATE_LIMIT`.                     | `60000` (1 min) |
 
 See also [Self-serve Registration rate limiting](#rate-limiting) for the separate, differently-defaulted `REGISTER_RATE_LIMIT`/`REGISTER_RATE_WINDOW_MS` pair that guards `POST /api/register`.
+
+### Password policy (optional)
+
+Global password complexity policy applied to every self-serve signup, accept-invitation, and forgot-password reset. Any `SaApp` can fully override this via the admin console's app edit drawer (Password Policy section). Defaults below reproduce the policy that was hardcoded prior to this becoming configurable.
+
+| Variable                        | Description                              | Default |
+|----------------------------------|-------------------------------------------|---------|
+| `PASSWORD_MIN_LENGTH`            | Minimum password length                   | `12`    |
+| `PASSWORD_REQUIRE_UPPERCASE`     | Require at least one uppercase letter     | `true`  |
+| `PASSWORD_REQUIRE_LOWERCASE`     | Require at least one lowercase letter     | `true`  |
+| `PASSWORD_REQUIRE_NUMBER`        | Require at least one number               | `true`  |
+| `PASSWORD_REQUIRE_SPECIAL`       | Require at least one special character    | `false` |
+| `PASSWORD_MIN_NUMBERS`           | Minimum count of numeric characters       | `1`     |
+| `PASSWORD_MIN_SPECIAL`           | Minimum count of special characters       | `0`     |
+
+### Signup captcha (optional)
+
+Cloudflare Turnstile widget shown on the admin console's `/signup` page. `TURNSTILE_SECRET_KEY` is verified server-side only and never exposed to the browser; leaving it unset fails every signup captcha check closed (`POST /api/register` always rejects with `422`).
+
+| Variable                          | Description |
+|-------------------------------------|--------------|
+| `TURNSTILE_SECRET_KEY`              | Secret key for verifying `/signup`'s captcha, auth-server only. For local dev/test/CI, use Cloudflare's documented always-pass test secret key: `1x0000000000000000000000000000000AA` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`    | Public site key for the admin `/signup` Turnstile widget — inlined into the client bundle by the `NEXT_PUBLIC_` prefix, safe to expose. For local dev/test/CI, use Cloudflare's documented always-pass test site key: `1x00000000000000000000AA` (paired with `TURNSTILE_SECRET_KEY` above) |
 
 ### Observability (optional)
 

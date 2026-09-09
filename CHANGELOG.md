@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-09
+
+Local `dev` had drifted 5 commits behind `origin/dev` (fast-forwarded
+cleanly to `53b2360` "feat(admin): add responsive sheet width tiers, ship
+HCI review doc"). This run reviewed the still-open `feat/activation-webhook`
+(PR #378) and the recently-rewritten admin login/reset-password/
+forgot-password forms, finding two bugs — both fixed with normal PRs
+against `dev`. Also flagged: a growing backlog of unmerged PRs on `dev`
+(seven open as of today, several from 2026-09-08 still unmerged) and an
+orphaned local worktree with in-progress, uncommitted work on the same
+webhook-SSRF area bug-0285 also touches. See
+[BUGS_2026-09-09.md](./docs/history/bugs/BUGS_2026-09-09.md) and
+[TODO_2026-09-09.md](./docs/history/todo/TODO_2026-09-09.md).
+
+### Fixed (2 bugs)
+
+- **bug-0285** (High) — `isAppUrlAllowed()`
+  (`apps/auth-server/src/common/config/app-url-policy.ts`) only rejected
+  `http://`, `localhost`/`*.localhost`, and the two literal loopback
+  addresses — any other dotted hostname passed, including RFC 1918 private
+  ranges, RFC 3927 link-local space, and the `169.254.169.254`
+  cloud-metadata address. A tenant-scoped app admin could point an app's
+  `url` (or the not-yet-merged PR #378's `webhookUrl`) at an internal
+  address, making any future server-side request to it an SSRF vector.
+  Added private-IP-literal range checks (IPv4 and IPv6) alongside the
+  existing loopback/localhost guards. PR #383.
+- **bug-0286** (Medium) — `apps/admin/messages/fr.json` was missing 10
+  keys present in `en.json` (`login.error.unverified`,
+  `users.status.unverified`, `apps.fields.defaultOrg*`/`defaultRole*`,
+  `signup.errors.captcha*`), causing untranslated fallback text for
+  French-locale users on the login-error, users-table, app-config, and
+  signup-captcha screens — the second time this bug class has shipped in a
+  few days. Added the missing keys plus a `messages-parity.test.ts`
+  regression test asserting the two locale files stay in sync. PR #384.
+
+### Docs
+
+- Daily code review bundle for 2026-09-09 (this entry, plus
+  `TODO_2026-09-09.md`, `BUGS_2026-09-09.md`, and a README sync adding
+  `NEXT_PUBLIC_AUTH_SERVER_URL` plus new "Password policy" and "Signup
+  captcha" sections documenting `PASSWORD_*`, `TURNSTILE_SECRET_KEY`, and
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — all already in `.env.example` but
+  missing from the README's Environment Variables table).
+
 ## [Unreleased] — 2026-09-04
 
 CI now runs on PRs targeting `dev`, not just `master` (`33e074c`). The
