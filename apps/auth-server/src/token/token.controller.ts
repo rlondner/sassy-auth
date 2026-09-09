@@ -486,7 +486,18 @@ export class TokenController {
     // The code was issued at /authorize time when the user was active, but they
     // could have been deactivated between /authorize and /token. Re-check here
     // so a mid-flow status change is honored.
-    if (saUser.status !== 'active') {
+    //
+    // Exception: a signup-flow code (amr=['signup'], minted directly by
+    // RegistrationService rather than through an authenticated /authorize
+    // request) is allowed to redeem for a still-pending/unverified account,
+    // so a freshly-registered user gets a working token before email
+    // verification. It still can't redeem for a since-disabled account.
+    const isSignupCode = exchangedAmr.includes('signup');
+    if (isSignupCode) {
+      if (saUser.status === 'inactive') {
+        throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+      }
+    } else if (saUser.status !== 'active') {
       throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
     }
 
@@ -812,12 +823,12 @@ export class TokenController {
     }
 
     const saUser = await prisma.saUser.findFirst({ where: { publicId: claims.sub } });
-    if (!saUser || saUser.status !== 'active') {
+    if (!saUser || saUser.status === 'inactive') {
       throw new UnauthorizedException(TokenErrorCode.USER_NOT_FOUND);
     }
 
     const scoped = await this.tokenService.buildScopedClaims(saUser.id, claims.scope ?? '');
-    return { sub: claims.sub, ...scoped };
+    return { sub: claims.sub, status: saUser.status, ...scoped };
   }
 
   /**

@@ -19,6 +19,7 @@ import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
 import { readIsPrivateEmail } from '../social/apple-private-relay-context';
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
+import { notifyActivation } from '../activation/notify-activation';
 import { getGlobalPasswordPolicy, resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH } from './password-policy';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
@@ -349,10 +350,17 @@ export const auth = betterAuth({
       // No-op for any status other than 'unverified' — a 'pending' user
       // (invitation, no credential) or an already-'active' user verifying an
       // email through some future path must not be silently promoted.
-      await prisma.saUser.updateMany({
+      const promoted = await prisma.saUser.updateMany({
         where: { betterAuthUserId: updatedUser.id, status: 'unverified' },
         data: { status: 'active' },
       });
+      if (promoted.count > 0) {
+        const saUser = await prisma.saUser.findUnique({
+          where: { betterAuthUserId: updatedUser.id },
+          select: { id: true, publicId: true, orgId: true },
+        });
+        if (saUser) await notifyActivation(saUser);
+      }
     },
     autoSignInAfterVerification: false, // consistent with emailAndPassword.autoSignIn: false above
   },
