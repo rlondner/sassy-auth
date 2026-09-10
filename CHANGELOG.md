@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-10
+
+Only one commit landed on `dev` in the last 24 hours: `ccf2cea`,
+renumbering the auth-server's default port from `3000` to `3010`
+across ~90 files (`.env.example`, Docker/Compose, CI, the Playwright
+e2e fixtures, `.flox/`, and docs). The port renumber itself is fine,
+but the same find/replace also swapped every touched
+`http://localhost:3000` default to `https://localhost:3010` — the
+auth-server (`apps/auth-server/src/main.ts`) never gained TLS support,
+so it only ever serves plain HTTP. Fixed with a normal PR against
+`dev`. See [BUGS_2026-09-10.md](./docs/history/bugs/BUGS_2026-09-10.md)
+and [TODO_2026-09-10.md](./docs/history/todo/TODO_2026-09-10.md).
+
+### Fixed (1 bug)
+
+- **bug-0287** (High) — every operational default that pointed at
+  `https://localhost:3010` (`.env.example`, `docker-compose.yml`,
+  `docker/entrypoint.sh`, `.github/workflows/e2e.yml`, the Playwright
+  e2e fixtures' fallback URLs, `.flox/env/manifest.{toml,lock}`,
+  `README.md`, `BEGINNER_README.md`) reverted to `http://`, matching
+  what the server actually serves. PR #386.
+
+### Internal
+
+- Daily review docs bundle. `docs/history/code_reviews/CR_2026-09-10.md`
+  replaces a stale copy left by an earlier failed attempt at today's
+  review (sandbox shell mount error, no commits reviewed).
+
 ## [Unreleased] — 2026-09-04
 
 CI now runs on PRs targeting `dev`, not just `master` (`33e074c`). The
