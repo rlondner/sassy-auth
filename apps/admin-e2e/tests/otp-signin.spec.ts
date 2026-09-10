@@ -3,7 +3,7 @@ import { LoginPage } from '../pages/login.page'
 
 const ACTIVE_ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 's@sa.io'
 
-const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 test.describe('email-OTP sign-in', () => {
   test('active user signs in with an emailed code', async ({ page }) => {

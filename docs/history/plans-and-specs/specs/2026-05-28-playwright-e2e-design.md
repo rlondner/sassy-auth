@@ -77,7 +77,7 @@ apps/admin-e2e/
                        │ fetch with cookies forwarded
                        ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ apps/auth-server (NestJS + BetterAuth, port 3000)                    │
+│ apps/auth-server (NestJS + BetterAuth, port 3010)                    │
 │  /api/auth/sign-in/email     issues better-auth.session_token cookie │
 │  /api/auth/get-session       validates cookie for middleware         │
 └──────────────────────────────────────────────────────────────────────┘

@@ -31,12 +31,12 @@ describe('app-url-policy', () => {
       expect(isAppUrlAllowed('http://app.example.com')).toBe(false);
     });
     it('rejects localhost and *.localhost', () => {
-      expect(isAppUrlAllowed('https://localhost:3000')).toBe(false);
+      expect(isAppUrlAllowed('https://localhost:3010')).toBe(false);
       expect(isAppUrlAllowed('https://api.localhost')).toBe(false);
     });
     it('rejects loopback IPs', () => {
-      expect(isAppUrlAllowed('https://127.0.0.1:3000')).toBe(false);
-      expect(isAppUrlAllowed('http://[::1]:3000')).toBe(false);
+      expect(isAppUrlAllowed('https://127.0.0.1:3010')).toBe(false);
+      expect(isAppUrlAllowed('http://[::1]:3010')).toBe(false);
     });
     it('rejects bare host with no dot', () => {
       expect(isAppUrlAllowed('https://intranet')).toBe(false);
@@ -52,7 +52,7 @@ describe('app-url-policy', () => {
   describe('isAppUrlAllowed (insecure mode)', () => {
     beforeEach(() => { process.env.SASSY_AUTH_ALLOW_INSECURE_APP_URLS = 'true'; });
     it('accepts http localhost', () => {
-      expect(isAppUrlAllowed('http://localhost:3000/cb')).toBe(true);
+      expect(isAppUrlAllowed('https://localhost:3010/cb')).toBe(true);
     });
     it('accepts loopback IP', () => {
       expect(isAppUrlAllowed('http://127.0.0.1:8080')).toBe(true);

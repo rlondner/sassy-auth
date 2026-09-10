@@ -4,13 +4,13 @@ import path from 'path'
 
 const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
-const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
 const STUB_IDP_URL = process.env.E2E_STUB_IDP_URL ?? 'http://localhost:9099'
 
 // task-13: ports for the three local webServer processes below are derived
 // from the *_URL constants above rather than hardcoded, so the whole suite
-// can be pointed at alternate ports (e.g. when 3000/3001/8010 are already
+// can be pointed at alternate ports (e.g. when 3010/3001/8010 are already
 // bound by an unrelated docker stack on this machine) purely via env vars —
 // no source edit needed per run. Two call sites previously hardcoded a
 // literal port despite the corresponding *_URL already being configurable:
@@ -19,7 +19,7 @@ const STUB_IDP_URL = process.env.E2E_STUB_IDP_URL ?? 'http://localhost:9099'
 // editing admin's package.json: `pnpm --filter @sassy-auth/admin exec next
 // start --port <PORT>` calls the local `next` binary directly, bypassing the
 // package.json script's own hardcoded flag entirely.
-const AUTH_SERVER_PORT = new URL(AUTH_SERVER_URL).port || '3000'
+const AUTH_SERVER_PORT = new URL(AUTH_SERVER_URL).port || '3010'
 const ADMIN_PORT = new URL(ADMIN_URL).port || '3001'
 const RS_PORT = new URL(RS_BASE_URL).port || '8010'
 
@@ -140,8 +140,8 @@ export default defineConfig({
           env: {
             NODE_ENV: 'test',
             E2E_STUB_IDP_URL: STUB_IDP_URL,
-            // task-13: without this the auth-server always binds 3000
-            // (main.ts: `app.listen(process.env.PORT ?? 3000)`), which
+            // task-13: without this the auth-server always binds 3010
+            // (main.ts: `app.listen(process.env.PORT ?? 3010)`), which
             // breaks AUTH_SERVER_URL-based port overrides.
             PORT: AUTH_SERVER_PORT,
           },

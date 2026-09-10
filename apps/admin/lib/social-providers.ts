@@ -1,4 +1,4 @@
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 /**
  * Ask the auth-server which provider buttons this app shows. `next` is the

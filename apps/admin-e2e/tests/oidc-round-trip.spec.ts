@@ -22,7 +22,7 @@ import { test, expect } from '@playwright/test';
 import * as client from 'openid-client';
 import { loginAsSeedAdmin } from '../lib/admins';
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000';
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010';
 
 test('a stock openid-client completes the full OIDC round trip', async ({ page, request }) => {
   // Discovery — no hand-written endpoint URLs anywhere in this test.

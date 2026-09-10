@@ -4,7 +4,7 @@ import { AuthCard } from '@sassy-auth/ui'
 import type { PasswordPolicy } from '@/lib/types'
 import { SignupForm } from './signup-form'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export const dynamic = 'force-dynamic'
 

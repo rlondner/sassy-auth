@@ -409,7 +409,7 @@ Every redirect URI is `{BETTER_AUTH_URL}/api/auth/callback/{provider}`.
 **Google** — free. Cloud Console → new project → *APIs & Services → Credentials →
 OAuth client ID → Web application*; consent screen External with your address as
 a test user (no verification review needed while in Testing). Redirect URI
-`http://localhost:3000/api/auth/callback/google` (plain-HTTP localhost is
+`https://localhost:3010/api/auth/callback/google` (plain-HTTP localhost is
 permitted).
 
 | Console value | Env var |
@@ -419,7 +419,7 @@ permitted).
 
 **Microsoft** — free. Entra admin center → *App registrations → New
 registration*; platform **Web**, redirect
-`http://localhost:3000/api/auth/callback/microsoft`; then *Certificates & secrets
+`https://localhost:3010/api/auth/callback/microsoft`; then *Certificates & secrets
 → New client secret* (max 24-month expiry — record the date, it will expire).
 
 | Portal value | Env var |

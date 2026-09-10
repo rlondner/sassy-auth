@@ -26,7 +26,7 @@ What it shows end-to-end:
 - Python 3.11 or newer.
 - [`uv`](https://docs.astral.sh/uv/) for dependency management (the lockfile is checked in).
 - A running SassyAuth stack:
-  - `auth-server` on `http://localhost:3000`
+  - `auth-server` on `https://localhost:3010`
   - `admin` console on `http://localhost:3001`
   - PostgreSQL with the migrations applied
 - A browser-facing URL for this FastAPI app whose **origin** (scheme + host + port) matches the `url` field of the `resourceserver01` app row in the SassyAuth database. The auth-server enforces an origin match between the `redirect_uri` you send and the app's registered `url` — if they differ, the authorize call returns `400 invalid_redirect_uri`. Either:
@@ -43,7 +43,7 @@ cp apps/resource-server-fastapi/.env.example apps/resource-server-fastapi/.env
 
 | Variable                  | Required | Description                                                                                                                                                |
 |---------------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `AUTH_SERVER_URL`         | yes      | Where this app reaches the SassyAuth API (JWKS fetch, token exchange). Same value as the auth-server's own `BETTER_AUTH_URL`. Default: `http://localhost:3000`. |
+| `AUTH_SERVER_URL`         | yes      | Where this app reaches the SassyAuth API (JWKS fetch, token exchange). Same value as the auth-server's own `BETTER_AUTH_URL`. Default: `https://localhost:3010`. |
 | `ADMIN_URL`               | yes      | Where this app sends the browser to authenticate. Default: `http://localhost:3001`.                                                                        |
 | `SASSY_CLIENT_ID`         | yes      | The `publicId` (Sqid) of the `resourceserver01` row in `sa_app`. Look it up in the admin console at `http://localhost:3001/apps` after seeding. There is no fixed value — it depends on the row's auto-increment id and the `SQIDS_ALPHABET` setting in your SassyAuth `.env.local`. |
 | `RS_BASE_URL`             | yes      | The browser-facing base URL of this app. Must match the `url` registered on the `resourceserver01` `sa_app` row.                                            |
@@ -98,7 +98,7 @@ On the same `/apps` page, copy the `resourceserver01` row's **publicId** (a shor
 ### 4. Fill in the remaining env vars
 
 ```dotenv
-AUTH_SERVER_URL=http://localhost:3000
+AUTH_SERVER_URL=https://localhost:3010
 ADMIN_URL=http://localhost:3001
 SASSY_CLIENT_ID=<the publicId you copied>
 RS_BASE_URL=http://localhost:8010

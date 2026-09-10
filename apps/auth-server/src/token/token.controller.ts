@@ -523,13 +523,15 @@ export class TokenController {
       pkceMethod: 'S256',
     });
 
-    return {
+    const oauthTokenResponse = {
       access_token: token,
       token_type: 'Bearer',
       expires_in: 3600,
       scope: exchanged.scope,
       ...(idToken ? { id_token: idToken } : {}),
     };
+    console.log('[oauth/token response]', oauthTokenResponse);
+    return oauthTokenResponse;
   }
 
   /**

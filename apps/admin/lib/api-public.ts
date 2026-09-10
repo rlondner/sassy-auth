@@ -8,7 +8,7 @@ import type { InvitationInfo, PasswordPolicy } from './types'
 // reading them here would always be undefined in the browser and silently
 // fall back to localhost in every real deployment. Only NEXT_PUBLIC_-
 // prefixed vars are statically inlined at build time, hence the separate var.
-const BASE = process.env.NEXT_PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const BASE = process.env.NEXT_PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export async function validateInvitation(token: string): Promise<InvitationInfo> {
   const res = await fetch(`${BASE}/api/invitations/${encodeURIComponent(token)}`)

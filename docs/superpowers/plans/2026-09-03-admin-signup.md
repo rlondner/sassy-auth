@@ -444,7 +444,7 @@ Create `apps/admin/app/signup/actions.ts`:
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export interface RegisterInput {
   clientId: string
@@ -952,7 +952,7 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { SignupForm } from './signup-form'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export const dynamic = 'force-dynamic'
 

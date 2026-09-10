@@ -3,7 +3,7 @@
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 
 export async function requestPasswordResetAction(formData: FormData): Promise<{ done: true }> {

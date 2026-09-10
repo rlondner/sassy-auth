@@ -65,6 +65,6 @@ COPY --from=build /app/packages/types/package.json ./packages/types/package.json
 COPY docker/entrypoint-auth-server-prod.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 3000
+EXPOSE 3010
 
 ENTRYPOINT ["/entrypoint.sh"]

@@ -102,7 +102,7 @@ async function bootstrap() {
   // (better-auth/dist/context/create-context.mjs); it never sets
   // `Access-Control-Allow-Origin`. Verified live: an OPTIONS preflight to
   // `/api/auth/sign-in/social` from a cross-origin admin (its own port,
-  // e.g. :3001 talking to the auth-server's :3000 — the exact topology
+  // e.g. :3001 talking to the auth-server's :3010 — the exact topology
   // TRUSTED_ORIGINS/.env.local already documents as the deployment
   // default) returned a bare 404, and the browser then blocked the actual
   // POST with "No 'Access-Control-Allow-Origin' header is present". That
@@ -190,8 +190,8 @@ async function bootstrap() {
     });
   }
 
-  await app.listen(process.env.PORT ?? 3000);
-  loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3000}`, 'Bootstrap');
+  await app.listen(process.env.PORT ?? 3010);
+  loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3010}`, 'Bootstrap');
 }
 
 bootstrap().catch((err) => {

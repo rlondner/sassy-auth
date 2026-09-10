@@ -114,8 +114,8 @@ When it settles, open <http://localhost:3001/login> and sign in as `s@sa.io` / `
 | | |
 |---|---|
 | Admin console | <http://localhost:3001/login> |
-| Auth server | <http://localhost:3000> |
-| API docs (Swagger) | <http://localhost:3000/api/docs> |
+| Auth server | <https://localhost:3010> |
+| API docs (Swagger) | <https://localhost:3010/api/docs> |
 | Mailpit — invitation + reset emails | <http://localhost:8025> |
 
 Uncomment `SEED_DEMO` in `docker-compose.yml` to also seed the app, org, roles, and users the [FastAPI sample resource server](#sample-resource-server-fastapi) expects.
@@ -160,7 +160,7 @@ Without Flox, follow [Getting Started](#getting-started) instead.
 **Mint your first token**, once an app and a user exist:
 
 ```bash
-curl -X POST http://localhost:3000/api/token/direct/login \
+curl -X POST https://localhost:3010/api/token/direct/login \
   -H "Content-Type: application/json" \
   -d '{"identifier":"user@example.com","password":"s3cr3t","appId":"<appPublicId>"}'
 ```
@@ -169,7 +169,7 @@ curl -X POST http://localhost:3000/api/token/direct/login \
 { "access_token": "<RS256 JWT>", "token_type": "Bearer", "expires_in": 3600 }
 ```
 
-Verify it in your resource server against `http://localhost:3000/api/token/jwks` — see [JWKS and Token Verification](#jwks-and-token-verification), or run the [FastAPI sample](#sample-resource-server-fastapi) for a complete working consumer.
+Verify it in your resource server against `https://localhost:3010/api/token/jwks` — see [JWKS and Token Verification](#jwks-and-token-verification), or run the [FastAPI sample](#sample-resource-server-fastapi) for a complete working consumer.
 
 ---
 
@@ -269,7 +269,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 
 ## Project Structure
 
-Built as a Turborepo + pnpm monorepo. Two apps — `auth-server` (NestJS, port 3000) and `admin` (Next.js, port 3001) — plus a Python reference consumer, over three shared packages: `db` (Prisma), `types`, and `ui` (Tailwind + Radix design system).
+Built as a Turborepo + pnpm monorepo. Two apps — `auth-server` (NestJS, port 3010) and `admin` (Next.js, port 3001) — plus a Python reference consumer, over three shared packages: `db` (Prisma), `types`, and `ui` (Tailwind + Radix design system).
 
 <details>
 <summary><strong>Full directory tree</strong></summary>
@@ -277,7 +277,7 @@ Built as a Turborepo + pnpm monorepo. Two apps — `auth-server` (NestJS, port 3
 ```
 sassy-auth/
   apps/
-    auth-server/             # NestJS (Express adapter) — main API (port 3000)
+    auth-server/             # NestJS (Express adapter) — main API (port 3010)
       src/
         auth/                # BetterAuth integration and guard
         token/               # JWT issuance: OAuth2 and direct login flows
@@ -360,9 +360,9 @@ At minimum, set:
 - `DATABASE_URL`
 - `RSA_PRIVATE_KEY`, `RSA_PUBLIC_KEY` (see [RSA Key Pair Generation](#rsa-key-pair-generation))
 - `BETTER_AUTH_SECRET` (32+ random chars)
-- `BETTER_AUTH_URL` (e.g. `http://localhost:3000`)
+- `BETTER_AUTH_URL` (e.g. `https://localhost:3010`)
 - `ADMIN_URL` (e.g. `http://localhost:3001`) — used to build invitation URLs sent by the API
-- `AUTH_SERVER_URL` (e.g. `http://localhost:3000`) — used by the admin Server Actions
+- `AUTH_SERVER_URL` (e.g. `https://localhost:3010`) — used by the admin Server Actions
 
 See [Environment Variables](#environment-variables) for the full list.
 
@@ -408,13 +408,13 @@ The seed script is idempotent — safe to run multiple times. It creates:
 **All apps in parallel (recommended):**
 
 ```bash
-pnpm dev          # turbo runs auth-server (3000) and admin (3001) together
+pnpm dev          # turbo runs auth-server (3010) and admin (3001) together
 ```
 
 **Or each app individually:**
 
 ```bash
-pnpm --filter @sassy-auth/auth-server dev      # port 3000
+pnpm --filter @sassy-auth/auth-server dev      # port 3010
 pnpm --filter @sassy-auth/admin dev            # port 3001
 ```
 
@@ -445,7 +445,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `RSA_PUBLIC_KEY`      | Base64-encoded SPKI PEM public key (served via JWKS endpoint)  |
 | `JWT_KEY_ID`          | `kid` written into every issued JWT header and the JWKS document. Resource servers use it to pick the right key from the JWKS. Rotate together with the RSA key pair. Default: `sassy-auth-1` |
 | `BETTER_AUTH_SECRET`  | Random string, 32+ characters                                  |
-| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`. Also used as the JWT `iss` claim. |
+| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `https://localhost:3010`. Also used as the JWT `iss` claim. |
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
 | `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
 | `SEED_ADMIN_PASSWORD` | Password given to every account created by the seed scripts. Falls back to `E2E_ADMIN_PASSWORD`, then to the documented dev default `Pass@word1234`. **Required when `NODE_ENV` is anything other than `development` or `test`** — the seed throws rather than provision admins with a publicly known password. |
@@ -458,7 +458,7 @@ Copy the two output lines directly into your `.env.local` file.
 | Variable              | Description                                                                                |
 |-----------------------|--------------------------------------------------------------------------------------------|
 | `ADMIN_URL`           | Public URL of the admin console, used by the API to build invitation links. Default: `http://localhost:3001` |
-| `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `http://localhost:3000`      |
+| `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `https://localhost:3010`      |
 | `PUBLIC_AUTH_SERVER_URL` | Optional. URL of the auth server as seen by the BROWSER, used to build the social sign-in redirect on the login page. Defaults to `AUTH_SERVER_URL`. Set separately when `AUTH_SERVER_URL` is an internal address (e.g. a docker-network hostname) the browser cannot resolve. |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | Comma-separated origins allowed by `/login?next=` redirect validation (in addition to `AUTH_SERVER_URL`). Default: empty |
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
@@ -596,7 +596,7 @@ A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_r
 **Step 4 — Exchange the code + verifier for a JWT**
 
 ```bash
-curl -X POST http://localhost:3000/api/token/oauth/token \
+curl -X POST https://localhost:3010/api/token/oauth/token \
   -H "Content-Type: application/json" \
   -d '{
     "code": "<authorization-code>",
@@ -625,7 +625,7 @@ Authorization codes are single-use and stored in the database (`SaOauthCode` tab
 Use this flow for first-party apps and management UIs that collect credentials directly without a browser redirect.
 
 ```bash
-curl -X POST http://localhost:3000/api/token/direct/login \
+curl -X POST https://localhost:3010/api/token/direct/login \
   -H "Content-Type: application/json" \
   -d '{
     "identifier": "user@example.com",
@@ -698,7 +698,7 @@ The `id_token` is RS256-signed with the same key as the access token and JWKS do
 **`/userinfo`.** `GET /api/token/oauth/userinfo` with `Authorization: Bearer <access_token>` returns the same scope-gated identity claims as the `id_token`, derived from the presented token's own `scope` claim — it can never return more than the token was granted:
 
 ```bash
-curl http://localhost:3000/api/token/oauth/userinfo \
+curl https://localhost:3010/api/token/oauth/userinfo \
   -H "Authorization: Bearer <access_token>"
 ```
 
@@ -715,7 +715,7 @@ Resource servers must never trust JWTs blindly. Verify the signature using the p
 **Fetch the JWKS document:**
 
 ```bash
-curl http://localhost:3000/api/token/jwks
+curl https://localhost:3010/api/token/jwks
 ```
 
 ```json
@@ -762,7 +762,7 @@ const jwksClient = require('jwks-rsa');
 const jwt = require('jsonwebtoken');
 
 const client = jwksClient({
-  jwksUri: 'http://localhost:3000/api/token/jwks',
+  jwksUri: 'https://localhost:3010/api/token/jwks',
 });
 
 function getKey(header, callback) {
@@ -1004,7 +1004,7 @@ uvicorn app.main:app --port 8010 --reload
 
 | Variable              | Description                                                   |
 |-----------------------|---------------------------------------------------------------|
-| `AUTH_SERVER_URL`     | SassyAuth base URL (default `http://localhost:3000`)          |
+| `AUTH_SERVER_URL`     | SassyAuth base URL (default `https://localhost:3010`)          |
 | `ADMIN_URL`           | Admin console URL for login redirect (default `http://localhost:3001`) |
 | `SASSY_CLIENT_ID`     | `sa_app.publicId` for this resource server (from seed output) |
 | `RS_BASE_URL`         | Public URL of this server (e.g. `http://localhost:8010`)      |
@@ -1045,7 +1045,7 @@ All CRUD operations (create, update, delete) show success toast notifications vi
 
 i18n is wired with `next-intl` (locales: `en`, `fr`). Strings live in `apps/admin/messages/`. The active locale is detected from the `Accept-Language` header and can be overridden via the `LocaleSwitcher` in the shell.
 
-The admin console talks to `auth-server` via `AUTH_SERVER_URL` (default `http://localhost:3000`). All API calls forward the BetterAuth session cookie via the helpers in `apps/admin/lib/api.ts`.
+The admin console talks to `auth-server` via `AUTH_SERVER_URL` (default `https://localhost:3010`). All API calls forward the BetterAuth session cookie via the helpers in `apps/admin/lib/api.ts`.
 
 The login page supports a `next=<url>` query parameter for post-login redirect (e.g., from a resource server's OAuth flow). URLs are validated against an allowlist (`AUTH_SERVER_URL` + `LOGIN_NEXT_ALLOWED_ORIGINS` env var) to prevent open redirects.
 

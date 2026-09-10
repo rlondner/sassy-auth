@@ -10,7 +10,7 @@
 
 SassyAuth is a multitenant auth/authz server. The platform admin needs a web UI to manage users, orgs, apps, roles, and permissions. This spec covers the **user management section** of that admin console, including the monorepo structure and design system that will serve all five management sections.
 
-The backend is a NestJS `auth-server` app (port 3000) with a fully-defined OpenAPI (`docs/api/openapi.yaml`). The admin UI calls it directly via BetterAuth session cookies.
+The backend is a NestJS `auth-server` app (port 3010) with a fully-defined OpenAPI (`docs/api/openapi.yaml`). The admin UI calls it directly via BetterAuth session cookies.
 
 ---
 
@@ -131,7 +131,7 @@ Three variants on shadcn `Badge`:
 |---|---|---|---|---|
 | `active` | `#dce9ff` (surface-container-high) | `#3525cd` (primary) | indigo | Signed up, can log in |
 | `pending` | `#fef3c7` (amber-100) | `#92400e` (amber-800) | `#d97706` (amber-600) | Invited, not yet registered |
-| `inactive` | `#ffdad6` (error-container) | `#93000a` (on-error-container) | `#ba1a1a` (error) | Disabled / deactivated |
+| `inactive` | `#ffdad6` (error-container) | `#93010a` (on-error-container) | `#ba1a1a` (error) | Disabled / deactivated |
 
 ---
 
@@ -369,7 +369,7 @@ All `fetch()` calls in Server Components and Server Actions forward the session 
 import { cookies } from 'next/headers'
 
 const cookieStore = await cookies()
-fetch('http://localhost:3000/api/users', {
+fetch('https://localhost:3010/api/users', {
   headers: { Cookie: cookieStore.toString() },
 })
 ```

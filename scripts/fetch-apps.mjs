@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 const storage = JSON.parse(readFileSync('apps/admin-e2e/.auth/super-admin.json', 'utf8'));
 const cookies = storage.cookies.map(c => `${c.name}=${c.value}`).join('; ');
-const res = await fetch('http://localhost:3000/api/apps?page=1&pageSize=25', {
+const res = await fetch('https://localhost:3010/api/apps?page=1&pageSize=25', {
   headers: { Cookie: cookies },
 });
 const body = await res.json();

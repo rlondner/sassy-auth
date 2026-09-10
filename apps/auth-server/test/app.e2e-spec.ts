@@ -24,7 +24,7 @@ const publicPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
 
 process.env.RSA_PRIVATE_KEY = Buffer.from(privatePem).toString('base64');
 process.env.RSA_PUBLIC_KEY = Buffer.from(publicPem).toString('base64');
-process.env.BETTER_AUTH_URL = 'http://localhost:3000';
+process.env.BETTER_AUTH_URL = 'https://localhost:3010';
 process.env.BETTER_AUTH_SECRET = 'test-secret-at-least-32-chars-long!!';
 
 describe('SassyAuth E2E', () => {
@@ -168,7 +168,7 @@ describe('SassyAuth E2E', () => {
 
       expect(decoded.sub).toBe(userPublicId);
       expect(decoded.aud).toBe(platformAppPublicId);
-      expect(decoded.iss).toBe('http://localhost:3000');
+      expect(decoded.iss).toBe('https://localhost:3010');
       expect(typeof decoded.scope).toBe('string');
       expect(Array.isArray(decoded.permissions)).toBe(true);
     });
@@ -285,7 +285,7 @@ describe('SassyAuth E2E', () => {
 
         // 2. Look up the platform app's publicId from the seed.
         // OauthTokenExchangeDto now uses @IsUrl({ require_tld: false }) so the
-        // seeded http://localhost:3000 URL is accepted as-is for the redirect_uri
+        // seeded https://localhost:3010 URL is accepted as-is for the redirect_uri
         // origin match — no test-side mutation needed.
         const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
 
@@ -510,7 +510,7 @@ describe('SassyAuth E2E', () => {
   // ── CORS preflight on public NestJS controllers ──────────────────────────
   // Regression guard for the accept-invite browser flow: the admin app at
   // http://localhost:3001 POSTs JSON to /api/invitations/:token/accept, which
-  // triggers a CORS preflight on the auth-server at http://localhost:3000.
+  // triggers a CORS preflight on the auth-server at https://localhost:3010.
   // configureNestApp() must wire app.enableCors() with TRUSTED_ORIGINS so the
   // preflight is answered with the matching Access-Control-Allow-Origin;
   // otherwise the browser surfaces a "Failed to fetch" with no useful trace.

@@ -6,7 +6,7 @@ describe('validateNextUrl', () => {
   beforeEach(() => {
     process.env = {
       ...ORIGINAL_ENV,
-      AUTH_SERVER_URL: 'http://localhost:3000',
+      AUTH_SERVER_URL: 'https://localhost:3010',
       LOGIN_NEXT_ALLOWED_ORIGINS: '',
     }
   })
@@ -35,7 +35,7 @@ describe('validateNextUrl', () => {
   })
 
   it('accepts absolute URLs with allowed origin', () => {
-    const url = 'http://localhost:3000/api/token/oauth/authorize?client_id=x'
+    const url = 'https://localhost:3010/api/token/oauth/authorize?client_id=x'
     expect(validateNextUrl(url)).toBe(url)
   })
 
@@ -45,7 +45,7 @@ describe('validateNextUrl', () => {
 
   it('rejects userinfo URLs', () => {
     expect(
-      validateNextUrl('http://attacker@localhost:3000/api/token/oauth/authorize'),
+      validateNextUrl('http://attacker@localhost:3010/api/token/oauth/authorize'),
     ).toBeNull()
   })
 

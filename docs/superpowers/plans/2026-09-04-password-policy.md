@@ -1300,7 +1300,7 @@ Run: `pnpm --filter @sassy-auth/auth-server test`
 Expected: PASS, no regressions.
 
 Run: `pnpm --filter @sassy-auth/auth-server dev` (in one terminal), then in another:
-`curl http://localhost:3000/api/password-policy`
+`curl https://localhost:3010/api/password-policy`
 Expected: `{"passwordPolicy":{"minLength":12,"requireUppercase":true,"requireLowercase":true,"requireNumber":true,"requireSpecial":false,"minNumbers":1,"minSpecial":0}}`
 
 - [ ] **Step 15: Commit**
@@ -1617,7 +1617,7 @@ export interface InvitationInfo {
 ```ts
 import type { InvitationInfo, PasswordPolicy } from './types'
 
-const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const BASE = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export async function validateInvitation(token: string): Promise<InvitationInfo> {
   const res = await fetch(`${BASE}/api/invitations/${encodeURIComponent(token)}`)

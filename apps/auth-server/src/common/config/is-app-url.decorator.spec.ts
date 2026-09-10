@@ -27,13 +27,13 @@ describe('IsAppUrl', () => {
 
   it('fails for http localhost in secure mode', () => {
     delete process.env.SASSY_AUTH_ALLOW_INSECURE_APP_URLS;
-    const errs = validateSync(makeWith('http://localhost:3000'));
+    const errs = validateSync(makeWith('https://localhost:3010'));
     expect(errs).toHaveLength(1);
     expect(errs[0].constraints?.isAppUrl).toContain('https');
   });
 
   it('passes for http localhost in insecure mode', () => {
     process.env.SASSY_AUTH_ALLOW_INSECURE_APP_URLS = 'true';
-    expect(validateSync(makeWith('http://localhost:3000'))).toHaveLength(0);
+    expect(validateSync(makeWith('https://localhost:3010'))).toHaveLength(0);
   });
 });

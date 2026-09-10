@@ -144,7 +144,7 @@ describe('requestOtp', () => {
     const [url, init] = (global.fetch as jest.MockedFunction<typeof fetch>).mock
       .calls[0] as [string, RequestInit]
     expect(url).toBe(
-      'http://localhost:3000/api/auth/email-otp/send-verification-otp',
+      'https://localhost:3010/api/auth/email-otp/send-verification-otp',
     )
     expect(JSON.parse(init.body as string)).toEqual({
       email: 'a@b.io',

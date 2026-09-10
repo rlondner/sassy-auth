@@ -1425,7 +1425,7 @@ Register `SocialModule` in the `imports` array of `apps/auth-server/src/app.modu
 Run the server (`pnpm --filter @sassy-auth/auth-server dev`), then:
 
 ```bash
-curl -s "http://localhost:3000/api/social-providers?client_id=doesnotexist"
+curl -s "https://localhost:3010/api/social-providers?client_id=doesnotexist"
 ```
 
 Expected: `{"providers":[]}` with HTTP 200 — not 401, not 404. If a global guard intercepts it, exempt the route the same way `/api/token/jwks` is exempted (see `better-auth.guard.ts` and `app.module.ts`).
@@ -1686,7 +1686,7 @@ Create `apps/admin/app/login/social-buttons.tsx`:
 > **Superseded (Fix round 1, task-9-report.md):** the snippet below reads a
 > `NEXT_PUBLIC_*` env var client-side, which Next.js inlines at BUILD time —
 > that variable was never wired up anywhere in the repo, so every real
-> deployment would silently point social buttons at `localhost:3000`. The
+> deployment would silently point social buttons at `localhost:3010`. The
 > shipped implementation instead resolves the origin server-side in
 > `app/login/page.tsx` (`PUBLIC_AUTH_SERVER_URL ?? AUTH_SERVER_URL`) and
 > passes it down as an `authServerUrl` prop. See `task-9-report.md` for the
@@ -1698,7 +1698,7 @@ Create `apps/admin/app/login/social-buttons.tsx`:
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
 
-const AUTH_SERVER = process.env.SUPERSEDED_ENV_VAR_SEE_NOTE_ABOVE ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.SUPERSEDED_ENV_VAR_SEE_NOTE_ABOVE ?? 'https://localhost:3010'
 
 const LABEL_KEY: Record<string, string> = {
   google: 'socialGoogle',
@@ -1761,7 +1761,7 @@ Expected: PASS, 3 tests.
 Create `apps/admin/lib/social-providers.ts`:
 
 ```ts
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 /**
  * Ask the auth-server which provider buttons this app shows. `next` is the

@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, MeProfile, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
 
-const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const BASE = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const cookieStore = await cookies()

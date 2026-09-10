@@ -398,11 +398,11 @@ describe('assertRedirectUriAllowed — set-valued matching', () => {
       url: 'https://app.example.com',
       redirectUris: [
         { uri: 'https://app.example.com/cb', kind: 'login' },
-        { uri: 'http://localhost:3000/cb', kind: 'login' },
+        { uri: 'https://localhost:3010/cb', kind: 'login' },
       ],
     };
 
-    expect(() => assertRedirectUriAllowed('http://localhost:3000/cb', app)).not.toThrow();
+    expect(() => assertRedirectUriAllowed('https://localhost:3010/cb', app)).not.toThrow();
     expect(() => assertRedirectUriAllowed('https://app.example.com/cb', app)).not.toThrow();
   });
 
@@ -708,15 +708,15 @@ Add to `apps/auth-server/src/token/oauth-metadata.spec.ts`:
 
 ```typescript
 describe('buildOpenIdConfiguration', () => {
-  const doc = buildOpenIdConfiguration('http://localhost:3000');
+  const doc = buildOpenIdConfiguration('https://localhost:3010');
 
   it('advertises the OIDC endpoints under the API prefix', () => {
-    expect(doc.issuer).toBe('http://localhost:3000');
-    expect(doc.authorization_endpoint).toBe('http://localhost:3000/api/token/oauth/authorize');
-    expect(doc.token_endpoint).toBe('http://localhost:3000/api/token/oauth/token');
-    expect(doc.userinfo_endpoint).toBe('http://localhost:3000/api/token/oauth/userinfo');
-    expect(doc.end_session_endpoint).toBe('http://localhost:3000/api/token/oauth/logout');
-    expect(doc.jwks_uri).toBe('http://localhost:3000/api/token/jwks');
+    expect(doc.issuer).toBe('https://localhost:3010');
+    expect(doc.authorization_endpoint).toBe('https://localhost:3010/api/token/oauth/authorize');
+    expect(doc.token_endpoint).toBe('https://localhost:3010/api/token/oauth/token');
+    expect(doc.userinfo_endpoint).toBe('https://localhost:3010/api/token/oauth/userinfo');
+    expect(doc.end_session_endpoint).toBe('https://localhost:3010/api/token/oauth/logout');
+    expect(doc.jwks_uri).toBe('https://localhost:3010/api/token/jwks');
   });
 
   it('advertises the supported OIDC capabilities', () => {
@@ -737,7 +737,7 @@ describe('buildOpenIdConfiguration', () => {
   });
 
   it('shares endpoint URLs with the RFC 8414 document', () => {
-    const oauthDoc = buildOAuthAuthorizationServerMetadata('http://localhost:3000');
+    const oauthDoc = buildOAuthAuthorizationServerMetadata('https://localhost:3010');
     expect(doc.authorization_endpoint).toBe(oauthDoc.authorization_endpoint);
     expect(doc.token_endpoint).toBe(oauthDoc.token_endpoint);
     expect(doc.jwks_uri).toBe(oauthDoc.jwks_uri);
@@ -751,8 +751,8 @@ Add to `apps/auth-server/src/token/discovery.controller.spec.ts`:
 it('serves the OIDC metadata at /.well-known/openid-configuration (root, not /api/...)', async () => {
   const res = await request(app.getHttpServer()).get('/.well-known/openid-configuration');
   expect(res.status).toBe(200);
-  expect(res.body.issuer).toBe('http://localhost:3000');
-  expect(res.body.userinfo_endpoint).toBe('http://localhost:3000/api/token/oauth/userinfo');
+  expect(res.body.issuer).toBe('https://localhost:3010');
+  expect(res.body.userinfo_endpoint).toBe('https://localhost:3010/api/token/oauth/userinfo');
 });
 ```
 
@@ -2157,7 +2157,7 @@ import { test, expect } from '@playwright/test';
 import * as client from 'openid-client';
 import { loginAsSeedAdmin } from '../lib/admins';
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000';
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010';
 
 test('a stock openid-client completes the full OIDC round trip', async ({ page, request }) => {
   // Discovery — no hand-written endpoint URLs anywhere in this test.

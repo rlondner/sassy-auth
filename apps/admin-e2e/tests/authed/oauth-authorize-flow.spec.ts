@@ -47,7 +47,7 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     await page.goto(
       buildAuthorizeUrl({
         client_id: 'ZZZZZ', // No sa_app row has this publicId.
-        redirect_uri: `${process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'}/cb`,
+        redirect_uri: `${process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'}/cb`,
         code_challenge: challenge,
         code_challenge_method: 'S256',
         state: 'pw-state-nonexistent',
@@ -138,7 +138,7 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     // Narrow the stub to exactly /cb on the redirect_uri origin. A broader
     // `${origin}/**` mock intercepts /api/token/oauth/authorize itself when
     // platformApp.url shares the auth-server's origin (BETTER_AUTH_URL=
-    // http://localhost:3000 by default), so the browser never reaches the
+    // https://localhost:3010 by default), so the browser never reaches the
     // real authorize endpoint and the test sits on /api/token/oauth/authorize
     // with an empty body.
     const redirectUriOrigin = new URL(redirectUri).origin

@@ -928,7 +928,7 @@ Expected: dependencies resolve and install cleanly
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    AUTH_SERVER_URL: str = "http://localhost:3000"
+    AUTH_SERVER_URL: str = "https://localhost:3010"
     ADMIN_URL: str = "http://localhost:3001"
     SASSY_CLIENT_ID: str
     RS_BASE_URL: str

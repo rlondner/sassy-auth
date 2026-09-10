@@ -1,5 +1,5 @@
 function allowlist(): string[] {
-  const base = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+  const base = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
   const extra = (process.env.LOGIN_NEXT_ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((s) => s.trim())

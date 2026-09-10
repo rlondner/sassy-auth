@@ -20,7 +20,7 @@ const LABEL_KEY: Record<string, string> = {
  * `NEXT_PUBLIC_` value gets inlined into the JS bundle at BUILD time, so a
  * single build could never be deployed to more than one auth-server origin,
  * and any deployment that forgot to set it at build time would silently
- * point every social button at `http://localhost:3000`. Reading it at
+ * point every social button at `https://localhost:3010`. Reading it at
  * request time on the server keeps it runtime-configurable.
  */
 export function SocialButtons({

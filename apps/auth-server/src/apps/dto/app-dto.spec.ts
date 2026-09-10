@@ -18,7 +18,7 @@ describe('App DTO validation (secure mode)', () => {
   });
 
   it('rejects an http app url in secure mode', () => {
-    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'http://localhost:3000' });
+    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'https://localhost:3010' });
     expect(validateSync(dto).length).toBeGreaterThan(0);
   });
 

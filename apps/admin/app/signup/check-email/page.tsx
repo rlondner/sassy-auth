@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 // this page fetches directly from the browser, so it needs the origin the
 // browser can reach, not the one this Next.js process reaches internally.
 const PUBLIC_AUTH_SERVER =
-  process.env.PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+  process.env.PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export default async function CheckEmailPage({
   searchParams,

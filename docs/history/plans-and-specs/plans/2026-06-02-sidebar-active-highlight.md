@@ -28,7 +28,7 @@ No new files. No deletions.
 Local dev servers must be running for the e2e test:
 
 ```bash
-pnpm --filter @sassy-auth/auth-server dev   # http://localhost:3000
+pnpm --filter @sassy-auth/auth-server dev   # https://localhost:3010
 pnpm --filter @sassy-auth/admin dev         # http://localhost:3001
 ```
 
@@ -291,7 +291,7 @@ import * as Sentry from '@sentry/nextjs'
 import { AdminShell } from '@/components/admin-shell'
 import { getAvailableLocales, getLocale } from '@/lib/locale'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 async function getSession() {
   const cookieStore = await cookies()

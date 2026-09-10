@@ -6,7 +6,7 @@ Author: Claude + Raphael Londner
 
 ## Summary
 
-Add a Python/FastAPI resource server to the monorepo at `apps/resource-server-fastapi/`, listening on port 8010 and exposed via the already-registered ngrok URL `https://cheryl-crescentlike-monte.ngrok-free.dev`. The RS authenticates users against SassyAuth (auth-server on 3000, admin UI on 3001) using OAuth 2.0 authorization-code flow with PKCE (S256). It receives an RS256 JWT whose `scope` claim carries the user's effective SassyAuth permissions, verifies the token via the auth-server's JWKS, and gates a dummy `/api/properties` endpoint on the `rs.properties.create` scope.
+Add a Python/FastAPI resource server to the monorepo at `apps/resource-server-fastapi/`, listening on port 8010 and exposed via the already-registered ngrok URL `https://cheryl-crescentlike-monte.ngrok-free.dev`. The RS authenticates users against SassyAuth (auth-server on 3010, admin UI on 3001) using OAuth 2.0 authorization-code flow with PKCE (S256). It receives an RS256 JWT whose `scope` claim carries the user's effective SassyAuth permissions, verifies the token via the auth-server's JWKS, and gates a dummy `/api/properties` endpoint on the `rs.properties.create` scope.
 
 The two demo users behave as follows:
 
@@ -45,14 +45,14 @@ Browser (cheryl-...ngrok-free.dev)
   │ RS generates PKCE verifier + state, stores PENDING[state],
   │ redirects browser to:
   │   http://localhost:3001/login
-  │     ?next=http://localhost:3000/api/token/oauth/authorize
+  │     ?next=https://localhost:3010/api/token/oauth/authorize
   │           ?client_id=<app.publicId>
   │           &redirect_uri=https://cheryl-...ngrok-free.dev/auth/callback
   │           &state=<random>
   │           &code_challenge=<S256>&code_challenge_method=S256
   │
   │ 3. POST /login with credentials  →  admin (3001)
-  │ admin calls POST /api/auth/sign-in/email on auth-server (3000),
+  │ admin calls POST /api/auth/sign-in/email on auth-server (3010),
   │ receives BetterAuth session cookie, forwards Set-Cookie to browser,
   │ validates `next` against AUTH_SERVER_URL allowlist, redirects to <next>.
   │
@@ -74,7 +74,7 @@ Browser (cheryl-...ngrok-free.dev)
 
 ### Cookie scope assumption (load-bearing)
 
-BetterAuth's session cookie is set by the admin signIn server action on host `localhost` without a `Domain` attribute → host-only cookie. Browsers do not include the port in cookie host matching (RFC 6265 §4.1.2.4), so a cookie set on `localhost:3001` is sent to `localhost:3000`. This is what makes the chosen "RS builds admin URL with `next=`" Sign-In flow viable without cookie-domain changes.
+BetterAuth's session cookie is set by the admin signIn server action on host `localhost` without a `Domain` attribute → host-only cookie. Browsers do not include the port in cookie host matching (RFC 6265 §4.1.2.4), so a cookie set on `localhost:3001` is sent to `localhost:3010`. This is what makes the chosen "RS builds admin URL with `next=`" Sign-In flow viable without cookie-domain changes.
 
 ## Live state replicated by the demo seed
 
@@ -243,7 +243,7 @@ Dev deps:
 
 `app/config.py` (`pydantic-settings.BaseSettings`):
 
-- `AUTH_SERVER_URL` — default `http://localhost:3000`.
+- `AUTH_SERVER_URL` — default `https://localhost:3010`.
 - `ADMIN_URL` — default `http://localhost:3001`.
 - `SASSY_CLIENT_ID` — required (e.g. `84LR`).
 - `REDIRECT_URI` — required (e.g. `https://cheryl-crescentlike-monte.ngrok-free.dev/auth/callback`).
@@ -380,7 +380,7 @@ The top-level `README.md` gets a one-paragraph pointer to this app.
 ### Manual
 
 1. `SEED_DEMO=1 pnpm --filter @sassy-auth/auth-server seed` — completes cleanly against the live DB (idempotency).
-2. Start auth-server (3000), admin (3001), FastAPI (8010), and ngrok tunnel.
+2. Start auth-server (3010), admin (3001), FastAPI (8010), and ngrok tunnel.
 3. Open `https://cheryl-crescentlike-monte.ngrok-free.dev/` in a clean browser.
 4. Click Sign In → confirm browser lands on `http://localhost:3001/login?next=<authorize_url>`.
 5. Sign in as `m@cpm.io` / `Pass@word1234`. Confirm: bounced through authorize → callback → page shows **Authorized**.
