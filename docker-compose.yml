@@ -57,8 +57,8 @@ services:
       # redirect flow work: apps/admin/app/login builds browser-facing
       # redirects from AUTH_SERVER_URL, so this value has to be one the
       # browser can also resolve — a Docker service name could not be.
-      BETTER_AUTH_URL: https://localhost:3010
-      AUTH_SERVER_URL: https://localhost:3010
+      BETTER_AUTH_URL: http://localhost:3010
+      AUTH_SERVER_URL: http://localhost:3010
       ADMIN_URL: http://localhost:3001
       TRUSTED_ORIGINS: http://localhost:3001
 

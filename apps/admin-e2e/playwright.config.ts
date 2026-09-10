@@ -4,7 +4,7 @@ import path from 'path'
 
 const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
-const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
+const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3010'
 const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
 const STUB_IDP_URL = process.env.E2E_STUB_IDP_URL ?? 'http://localhost:9099'
 
