@@ -39,9 +39,9 @@ jobs:
       # ephemeral and torn down after every run.
       CI_TESTS: 'true'
       DATABASE_URL: postgresql://sassy:sassy@localhost:5432/sassy_e2e
-      BETTER_AUTH_URL: https://localhost:3010
+      BETTER_AUTH_URL: http://localhost:3010
       BETTER_AUTH_SECRET: test-secret-at-least-32-chars-long!!
-      AUTH_SERVER_URL: https://localhost:3010
+      AUTH_SERVER_URL: http://localhost:3010
       ADMIN_URL: http://localhost:3001
       NODE_ENV: test
 
