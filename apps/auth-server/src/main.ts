@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
 loadEnv({ path: resolve(process.cwd(), '../../.env.local') });
@@ -69,6 +71,15 @@ function validateStartupEnv(): void {
 
 async function bootstrap() {
   validateStartupEnv();
+  const isDev = process.env.NODE_ENV !== 'production';
+  let httpsOptions: { key: Buffer; cert: Buffer } | undefined;
+
+    if (isDev) {
+    httpsOptions = {
+      key: fs.readFileSync(path.join(__dirname, '..', 'secrets', 'localhost-key.pem')),
+      cert: fs.readFileSync(path.join(__dirname, '..', 'secrets', 'localhost.pem')),
+    };
+  }
   const expressApp = express();
 
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.
@@ -137,6 +148,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp), {
     logger: loggerService,
+    httpsOptions,
   });
 
   configureNestApp(app, loggerService);
