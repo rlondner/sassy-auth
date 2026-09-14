@@ -1,7 +1,10 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { SocialService } from './social.service';
 
-function makeService(rows: { appId: number | null; provider: string; enabled: boolean }[], app: { id: number } | null) {
+function makeService(
+  rows: { appId: number | null; provider: string; enabled: boolean }[],
+  app: { id: number; logo?: string | null } | null,
+) {
   const db = {
     saApp: { findUnique: async () => app },
     saSocialProvider: { findMany: async () => rows },
@@ -34,6 +37,28 @@ describe('SocialService.listForApp', () => {
       { id: 7 },
     );
     await expect(svc.listForApp('qp31')).resolves.toEqual([]);
+  });
+});
+
+describe('SocialService.getLogoForApp', () => {
+  it('returns the logo for a known app', async () => {
+    const svc = makeService([], { id: 7, logo: 'data:image/png;base64,AAA=' });
+    await expect(svc.getLogoForApp('qp31')).resolves.toBe('data:image/png;base64,AAA=');
+  });
+
+  it('returns null for a known app with no logo set', async () => {
+    const svc = makeService([], { id: 7, logo: null });
+    await expect(svc.getLogoForApp('qp31')).resolves.toBeNull();
+  });
+
+  it('returns null for an unknown client_id rather than throwing', async () => {
+    const svc = makeService([], null);
+    await expect(svc.getLogoForApp('nope')).resolves.toBeNull();
+  });
+
+  it('returns null when no client_id is given', async () => {
+    const svc = makeService([], null);
+    await expect(svc.getLogoForApp(undefined)).resolves.toBeNull();
   });
 });
 
