@@ -310,20 +310,22 @@ describe('RegistrationService', () => {
 
   describe('getAppName — hasDefaultOrg', () => {
     it('reports hasDefaultOrg: true when the app has a defaultOrgId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99, passwordPolicyOverride: null });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99, passwordPolicyOverride: null, logo: null });
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: true,
         passwordPolicy: expect.any(Object),
+        logo: null,
       });
     });
 
     it('reports hasDefaultOrg: false when the app has no defaultOrgId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null });
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
+        logo: null,
       });
     });
   });
@@ -376,17 +378,29 @@ describe('RegistrationService', () => {
   });
 
   describe('getAppName', () => {
-    it('returns the app name for a known appPublicId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null });
+    it('returns the app name and logo for a known appPublicId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: 'data:image/png;base64,AAA=' });
 
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
+        logo: 'data:image/png;base64,AAA=',
       });
       expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
         where: { publicId: 'sq_1' },
-        select: { name: true, defaultOrgId: true, passwordPolicyOverride: true },
+        select: { name: true, defaultOrgId: true, passwordPolicyOverride: true, logo: true },
+      });
+    });
+
+    it('returns logo: null when the app has no logo set', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null });
+
+      await expect(service.getAppName('sq_1')).resolves.toEqual({
+        name: 'MyApp',
+        hasDefaultOrg: false,
+        passwordPolicy: expect.any(Object),
+        logo: null,
       });
     });
 

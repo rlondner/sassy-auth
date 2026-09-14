@@ -111,3 +111,33 @@ export function evaluatePasswordPolicy(
   }
   return results;
 }
+
+export const APP_LOGO_MAX_BYTES = 250 * 1024;
+
+export const APP_LOGO_ALLOWED_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/svg+xml',
+] as const;
+
+const APP_LOGO_DATA_URI_PATTERN = new RegExp(
+  `^data:(${APP_LOGO_ALLOWED_MIME_TYPES.map((t) => t.replace('/', '\\/').replace('+', '\\+')).join('|')});base64,([A-Za-z0-9+/]+=?=?)$`,
+);
+
+/**
+ * True when `value` is a data URI of an allowed image type whose decoded
+ * byte size is within APP_LOGO_MAX_BYTES. Used both by the admin console's
+ * client-side file picker (before FileReader output is stored in state)
+ * and by the auth-server's IsAppLogo class-validator decorator (before a
+ * write hits the database) — one definition, two enforcement points.
+ */
+export function isValidAppLogoDataUri(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const match = APP_LOGO_DATA_URI_PATTERN.exec(value);
+  if (!match) return false;
+  const base64Payload = match[2];
+  const padding = base64Payload.endsWith('==') ? 2 : base64Payload.endsWith('=') ? 1 : 0;
+  const decodedBytes = (base64Payload.length * 3) / 4 - padding;
+  return decodedBytes <= APP_LOGO_MAX_BYTES;
+}

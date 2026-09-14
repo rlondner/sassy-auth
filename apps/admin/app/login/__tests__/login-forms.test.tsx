@@ -154,6 +154,16 @@ describe('LoginForm', () => {
 
     expect(screen.queryByText(messages.login.signupLink)).not.toBeInTheDocument()
   })
+
+  it('renders the app logo when a logo URL is provided', () => {
+    wrap(<LoginForm next="" logo="data:image/png;base64,AAA=" authServerUrl="https://auth.test" />)
+    expect(screen.getByRole('img')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+  })
+
+  it('renders no logo image when none is provided', () => {
+    wrap(<LoginForm next="" authServerUrl="https://auth.test" />)
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
 })
 
 describe('LoginOtpForm', () => {

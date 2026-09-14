@@ -4,7 +4,7 @@ import { availableSocialProviders } from './build-social-providers';
 import { resolveEnabledProviders, type SocialProviderId } from './resolve-enabled-providers';
 
 type Db = {
-  saApp: { findUnique(args: unknown): Promise<{ id: number; isPlatform?: boolean } | null> };
+  saApp: { findUnique(args: unknown): Promise<{ id: number; isPlatform?: boolean; logo?: string | null } | null> };
   saSocialProvider: {
     findMany(args?: unknown): Promise<{ appId: number | null; provider: string; enabled: boolean }[]>;
     upsert(args: unknown): Promise<unknown>;
@@ -60,6 +60,18 @@ export class SocialService {
     if (clientId && !app) return [];
 
     return resolveEnabledProviders(rows, availableSocialProviders(this.env), app?.id ?? null);
+  }
+
+  /**
+   * The logo to show on the login screen for this app, or null if the app
+   * has none or the client_id is unknown/absent. Mirrors listForApp's
+   * enumeration-safety rule: an unknown client_id yields null, never a
+   * throw, so this stays indistinguishable from "app has no logo".
+   */
+  async getLogoForApp(clientId: string | undefined): Promise<string | null> {
+    if (!clientId) return null;
+    const app = await this.db.saApp.findUnique({ where: { publicId: clientId }, select: { id: true, logo: true } });
+    return app?.logo ?? null;
   }
 
   /**

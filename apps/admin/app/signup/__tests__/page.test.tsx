@@ -26,6 +26,7 @@ describe('fetchAppInfo', () => {
       name: 'Acme',
       hasDefaultOrg: true,
       passwordPolicy: POLICY,
+      logo: null,
     })
   })
 
@@ -39,6 +40,7 @@ describe('fetchAppInfo', () => {
       name: 'Acme',
       hasDefaultOrg: true,
       passwordPolicy: null,
+      logo: null,
     })
   })
 
@@ -52,6 +54,7 @@ describe('fetchAppInfo', () => {
       name: null,
       hasDefaultOrg: false,
       passwordPolicy: null,
+      logo: null,
     })
   })
 
@@ -62,6 +65,7 @@ describe('fetchAppInfo', () => {
       name: null,
       hasDefaultOrg: false,
       passwordPolicy: null,
+      logo: null,
     })
   })
 })

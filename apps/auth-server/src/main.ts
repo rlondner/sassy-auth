@@ -133,6 +133,28 @@ async function bootstrap() {
     runWithPrivateRelayCapture(() => authNodeHandler(req, res)),
   );
 
+  // Final review finding 1: mount an explicit JSON body parser on the raw
+  // Express app BEFORE NestFactory.create runs. Nest's ExpressAdapter, given
+  // no `bodyParser` option, mounts its own default `express.json()` with
+  // Express's default 100kb limit — well under the ~342KB a 250KB logo data
+  // URI needs (base64 is ~4/3 the raw size, plus the `data:image/...;base64,`
+  // prefix), making the app-logo feature's advertised cap unreachable. A
+  // middleware registered here runs first and satisfies the request before
+  // Nest's own parser gets a chance to reject it at 100kb. 1mb is a
+  // deliberate ceiling — comfortably above the logo cap without opening up
+  // unbounded JSON bodies on other endpoints.
+  //
+  // Registered AFTER the `/api/auth/*` handler above (not before): that
+  // route fully handles and ends matching requests itself via
+  // `toNodeHandler(auth)`, which needs the raw, unconsumed request stream to
+  // parse BetterAuth's own body. Registering express.json() ahead of it
+  // would consume that stream first (Express runs `.use()` middleware in
+  // registration order for every matching path, `express.json()` included),
+  // leaving BetterAuth with an already-drained body. Placing it after means
+  // it's simply never reached for `/api/auth/*` requests, since that route
+  // never calls `next()`.
+  expressApp.use(express.json({ limit: '1mb' }));
+
   const loggerService = new LoggerService();
 
   const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp), {
