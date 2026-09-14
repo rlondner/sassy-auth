@@ -26,10 +26,12 @@ function clientIdFromNext(next: string): string | null {
 export function LoginForm({
   next,
   providers = [],
+  logo = null,
   authServerUrl,
 }: {
   next: string
   providers?: string[]
+  logo?: string | null
   authServerUrl: string
 }) {
   const t = useTranslations('login')
@@ -55,6 +57,7 @@ export function LoginForm({
     <AuthCard
       title={t('title')}
       subtitle={t('subtitle')}
+      logoUrl={logo}
       footer={
         clientId ? (
           <p className="text-center text-label-md text-muted-foreground">

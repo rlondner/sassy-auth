@@ -57,7 +57,7 @@ export default async function LoginPage({
     redirect(nextSafe)
   }
 
-  const providers = await fetchSocialProviders(nextSafe ?? '')
+  const { providers, logo } = await fetchSocialProviders(nextSafe ?? '')
 
-  return <LoginForm next={nextSafe ?? ''} providers={providers} authServerUrl={PUBLIC_AUTH_SERVER} />
+  return <LoginForm next={nextSafe ?? ''} providers={providers} logo={logo} authServerUrl={PUBLIC_AUTH_SERVER} />
 }
