@@ -5,6 +5,7 @@ import en from '@/messages/en.json'
 import { OrgsTable } from '../orgs-table'
 import * as actions from '@/app/(admin)/orgs/actions'
 import type { App, OrgRow } from '@/lib/types'
+import { FALLBACK_PASSWORD_POLICY } from '@/lib/types'
 
 jest.mock('@/app/(admin)/orgs/actions', () => ({
   deleteOrgAction: jest.fn(),
@@ -37,8 +38,8 @@ jest.mock('@sassy-auth/ui', () => {
 })
 
 const apps: App[] = [
-  { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false },
-  { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth.example.com', isPlatform: true, requireTwoFactor: false },
+  { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: FALLBACK_PASSWORD_POLICY },
+  { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth.example.com', isPlatform: true, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: FALLBACK_PASSWORD_POLICY },
 ]
 
 const initial = {

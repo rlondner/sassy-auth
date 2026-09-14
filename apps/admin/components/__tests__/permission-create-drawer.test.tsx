@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PermissionCreateDrawer } from '../permission-create-drawer'
 import type { App } from '@/lib/types'
+import { FALLBACK_PASSWORD_POLICY } from '@/lib/types'
 
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -11,7 +12,7 @@ jest.mock('@/app/(admin)/permissions/actions', () => ({
 }))
 
 const apps: App[] = [
-  { publicId: 'sq_a1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false },
+  { publicId: 'sq_a1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: FALLBACK_PASSWORD_POLICY },
 ]
 
 describe('PermissionCreateDrawer', () => {
