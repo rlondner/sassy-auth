@@ -510,6 +510,7 @@
   "login": {
     "title": "Console d’administration",
     "subtitle": "Connectez-vous pour continuer",
+    "logoAlt": "Logo de l'entreprise",
     "email": "Adresse e-mail",
     "password": "Mot de passe",
     "submit": "Se connecter",

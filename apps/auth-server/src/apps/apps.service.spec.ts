@@ -135,6 +135,24 @@ describe('AppsService', () => {
     }));
   });
 
+  // Finding 2 (final review): the admin console's apps table never renders
+  // logos, so listApps must not ship every row's full base64 blob. Both the
+  // Prisma query (an explicit `select` that omits `logo`) and the formatted
+  // response are covered here: even a mocked DB row that *does* carry a
+  // `logo` value must come back as `logo: null` in every item, and the
+  // query itself must never request the column.
+  it('listApps never selects logo and always returns logo: null in every row, even if the DB row has one', async () => {
+    mockPrisma.saApp.findMany.mockResolvedValue([{ ...appRow, logo: 'data:image/png;base64,LEAKED=' }]);
+    mockPrisma.saApp.count.mockResolvedValue(1);
+    const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].logo).toBeNull();
+    const call = mockPrisma.saApp.findMany.mock.calls[0][0];
+    expect(call.select).toBeDefined();
+    expect(call.select.logo).toBeUndefined();
+    expect(call.include).toBeUndefined();
+  });
+
   it('createApp generates publicId via two-step transaction', async () => {
     mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
     mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });

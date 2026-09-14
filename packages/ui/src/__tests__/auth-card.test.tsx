@@ -22,18 +22,31 @@ describe('AuthCard', () => {
     expect(screen.getByTestId('icon')).toBeInTheDocument()
   })
 
-  it('renders a logo image above the title when logoUrl is provided', () => {
+  it('renders a logo image above the title when logoUrl is provided, using the caller-supplied alt text', () => {
     render(
-      <AuthCard title="Sign in" logoUrl="data:image/png;base64,AAA=">
+      <AuthCard title="Sign in" logoUrl="data:image/png;base64,AAA=" logoAlt="Acme logo">
         content
       </AuthCard>,
     )
     const img = screen.getByRole('img')
     expect(img).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+    expect(img).toHaveAttribute('alt', 'Acme logo')
+  })
+
+  it('defaults the logo alt text to an empty string when logoAlt is not provided', () => {
+    // An <img alt=""> is treated as decorative and dropped from the
+    // accessibility tree's "img" role (getByRole('img') would not find
+    // it) — query the DOM directly instead.
+    const { container } = render(
+      <AuthCard title="Sign in" logoUrl="data:image/png;base64,AAA=">
+        content
+      </AuthCard>,
+    )
+    expect(container.querySelector('img')).toHaveAttribute('alt', '')
   })
 
   it('shows the header for logoUrl alone, with no title/subtitle/icon', () => {
-    render(<AuthCard logoUrl="data:image/png;base64,AAA=">content</AuthCard>)
+    render(<AuthCard logoUrl="data:image/png;base64,AAA=" logoAlt="Acme logo">content</AuthCard>)
     expect(screen.getByRole('img')).toBeInTheDocument()
   })
 

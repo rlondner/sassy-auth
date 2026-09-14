@@ -61,6 +61,7 @@ export default async function SignupPage({
       title={appName ? t('signup.titleWithApp', { appName }) : t('signup.title')}
       subtitle={t('signup.subtitle')}
       logoUrl={logo}
+      logoAlt={appName ?? t('signup.title')}
       footer={
         <Link
           href={nextSafe ? `/login?next=${encodeURIComponent(nextSafe)}` : '/login'}

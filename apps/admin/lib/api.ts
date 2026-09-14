@@ -227,6 +227,16 @@ export async function getApps(params: ListAppsParams = {}): Promise<ListAppsResp
   return res.json();
 }
 
+// GET /api/apps/:publicId — unlike getApps (the paginated list, which omits
+// `logo` to avoid shipping every row's base64 blob), this single-app fetch
+// still returns it. Used by the edit drawer to seed its logo field with the
+// real current value, since the drawer's `app` prop otherwise only ever
+// comes from the (logo-less) list response.
+export async function getApp(publicId: string): Promise<App> {
+  const res = await apiFetch(`/api/apps/${publicId}`);
+  return res.json();
+}
+
 export async function createApp(payload: CreateAppPayload): Promise<App> {
   const res = await apiFetch('/api/apps', { method: 'POST', body: JSON.stringify(payload) });
   const app: App = await res.json();

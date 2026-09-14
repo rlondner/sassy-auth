@@ -58,6 +58,7 @@ export function LoginForm({
       title={t('title')}
       subtitle={t('subtitle')}
       logoUrl={logo}
+      logoAlt={t('logoAlt')}
       footer={
         clientId ? (
           <p className="text-center text-label-md text-muted-foreground">

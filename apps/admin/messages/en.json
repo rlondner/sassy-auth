@@ -517,6 +517,7 @@
   "login": {
     "title": "Admin Console",
     "subtitle": "Sign in to continue",
+    "logoAlt": "Company logo",
     "email": "Email Address",
     "password": "Password",
     "submit": "Sign In",

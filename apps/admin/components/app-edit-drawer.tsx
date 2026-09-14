@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@sassy-auth/ui'
-import { updateAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction } from '@/app/(admin)/apps/actions'
+import { updateAppAction, getAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction } from '@/app/(admin)/apps/actions'
 import { listOrgsAction } from '@/app/(admin)/orgs/actions'
 import { listRolesAction } from '@/app/(admin)/roles/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
@@ -39,6 +39,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
   const [logo, setLogo] = React.useState<string | null>(app.logo ?? null)
+  // Baseline used by `dirty`/patch-building below. `app.logo` is always null
+  // now (GET /api/apps strips it — Finding 2), so it can't be used as the
+  // "unchanged" reference once the real value comes back from getAppAction;
+  // this tracks that real value instead, same pattern as `initialProviders`
+  // for the social-provider checkboxes.
+  const [originalLogo, setOriginalLogo] = React.useState<string | null>(app.logo ?? null)
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
@@ -82,6 +88,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setName(app.name)
     setUrl(app.url)
     setLogo(app.logo ?? null)
+    setOriginalLogo(app.logo ?? null)
     setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
@@ -99,8 +106,21 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     // was never shown. Skipping while closed also means an app switch that
     // happens while the drawer is closed doesn't fetch until it opens.
     if (!open) return
-    setSocialLoading(true)
     let cancelled = false
+    // Finding 2 (final review): GET /api/apps (the list this drawer's `app`
+    // prop is sourced from, via AppsTable's `selected` row) no longer sends
+    // `logo` — it's stripped to avoid shipping every row's base64 blob on a
+    // page load. Fetch the single-app record here, which still includes it,
+    // so the logo field is seeded with the real current value rather than
+    // always appearing empty.
+    getAppAction(app.publicId).then((result) => {
+      if (cancelled) return
+      if ('app' in result) {
+        setLogo(result.app.logo ?? null)
+        setOriginalLogo(result.app.logo ?? null)
+      }
+    })
+    setSocialLoading(true)
     getSocialProviderSettingsAction(app.publicId).then((result) => {
       if (cancelled) return
       const { available, enabled } = 'available' in result ? result : { available: [], enabled: [] }
@@ -156,7 +176,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const passwordPolicyDirty =
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
-  const dirty = name !== app.name || url !== app.url || logo !== (app.logo ?? null) || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -172,7 +192,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
-    if (logo !== (app.logo ?? null)) patch.logo = logo
+    if (logo !== originalLogo) patch.logo = logo
     if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor

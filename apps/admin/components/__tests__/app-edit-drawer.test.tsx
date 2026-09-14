@@ -10,6 +10,7 @@ import type { PasswordPolicy } from '@/lib/types'
 
 jest.mock('@/app/(admin)/apps/actions', () => ({
   updateAppAction: jest.fn(),
+  getAppAction: jest.fn(),
   getSocialProviderSettingsAction: jest.fn(),
   updateSocialProvidersAction: jest.fn(),
   rotateClientSecretAction: jest.fn(),
@@ -146,6 +147,11 @@ function withIntl(node: React.ReactNode) {
 describe('AppEditDrawer', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    // Finding 2 (final review): the list response no longer carries `logo`,
+    // so the drawer fetches the single-app record on open to seed it. This
+    // default keeps existing tests, which build their fixtures without a
+    // real logo, behaving as before (`app.logo` is undefined either way).
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({ app })
     ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({ available: [], enabled: [] })
     ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
     ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
@@ -180,6 +186,26 @@ describe('AppEditDrawer', () => {
       expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', { name: 'New' }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  // Finding 2 (final review): GET /api/apps (the list AppsTable sources
+  // `selected` — and therefore this drawer's `app` prop — from) no longer
+  // sends `logo`, to avoid shipping every row's base64 blob on page load.
+  // The drawer must backfill it via a dedicated single-app fetch so editing
+  // an app that already has a logo doesn't show it as empty, and must not
+  // mark the form dirty (or resend the logo) purely because that fetch
+  // resolved.
+  it('backfills the logo from getAppAction and does not mark the form dirty from that alone', async () => {
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, logo: 'data:image/png;base64,EXISTING=' },
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    await waitFor(() =>
+      expect(screen.getByRole('img')).toHaveAttribute('src', 'data:image/png;base64,EXISTING='),
+    )
+    expect(screen.getByRole('button', { name: en.apps.drawer.save })).toBeDisabled()
   })
 
   it('includes a changed logo in the update payload', async () => {
