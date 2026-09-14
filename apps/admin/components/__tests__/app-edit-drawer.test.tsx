@@ -182,6 +182,25 @@ describe('AppEditDrawer', () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
+  it('includes a changed logo in the update payload', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: { ...app, name: 'X2' } })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    const file = new File(['a'.repeat(10)], 'logo.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.logo), { target: { files: [file] } })
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ logo: expect.stringMatching(/^data:image\/png;base64,/) }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
   // Task 4: the single callbackUrl input is gone — apps now register a
   // repeatable list of login/post_logout redirect URIs.
   it('shows the no-login-URIs warning when the app has none registered', () => {

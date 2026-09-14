@@ -25,6 +25,7 @@ import { listRolesAction } from '@/app/(admin)/roles/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { App, RedirectUri, OrgRow, RoleRow, PasswordPolicy } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
+import { AppLogoField } from './app-logo-field'
 
 interface Props {
   app: App
@@ -37,6 +38,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
+  const [logo, setLogo] = React.useState<string | null>(app.logo ?? null)
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
@@ -79,6 +81,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   React.useEffect(() => {
     setName(app.name)
     setUrl(app.url)
+    setLogo(app.logo ?? null)
     setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
@@ -153,7 +156,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const passwordPolicyDirty =
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
-  const dirty = name !== app.name || url !== app.url || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty
+  const dirty = name !== app.name || url !== app.url || logo !== (app.logo ?? null) || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -166,9 +169,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
+    if (logo !== (app.logo ?? null)) patch.logo = logo
     if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
@@ -229,6 +233,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 onChange={(e) => setUrl(e.target.value)}
                 required
               />
+            </div>
+            <div>
+              <AppLogoField value={logo} onValueChange={setLogo} />
             </div>
             <div>
               <Label>{t('apps.fields.redirectUris')}</Label>
