@@ -6,18 +6,24 @@ export interface AuthCardProps {
   title?: string
   subtitle?: string
   icon?: React.ReactNode
+  logoUrl?: string | null
   footer?: React.ReactNode
   className?: string
   children?: React.ReactNode
 }
 
-export function AuthCard({ title, subtitle, icon, footer, className, children }: AuthCardProps) {
-  const hasHeader = Boolean(title || subtitle || icon)
+export function AuthCard({ title, subtitle, icon, logoUrl, footer, className, children }: AuthCardProps) {
+  const hasHeader = Boolean(title || subtitle || icon || logoUrl)
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className={cn('w-full max-w-sm', className)}>
         {hasHeader && (
           <CardHeader className="text-center">
+            {logoUrl && (
+              <div className="mb-4 flex justify-center">
+                <img src={logoUrl} className="max-h-12 object-contain" />
+              </div>
+            )}
             {icon && <div className="mb-4 flex justify-center">{icon}</div>}
             {title && <CardTitle className="text-headline-sm">{title}</CardTitle>}
             {subtitle && <CardDescription className="mt-1 text-body-sm">{subtitle}</CardDescription>}

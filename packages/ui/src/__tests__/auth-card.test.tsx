@@ -22,6 +22,21 @@ describe('AuthCard', () => {
     expect(screen.getByTestId('icon')).toBeInTheDocument()
   })
 
+  it('renders a logo image above the title when logoUrl is provided', () => {
+    render(
+      <AuthCard title="Sign in" logoUrl="data:image/png;base64,AAA=">
+        content
+      </AuthCard>,
+    )
+    const img = screen.getByRole('img')
+    expect(img).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+  })
+
+  it('shows the header for logoUrl alone, with no title/subtitle/icon', () => {
+    render(<AuthCard logoUrl="data:image/png;base64,AAA=">content</AuthCard>)
+    expect(screen.getByRole('img')).toBeInTheDocument()
+  })
+
   it('renders the footer when provided', () => {
     render(
       <AuthCard title="Sign in" footer={<a href="/login">Back to sign in</a>}>
