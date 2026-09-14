@@ -21,7 +21,7 @@ export function AuthCard({ title, subtitle, icon, logoUrl, footer, className, ch
           <CardHeader className="text-center">
             {logoUrl && (
               <div className="mb-4 flex justify-center">
-                <img src={logoUrl} className="max-h-12 object-contain" />
+                <img src={logoUrl} alt="App logo" className="max-h-12 object-contain" />
               </div>
             )}
             {icon && <div className="mb-4 flex justify-center">{icon}</div>}
