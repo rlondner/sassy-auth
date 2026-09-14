@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { isRedirectSentinel } from '@/lib/redirect-sentinel'
-import { createApp, updateApp, deleteApp, getApps, getSocialProviderSettings, setSocialProviders, rotateClientSecret } from '@/lib/api'
+import { createApp, updateApp, deleteApp, getApp, getApps, getSocialProviderSettings, setSocialProviders, rotateClientSecret } from '@/lib/api'
 import type {
   App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse,
 } from '@/lib/types'
@@ -107,6 +107,20 @@ export async function rotateClientSecretAction(
   } catch (err) {
     if (isRedirectSentinel(err)) throw err
     return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
+  }
+}
+
+// Used by the edit drawer to fetch the full app record (including `logo`,
+// which GET /api/apps — listAppsAction below — deliberately omits from every
+// row to avoid shipping every app's base64 logo blob on a page load).
+export async function getAppAction(
+  publicId: string,
+): Promise<{ app: App } | ErrorResult> {
+  try {
+    return { app: await getApp(publicId) }
+  } catch (err) {
+    if (isRedirectSentinel(err)) throw err
+    return { errorKey: 'apps.errors.generic' }
   }
 }
 

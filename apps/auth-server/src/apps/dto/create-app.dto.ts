@@ -1,10 +1,20 @@
 import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
+import { IsAppLogo } from '../../common/config/is-app-logo.decorator';
 
 export class CreateAppDto {
   @IsString() @MinLength(1) @MaxLength(120) name!: string;
   @IsAppUrl() @MaxLength(2048) url!: string;
+
+  /**
+   * Full data URI (e.g. "data:image/png;base64,..."), validated by
+   * IsAppLogo against the shared @sassy-auth/types size/type rule.
+   * Omitted or null means no logo.
+   */
+  @IsOptional()
+  @IsAppLogo()
+  logo?: string | null;
 
   /**
    * Per-app 2FA trust / re-prompt interval in days.

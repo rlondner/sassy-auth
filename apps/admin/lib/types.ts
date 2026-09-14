@@ -91,6 +91,7 @@ export interface App {
   publicId: string;
   name: string;
   url: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
@@ -108,6 +109,7 @@ export interface App {
 export interface CreateAppPayload {
   name: string;
   url: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
@@ -116,6 +118,7 @@ export interface CreateAppPayload {
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
