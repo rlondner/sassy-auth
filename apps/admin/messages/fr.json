@@ -573,6 +573,7 @@
     "title": "Créez votre compte",
     "titleWithApp": "Créez votre compte pour {appName}",
     "subtitle": "Configurez votre organisation pour commencer.",
+    "subtitleDefaultOrg": "Créez votre compte pour commencer.",
     "invalidLink": "Ce lien d'inscription a expiré ou est invalide. Contactez l'application concernée pour en obtenir un nouveau.",
     "firstName": "Prénom",
     "lastName": "Nom",

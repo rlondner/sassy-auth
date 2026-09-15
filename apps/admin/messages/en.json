@@ -575,6 +575,7 @@
     "title": "Create your account",
     "titleWithApp": "Create your account with {appName}",
     "subtitle": "Set up your organization to get started.",
+    "subtitleDefaultOrg": "Create your account to get started.",
     "invalidLink": "This signup link has expired or is invalid. Contact the app you're signing up for to get a new one.",
     "firstName": "First Name",
     "lastName": "Last Name",

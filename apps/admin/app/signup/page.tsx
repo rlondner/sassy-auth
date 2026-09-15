@@ -59,7 +59,7 @@ export default async function SignupPage({
   return (
     <AuthCard
       title={appName ? t('signup.titleWithApp', { appName }) : t('signup.title')}
-      subtitle={t('signup.subtitle')}
+      subtitle={hasDefaultOrg ? t('signup.subtitleDefaultOrg') : t('signup.subtitle')}
       logoUrl={logo}
       logoAlt={appName ?? t('signup.title')}
       footer={
