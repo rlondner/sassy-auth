@@ -101,6 +101,22 @@ export const auth = betterAuth({
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     },
+    // dev(sec) https rollout: BetterAuth derives `useSecureCookies` (which
+    // renames every session cookie with a `__Secure-` prefix, per RFC 6265bis)
+    // from whether `BETTER_AUTH_URL` starts with `https://` — completely
+    // independent of `defaultCookieAttributes.secure` above. Once the
+    // auth-server started running dev over https (mkcert), that flipped
+    // `useSecureCookies` on in development too, silently renaming
+    // `better-auth.session_token` to `__Secure-better-auth.session_token`.
+    // apps/admin hardcodes the unprefixed name in a dozen places (reading
+    // Set-Cookie from the auth-server, setting/forwarding the browser
+    // cookie, middleware's readSessionToken), so every sign-in "succeeded"
+    // upstream but admin's forwardSessionCookie() found no cookie named
+    // `better-auth.session_token`, returned false, and the login form
+    // showed "Sign-in service is unavailable." Pin this to the same
+    // production-only condition as `secure` above so dev keeps the
+    // unprefixed name regardless of the auth-server's protocol.
+    useSecureCookies: process.env.NODE_ENV === 'production',
   },
   rateLimit: {
     // Explicit rate-limit for the 2FA verify endpoints. In better-auth 1.6.11
