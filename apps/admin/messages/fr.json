@@ -19,7 +19,9 @@
     "confirm": "Confirmer",
     "itemsPerPage": "Éléments par page",
     "copyFailed": "Échec de la copie — accès au presse-papiers refusé",
-    "moreActions": "Plus d'actions"
+    "moreActions": "Plus d'actions",
+    "yes": "Oui",
+    "no": "Non"
   },
   "apps": {
     "title": "Applications",
@@ -56,13 +58,22 @@
       "logo": "Logo de l'application",
       "logoHint": "Affiché sur les pages de connexion et d'inscription de cette application. PNG, JPEG, WebP ou SVG, 250 Ko maximum.",
       "removeLogo": "Supprimer le logo",
+      "noLogo": "Aucun logo configuré",
       "twoFactorTrustDays": "Intervalle de confiance 2FA (jours)",
       "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
+      "twoFactorTrustDaysSystemDefault": "Valeur par défaut système",
       "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système.",
       "requireTwoFactor": "Exiger l'authentification à deux facteurs",
       "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer.",
+      "defaultOrg": "Organisation par défaut",
+      "defaultOrgHint": "Les nouvelles inscriptions autonomes sur cette application rejoignent automatiquement cette organisation au lieu d’en créer une nouvelle. Laissez vide pour que chaque inscription crée sa propre organisation.",
+      "defaultOrgNone": "Aucune — les inscriptions créent une nouvelle organisation",
+      "defaultRole": "Rôle par défaut",
+      "defaultRoleHint": "Attribué automatiquement à chaque inscription autonome sur cette application, qu’elle rejoigne l’organisation par défaut ou en crée une nouvelle.",
+      "defaultRoleNone": "Aucun — aucun rôle attribué",
       "socialProviders": "Connexion sociale",
       "socialProvidersHint": "Choisissez les fournisseurs d’identité sociale proposés sur l’écran de connexion de cette application.",
+      "socialProvidersNone": "Aucun fournisseur social activé",
       "socialProviderNames": {
         "google": "Google",
         "microsoft": "Microsoft",

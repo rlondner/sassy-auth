@@ -19,7 +19,9 @@
     "confirm": "Confirm",
     "itemsPerPage": "Items per page",
     "copyFailed": "Failed to copy — clipboard access denied",
-    "moreActions": "More actions"
+    "moreActions": "More actions",
+    "yes": "Yes",
+    "no": "No"
   },
   "apps": {
     "title": "Applications",
@@ -56,8 +58,10 @@
       "logo": "App logo",
       "logoHint": "Shown on this app's sign in and sign up pages. PNG, JPEG, WebP, or SVG, up to 250KB.",
       "removeLogo": "Remove logo",
+      "noLogo": "No logo configured",
       "twoFactorTrustDays": "2FA trust interval (days)",
       "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
+      "twoFactorTrustDaysSystemDefault": "System default",
       "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server.",
       "requireTwoFactor": "Require two-factor authentication",
       "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue.",
@@ -69,6 +73,7 @@
       "defaultRoleNone": "None — no role assigned",
       "socialProviders": "Social sign-in",
       "socialProvidersHint": "Choose which social identity providers this app's login screen offers.",
+      "socialProvidersNone": "No social providers enabled",
       "socialProviderNames": {
         "google": "Google",
         "microsoft": "Microsoft",
