@@ -221,7 +221,8 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
     - [3. Set up the database](#3-set-up-the-database)
     - [4. Generate the Prisma client](#4-generate-the-prisma-client)
     - [5. Seed platform data](#5-seed-platform-data)
-    - [6. Start the development servers](#6-start-the-development-servers)
+    - [6. Local HTTPS certificates (auth-server)](#6-local-https-certificates-auth-server)
+    - [7. Start the development servers](#7-start-the-development-servers)
   - [RSA Key Pair Generation](#rsa-key-pair-generation)
   - [Environment Variables](#environment-variables)
     - [Required](#required)
@@ -403,7 +404,34 @@ The seed script is idempotent — safe to run multiple times. It creates:
 
 **Optional — multi-tenant demo data.** Set `SEED_DEMO_MULTITENANT=1` to create a second sample app (`app01`) with two orgs (Acme, Globex), 3 users each, and org-scoped permissions (`contracts.read`, `contracts.create`, `org.users.manage`, `org.roles.manage`). Useful for testing the org-scoped admin experience.
 
-### 6. Start the development servers
+### 6. Local HTTPS certificates (auth-server)
+
+`apps/auth-server` serves dev over `https://localhost:3010` (to match
+`BETTER_AUTH_URL` above) using a real TLS certificate rather than a
+self-signed one Node trusts automatically. Generate one with
+[mkcert](https://github.com/FiloSottile/mkcert):
+
+```bash
+# once per machine
+mkcert -install
+
+# from the repo root
+mkdir -p apps/auth-server/secrets
+mkcert -key-file apps/auth-server/secrets/localhost-key.pem \
+       -cert-file apps/auth-server/secrets/localhost.pem \
+       localhost 127.0.0.1 ::1
+```
+
+Both files are gitignored — never commit them. If they're absent,
+`auth-server` logs a `[bug-0290]` warning and falls back to plain HTTP
+instead of failing to start, but sign-in from the admin console expects
+`https://localhost:3010`, so generate the certs before your first `pnpm
+dev`.
+
+`apps/admin` uses a different, self-generating mechanism
+(`next dev --experimental-https`) and needs no manual step.
+
+### 7. Start the development servers
 
 **All apps in parallel (recommended):**
 
