@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
@@ -18,6 +17,7 @@ import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { mergeOpenApiDocs } from './docs/openapi';
 import { BETTER_AUTH_SESSION_COOKIE } from './common/constants';
+import { resolveHttpsOptions } from './https-options';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = require('../package.json');
 
@@ -72,14 +72,7 @@ function validateStartupEnv(): void {
 async function bootstrap() {
   validateStartupEnv();
   const isDev = process.env.NODE_ENV !== 'production';
-  let httpsOptions: { key: Buffer; cert: Buffer } | undefined;
-
-    if (isDev) {
-    httpsOptions = {
-      key: fs.readFileSync(path.join(__dirname, '..', 'secrets', 'localhost-key.pem')),
-      cert: fs.readFileSync(path.join(__dirname, '..', 'secrets', 'localhost.pem')),
-    };
-  }
+  const httpsOptions = resolveHttpsOptions(isDev, path.join(__dirname, '..', 'secrets'));
   const expressApp = express();
 
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.
