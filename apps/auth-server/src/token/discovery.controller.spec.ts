@@ -1,4 +1,6 @@
 import { INestApplication } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { DiscoveryController } from './discovery.controller';
@@ -107,5 +109,26 @@ describe('DiscoveryController', () => {
     expect(res.status).toBe(200);
     expect(res.body.issuer).toBe('https://localhost:3010');
     expect(res.body.userinfo_endpoint).toBe('https://localhost:3010/api/token/oauth/userinfo');
+  });
+
+  // Render's healthCheckPath is /.well-known/oauth-authorization-server, polled
+  // frequently (aggressively so right after a deploy). Without @SkipThrottle()
+  // on this controller, that polling counts against the same global rate
+  // bucket as the rest of the API — trip it, and Render sees failing health
+  // checks and restarts the instance, producing a self-inflicted restart loop.
+  it('is exempt from the global throttler, even past the configured limit', async () => {
+    process.env.BETTER_AUTH_URL = 'https://localhost:3010';
+    const moduleRef = await Test.createTestingModule({
+      controllers: [DiscoveryController],
+      imports: [ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 2 }])],
+      providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app.getHttpServer()).get('/.well-known/oauth-authorization-server');
+      expect(res.status).toBe(200);
+    }
   });
 });
