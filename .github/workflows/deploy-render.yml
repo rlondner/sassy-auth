@@ -43,6 +43,8 @@ jobs:
           DEPLOY_GITHUB_TOKEN: ${{ secrets.GH_SECRETS_PAT }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # Required only when NEON_API_KEY is a Neon organization API key.
+          NEON_ORG_ID: ${{ secrets.NEON_ORG_ID }}
           # CLI-managed secrets: generated/rotated by the deploy-render CLI itself
           # and written back to GitHub via DEPLOY_GITHUB_TOKEN above.
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}

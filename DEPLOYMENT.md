@@ -68,7 +68,7 @@ platform seed as a Render Job — no dashboard clicks required after this
 one-time setup:
 
 1. Create a [Render API key](https://api-docs.render.com/reference/authentication) and store it as the `RENDER_API_KEY` secret on this repo's `production` GitHub Environment.
-2. Create a [Neon API key](https://neon.tech/docs/manage/api-keys) and store it as `NEON_API_KEY` on the same Environment.
+2. Create a [Neon API key](https://neon.tech/docs/manage/api-keys) and store it as `NEON_API_KEY` on the same Environment. If it's an **organization** API key (not a personal one), also store your Neon organization ID — found on the Neon dashboard's organization settings page — as `NEON_ORG_ID`; the Neon API rejects project listing/creation from org keys without it.
 3. Create a fine-grained GitHub PAT scoped to this repo with **Environments: write** permission, and store it as `GH_SECRETS_PAT` (the default `GITHUB_TOKEN` can't write Environment secrets).
 4. Connect this repository to Render as a Blueprint once (**Render Dashboard → New → Blueprint**) — Render has no public API for this first-time connection. On this first sync, Render will prompt for the `sync: false` variables; leave them blank and push to `master` — the workflow fills them in on the next run.
 5. Point DNS at the CNAME targets Render shows for each custom domain (see §3.2 below) — a one-time step per domain.
