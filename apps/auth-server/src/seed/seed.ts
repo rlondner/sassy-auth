@@ -187,7 +187,7 @@ async function main() {
         data: {
           publicId: generatePendingPublicId(),
           name: 'SassyAuth',
-          url: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
+          url: process.env.BETTER_AUTH_URL ?? 'https://localhost:3010',
           isPlatform: true,
         },
       });

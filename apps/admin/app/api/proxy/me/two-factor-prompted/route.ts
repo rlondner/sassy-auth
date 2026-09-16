@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 
-const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export async function POST() {
   const cookieStore = await cookies()

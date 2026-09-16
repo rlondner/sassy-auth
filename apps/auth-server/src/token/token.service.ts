@@ -100,13 +100,35 @@ export class TokenService {
     return Array.from(names).sort();
   }
 
+  /** Names of the audience app's roles held by the user (roles are always app-scoped). */
+  async resolveRoles(saUserId: number, audienceAppId: number): Promise<string[]> {
+    const user = await prisma.saUser.findUnique({
+      where: { id: saUserId },
+      include: { roles: { include: { role: true } } },
+    });
+
+    if (!user) {
+      throw new NotFoundException(TokenErrorCode.USER_NOT_FOUND);
+    }
+
+    const names = new Set<string>();
+    for (const ur of user.roles) {
+      if (ur.role.appId === audienceAppId) names.add(ur.role.name);
+    }
+
+    return Array.from(names).sort();
+  }
+
   async issueJwt(params: IssueJwtParams): Promise<string> {
     return tracer.startActiveSpan('auth.token.issue', async (span) => {
       span.setAttribute('kid', this.kid);
       span.setAttribute('ttl', TOKEN_TTL_SECONDS);
       const start = Date.now();
       try {
-        const permissions = await this.resolvePermissions(params.saUserId, params.appId);
+        const [permissions, roles] = await Promise.all([
+          this.resolvePermissions(params.saUserId, params.appId),
+          this.resolveRoles(params.saUserId, params.appId),
+        ]);
         // Share normalization with the RFC 8414 discovery doc so the advertised
         // `issuer` and the JWT `iss` claim cannot diverge on a trailing slash.
         const issuer = resolveIssuer();
@@ -123,11 +145,13 @@ export class TokenService {
           // their own array claim in the OIDC compatibility work.
           scope: params.scope,
           permissions,
+          roles,
           ...(params.amr && params.amr.length ? { amr: params.amr } : {}),
           ...(params.idp ? { idp: params.idp } : {}),
         };
 
         const token = jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
+        console.log('[minted access_token]', token, payload);
         recordTokenIssueDuration(Date.now() - start, 'ok');
         return token;
       } catch (err) {
@@ -188,7 +212,9 @@ export class TokenService {
       ...scoped,
     };
 
-    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
+    const idToken = jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
+    console.log('[minted id_token]', idToken, payload);
+    return idToken;
   }
 
   /** Verifies an access token this server issued. Throws on any failure. */

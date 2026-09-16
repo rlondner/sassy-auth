@@ -55,14 +55,14 @@ Serve a single Swagger UI page from the Nest auth-server that:
 
 ## Authentication flow
 
-The Nest server has no HTML UI of its own. The admin app lives on a different origin (`:3001` in dev) and cannot share cookies with `:3000` without explicit cookie-domain configuration. Therefore the Swagger page itself is the developer's login surface.
+The Nest server has no HTML UI of its own. The admin app lives on a different origin (`:3001` in dev) and cannot share cookies with `:3010` without explicit cookie-domain configuration. Therefore the Swagger page itself is the developer's login surface.
 
 **Sign-in via the Swagger page (v1 default):**
 
-1. User opens `http://localhost:3000/api/docs`.
+1. User opens `https://localhost:3010/api/docs`.
 2. Scrolls to the `Auth` tag, finds `POST /api/auth/sign-in/email`.
 3. Clicks Try it out, pastes `{ "email": "...", "password": "..." }`, hits Execute.
-4. Response: 200 with `Set-Cookie: better-auth.session_token=…` on `localhost:3000`.
+4. Response: 200 with `Set-Cookie: better-auth.session_token=…` on `localhost:3010`.
 5. Because `swaggerOptions.withCredentials = true`, the browser stored the cookie and now attaches it to every subsequent Try-it-out request.
 6. User scrolls to `Users`, clicks Try-it-out on `GET /api/users`: cookie travels → `BetterAuthGuard` resolves the session → call succeeds.
 7. `POST /api/auth/sign-out` clears the cookie; protected endpoints return 401 again.
@@ -205,16 +205,16 @@ SwaggerModule.setup('api/docs', app, merged, {
 **Manual acceptance (golden path):**
 
 1. `pnpm --filter @sassy-auth/auth-server dev` boots the server.
-2. `http://localhost:3000/api/docs` renders Swagger UI with sections `Auth`, `Invitations`, `Orgs`, `Roles`, `Token`, `Users`.
+2. `https://localhost:3010/api/docs` renders Swagger UI with sections `Auth`, `Invitations`, `Orgs`, `Roles`, `Token`, `Users`.
 3. `GET /api/docs-json` returns valid JSON parseable by `openapi-types`.
 4. `GET /api/users` Try-it-out (no session) → 401.
-5. `POST /api/auth/sign-in/email` Try-it-out with seeded credentials → 200, cookie visible in DevTools → Application → Cookies → `localhost:3000` → `better-auth.session_token`.
+5. `POST /api/auth/sign-in/email` Try-it-out with seeded credentials → 200, cookie visible in DevTools → Application → Cookies → `localhost:3010` → `better-auth.session_token`.
 6. `GET /api/users` Try-it-out after step 5 → 200 with user list.
 7. `POST /api/auth/sign-out` → cookie removed; `GET /api/users` Try-it-out → 401 again.
 
 **Spec-correctness sanity:**
 
-- `npx @redocly/cli lint http://localhost:3000/api/docs-json` reports zero errors (warnings allowed).
+- `npx @redocly/cli lint https://localhost:3010/api/docs-json` reports zero errors (warnings allowed).
 - `class-validator` constraints visible in UI (e.g., `CreateUserDto.email` shows `format: email`).
 
 ## Out of scope (v1)

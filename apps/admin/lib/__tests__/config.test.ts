@@ -7,13 +7,13 @@ describe('AUTH_SERVER_URL', () => {
     jest.resetModules()
   })
 
-  it('falls back to http://localhost:3000 when the env var is unset', async () => {
+  it('falls back to https://localhost:3010 when the env var is unset', async () => {
     delete process.env.AUTH_SERVER_URL
     jest.resetModules()
 
     const { AUTH_SERVER_URL } = await import('../config')
 
-    expect(AUTH_SERVER_URL).toBe('http://localhost:3000')
+    expect(AUTH_SERVER_URL).toBe('https://localhost:3010')
   })
 
   it('uses the env var when set', async () => {

@@ -36,8 +36,12 @@ export class SocialController {
    * it.
    */
   @Get()
-  async list(@Query('client_id') clientId?: string): Promise<{ providers: string[] }> {
-    return { providers: await this.social.listForApp(clientId) };
+  async list(@Query('client_id') clientId?: string): Promise<{ providers: string[]; logo: string | null }> {
+    const [providers, logo] = await Promise.all([
+      this.social.listForApp(clientId),
+      this.social.getLogoForApp(clientId),
+    ]);
+    return { providers, logo };
   }
 
   /**

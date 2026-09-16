@@ -19,8 +19,9 @@ export class SignupPage {
   readonly confirmPasswordInput: Locator
   readonly submitButton: Locator
   readonly errorMessage: Locator
-  readonly successMessage: Locator
-  readonly continueToLoginLink: Locator
+  readonly checkEmailTitle: Locator
+  readonly resendButton: Locator
+  readonly backToLoginLink: Locator
   readonly invalidLinkMessage: Locator
 
   constructor(page: Page) {
@@ -35,8 +36,11 @@ export class SignupPage {
     // Single error <p> renders one of several dynamic error keys; selecting
     // by testid avoids coupling to a specific key (mirrors LoginPage).
     this.errorMessage = page.getByTestId('signup-error')
-    this.successMessage = page.getByText(t('signup.success'))
-    this.continueToLoginLink = page.getByRole('link', { name: t('signup.continueToLogin') })
+    // Signup success navigates to /signup/check-email rather than rendering
+    // inline — see signup-form.tsx.
+    this.checkEmailTitle = page.getByText(t('signup.checkEmail.title'))
+    this.resendButton = page.getByRole('button', { name: t('signup.checkEmail.resendButton') })
+    this.backToLoginLink = page.getByRole('link', { name: t('signup.checkEmail.backToLogin') })
     this.invalidLinkMessage = page.getByText(t('signup.invalidLink'))
   }
 
