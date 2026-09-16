@@ -36,7 +36,7 @@ jobs:
 
       - name: Run deploy automation
         working-directory: packages/deploy-render
-        run: pnpm deploy
+        run: pnpm run deploy
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           # Human-provisioned secrets: created by an operator outside this repo.
