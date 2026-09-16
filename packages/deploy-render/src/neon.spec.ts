@@ -43,6 +43,34 @@ describe('createProject', () => {
   });
 });
 
+describe('org-scoped API keys', () => {
+  const orgCfg: NeonConfig = { ...neonCfg, orgId: 'org-123' };
+
+  it('findProjectByName includes org_id as a query param', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ projects: [] }) } as Response);
+    await findProjectByName(orgCfg, fetchFn);
+    const calledUrl = fetchFn.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('org_id=org-123');
+  });
+
+  it('createProject includes org_id in the request body', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ project: { id: 'p3', name: 'sassy-auth-production' } }),
+    } as Response);
+    await createProject(orgCfg, fetchFn);
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body).toEqual({ project: { name: 'sassy-auth-production', org_id: 'org-123' } });
+  });
+
+  it('omits org_id when not configured', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ projects: [] }) } as Response);
+    await findProjectByName(neonCfg, fetchFn);
+    const calledUrl = fetchFn.mock.calls[0][0] as string;
+    expect(calledUrl).not.toContain('org_id');
+  });
+});
+
 describe('getPooledConnectionUri', () => {
   it('requests a pooled URI for the configured database and role', async () => {
     const fetchFn = jest.fn().mockResolvedValue({

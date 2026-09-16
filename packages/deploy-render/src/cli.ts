@@ -68,6 +68,8 @@ async function main(): Promise<void> {
     projectName: 'sassy-auth-production',
     databaseName: 'sassyauth',
     roleName: 'sassyauth_owner',
+    // Only required when NEON_API_KEY is an organization API key.
+    orgId: process.env.NEON_ORG_ID || undefined,
   };
   const renderCfg: RenderConfig = { apiKey: requireEnv('RENDER_API_KEY') };
 

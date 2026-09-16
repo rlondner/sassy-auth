@@ -8,6 +8,10 @@ export interface NeonConfig {
   projectName: string;
   databaseName: string;
   roleName: string;
+  // Required when apiKey is a Neon organization API key — the Neon API
+  // rejects GET/POST /projects with "org_id is required" otherwise.
+  // Personal API keys don't need this.
+  orgId?: string;
 }
 
 interface NeonProject {
@@ -27,7 +31,10 @@ export async function findProjectByName(
   cfg: NeonConfig,
   fetchFn: FetchLike = fetch,
 ): Promise<NeonProject | undefined> {
-  const res = await fetchFn(`${NEON_API_BASE}/projects`, { headers: neonHeaders(cfg.apiKey) });
+  const url = cfg.orgId
+    ? `${NEON_API_BASE}/projects?org_id=${encodeURIComponent(cfg.orgId)}`
+    : `${NEON_API_BASE}/projects`;
+  const res = await fetchFn(url, { headers: neonHeaders(cfg.apiKey) });
   if (!res.ok) {
     throw new Error(`Neon API error listing projects: ${res.status} ${await res.text()}`);
   }
@@ -39,7 +46,9 @@ export async function createProject(cfg: NeonConfig, fetchFn: FetchLike = fetch)
   const res = await fetchFn(`${NEON_API_BASE}/projects`, {
     method: 'POST',
     headers: neonHeaders(cfg.apiKey),
-    body: JSON.stringify({ project: { name: cfg.projectName } }),
+    body: JSON.stringify({
+      project: { name: cfg.projectName, ...(cfg.orgId ? { org_id: cfg.orgId } : {}) },
+    }),
   });
   if (!res.ok) {
     throw new Error(`Neon API error creating project: ${res.status} ${await res.text()}`);
