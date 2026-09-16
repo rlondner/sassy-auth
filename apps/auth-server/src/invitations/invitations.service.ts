@@ -13,6 +13,7 @@ import * as crypto from 'crypto';
 import { PasswordPolicy } from '@sassy-auth/types';
 import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password-policy';
 import { LoggerService } from '../common/logger/logger.service';
+import { notifyActivation } from '../activation/notify-activation';
 
 const INVITATION_INCLUDE = {
   user: {
@@ -115,6 +116,8 @@ export class InvitationsService {
         data: { emailVerified: true, updatedAt: now },
       });
     });
+
+    await notifyActivation({ id: inv.user.id, publicId: inv.user.publicId, orgId: inv.user.orgId });
 
     this.logger.getWinstonLogger().info('Invitation accepted', {
       context: 'InvitationsService',
