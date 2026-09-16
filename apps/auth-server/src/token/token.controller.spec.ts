@@ -1318,5 +1318,82 @@ describe('TokenController', () => {
 
       expect(res.headers.location).toContain('/logged-out');
     });
+
+    it('forwards the session-clearing Set-Cookie header to the browser', async () => {
+      mockAuth.api.signOut.mockResolvedValue({
+        headers: new Headers({
+          'set-cookie': 'better-auth.session_token=; Max-Age=0; Path=/',
+        }),
+      });
+
+      const res = await request(app.getHttpServer()).get('/api/token/oauth/logout');
+
+      expect(mockAuth.api.signOut).toHaveBeenCalledWith(
+        expect.objectContaining({ asResponse: true }),
+      );
+      expect(res.headers['set-cookie']?.[0]).toContain('better-auth.session_token=;');
+    });
+  });
+
+  // ── POST /api/token/oauth/logout ─────────────────────────────────────────
+  // Not spec-mandated (RP-Initiated Logout is a front-channel GET redirect),
+  // but accepted defensively — some OIDC client libraries POST here instead.
+
+  describe('POST /api/token/oauth/logout', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        controllers: [TokenController],
+        providers: [
+          { provide: TokenService, useValue: mockTokenService },
+          { provide: OauthService, useValue: mockOauthService },
+          { provide: SqidService, useValue: mockSqidService },
+          { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api');
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockAuth.api.signOut.mockResolvedValue(undefined);
+    });
+
+    it('terminates the session and redirects, given a form-urlencoded body', async () => {
+      const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/token/oauth/logout')
+        .type('form')
+        .send({
+          id_token_hint: idToken,
+          post_logout_redirect_uri: 'https://app.example.com/bye',
+          state: 'xyz',
+        });
+
+      expect(mockAuth.api.signOut).toHaveBeenCalled();
+      expect(res.status).toBe(302);
+      const target = new URL(res.headers.location);
+      expect(target.origin + target.pathname).toBe('https://app.example.com/bye');
+      expect(target.searchParams.get('state')).toBe('xyz');
+    });
+
+    it('signs out and shows the logged-out page with no body', async () => {
+      const res = await request(app.getHttpServer()).post('/api/token/oauth/logout');
+
+      expect(mockAuth.api.signOut).toHaveBeenCalled();
+      expect(res.headers.location).toContain('/logged-out');
+    });
   });
 });

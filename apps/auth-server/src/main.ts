@@ -165,6 +165,11 @@ async function bootstrap() {
   // it's simply never reached for `/api/auth/*` requests, since that route
   // never calls `next()`.
   expressApp.use(express.json({ limit: '1mb' }));
+  // Some OIDC relying-party libraries POST to the end_session_endpoint with a
+  // form-urlencoded body (mirroring the GET query params) rather than
+  // following the spec's front-channel GET redirect — TokenController.oauthLogout
+  // accepts both, so the body needs to actually be parsed either way.
+  expressApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
   const loggerService = new LoggerService();
 

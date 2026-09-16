@@ -20,6 +20,9 @@ importers:
       '@marsidev/react-turnstile':
         specifier: ^1.1.0
         version: 1.6.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@next/env':
+        specifier: ^15.0.0
+        version: 15.5.18
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.1
