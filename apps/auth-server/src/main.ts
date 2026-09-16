@@ -14,7 +14,11 @@ import { runWithPrivateRelayCapture } from './social/apple-private-relay-context
 import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import { mergeOpenApiDocs } from './docs/openapi';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { applyRedocExtensions, mergeOpenApiDocs } from './docs/openapi';
+import { renderRedocPage } from './docs/redoc-page';
+import { renderRedocInitScript } from './docs/redoc-init';
 import { BETTER_AUTH_SESSION_COOKIE } from './common/constants';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = require('../package.json');
@@ -153,7 +157,15 @@ async function bootstrap() {
   if (process.env.NODE_ENV !== 'production') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Sassy Auth API')
-      .setDescription('Multi-tenant auth and user management')
+      .setDescription(
+        [
+          '## Overview',
+          'Multi-tenant auth and user management.',
+          '',
+          '## Authentication',
+          `BetterAuth routes (\`/api/auth/*\`) issue a \`${BETTER_AUTH_SESSION_COOKIE}\` session cookie, which the Management API endpoints below require.`,
+        ].join('\n'),
+      )
       .setVersion(pkg.version)
       .addCookieAuth(
         BETTER_AUTH_SESSION_COOKIE,
@@ -184,9 +196,47 @@ async function bootstrap() {
       );
     }
 
-    SwaggerModule.setup('api/docs', app, mergedDoc, {
+    // Adds ReDoc's x-logo / x-tagGroups extensions. Swagger UI ignores unknown
+    // x-* keys, so the same enriched document backs every doc surface below.
+    const enrichedDoc = applyRedocExtensions(mergedDoc);
+
+    SwaggerModule.setup('api/docs', app, enrichedDoc, {
       swaggerOptions: { withCredentials: true, persistAuthorization: true },
       jsonDocumentUrl: 'api/docs-json',
+      yamlDocumentUrl: 'api/docs-yaml',
+    });
+
+    const redocLogo = readFileSync(join(__dirname, 'docs/assets/redoc-logo.jpg'));
+    expressApp.get('/api/redoc-logo.jpg', (_req, res) => {
+      res.type('image/jpeg').send(redocLogo);
+    });
+    // Served same-origin, not from a CDN: helmet()'s default CSP (script-src
+    // 'self', set unconditionally in configureNestApp — including in dev)
+    // blocks cross-origin <script> tags, the same reason Swagger UI above
+    // self-hosts its JS from swagger-ui-dist instead of unpkg.
+    const redocBundle = readFileSync(require.resolve('redoc/bundles/redoc.standalone.js'));
+    expressApp.get('/api/redoc-bundle.js', (_req, res) => {
+      res.type('application/javascript').send(redocBundle);
+    });
+    expressApp.get('/api/redoc-init.js', (_req, res) => {
+      res.type('application/javascript').send(renderRedocInitScript());
+    });
+    expressApp.get('/api/redoc', (_req, res) => {
+      // ReDoc needs two narrow additions to helmet()'s default CSP (see the
+      // script-src note above): worker-src for the blob: web worker it spawns
+      // to build its search index (falls back to script-src 'self' otherwise,
+      // which blocks blob: workers), and img-src for the "powered by ReDoc"
+      // badge it fetches from cdn.redoc.ly. Scoped to this one response, not
+      // helmet()'s global config, so it can't weaken CSP anywhere else.
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; base-uri 'self'; font-src 'self' https: data:; " +
+          "form-action 'self'; frame-ancestors 'self'; object-src 'none'; " +
+          "script-src 'self'; script-src-attr 'none'; style-src 'self' https: 'unsafe-inline'; " +
+          "worker-src 'self' blob:; img-src 'self' data: https://cdn.redoc.ly; " +
+          'upgrade-insecure-requests',
+      );
+      res.type('html').send(renderRedocPage());
     });
   }
 

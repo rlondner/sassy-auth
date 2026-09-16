@@ -115,7 +115,8 @@ When it settles, open <http://localhost:3001/login> and sign in as `s@sa.io` / `
 |---|---|
 | Admin console | <http://localhost:3001/login> |
 | Auth server | <http://localhost:3000> |
-| API docs (Swagger) | <http://localhost:3000/api/docs> |
+| API docs (Swagger UI) | <http://localhost:3000/api/docs> |
+| API docs (ReDoc) | <http://localhost:3000/api/redoc> |
 | Mailpit — invitation + reset emails | <http://localhost:8025> |
 
 Uncomment `SEED_DEMO` in `docker-compose.yml` to also seed the app, org, roles, and users the [FastAPI sample resource server](#sample-resource-server-fastapi) expects.
@@ -933,7 +934,20 @@ The endpoints you will use from a resource server:
 
 BetterAuth mounts on Express before NestJS and intercepts all `/api/auth/*` routes directly. NestJS handles all other routes.
 
-Full OpenAPI spec is in `docs/`.
+### API documentation
+
+Generated automatically from Nest controllers/DTOs (`@nestjs/swagger`) merged with BetterAuth's own OpenAPI schema — see `apps/auth-server/src/docs/openapi.ts`. Nothing to run manually; it's built at server boot, from whatever routes/DTOs exist at that moment. Only mounted when `NODE_ENV !== 'production'` (bug-0153) — not reachable in prod deploys.
+
+| | |
+|---|---|
+| Swagger UI (interactive, sign in and try endpoints live) | `/api/docs` |
+| ReDoc (read-focused reference, grouped by Authentication vs Management API) | `/api/redoc` |
+| Raw spec — JSON | `/api/docs-json` |
+| Raw spec — YAML | `/api/docs-yaml` |
+
+All four read the same enriched document, so `x-logo`/`x-tagGroups` and every route/schema are identical everywhere.
+
+A separate, hand-updated snapshot for offline/static viewing lives in `docs/api/` (`openapi.yaml` + a standalone Swagger UI `index.html`) — not auto-generated, regenerate by hand from `/api/docs-yaml` when it goes stale.
 
 ---
 
