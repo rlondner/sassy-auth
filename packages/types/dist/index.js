@@ -91,7 +91,10 @@ function isValidAppLogoDataUri(value) {
  * Literal `{{token}}` substitution — no conditionals, no loops. A token not
  * present in `vars` is left in the output untouched, so a typo'd or removed
  * placeholder degrades visibly rather than silently vanishing.
+ *
+ * Does no output-context escaping — a caller substituting a value into HTML
+ * (e.g. a user-supplied name) is responsible for escaping it first.
  */
 function renderTemplate(template, vars) {
-    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => (key in vars ? vars[key] : match));
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : match);
 }

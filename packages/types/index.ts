@@ -149,6 +149,7 @@ export function isValidAppLogoDataUri(value: unknown): boolean {
  */
 export interface ActivationEmailBranding {
   fromName?: string;
+  /** Domain must be verified with the email provider (e.g. Resend), or sends will fail. */
   fromAddress?: string;
   subject?: string;
   message?: string;
@@ -158,7 +159,12 @@ export interface ActivationEmailBranding {
  * Literal `{{token}}` substitution — no conditionals, no loops. A token not
  * present in `vars` is left in the output untouched, so a typo'd or removed
  * placeholder degrades visibly rather than silently vanishing.
+ *
+ * Does no output-context escaping — a caller substituting a value into HTML
+ * (e.g. a user-supplied name) is responsible for escaping it first.
  */
 export function renderTemplate(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => (key in vars ? vars[key] : match));
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : match,
+  );
 }
