@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-16
+
+`render-deploy-automation` (16 commits) merged into `dev`: a new
+`packages/deploy-render` package plus `.github/workflows/deploy-render.yml`
+automate Render.com deployment for `sassy-auth-server` and
+`sassy-auth-admin` — no more manual dashboard secret entry or a manual
+`db:seed` shell session per deploy. On push to `master`, the workflow
+generates and persists any missing production secrets (RSA JWT keypair,
+`BETTER_AUTH_SECRET`, `SEED_ADMIN_PASSWORD`) as GitHub Environment
+secrets, provisions the Neon database via its API if `DATABASE_URL`
+isn't set yet, merges the resulting values with `render.yaml`'s static
+config and pushes them to Render, waits for the deploy to go live, and
+triggers the platform seed as a one-off Render Job. `render.yaml`
+remains the source of truth for service topology; only the previously
+manual parts are now automated. `sassy-resource-server` (the FastAPI
+demo app) stays out of scope and deployable by hand. Full design in
+[`docs/superpowers/specs/2026-09-16-render-deploy-automation-design.md`](./docs/superpowers/specs/2026-09-16-render-deploy-automation-design.md).
+
+Built via subagent-driven development with a spec-compliance + code-quality
+review after every task; three real issues were caught and fixed before
+merge: a missing GitHub-secret write-verification call, generated secrets
+being printed in cleartext to the workflow's job summary (fixed to log
+names only — GitHub secrets are write-only, so values are never shown),
+and — caught only in a final whole-branch pass — a critical bug where the
+naive env-var sync would have silently wiped any operator-set optional
+secrets (e.g. `RESEND_API_KEY`, social sign-in credentials) on every
+automated deploy, fixed by fetching and merging with Render's existing
+env vars instead of blindly replacing them.
+
+### Docs
+
+- `DEPLOYMENT.md` — added a "One-time setup for automated deploys"
+  section describing the pipeline and the three secrets an operator still
+  creates by hand (`RENDER_API_KEY`, `NEON_API_KEY`, `GH_SECRETS_PAT`);
+  trimmed the now-superseded manual secret-generation and manual
+  first-time-seed instructions.
+
 ## [Unreleased] — 2026-09-04
 
 CI now runs on PRs targeting `dev`, not just `master` (`33e074c`). The
