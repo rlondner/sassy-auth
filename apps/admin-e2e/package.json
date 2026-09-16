@@ -1,6 +1,6 @@
 {
   "name": "@sassy-auth/admin-e2e",
-  "version": "0.0.1",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "test:e2e": "node ../../scripts/log-test.mjs admin-e2e playwright test",
