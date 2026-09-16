@@ -6,6 +6,9 @@ import {
   syncManagedEnvVars,
   getLatestDeployStatus,
   waitForLiveDeploy,
+  triggerDeploy,
+  getDeployStatus,
+  waitForDeploy,
   startJob,
   waitForJobCompletion,
   type RenderConfig,
@@ -172,6 +175,69 @@ describe('waitForLiveDeploy', () => {
     const sleepFn = jest.fn().mockResolvedValue(undefined);
 
     await expect(waitForLiveDeploy(cfg, 'srv-2', fetchFn, sleepFn, 1, 2)).rejects.toThrow(/Timed out/);
+  });
+
+  it('treats pre_deploy_failed as a terminal failure', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ deploy: { id: 'd1', status: 'pre_deploy_failed' } }],
+    } as Response);
+    const sleepFn = jest.fn().mockResolvedValue(undefined);
+
+    await expect(waitForLiveDeploy(cfg, 'srv-2', fetchFn, sleepFn, 1, 5)).rejects.toThrow(/pre_deploy_failed/);
+    expect(sleepFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('triggerDeploy', () => {
+  it('POSTs to the deploys endpoint and returns the created deploy', async () => {
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ id: 'd9', status: 'created' }) } as Response);
+    await expect(triggerDeploy(cfg, 'srv-2', fetchFn)).resolves.toEqual({ id: 'd9', status: 'created' });
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://api.render.com/v1/services/srv-2/deploys',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('throws on a non-ok response', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' } as Response);
+    await expect(triggerDeploy(cfg, 'srv-2', fetchFn)).rejects.toThrow(/500/);
+  });
+});
+
+describe('waitForDeploy', () => {
+  it('polls the specific deploy id, ignoring other deploys on the service', async () => {
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'd9', status: 'update_in_progress' }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'd9', status: 'live' }) } as Response);
+    const sleepFn = jest.fn().mockResolvedValue(undefined);
+
+    await waitForDeploy(cfg, 'srv-2', 'd9', fetchFn, sleepFn, 1, 5);
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://api.render.com/v1/services/srv-2/deploys/d9',
+      expect.objectContaining({ headers: expect.anything() }),
+    );
+    expect(sleepFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when the specific deploy reaches a terminal failure status', async () => {
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ id: 'd9', status: 'pre_deploy_failed' }) } as Response);
+    const sleepFn = jest.fn().mockResolvedValue(undefined);
+
+    await expect(waitForDeploy(cfg, 'srv-2', 'd9', fetchFn, sleepFn, 1, 5)).rejects.toThrow(/pre_deploy_failed/);
+  });
+});
+
+describe('getDeployStatus', () => {
+  it('throws on a non-ok response', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 404, text: async () => 'not found' } as Response);
+    await expect(getDeployStatus(cfg, 'srv-2', 'd9', fetchFn)).rejects.toThrow(/404/);
   });
 });
 

@@ -33,10 +33,16 @@ function literalValues(envVars: RenderYamlEnvVar[] | undefined): Record<string, 
 
 export function staticGroupValues(doc: RenderYamlDocument, groupName: string): Record<string, string> {
   const group = doc.envVarGroups?.find((g) => g.name === groupName);
-  return literalValues(group?.envVars);
+  if (!group) {
+    throw new Error(`render.yaml has no envVarGroup named "${groupName}"`);
+  }
+  return literalValues(group.envVars);
 }
 
 export function staticServiceValues(doc: RenderYamlDocument, serviceName: string): Record<string, string> {
   const service = doc.services.find((s) => s.name === serviceName);
-  return literalValues(service?.envVars);
+  if (!service) {
+    throw new Error(`render.yaml has no service named "${serviceName}"`);
+  }
+  return literalValues(service.envVars);
 }
