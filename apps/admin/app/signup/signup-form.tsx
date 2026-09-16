@@ -47,10 +47,11 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
 
   const policy = passwordPolicy ?? FALLBACK_PASSWORD_POLICY
   const policyMet = evaluatePasswordPolicy(password, policy).every((r) => r.met)
+  const passwordsMismatch = confirm.length > 0 && password !== confirm
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (password !== confirm) { setError(t('signup.errors.passwordMismatch')); return }
+    if (passwordsMismatch) { setError(t('signup.errors.passwordMismatch')); return }
     if (!policyMet) { setError(t('signup.errors.passwordComplexity')); return }
     if (!captchaToken) { setError(t('signup.errors.captchaRequired')); return }
     setError(null)
@@ -128,6 +129,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
         label={t('signup.confirmPassword')}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
+        error={passwordsMismatch ? t('signup.errors.passwordMismatch') : undefined}
         required
       />
       {error && <p data-testid="signup-error" className="text-label-md text-destructive">{error}</p>}

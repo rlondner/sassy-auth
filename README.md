@@ -114,9 +114,9 @@ When it settles, open <http://localhost:3001/login> and sign in as `s@sa.io` / `
 | | |
 |---|---|
 | Admin console | <http://localhost:3001/login> |
-| Auth server | <http://localhost:3000> |
-| API docs (Swagger UI) | <http://localhost:3000/api/docs> |
-| API docs (ReDoc) | <http://localhost:3000/api/redoc> |
+| Auth server | <https://localhost:3010> |
+| API docs (Swagger UI) | <https://localhost:3010/api/docs> |
+| API docs (ReDoc) | <https://localhost:3010/api/redoc> |
 | Mailpit — invitation + reset emails | <http://localhost:8025> |
 
 Uncomment `SEED_DEMO` in `docker-compose.yml` to also seed the app, org, roles, and users the [FastAPI sample resource server](#sample-resource-server-fastapi) expects.
@@ -161,7 +161,7 @@ Without Flox, follow [Getting Started](#getting-started) instead.
 **Mint your first token**, once an app and a user exist:
 
 ```bash
-curl -X POST http://localhost:3000/api/token/direct/login \
+curl -X POST https://localhost:3010/api/token/direct/login \
   -H "Content-Type: application/json" \
   -d '{"identifier":"user@example.com","password":"s3cr3t","appId":"<appPublicId>"}'
 ```
@@ -170,7 +170,7 @@ curl -X POST http://localhost:3000/api/token/direct/login \
 { "access_token": "<RS256 JWT>", "token_type": "Bearer", "expires_in": 3600 }
 ```
 
-Verify it in your resource server against `http://localhost:3000/api/token/jwks` — see [JWKS and Token Verification](#jwks-and-token-verification), or run the [FastAPI sample](#sample-resource-server-fastapi) for a complete working consumer.
+Verify it in your resource server against `https://localhost:3010/api/token/jwks` — see [JWKS and Token Verification](#jwks-and-token-verification), or run the [FastAPI sample](#sample-resource-server-fastapi) for a complete working consumer.
 
 ---
 
@@ -222,12 +222,15 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
     - [3. Set up the database](#3-set-up-the-database)
     - [4. Generate the Prisma client](#4-generate-the-prisma-client)
     - [5. Seed platform data](#5-seed-platform-data)
-    - [6. Start the development servers](#6-start-the-development-servers)
+    - [6. Local HTTPS certificates (auth-server)](#6-local-https-certificates-auth-server)
+    - [7. Start the development servers](#7-start-the-development-servers)
   - [RSA Key Pair Generation](#rsa-key-pair-generation)
   - [Environment Variables](#environment-variables)
     - [Required](#required)
     - [Admin console](#admin-console)
     - [Rate limiting (optional)](#rate-limiting-optional)
+    - [Password policy (optional)](#password-policy-optional)
+    - [Signup captcha (optional)](#signup-captcha-optional)
     - [Observability (optional)](#observability-optional)
     - [Email (optional)](#email-optional)
     - [Test credentials (optional)](#test-credentials-optional)
@@ -240,6 +243,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
   - [JWKS and Token Verification](#jwks-and-token-verification)
   - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
   - [Social Sign-In](#social-sign-in)
+  - [Activation Webhook](#activation-webhook)
   - [API Reference](#api-reference)
   - [Self-serve Registration (`POST /api/register`)](#self-serve-registration-post-apiregister)
     - [Request](#request)
@@ -270,7 +274,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 
 ## Project Structure
 
-Built as a Turborepo + pnpm monorepo. Two apps — `auth-server` (NestJS, port 3000) and `admin` (Next.js, port 3001) — plus a Python reference consumer, over three shared packages: `db` (Prisma), `types`, and `ui` (Tailwind + Radix design system).
+Built as a Turborepo + pnpm monorepo. Two apps — `auth-server` (NestJS, port 3010) and `admin` (Next.js, port 3001) — plus a Python reference consumer, over three shared packages: `db` (Prisma), `types`, and `ui` (Tailwind + Radix design system).
 
 <details>
 <summary><strong>Full directory tree</strong></summary>
@@ -278,7 +282,7 @@ Built as a Turborepo + pnpm monorepo. Two apps — `auth-server` (NestJS, port 3
 ```
 sassy-auth/
   apps/
-    auth-server/             # NestJS (Express adapter) — main API (port 3000)
+    auth-server/             # NestJS (Express adapter) — main API (port 3010)
       src/
         auth/                # BetterAuth integration and guard
         token/               # JWT issuance: OAuth2 and direct login flows
@@ -361,9 +365,9 @@ At minimum, set:
 - `DATABASE_URL`
 - `RSA_PRIVATE_KEY`, `RSA_PUBLIC_KEY` (see [RSA Key Pair Generation](#rsa-key-pair-generation))
 - `BETTER_AUTH_SECRET` (32+ random chars)
-- `BETTER_AUTH_URL` (e.g. `http://localhost:3000`)
+- `BETTER_AUTH_URL` (e.g. `https://localhost:3010`)
 - `ADMIN_URL` (e.g. `http://localhost:3001`) — used to build invitation URLs sent by the API
-- `AUTH_SERVER_URL` (e.g. `http://localhost:3000`) — used by the admin Server Actions
+- `AUTH_SERVER_URL` (e.g. `https://localhost:3010`) — used by the admin Server Actions
 
 See [Environment Variables](#environment-variables) for the full list.
 
@@ -404,18 +408,45 @@ The seed script is idempotent — safe to run multiple times. It creates:
 
 **Optional — multi-tenant demo data.** Set `SEED_DEMO_MULTITENANT=1` to create a second sample app (`app01`) with two orgs (Acme, Globex), 3 users each, and org-scoped permissions (`contracts.read`, `contracts.create`, `org.users.manage`, `org.roles.manage`). Useful for testing the org-scoped admin experience.
 
-### 6. Start the development servers
+### 6. Local HTTPS certificates (auth-server)
+
+`apps/auth-server` serves dev over `https://localhost:3010` (to match
+`BETTER_AUTH_URL` above) using a real TLS certificate rather than a
+self-signed one Node trusts automatically. Generate one with
+[mkcert](https://github.com/FiloSottile/mkcert):
+
+```bash
+# once per machine
+mkcert -install
+
+# from the repo root
+mkdir -p apps/auth-server/secrets
+mkcert -key-file apps/auth-server/secrets/localhost-key.pem \
+       -cert-file apps/auth-server/secrets/localhost.pem \
+       localhost 127.0.0.1 ::1
+```
+
+Both files are gitignored — never commit them. If they're absent,
+`auth-server` logs a `[bug-0290]` warning and falls back to plain HTTP
+instead of failing to start, but sign-in from the admin console expects
+`https://localhost:3010`, so generate the certs before your first `pnpm
+dev`.
+
+`apps/admin` uses a different, self-generating mechanism
+(`next dev --experimental-https`) and needs no manual step.
+
+### 7. Start the development servers
 
 **All apps in parallel (recommended):**
 
 ```bash
-pnpm dev          # turbo runs auth-server (3000) and admin (3001) together
+pnpm dev          # turbo runs auth-server (3010) and admin (3001) together
 ```
 
 **Or each app individually:**
 
 ```bash
-pnpm --filter @sassy-auth/auth-server dev      # port 3000
+pnpm --filter @sassy-auth/auth-server dev      # port 3010
 pnpm --filter @sassy-auth/admin dev            # port 3001
 ```
 
@@ -446,7 +477,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `RSA_PUBLIC_KEY`      | Base64-encoded SPKI PEM public key (served via JWKS endpoint)  |
 | `JWT_KEY_ID`          | `kid` written into every issued JWT header and the JWKS document. Resource servers use it to pick the right key from the JWKS. Rotate together with the RSA key pair. Default: `sassy-auth-1` |
 | `BETTER_AUTH_SECRET`  | Random string, 32+ characters                                  |
-| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `http://localhost:3000`. Also used as the JWT `iss` claim. |
+| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `https://localhost:3010`. Also used as the JWT `iss` claim. |
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
 | `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
 | `SEED_ADMIN_PASSWORD` | Password given to every account created by the seed scripts. Falls back to `E2E_ADMIN_PASSWORD`, then to the documented dev default `Pass@word1234`. **Required when `NODE_ENV` is anything other than `development` or `test`** — the seed throws rather than provision admins with a publicly known password. |
@@ -459,8 +490,9 @@ Copy the two output lines directly into your `.env.local` file.
 | Variable              | Description                                                                                |
 |-----------------------|--------------------------------------------------------------------------------------------|
 | `ADMIN_URL`           | Public URL of the admin console, used by the API to build invitation links. Default: `http://localhost:3001` |
-| `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `http://localhost:3000`      |
+| `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `https://localhost:3010`      |
 | `PUBLIC_AUTH_SERVER_URL` | Optional. URL of the auth server as seen by the BROWSER, used to build the social sign-in redirect on the login page. Defaults to `AUTH_SERVER_URL`. Set separately when `AUTH_SERVER_URL` is an internal address (e.g. a docker-network hostname) the browser cannot resolve. |
+| `NEXT_PUBLIC_AUTH_SERVER_URL` | Same origin as `PUBLIC_AUTH_SERVER_URL`, but readable from CLIENT COMPONENT code — the `NEXT_PUBLIC_` prefix is required for Next.js to inline it into the browser bundle (plain server-only vars like `AUTH_SERVER_URL`/`PUBLIC_AUTH_SERVER_URL` are always `undefined` there). Used by the accept-invite and reset-password forms, which call the auth server directly from the browser. Default: `http://localhost:3000` |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | Comma-separated origins allowed by `/login?next=` redirect validation (in addition to `AUTH_SERVER_URL`). Default: empty |
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
 | `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |
@@ -480,6 +512,29 @@ Two NestJS throttler buckets (`@nestjs/throttler`), applied globally, keyed per-
 | `AUTH_RATE_WINDOW_MS`    | Window length in milliseconds for `AUTH_RATE_LIMIT`.                     | `60000` (1 min) |
 
 See also [Self-serve Registration rate limiting](#rate-limiting) for the separate, differently-defaulted `REGISTER_RATE_LIMIT`/`REGISTER_RATE_WINDOW_MS` pair that guards `POST /api/register`.
+
+### Password policy (optional)
+
+Global password complexity policy applied to every self-serve signup, accept-invitation, and forgot-password reset. Any `SaApp` can fully override this via the admin console's app edit drawer (Password Policy section). Defaults below reproduce the policy that was hardcoded prior to this becoming configurable.
+
+| Variable                        | Description                              | Default |
+|----------------------------------|-------------------------------------------|---------|
+| `PASSWORD_MIN_LENGTH`            | Minimum password length                   | `12`    |
+| `PASSWORD_REQUIRE_UPPERCASE`     | Require at least one uppercase letter     | `true`  |
+| `PASSWORD_REQUIRE_LOWERCASE`     | Require at least one lowercase letter     | `true`  |
+| `PASSWORD_REQUIRE_NUMBER`        | Require at least one number               | `true`  |
+| `PASSWORD_REQUIRE_SPECIAL`       | Require at least one special character    | `false` |
+| `PASSWORD_MIN_NUMBERS`           | Minimum count of numeric characters       | `1`     |
+| `PASSWORD_MIN_SPECIAL`           | Minimum count of special characters       | `0`     |
+
+### Signup captcha (optional)
+
+Cloudflare Turnstile widget shown on the admin console's `/signup` page. `TURNSTILE_SECRET_KEY` is verified server-side only and never exposed to the browser; leaving it unset fails every signup captcha check closed (`POST /api/register` always rejects with `422`).
+
+| Variable                          | Description |
+|-------------------------------------|--------------|
+| `TURNSTILE_SECRET_KEY`              | Secret key for verifying `/signup`'s captcha, auth-server only. For local dev/test/CI, use Cloudflare's documented always-pass test secret key: `1x0000000000000000000000000000000AA` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`    | Public site key for the admin `/signup` Turnstile widget — inlined into the client bundle by the `NEXT_PUBLIC_` prefix, safe to expose. For local dev/test/CI, use Cloudflare's documented always-pass test site key: `1x00000000000000000000AA` (paired with `TURNSTILE_SECRET_KEY` above) |
 
 ### Observability (optional)
 
@@ -597,7 +652,7 @@ A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_r
 **Step 4 — Exchange the code + verifier for a JWT**
 
 ```bash
-curl -X POST http://localhost:3000/api/token/oauth/token \
+curl -X POST https://localhost:3010/api/token/oauth/token \
   -H "Content-Type: application/json" \
   -d '{
     "code": "<authorization-code>",
@@ -626,7 +681,7 @@ Authorization codes are single-use and stored in the database (`SaOauthCode` tab
 Use this flow for first-party apps and management UIs that collect credentials directly without a browser redirect.
 
 ```bash
-curl -X POST http://localhost:3000/api/token/direct/login \
+curl -X POST https://localhost:3010/api/token/direct/login \
   -H "Content-Type: application/json" \
   -d '{
     "identifier": "user@example.com",
@@ -699,13 +754,32 @@ The `id_token` is RS256-signed with the same key as the access token and JWKS do
 **`/userinfo`.** `GET /api/token/oauth/userinfo` with `Authorization: Bearer <access_token>` returns the same scope-gated identity claims as the `id_token`, derived from the presented token's own `scope` claim — it can never return more than the token was granted:
 
 ```bash
-curl http://localhost:3000/api/token/oauth/userinfo \
+curl https://localhost:3010/api/token/oauth/userinfo \
   -H "Authorization: Bearer <access_token>"
 ```
 
 ```json
 { "sub": "<userPublicId>", "email": "user@example.com", "email_verified": true }
 ```
+
+Every response always includes:
+
+| Claim    | Description                                                                 |
+| -------- | ----------------------------------------------------------------------------- |
+| `sub`    | The user's public ID, taken from the access token's own `sub` claim.          |
+| `status` | The user's current account status (e.g. `active`), read fresh from the database on every call — not cached in the token. |
+
+Before returning anything, the endpoint re-checks the user in the database and rejects with `401 invalid_grant` if the account is `inactive` or no longer exists — even if the access token itself hasn't expired yet.
+
+The rest of the claims are gated by the scopes granted at authorize time (`&scope=...`), mirrored from the same `buildScopedClaims` logic used for `id_token` issuance:
+
+| Scope granted | Additional claims returned                                    |
+| -------------- | --------------------------------------------------------------- |
+| `profile`      | `name`, `given_name`, `family_name`                            |
+| `email`        | `email`, `email_verified`                                       |
+| neither        | none — response is just `{ sub, status }`                       |
+
+Requesting `profile` and `email` together returns all five extra claims in one call.
 
 ---
 
@@ -716,7 +790,7 @@ Resource servers must never trust JWTs blindly. Verify the signature using the p
 **Fetch the JWKS document:**
 
 ```bash
-curl http://localhost:3000/api/token/jwks
+curl https://localhost:3010/api/token/jwks
 ```
 
 ```json
@@ -763,7 +837,7 @@ const jwksClient = require('jwks-rsa');
 const jwt = require('jsonwebtoken');
 
 const client = jwksClient({
-  jwksUri: 'http://localhost:3000/api/token/jwks',
+  jwksUri: 'https://localhost:3010/api/token/jwks',
 });
 
 function getKey(header, callback) {
@@ -868,6 +942,67 @@ returns the list of provider buttons that app's login page should render.
 It is public and unauthenticated by design — it discloses only which buttons
 to show, never credentials — and returns an empty list (not a 404) for an
 unknown `client_id`, so it cannot be used to enumerate registered apps.
+
+---
+
+## Activation Webhook
+
+A SaApp can register a URL to be notified, server-to-server, the moment one of its users' accounts becomes `active` — instead of polling `/userinfo` or `/api/me` to find out.
+
+**Why a relying party would want this.** Say a SaaS product provisions a tenant workspace, seeds default data, and sends a "you're in" email once a customer's account is usable — but signup redirects the user back immediately while the account is still `pending`/`unverified` (see [Known Limitations](#known-limitations) for that design elsewhere in the flow), and email verification can complete minutes or days later, from a link the resource server never sees. Without a signal, the resource server either provisions too early (before the account is real) or has to poll on a timer. The activation webhook removes the guesswork: SassyAuth calls the resource server's endpoint exactly once, right when the transition to `active` happens — from *any* path that causes it (email verification, invitation acceptance, or an admin re-activating the account) — and the resource server reacts from there (finish provisioning, send the welcome email, unlock the trial).
+
+**Configuring it.** Set a webhook URL and a signing secret on the app, either in the admin console (`/apps` → edit an app → **Webhook URL** / **Webhook secret**) or via the API:
+
+```bash
+curl -X PATCH https://localhost:3010/api/apps/<appPublicId> \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <admin session>" \
+  -d '{
+    "webhookUrl": "https://app.example.com/webhooks/sassy-auth",
+    "webhookSecret": "a-random-secret-at-least-16-chars"
+  }'
+```
+
+Both fields must be set together, or both cleared — a URL with no secret (or vice versa) is rejected with `400`, since an unsigned webhook has no way to be verified. The secret is stored in plaintext (not hashed), because the server needs it back to *sign* outgoing requests, not to verify an incoming credential; treat it as sensitive. `GET`/list responses on `/api/apps` never return the secret itself — only `hasWebhookSecret: true|false` — so the admin console can show whether one is configured without ever displaying it again after it's set.
+
+**Delivery.** When a `SaUser` transitions to `active`, SassyAuth POSTs:
+
+```json
+POST <webhookUrl>
+Content-Type: application/json
+X-Sassy-Signature: sha256=<hex hmac>
+
+{
+  "event": "account.activated",
+  "userId": "<SaUser.publicId>",
+  "appPublicId": "<SaApp.publicId>",
+  "activatedAt": "2026-09-15T12:34:56.000Z"
+}
+```
+
+`X-Sassy-Signature` is an HMAC-SHA256 of the raw JSON body, keyed with `webhookSecret` — the same shape as Stripe's or GitHub's webhook signing, so existing verification libraries and patterns apply. Verify it in Node with a constant-time comparison:
+
+```javascript
+const crypto = require('crypto');
+
+function isValidSassyWebhook(rawBody, signatureHeader, secret) {
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  const provided = (signatureHeader || '').replace(/^sha256=/, '');
+  const a = Buffer.from(expected, 'hex');
+  const b = Buffer.from(provided, 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+```
+
+> Always compute the HMAC over the **raw** request body, before any JSON parsing/re-serialization — re-stringifying a parsed object can reorder keys or change whitespace and silently break the signature check.
+
+**What to expect operationally:**
+
+- **5-second timeout, one retry.** A single retry on a network error or a `5xx` response; a `4xx` is treated as a permanent failure and is not retried. There is no further backoff and no delivery queue — a webhook endpoint that is down when the event fires simply misses it.
+- **Redirects are not followed.** A `webhookUrl` that responds with a redirect fails the delivery rather than being followed, so a signed request can't be silently re-sent somewhere else (e.g. an internal address) by a compromised or misconfigured endpoint.
+- **Fire-and-forget, never blocks activation.** Delivery success or failure has no effect on the activation itself — it always commits — and every outcome (delivered, failed, or no-op because no `webhookUrl` is configured) is written to the `SaAuditEvent` table for later inspection, not held anywhere retriable.
+- **Idempotent trigger, not idempotent delivery.** The status transition itself only fires once (re-activating an already-`active` user is a no-op), but because there's no delivery ledger, treat `userId` + `event` as a natural dedupe key on your side if you care about exactly-once processing across retries.
+- **Scope.** One URL and one secret per app, and `account.activated` is the only event today — no per-app multiple endpoints/subscriptions and no deactivation or other status-change events. See [Known Limitations](#known-limitations).
 
 ---
 
@@ -1018,7 +1153,7 @@ uvicorn app.main:app --port 8010 --reload
 
 | Variable              | Description                                                   |
 |-----------------------|---------------------------------------------------------------|
-| `AUTH_SERVER_URL`     | SassyAuth base URL (default `http://localhost:3000`)          |
+| `AUTH_SERVER_URL`     | SassyAuth base URL (default `https://localhost:3010`)          |
 | `ADMIN_URL`           | Admin console URL for login redirect (default `http://localhost:3001`) |
 | `SASSY_CLIENT_ID`     | `sa_app.publicId` for this resource server (from seed output) |
 | `RS_BASE_URL`         | Public URL of this server (e.g. `http://localhost:8010`)      |
@@ -1050,7 +1185,7 @@ Routes:
 - `/oauth-error` — OAuth error page (shown when the authorize flow fails; optionally links to `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`)
 - `/users` — users management (TanStack Table, view/edit/create drawers)
 - `/orgs` — org management
-- `/apps` — app management
+- `/apps` — app management, including per-app 2FA policy, redirect URIs, default org/role, social providers, and the [activation webhook](#activation-webhook) URL/secret
 - `/roles` — role management with inline permission assignment
 - `/permissions` — permission management with role/user detail view
 - `/account/security` — per-user 2FA enrolment
@@ -1059,7 +1194,7 @@ All CRUD operations (create, update, delete) show success toast notifications vi
 
 i18n is wired with `next-intl` (locales: `en`, `fr`). Strings live in `apps/admin/messages/`. The active locale is detected from the `Accept-Language` header and can be overridden via the `LocaleSwitcher` in the shell.
 
-The admin console talks to `auth-server` via `AUTH_SERVER_URL` (default `http://localhost:3000`). All API calls forward the BetterAuth session cookie via the helpers in `apps/admin/lib/api.ts`.
+The admin console talks to `auth-server` via `AUTH_SERVER_URL` (default `https://localhost:3010`). All API calls forward the BetterAuth session cookie via the helpers in `apps/admin/lib/api.ts`.
 
 The login page supports a `next=<url>` query parameter for post-login redirect (e.g., from a resource server's OAuth flow). URLs are validated against an allowlist (`AUTH_SERVER_URL` + `LOGIN_NEXT_ALLOWED_ORIGINS` env var) to prevent open redirects.
 

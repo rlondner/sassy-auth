@@ -53,7 +53,7 @@ def _stub_pyjwk(monkeypatch, pub_pem: str):
 def _claims(**overrides):
     now = int(time.time())
     base = {
-        "iss": "http://localhost:3000",
+        "iss": "https://localhost:3010",
         "sub": "user-1",
         "aud": "84LR",
         "iat": now,

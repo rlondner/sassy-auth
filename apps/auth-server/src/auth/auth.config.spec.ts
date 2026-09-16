@@ -19,6 +19,9 @@ jest.mock('../email/email.singleton', () => ({
 }));
 jest.mock('./otp-test-store', () => ({ otpTestStore: {} }));
 jest.mock('./otp-sender', () => ({ sendSignInOtp: jest.fn() }));
+jest.mock('../activation/notify-activation', () => ({
+  notifyActivation: jest.fn().mockResolvedValue(undefined),
+}));
 
 describe('auth.config — twoFactor plugin', () => {
   it('includes the twoFactor plugin in the plugins array', async () => {
@@ -254,19 +257,47 @@ describe('auth.config — emailVerification', () => {
     expect(ev['autoSignInAfterVerification']).toBe(false);
   });
 
-  it('sendVerificationEmail sends via the emailer with the verify URL', async () => {
+  it('sendVerificationEmail resolves the owning SaApp and brands the email with its name and override', async () => {
     const sendMock = jest.fn().mockResolvedValue({ sent: true });
     jest.doMock('../email/email.singleton', () => ({ getEmailer: () => ({ send: sendMock }) }));
     jest.resetModules();
     const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique.mockResolvedValue({
+      org: { app: { name: 'Vibecast', activationEmailOverride: { fromName: 'Vibecast', fromAddress: 'no-reply@vibecast.io' } } },
+    });
     const options = (auth as unknown as { options: Record<string, unknown> }).options;
     const ev = options['emailVerification'] as {
-      sendVerificationEmail: (args: { user: { email: string; name?: string }; url: string }) => Promise<void>;
+      sendVerificationEmail: (args: { user: { id: string; email: string; name?: string }; url: string }) => Promise<void>;
     };
-    await ev.sendVerificationEmail({ user: { email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
+    await ev.sendVerificationEmail({ user: { id: 'ba-user-1', email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
+    expect(prisma.saUser.findUnique).toHaveBeenCalledWith({
+      where: { betterAuthUserId: 'ba-user-1' },
+      select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
+    });
     expect(sendMock).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'jane@example.com', html: expect.stringContaining('https://x/verify-email?token=abc') }),
+      expect.objectContaining({
+        to: 'jane@example.com',
+        subject: 'Verify your Vibecast email address',
+        from: 'Vibecast <no-reply@vibecast.io>',
+        html: expect.stringContaining('https://x/verify-email?token=abc'),
+      }),
     );
+  });
+
+  it('sendVerificationEmail falls back to "Sassy Auth" and no branding when the SaUser lookup finds nothing', async () => {
+    const sendMock = jest.fn().mockResolvedValue({ sent: true });
+    jest.doMock('../email/email.singleton', () => ({ getEmailer: () => ({ send: sendMock }) }));
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique.mockResolvedValue(null);
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as {
+      sendVerificationEmail: (args: { user: { id: string; email: string; name?: string }; url: string }) => Promise<void>;
+    };
+    await ev.sendVerificationEmail({ user: { id: 'ba-unknown', email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
+    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ subject: 'Verify your Sassy Auth email address' }));
   });
 
   it('afterEmailVerification flips a matching unverified SaUser to active', async () => {
@@ -279,6 +310,36 @@ describe('auth.config — emailVerification', () => {
       where: { betterAuthUserId: 'ba-user-1', status: 'unverified' },
       data: { status: 'active' },
     });
+  });
+
+  it('notifies the activation webhook when email verification promotes unverified -> active', async () => {
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { notifyActivation: mockNotifyActivation } = require('../activation/notify-activation');
+    mockNotifyActivation.mockClear();
+    prisma.saUser.updateMany.mockClear();
+    prisma.saUser.findUnique.mockClear();
+    prisma.saUser.updateMany.mockResolvedValue({ count: 1 });
+    prisma.saUser.findUnique.mockResolvedValue({ id: 1, publicId: 'usr_1', orgId: 5 });
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
+    await ev.afterEmailVerification({ id: 'ba-1' });
+    expect(mockNotifyActivation).toHaveBeenCalledWith({ id: 1, publicId: 'usr_1', orgId: 5 });
+  });
+
+  it('does not notify the activation webhook when the user was already verified (updateMany matches nothing)', async () => {
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { notifyActivation: mockNotifyActivation } = require('../activation/notify-activation');
+    mockNotifyActivation.mockClear();
+    prisma.saUser.updateMany.mockClear();
+    prisma.saUser.updateMany.mockResolvedValue({ count: 0 });
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
+    await ev.afterEmailVerification({ id: 'ba-1' });
+    expect(mockNotifyActivation).not.toHaveBeenCalled();
   });
 });
 

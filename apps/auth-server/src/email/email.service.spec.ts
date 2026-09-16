@@ -38,4 +38,13 @@ describe('EmailService', () => {
     expect(res).toEqual({ sent: false });
     expect(warn).toHaveBeenCalled();
   });
+
+  it('uses msg.from when provided, overriding EMAIL_FROM', async () => {
+    const send = jest.fn().mockResolvedValue(undefined);
+    process.env.EMAIL_FROM = 'sender@x.co';
+    const { service } = await build({ name: 'fake', send });
+    const res = await service.send({ to: 'a@b.co', subject: 'S', html: '<p>h</p>', text: 'h', from: 'Vibecast <no-reply@vibecast.io>' });
+    expect(res).toEqual({ sent: true });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ from: 'Vibecast <no-reply@vibecast.io>' }));
+  });
 });

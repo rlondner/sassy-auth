@@ -116,6 +116,8 @@ model SaApp {
   publicId    String         @unique
   name        String         @unique
   url         String
+  /// Full data URI (e.g. "data:image/png;base64,...."). null = no logo set.
+  logo        String?
   twoFactorTrustDays Int?
   requireTwoFactor   Boolean        @default(false)
   isPlatform         Boolean        @default(false)
@@ -126,6 +128,18 @@ model SaApp {
   // separate client-type flag, so the two cannot contradict each other.
   clientSecretHash      String?
   clientSecretUpdatedAt DateTime?
+  // Signing secret and delivery target for the activation webhook (see
+  // apps/auth-server/src/activation/notify-activation.ts). webhookSecret is
+  // stored in plaintext, unlike clientSecretHash, because it is used to SIGN
+  // outgoing requests rather than verify incoming credentials — the server
+  // must be able to read it back.
+  webhookUrl    String?
+  webhookSecret String?
+  /// Partial ActivationEmailBranding JSON override (see @sassy-auth/types).
+  /// Unlike passwordPolicyOverride, this is field-level, not all-or-nothing:
+  /// null, or any field omitted within it, means "use the platform default"
+  /// for that field.
+  activationEmailOverride Json?
   orgs        SaOrg[]
   permissions SaPermission[]
   roles       SaRole[]

@@ -84,6 +84,7 @@ async def auth_callback(
             resp = await client.post(
                 f"{s.AUTH_SERVER_URL}/api/token/oauth/token",
                 json={
+                    "grant_type": "authorization_code",
                     "code": code,
                     "client_id": s.SASSY_CLIENT_ID,
                     "code_verifier": verifier,

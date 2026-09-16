@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { magicLink, emailOTP, openAPI, twoFactor, genericOAuth } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
+import type { ActivationEmailBranding } from '@sassy-auth/types';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { verificationEmail } from '../email/templates/verify-email.template';
 import { getEmailer } from '../email/email.singleton';
@@ -19,7 +20,8 @@ import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
 import { readIsPrivateEmail } from '../social/apple-private-relay-context';
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
-import { getGlobalPasswordPolicy, resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH } from './password-policy';
+import { notifyActivation } from '../activation/notify-activation';
+import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -101,6 +103,22 @@ export const auth = betterAuth({
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     },
+    // dev(sec) https rollout: BetterAuth derives `useSecureCookies` (which
+    // renames every session cookie with a `__Secure-` prefix, per RFC 6265bis)
+    // from whether `BETTER_AUTH_URL` starts with `https://` — completely
+    // independent of `defaultCookieAttributes.secure` above. Once the
+    // auth-server started running dev over https (mkcert), that flipped
+    // `useSecureCookies` on in development too, silently renaming
+    // `better-auth.session_token` to `__Secure-better-auth.session_token`.
+    // apps/admin hardcodes the unprefixed name in a dozen places (reading
+    // Set-Cookie from the auth-server, setting/forwarding the browser
+    // cookie, middleware's readSessionToken), so every sign-in "succeeded"
+    // upstream but admin's forwardSessionCookie() found no cookie named
+    // `better-auth.session_token`, returned false, and the login form
+    // showed "Sign-in service is unavailable." Pin this to the same
+    // production-only condition as `secure` above so dev keeps the
+    // unprefixed name regardless of the auth-server's protocol.
+    useSecureCookies: process.env.NODE_ENV === 'production',
   },
   rateLimit: {
     // Explicit rate-limit for the 2FA verify endpoints. In better-auth 1.6.11
@@ -311,15 +329,21 @@ export const auth = betterAuth({
     // (never-persisted) user so sign-up cannot be used to enumerate accounts.
     // RegistrationService checks for that explicitly — see its 409 path.
     autoSignIn: false,
-    // Belt-and-braces baseline matching the global policy's length bounds.
+    // Belt-and-braces baseline, NOT the global policy's minLength (bug found
+    // by the "per-app password policy override" e2e spec: pinning this to
+    // getGlobalPasswordPolicy(...).minLength rejected every app-level
+    // override that relaxes the minimum below the global default, since
     // BetterAuth reads these two options into ctx.context.password.config
     // (dist/context/create-context.mjs) and enforces them natively on
-    // sign-up/update-user/reset-password (defaults would otherwise be 8/128
-    // — too permissive for this policy). The hooks.before matcher below is
-    // the actual complexity enforcement for /reset-password; this covers
-    // any other BetterAuth-native path that consults these two options
-    // directly.
-    minPasswordLength: getGlobalPasswordPolicy(process.env).minLength,
+    // sign-up/update-user/reset-password — a SECOND, app-unaware length
+    // check running after validatePasswordOrThrow had already accepted the
+    // password against the correct app-specific policy). Use the absolute
+    // floor any override is allowed to set instead (defaults would
+    // otherwise be 8/128 — too permissive for this policy). The
+    // hooks.before matcher below is the actual complexity+app-aware-length
+    // enforcement for /reset-password; this covers any other
+    // BetterAuth-native path that consults these two options directly.
+    minPasswordLength: MIN_PASSWORD_LENGTH_FLOOR,
     maxPasswordLength: MAX_PASSWORD_LENGTH,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
     // Without this, BetterAuth's /reset-password endpoint changes the
@@ -341,18 +365,35 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    sendVerificationEmail: async ({ user, url }: { user: { email: string; name?: string }; url: string }) => {
+    sendVerificationEmail: async ({ user, url }: { user: { id: string; email: string; name?: string }; url: string }) => {
       const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
-      await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url }) });
+      const saUser = await prisma.saUser.findUnique({
+        where: { betterAuthUserId: user.id },
+        select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
+      });
+      const appName = saUser?.org.app.name ?? 'Sassy Auth';
+      // AppsService.assertValidActivationEmailOverride is the only write path
+      // and shape-checks every field, but this cast still isn't a runtime
+      // guarantee — verificationEmail()'s optional chaining degrades to
+      // defaults on any malformed/missing field regardless.
+      const branding = (saUser?.org.app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
+      await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url, appName, branding }) });
     },
     afterEmailVerification: async (updatedUser: { id: string }) => {
       // No-op for any status other than 'unverified' — a 'pending' user
       // (invitation, no credential) or an already-'active' user verifying an
       // email through some future path must not be silently promoted.
-      await prisma.saUser.updateMany({
+      const promoted = await prisma.saUser.updateMany({
         where: { betterAuthUserId: updatedUser.id, status: 'unverified' },
         data: { status: 'active' },
       });
+      if (promoted.count > 0) {
+        const saUser = await prisma.saUser.findUnique({
+          where: { betterAuthUserId: updatedUser.id },
+          select: { id: true, publicId: true, orgId: true },
+        });
+        if (saUser) await notifyActivation(saUser);
+      }
     },
     autoSignInAfterVerification: false, // consistent with emailAndPassword.autoSignIn: false above
   },

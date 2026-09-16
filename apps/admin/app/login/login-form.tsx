@@ -26,10 +26,12 @@ function clientIdFromNext(next: string): string | null {
 export function LoginForm({
   next,
   providers = [],
+  logo = null,
   authServerUrl,
 }: {
   next: string
   providers?: string[]
+  logo?: string | null
   authServerUrl: string
 }) {
   const t = useTranslations('login')
@@ -53,8 +55,13 @@ export function LoginForm({
 
   return (
     <AuthCard
-      title={t('title')}
+      // Signing in through an SaApp's authorize redirect (`client_id` present)
+      // is that app's login, not this operator console's -- "Admin Console"
+      // there is confusing/wrong branding for the app's own end users.
+      title={clientId ? undefined : t('title')}
       subtitle={t('subtitle')}
+      logoUrl={logo}
+      logoAlt={t('logoAlt')}
       footer={
         clientId ? (
           <p className="text-center text-label-md text-muted-foreground">

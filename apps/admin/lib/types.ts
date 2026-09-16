@@ -1,6 +1,7 @@
-import type { PasswordPolicy } from '@sassy-auth/types'
+import type { PasswordPolicy, ActivationEmailBranding } from '@sassy-auth/types'
 
 export type { PasswordPolicy }
+export type { ActivationEmailBranding }
 
 // Matches the server's global default password policy. Used by signup and
 // reset-password forms when a per-app/per-request policy hasn't been
@@ -91,6 +92,7 @@ export interface App {
   publicId: string;
   name: string;
   url: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
@@ -103,11 +105,17 @@ export interface App {
   defaultRoleId?: string | null;
   passwordPolicyOverride: PasswordPolicy | null;
   effectivePasswordPolicy: PasswordPolicy;
+  webhookUrl?: string | null;
+  // The secret itself is never sent to the admin console — only whether one
+  // is configured, mirroring isConfidential/clientSecretHash above.
+  hasWebhookSecret?: boolean;
+  activationEmailOverride: ActivationEmailBranding | null;
 }
 
 export interface CreateAppPayload {
   name: string;
   url: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
@@ -116,12 +124,15 @@ export interface CreateAppPayload {
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
   defaultOrgId?: string | null;
   defaultRoleId?: string | null;
   passwordPolicyOverride?: PasswordPolicy | null;
+  webhookUrl?: string | null;
+  activationEmailOverride?: ActivationEmailBranding | null;
 }
 
 export interface ListAppsParams {

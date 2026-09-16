@@ -12,7 +12,7 @@ export class EmailService {
 
   /** Send an email. Never throws — a transport failure is logged and reported as { sent: false }. */
   async send(msg: EmailMessage): Promise<{ sent: boolean }> {
-    const from = process.env.EMAIL_FROM ?? 'no-reply@sassy-auth.local';
+    const from = msg.from ?? process.env.EMAIL_FROM ?? 'no-reply@sassy-auth.local';
     try {
       await this.transport.send({ ...msg, from });
       return { sent: true };

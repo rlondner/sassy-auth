@@ -9,6 +9,22 @@ import { evaluatePasswordPolicy, PasswordPolicy, PasswordRuleKey } from '@sassy-
  */
 export const MAX_PASSWORD_LENGTH = 256;
 
+/**
+ * Absolute floor for any app's passwordPolicyOverride.minLength (enforced in
+ * apps.service.ts's assertValidPasswordPolicyOverride). BetterAuth's own
+ * native minPasswordLength (auth.config.ts) must be set to this floor, not
+ * the global default policy's minLength — a per-app override that relaxes
+ * the minimum below the global default is validated by
+ * validatePasswordOrThrow before BetterAuth ever sees the password
+ * (registration.service.ts, invitations.service.ts), but BetterAuth's
+ * signUpEmail/updateUser/reset-password code paths run their own native
+ * length check against this single global option regardless of which app's
+ * policy applies — pinning it to the global default rejected every override
+ * below 12 chars even though the app-aware check upstream had already
+ * accepted it (found via the "per-app password policy override" e2e spec).
+ */
+export const MIN_PASSWORD_LENGTH_FLOOR = 8;
+
 function parseBool(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) return fallback;
   return value.toLowerCase() === 'true';

@@ -127,7 +127,7 @@ RSA_PUBLIC_KEY="<base64-encoded SPKI PEM>"
 
 # BetterAuth
 BETTER_AUTH_SECRET="change-me-to-a-random-32-char-string"
-BETTER_AUTH_URL="http://localhost:3000"
+BETTER_AUTH_URL="https://localhost:3010"
 
 # Social providers (optional — omit unused ones)
 GOOGLE_CLIENT_ID=""
@@ -634,7 +634,7 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3010);
 }
 
 bootstrap();
@@ -2083,7 +2083,7 @@ async function main() {
       data: {
         publicId: 'placeholder',
         name: 'SassyAuth',
-        url: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
+        url: process.env.BETTER_AUTH_URL ?? 'https://localhost:3010',
         isPlatform: true,
       },
     });
@@ -2218,7 +2218,7 @@ const publicPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
 
 process.env.RSA_PRIVATE_KEY = Buffer.from(privatePem).toString('base64');
 process.env.RSA_PUBLIC_KEY = Buffer.from(publicPem).toString('base64');
-process.env.BETTER_AUTH_URL = 'http://localhost:3000';
+process.env.BETTER_AUTH_URL = 'https://localhost:3010';
 process.env.BETTER_AUTH_SECRET = 'test-secret-at-least-32-chars-long!!';
 
 describe('SassyAuth E2E', () => {
@@ -2338,7 +2338,7 @@ describe('SassyAuth E2E', () => {
 
       expect(decoded.sub).toBe(userPublicId);
       expect(decoded.aud).toBe(platformAppPublicId);
-      expect(decoded.iss).toBe('http://localhost:3000');
+      expect(decoded.iss).toBe('https://localhost:3010');
       expect(Array.isArray(decoded.permissions)).toBe(true);
     });
 

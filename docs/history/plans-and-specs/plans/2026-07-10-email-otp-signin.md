@@ -1009,7 +1009,7 @@ import { t } from '../lib/i18n'
 // Auth-server base URL for the test-only OTP retrieval endpoint. Reuse the
 // same env the suite already uses to reach the auth server (confirm the name
 // in Step 1; AUTH_SERVER_URL shown here as the documented default).
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export class LoginPage {
   constructor(private readonly page: Page) {}
@@ -1096,7 +1096,7 @@ Append to `apps/admin-e2e/tests/matrix/otp-signin.spec.ts` inside the `describe`
     // error; otherwise assert no code was issued (delivery was skipped).
     await login.requestCode(DEACTIVATED_EMAIL)
     const res = await page.request.get(
-      `${process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'}/test/last-otp?email=${encodeURIComponent(DEACTIVATED_EMAIL)}`,
+      `${process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'}/test/last-otp?email=${encodeURIComponent(DEACTIVATED_EMAIL)}`,
     )
     expect(res.status(), 'no code should be issued to a deactivated user').toBe(404)
   })

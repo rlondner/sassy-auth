@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, MeProfile, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
 
-const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const BASE = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const cookieStore = await cookies()
@@ -227,6 +227,16 @@ export async function getApps(params: ListAppsParams = {}): Promise<ListAppsResp
   return res.json();
 }
 
+// GET /api/apps/:publicId — unlike getApps (the paginated list, which omits
+// `logo` to avoid shipping every row's base64 blob), this single-app fetch
+// still returns it. Used by the edit drawer to seed its logo field with the
+// real current value, since the drawer's `app` prop otherwise only ever
+// comes from the (logo-less) list response.
+export async function getApp(publicId: string): Promise<App> {
+  const res = await apiFetch(`/api/apps/${publicId}`);
+  return res.json();
+}
+
 export async function createApp(payload: CreateAppPayload): Promise<App> {
   const res = await apiFetch('/api/apps', { method: 'POST', body: JSON.stringify(payload) });
   const app: App = await res.json();
@@ -253,6 +263,16 @@ export async function rotateClientSecret(publicId: string): Promise<{ clientSecr
   const res = await apiFetch(`/api/apps/${publicId}/client-secret`, { method: 'POST' });
   const result: { clientSecret: string } = await res.json();
   Sentry.addBreadcrumb({ category: 'admin.action', message: `Client secret rotated: ${publicId}`, level: 'info' });
+  return result;
+}
+
+// Returns the new webhook secret in plaintext — same one-time-reveal pattern
+// as rotateClientSecret above. There is no free-text way to set this secret
+// anymore (see AppEditDrawer): it's always server-generated.
+export async function rotateWebhookSecret(publicId: string): Promise<{ webhookSecret: string }> {
+  const res = await apiFetch(`/api/apps/${publicId}/webhook-secret`, { method: 'POST' });
+  const result: { webhookSecret: string } = await res.json();
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Webhook secret rotated: ${publicId}`, level: 'info' });
   return result;
 }
 

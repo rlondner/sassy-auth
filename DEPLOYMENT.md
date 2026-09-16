@@ -58,6 +58,41 @@ flowchart LR
 
 ---
 
+## One-time setup for automated deploys
+
+Deploys are automated by `.github/workflows/deploy-render.yml`, which runs
+`packages/deploy-render` on every push to `master`. It generates and stores
+missing secrets, provisions the Neon database, syncs env vars to
+`sassy-auth-server` and `sassy-auth-admin` via the Render API, and runs the
+platform seed as a Render Job — no dashboard clicks required after this
+one-time setup:
+
+1. Create a [Render API key](https://api-docs.render.com/reference/authentication) and store it as the `RENDER_API_KEY` secret on this repo's `production` GitHub Environment.
+2. Create a [Neon API key](https://neon.tech/docs/manage/api-keys) and store it as `NEON_API_KEY` on the same Environment.
+3. Create a fine-grained GitHub PAT scoped to this repo with **Environments: write** permission, and store it as `GH_SECRETS_PAT` (the default `GITHUB_TOKEN` can't write Environment secrets).
+4. Connect this repository to Render as a Blueprint once (**Render Dashboard → New → Blueprint**) — Render has no public API for this first-time connection. On this first sync, Render will prompt for the `sync: false` variables; leave them blank and push to `master` — the workflow fills them in on the next run.
+5. Point DNS at the CNAME targets Render shows for each custom domain (see §3.2 below) — a one-time step per domain.
+
+On the first workflow run, generated secrets (RSA keypair, `BETTER_AUTH_SECRET`,
+`SEED_ADMIN_PASSWORD`) are generated and stored directly as GitHub Environment
+secrets — their values are never printed anywhere, including the workflow's
+job summary, since GitHub secrets are write-only after creation and there's no
+safe way to display them. If one is ever lost, delete it from the repo's
+`production` Environment on GitHub and re-run the workflow; it will generate
+and store a fresh value automatically (rotating the RSA keypair invalidates
+issued JWTs, and rotating `BETTER_AUTH_SECRET` signs out every admin session —
+see §7 below). Every subsequent push reuses the same stored secrets.
+
+Note: this automation covers `sassy-auth-server` and `sassy-auth-admin` only.
+The sample `sassy-resource-server` (FastAPI) app is a dev/demo app, is out of
+scope for the automated pipeline, and stays deployable manually via its
+existing `render.yaml` entry (see §5 below).
+
+See `docs/superpowers/specs/2026-09-16-render-deploy-automation-design.md` for
+the full design.
+
+---
+
 ## 1. Neon database
 
 1. Create a project at [console.neon.tech](https://console.neon.tech).
@@ -76,25 +111,19 @@ Neon is the only database in this layout. Do not provision Render Postgres unles
 
 ## 2. Generate secrets (one time)
 
-Run locally from the repository root.
+Production secret generation is automated (see "One-time setup for automated deploys" above) — you should not need to run these manually for a production deploy. They're kept here for local development (§8), where you generate your own `.env.local` values by hand.
 
-**RSA key pair** (JWT signing):
+**RSA key pair** (JWT signing — `RSA_PRIVATE_KEY` / `RSA_PUBLIC_KEY`):
 
 ```bash
 node -e "const c=require('crypto');const {privateKey,publicKey}=c.generateKeyPairSync('rsa',{modulusLength:2048});console.log('RSA_PRIVATE_KEY='+Buffer.from(privateKey.export({type:'pkcs8',format:'pem'})).toString('base64'));console.log('RSA_PUBLIC_KEY='+Buffer.from(publicKey.export({type:'spki',format:'pem'})).toString('base64'))"
 ```
 
-**BetterAuth secret** (32+ random characters):
+**BetterAuth secret** (`BETTER_AUTH_SECRET`, 32+ random characters):
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
-
-**Admin seed password** (required in production — the seed script refuses the published dev default when `NODE_ENV=production`):
-
-Choose a strong password and store it as `SEED_ADMIN_PASSWORD`. You will use it for the first platform admin account created by the seed.
-
-Store all generated values in a password manager. Rotating `RSA_PRIVATE_KEY` / `RSA_PUBLIC_KEY` invalidates every issued JWT; rotating `BETTER_AUTH_SECRET` signs out every admin session.
 
 ---
 
@@ -105,17 +134,7 @@ Store all generated values in a password manager. Rotating `RSA_PRIVATE_KEY` / `
 1. Push this repository to GitHub (if not already).
 2. In Render: **New → Blueprint**.
 3. Connect the repository and select the default `render.yaml`.
-4. Render prompts for every `sync: false` variable. At minimum provide:
-
-   | Variable | Service / group | Notes |
-   |----------|-----------------|-------|
-   | `DATABASE_URL` | `sassy-auth-production` | Neon pooled connection string |
-   | `RSA_PRIVATE_KEY` | `sassy-auth-production` | Base64 PKCS8 PEM |
-   | `RSA_PUBLIC_KEY` | `sassy-auth-production` | Base64 SPKI PEM |
-   | `BETTER_AUTH_SECRET` | `sassy-auth-production` | 32+ char random string |
-   | `SEED_ADMIN_PASSWORD` | `sassy-auth-server` | Strong password for seeded admins |
-   | `SASSY_CLIENT_ID` | `sassy-resource-server` | Set after [§5 Register the resource-server app](#5-register-the-resource-server-app) |
-   | `RESEND_API_KEY` | `sassy-auth-server` | Recommended for invitation/reset email |
+4. Render prompts for every `sync: false` variable on `sassy-auth-server` and `sassy-auth-admin`. Leave these blank per the one-time setup steps above — the deploy workflow populates them on the next push to `master`, before Render's Blueprint sync rebuilds the service. `sassy-resource-server` is not covered by that automation; if you're deploying it too, set its `sync: false` variables (including `SASSY_CLIENT_ID`, see [§5](#5-register-the-resource-server-app)) by hand as before.
 
 5. Click **Apply**. Render builds and deploys all three services.
 
@@ -153,20 +172,14 @@ Running migrations in both places executes them twice per deploy — pick one lo
 
 ### 3.4 First-time seed
 
-Migrations run automatically; **seed does not**. Run the idempotent platform seed once from a Render shell on `sassy-auth-server` (**Shell** tab in the service dashboard):
-
-```bash
-corepack enable && corepack prepare pnpm@9.0.0 --activate
-pnpm --filter @sassy-auth/db db:seed
-```
-
-The shell inherits environment variables from the service, including `DATABASE_URL` and `SEED_ADMIN_PASSWORD`.
+Seeding is automated as a Render Job triggered by the deploy workflow after every successful deploy of `sassy-auth-server`. `db:seed` is idempotent, so re-running it on every deploy is safe.
 
 This creates the platform app, org, permissions, and five platform admin users (`s@sa.io`, `u@sa.io`, …). Sign in at https://auth.milissai.com/login as `s@sa.io` with your `SEED_ADMIN_PASSWORD`.
 
-**Optional demo data** for the FastAPI sample (creates app `resourceserver01`, org `Citadel`, demo users):
+**Optional demo data** for the FastAPI sample (creates app `resourceserver01`, org `Citadel`, demo users) — this is not part of the automated pipeline; run it once from a Render shell on `sassy-auth-server` (**Shell** tab in the service dashboard, which inherits the service's environment variables):
 
 ```bash
+corepack enable && corepack prepare pnpm@9.0.0 --activate
 SEED_DEMO=1 pnpm --filter @sassy-auth/db db:seed
 ```
 
@@ -311,7 +324,7 @@ The auth-server and admin are independent web services and can be scaled separat
 
 ## 8. Local mock deployment (custom ports)
 
-Use this layout to rehearse the production topology on one machine without occupying the default dev ports (`3000` / `3001`). It mirrors the three public URLs above but maps them to localhost with distinct ports.
+Use this layout to rehearse the production topology on one machine without occupying the default dev ports (`3010` / `3001`). It mirrors the three public URLs above but maps them to localhost with distinct ports.
 
 | Role | Local URL | Port |
 |------|-----------|------|
@@ -503,7 +516,7 @@ Multi-stage Dockerfiles build compiled artifacts (not dev servers). Each app is 
 
 | Image | Dockerfile | Default port |
 |-------|------------|--------------|
-| Auth server | [`docker/Dockerfile.auth-server`](docker/Dockerfile.auth-server) | 3000 |
+| Auth server | [`docker/Dockerfile.auth-server`](docker/Dockerfile.auth-server) | 3010 |
 | Admin console | [`docker/Dockerfile.admin`](docker/Dockerfile.admin) | 3001 |
 | Resource server | [`apps/resource-server-fastapi/Dockerfile`](apps/resource-server-fastapi/Dockerfile) | 8010 |
 
@@ -531,7 +544,7 @@ Set the same environment variables documented in [§4](#4-environment-variable-r
 
 ```bash
 # Auth server — migrations run automatically on container start
-docker run --rm -p 3000:3000 \
+docker run --rm -p 3010:3010 \
   -e DATABASE_URL="$DATABASE_URL" \
   -e RSA_PRIVATE_KEY="$RSA_PRIVATE_KEY" \
   -e RSA_PUBLIC_KEY="$RSA_PUBLIC_KEY" \
@@ -562,7 +575,7 @@ docker run --rm -p 8010:8010 \
 
 Terminate TLS in front of these containers (load balancer, reverse proxy, or a platform like Render). Do not expose them on plain HTTP in production — admin session cookies require HTTPS when `NODE_ENV=production`.
 
-The auth-server entrypoint ([`docker/entrypoint-auth-server-prod.sh`](docker/entrypoint-auth-server-prod.sh)) runs `prisma migrate deploy` before startup when `DATABASE_URL` is set. **Seeding is not automatic** — run [§3.4 First-time seed](#34-first-time-seed) manually.
+The auth-server entrypoint ([`docker/entrypoint-auth-server-prod.sh`](docker/entrypoint-auth-server-prod.sh)) runs `prisma migrate deploy` before startup when `DATABASE_URL` is set. **Seeding is not automatic here** — the deploy workflow's Render Job (§3.4) only runs for the Render Blueprint deployment. Running the container yourself, seed it once with `pnpm --filter @sassy-auth/db db:seed` against the same `DATABASE_URL` (it's idempotent, so re-running it is safe).
 
 ### Use on Render instead of native buildpacks
 
@@ -584,7 +597,7 @@ Apply the same pattern for `sassy-auth-admin` and `sassy-resource-server` (using
 To rehearse the [§8 local mock](#8-local-mock-deployment-custom-ports) using these images instead of `pnpm` directly, map the same custom ports and pass `http://localhost:…` URLs:
 
 ```bash
-docker run --rm -p 3100:3000 -e PORT=3000 ... sassy-auth-server
+docker run --rm -p 3100:3010 -e PORT=3010 ... sassy-auth-server
 docker run --rm -p 3101:3001 -e PORT=3001 ... sassy-auth-admin
 docker run --rm -p 8100:8010 -e PORT=8010 ... sassy-resource-server
 ```

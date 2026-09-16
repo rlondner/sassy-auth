@@ -90,8 +90,8 @@ cat <<'BANNER'
   SassyAuth is starting.
 
     Admin console   http://localhost:3001/login
-    Auth server     http://localhost:3000
-    API docs        http://localhost:3000/api/docs
+    Auth server     https://localhost:3010
+    API docs        https://localhost:3010/api/docs
 
     Sign in as      s@sa.io / Pass@word1234
 

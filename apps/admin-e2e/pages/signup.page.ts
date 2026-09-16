@@ -1,4 +1,4 @@
-import { type Page, type Locator } from '@playwright/test'
+import { expect, type Page, type Locator } from '@playwright/test'
 import { t } from '../lib/i18n'
 
 export interface SignupDetails {
@@ -60,6 +60,16 @@ export class SignupPage {
     await this.emailInput.fill(details.email)
     await this.passwordInput.fill(details.password)
     await this.confirmPasswordInput.fill(details.password)
+    // The Turnstile widget (signup-form.tsx) loads Cloudflare's script and
+    // solves the (always-pass, in CI) challenge asynchronously — the submit
+    // button isn't gated on it, so clicking immediately after filling the
+    // form races the widget: handleSubmit sees captchaToken still null and
+    // bails out client-side before any network request. Cloudflare injects
+    // a hidden `cf-turnstile-response` input into the widget's container
+    // once solved; wait for it to carry a real token first.
+    await expect
+      .poll(() => this.page.locator('input[name="cf-turnstile-response"]').first().inputValue())
+      .not.toBe('')
     await this.submitButton.click()
   }
 }

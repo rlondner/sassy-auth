@@ -86,7 +86,7 @@ The Admin app talks to the `auth-server` using helper functions in `apps/admin/l
 1. **User Logs In:** The user goes to `/login` in the `admin` app.
 2. **Session Created:** BetterAuth creates a session cookie.
 3. **Admin Dashboard:** The `admin` app checks this session. If valid, it shows the dashboard.
-4. **Fetching Data:** To show the user list, the `admin` app (on the server) calls `GET http://localhost:3000/api/users` via the `getUsers()` helper, forwarding the session cookie.
+4. **Fetching Data:** To show the user list, the `admin` app (on the server) calls `GET https://localhost:3010/api/users` via the `getUsers()` helper, forwarding the session cookie.
 5. **API Response:** The `auth-server` validates the session, fetches users from the database using `@sassy-auth/db`, and returns them.
 
 ---

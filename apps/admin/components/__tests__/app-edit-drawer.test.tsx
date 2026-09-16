@@ -10,6 +10,7 @@ import type { PasswordPolicy } from '@/lib/types'
 
 jest.mock('@/app/(admin)/apps/actions', () => ({
   updateAppAction: jest.fn(),
+  getAppAction: jest.fn(),
   getSocialProviderSettingsAction: jest.fn(),
   updateSocialProvidersAction: jest.fn(),
   rotateClientSecretAction: jest.fn(),
@@ -133,6 +134,7 @@ const app = {
   requireTwoFactor: false,
   passwordPolicyOverride: null,
   effectivePasswordPolicy: EFFECTIVE_PASSWORD_POLICY,
+  activationEmailOverride: null,
 }
 
 function withIntl(node: React.ReactNode) {
@@ -146,6 +148,11 @@ function withIntl(node: React.ReactNode) {
 describe('AppEditDrawer', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    // Finding 2 (final review): the list response no longer carries `logo`,
+    // so the drawer fetches the single-app record on open to seed it. This
+    // default keeps existing tests, which build their fixtures without a
+    // real logo, behaving as before (`app.logo` is undefined either way).
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({ app })
     ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({ available: [], enabled: [] })
     ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
     ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
@@ -178,6 +185,45 @@ describe('AppEditDrawer', () => {
     fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
     await waitFor(() =>
       expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', { name: 'New' }),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  // Finding 2 (final review): GET /api/apps (the list AppsTable sources
+  // `selected` — and therefore this drawer's `app` prop — from) no longer
+  // sends `logo`, to avoid shipping every row's base64 blob on page load.
+  // The drawer must backfill it via a dedicated single-app fetch so editing
+  // an app that already has a logo doesn't show it as empty, and must not
+  // mark the form dirty (or resend the logo) purely because that fetch
+  // resolved.
+  it('backfills the logo from getAppAction and does not mark the form dirty from that alone', async () => {
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, logo: 'data:image/png;base64,EXISTING=' },
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    await waitFor(() =>
+      expect(screen.getByRole('img')).toHaveAttribute('src', 'data:image/png;base64,EXISTING='),
+    )
+    expect(screen.getByRole('button', { name: en.apps.drawer.save })).toBeDisabled()
+  })
+
+  it('includes a changed logo in the update payload', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: { ...app, name: 'X2' } })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    const file = new File(['a'.repeat(10)], 'logo.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.logo), { target: { files: [file] } })
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ logo: expect.stringMatching(/^data:image\/png;base64,/) }),
+      ),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
@@ -516,5 +562,32 @@ describe('AppEditDrawer', () => {
       )
       await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     })
+  })
+
+  // Code quality review (finding 2): a partially-set activationEmailOverride
+  // (only one field populated) that gets cleared entirely in the form must
+  // collapse to `null` in the patch, not an object with an empty string.
+  it('clears a partially-set activationEmailOverride to null when the only field is emptied', async () => {
+    const appWithPartialOverride = {
+      ...app,
+      activationEmailOverride: { fromName: 'Vibecast' },
+    }
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: appWithPartialOverride })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={appWithPartialOverride} open onOpenChange={onOpenChange} />))
+
+    const fromName = screen.getByLabelText(en.apps.fields.activationEmailFromName) as HTMLInputElement
+    expect(fromName.value).toBe('Vibecast')
+    fireEvent.change(fromName, { target: { value: '' } })
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ activationEmailOverride: null }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 })

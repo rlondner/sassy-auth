@@ -2,7 +2,7 @@ import { expect, type Page, type Locator } from '@playwright/test'
 import { t } from '../lib/i18n'
 
 // Auth-server base URL for the test-only OTP retrieval endpoint.
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export class LoginPage {
   readonly page: Page

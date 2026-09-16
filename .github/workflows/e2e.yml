@@ -39,18 +39,39 @@ jobs:
       # ephemeral and torn down after every run.
       CI_TESTS: 'true'
       DATABASE_URL: postgresql://sassy:sassy@localhost:5432/sassy_e2e
-      BETTER_AUTH_URL: http://localhost:3000
+      # dev(sec) (commit 0002a11d) made the auth-server serve BETTER_AUTH_URL
+      # over https in any non-production NODE_ENV, using a locally mkcert'd
+      # cert (apps/auth-server/secrets/*.pem, gitignored). CI has no such
+      # cert, and main.ts now falls back to plain http when the files are
+      # absent (see that file) — so CI keeps using http here rather than
+      # standing up a self-signed cert that Node's TLS client, Next's
+      # server-side fetches, and Python's httpx/PyJWKClient in the FastAPI
+      # RS would all separately need to be told to trust.
+      BETTER_AUTH_URL: http://localhost:3010
       BETTER_AUTH_SECRET: test-secret-at-least-32-chars-long!!
-      AUTH_SERVER_URL: http://localhost:3000
+      AUTH_SERVER_URL: http://localhost:3010
+      # api-public.ts is bundled into client-side JS and only inlines the
+      # NEXT_PUBLIC_-prefixed var (the bare AUTH_SERVER_URL above is stripped
+      # to `undefined` in the browser bundle, same as any non-NEXT_PUBLIC_
+      # var) — without this the accept-invite/reset-password/signup pages'
+      # direct browser→auth-server fetches fall back to api-public.ts's
+      # hardcoded 'https://localhost:3010' literal and hit
+      # net::ERR_SSL_PROTOCOL_ERROR against this job's plain-http server.
+      NEXT_PUBLIC_AUTH_SERVER_URL: http://localhost:3010
       ADMIN_URL: http://localhost:3001
       NODE_ENV: test
+      # Cloudflare's documented always-pass Turnstile test keypair (see
+      # .env.example) — without these the /signup captcha widget throws
+      # `Invalid input for parameter "sitekey"` and every signup spec fails.
+      TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA'
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -109,7 +130,7 @@ jobs:
         run: pnpm --filter @sassy-auth/auth-server seed
 
       - name: Set up Python for FastAPI RS
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -174,7 +195,7 @@ jobs:
       # accounting is worse than having no report for a run that succeeded.
       - name: Upload Playwright report
         if: ${{ failure() && steps.run-e2e.outcome == 'failure' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: apps/admin-e2e/playwright-report/
@@ -182,7 +203,7 @@ jobs:
 
       - name: Upload test results (traces, videos, attachments)
         if: ${{ failure() && steps.run-e2e.outcome == 'failure' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-test-results
           path: apps/admin-e2e/test-results/

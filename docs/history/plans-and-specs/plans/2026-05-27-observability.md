@@ -756,8 +756,8 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new SentryExceptionFilter(loggerService));
 
-  await app.listen(process.env.PORT ?? 3000);
-  loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3000}`, 'Bootstrap');
+  await app.listen(process.env.PORT ?? 3010);
+  loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3010}`, 'Bootstrap');
 }
 
 bootstrap();
@@ -1561,7 +1561,7 @@ Verify:
 - Auth server starts and Winston logs appear in console (pretty-print format)
 - `logs/combined.log` and `logs/error.log` are created in `apps/auth-server/logs/`
 - Admin console starts without Sentry errors (NEXT_PUBLIC_SENTRY_DSN not set = SDK inert)
-- Hit `http://localhost:3000/api/token/jwks` and verify request log appears in console
+- Hit `https://localhost:3010/api/token/jwks` and verify request log appears in console
 
 - [ ] **Step 5: Commit any final fixes if needed**
 
