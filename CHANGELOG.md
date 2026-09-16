@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-14
+
+No commits landed on `dev` in the last 24 hours — the branch has been idle
+since `ccf2cea` (2026-09-10). Reviewed `dev`'s current `typecheck` state
+directly instead, since several of the 9 PRs now open against `dev` show a
+red `typecheck`/`admin-e2e` check despite having no code changes that could
+explain it. Traced this to bug-0283's fix (PR #380) still being unmerged,
+and found the same root cause extends to 9 more test files bug-0283 didn't
+cover. See [BUGS_2026-09-14.md](./docs/history/bugs/BUGS_2026-09-14.md) and
+[TODO_2026-09-14.md](./docs/history/todo/TODO_2026-09-14.md) — the latter
+flags the growing 9-PR unmerged backlog itself as the top risk right now,
+ahead of any individual defect.
+
+### Fixed (2 bugs)
+
+- **bug-0288** (High) — 7 admin test files built `App`-typed mock objects
+  missing the `passwordPolicyOverride`/`effectivePasswordPolicy` fields
+  added 2026-09-05, the same gap bug-0283 fixed for one production call
+  site but not for tests. This is the actual reason `typecheck` has been
+  red on `dev`'s own baseline (and therefore on every PR built against it)
+  since before this window. PR #388.
+- **bug-0289** (Medium) — 2 admin test files built `User`-typed mock
+  objects missing `createdAt`/`lastLoginAt` (required since bug-0186),
+  same failure class as bug-0288 against a different type. PR #389.
+
+### Docs
+
+- Daily code review bundle for 2026-09-14 (this entry, plus
+  `TODO_2026-09-14.md`, `BUGS_2026-09-14.md`). Root README was reviewed
+  for currency against the 2026-09-10 port migration (`ccf2cea`) and found
+  already fully updated to `:3010` — no changes needed.
 ## [Unreleased] — 2026-09-10
 
 Only one commit landed on `dev` in the last 24 hours: `ccf2cea`,
