@@ -16,10 +16,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
-    # waitForLiveDeploy (15s x 40 attempts = 10 min) and the two sequential
-    # waitForJobCompletion calls — db:seed, then db:seed:vibecast (10s x 60
-    # attempts = 10 min each) — can each run to their full timeout in the
-    # worst case, plus headroom for checkout/install and other CLI steps.
+    # The two waitForDeploy calls (auth-server, admin) run in parallel, each up to
+    # 15s x 40 attempts = 10 min. The two sequential waitForJobCompletion calls —
+    # db:seed, then db:seed:vibecast (10s x 60 attempts = 10 min each) — follow after.
+    # Worst case: 10 + 10 + 10 = 30 min, plus headroom for checkout/install and other
+    # CLI steps.
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5

@@ -6,7 +6,8 @@ import { ensureNeonDatabase, type NeonConfig } from './neon';
 import {
   findServiceIdByName,
   syncManagedEnvVars,
-  waitForLiveDeploy,
+  triggerDeploy,
+  waitForDeploy,
   startJob,
   waitForJobCompletion,
   type RenderConfig,
@@ -118,7 +119,7 @@ async function main(): Promise<void> {
   // repo root; would need adjustment if ever run from a compiled dist/ build.
   const renderYamlPath = path.resolve(__dirname, '../../../render.yaml');
   const doc = parseRenderYaml(fs.readFileSync(renderYamlPath, 'utf8'));
-  const groupValues = staticGroupValues(doc, 'sassy-auth');
+  const groupValues = staticGroupValues(doc, 'sassy-auth-production');
 
   const authServerValues: Record<string, string> = {
     ...groupValues,
@@ -148,7 +149,21 @@ async function main(): Promise<void> {
     syncManagedEnvVars(renderCfg, adminId, toRenderEnvVars(adminValues)),
   );
 
-  await withServiceContext('sassy-auth-server', () => waitForLiveDeploy(renderCfg, authServerId));
+  // Syncing env vars above does NOT itself trigger a new deploy. Relying on the push's own
+  // autoDeploy would race this sync — that deploy can start (and fail its preDeployCommand,
+  // e.g. `prisma migrate deploy` with no DATABASE_URL yet) before the sync above completes.
+  // Trigger fresh deploys now, after secrets are in place, and wait on those specific deploys.
+  const authServerDeploy = await withServiceContext('sassy-auth-server', () =>
+    triggerDeploy(renderCfg, authServerId),
+  );
+  const adminDeploy = await withServiceContext('sassy-auth-admin', () => triggerDeploy(renderCfg, adminId));
+
+  // Waited in parallel, not sequentially — each can take up to ~10 minutes, and this job
+  // has a fixed overall timeout (see deploy-render.yml) shared with the db:seed waits below.
+  await Promise.all([
+    withServiceContext('sassy-auth-server', () => waitForDeploy(renderCfg, authServerId, authServerDeploy.id)),
+    withServiceContext('sassy-auth-admin', () => waitForDeploy(renderCfg, adminId, adminDeploy.id)),
+  ]);
 
   await withServiceContext('sassy-auth-server', async () => {
     const job = await startJob(renderCfg, authServerId, 'pnpm --filter @sassy-auth/db db:seed');
