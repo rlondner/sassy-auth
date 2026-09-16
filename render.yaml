@@ -52,6 +52,7 @@ services:
     name: sassy-auth-server
     runtime: node
     plan: starter
+    region: ohio
     branch: master
     buildCommand: >-
       corepack enable &&
@@ -102,6 +103,7 @@ services:
     name: sassy-auth-admin
     runtime: node
     plan: starter
+    region: ohio
     branch: master
     buildCommand: >-
       corepack enable &&
