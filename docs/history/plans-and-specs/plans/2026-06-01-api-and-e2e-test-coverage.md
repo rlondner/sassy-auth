@@ -977,7 +977,7 @@ function ensureTestEnv() {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
   process.env.RSA_PRIVATE_KEY = Buffer.from(privateKey.export({ type: 'pkcs8', format: 'pem' }) as string).toString('base64');
   process.env.RSA_PUBLIC_KEY = Buffer.from(publicKey.export({ type: 'spki', format: 'pem' }) as string).toString('base64');
-  process.env.BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000';
+  process.env.BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? 'https://localhost:3010';
   process.env.BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET ?? 'test-secret-at-least-32-chars-long!!';
 }
 
@@ -2536,7 +2536,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
-const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export default defineConfig({
   testDir: './tests',
@@ -3919,7 +3919,7 @@ Expected: in-process Nest + supertest matrix runs. Save the log.
 - [ ] **Step 5: Run Wave C (UI E2E) and capture failures**
 
 ```bash
-# Make sure auth-server is not still on port 3000 from Wave B.
+# Make sure auth-server is not still on port 3010 from Wave B.
 # (Wave B closes Nest via app.close() in afterAll; if any stray process,
 # kill it before proceeding.)
 pnpm --filter @sassy-auth/admin-e2e test:e2e 2>&1 | tee tmp/wave-c-run.log || true

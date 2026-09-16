@@ -22,8 +22,8 @@
     },
     "vars": {
       "ADMIN_URL": "http://localhost:3001",
-      "AUTH_SERVER_URL": "http://localhost:3000",
-      "BETTER_AUTH_URL": "http://localhost:3000",
+      "AUTH_SERVER_URL": "https://localhost:3010",
+      "BETTER_AUTH_URL": "https://localhost:3010",
       "PGDATABASE": "sassyauth_0.1",
       "PGHOST": "localhost",
       "PGPORT": "5432",

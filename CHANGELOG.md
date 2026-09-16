@@ -47,6 +47,91 @@ webhook-SSRF area bug-0285 also touches. See
   captcha" sections documenting `PASSWORD_*`, `TURNSTILE_SECRET_KEY`, and
   `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — all already in `.env.example` but
   missing from the README's Environment Variables table).
+## [Unreleased] — 2026-09-08
+
+Two features landed on `dev`: signup captcha (Cloudflare Turnstile, 6
+commits — `TurnstileService` verification in `RegistrationService`, admin
+signup-form widget, 422→`captchaFailed` mapping) and OIDC spec-correctness
+fixes (exact `redirect_uri` matching, consolidated well-known path
+exclusion, an e2e round-trip test against a stock `openid-client` that
+found and fixed 3 spec bugs), both merged via `feat/oidc-compatibility` →
+`dev` (`e4d4510`). A third feature, activation webhooks + pending-account
+signup (10 commits — `SaApp.webhookUrl`/`webhookSecret` columns, webhook
+delivery on email verification/invitation-accept/admin-reactivation, a
+signup-flow code that lets pending users redeem tokens), is open as PR
+#378 against `dev`, not yet merged.
+
+Reviewing PR #378 surfaced that its `typecheck` and `admin-e2e` CI checks
+were both failing — not from anything in the PR's own diff, but from two
+pre-existing defects already on `dev` that had zero CI signal because
+`typecheck`/`unit-tests`/`e2e` only ran on push to `master`, never `dev`.
+Filed and fixed all three: the two silent build breaks plus the CI-trigger
+gap that hid them. See
+[BUGS_2026-09-08.md](./docs/history/bugs/BUGS_2026-09-08.md) and
+[TODO_2026-09-08.md](./docs/history/todo/TODO_2026-09-08.md).
+
+### Fixed (3 bugs)
+
+- **bug-0282** (High) — `app/signup/page.tsx` exported `fetchAppInfo` as a
+  named export alongside its default page component. Next's App Router
+  rejects any `page.tsx` export outside its recognized allow-list, so
+  `next build` has failed since the function landed 2026-09-05 —
+  invisible for 3 days for the CI-trigger reason above. Extracted the
+  function to `fetch-app-info.ts`. PR #379.
+- **bug-0283** (High) — `app/(admin)/roles/page.tsx`'s non-platform app
+  picker builds an `App[]` by hand and never picked up
+  `passwordPolicyOverride`/`effectivePasswordPolicy` after they became
+  required `App` fields (`430f870`, 2026-09-05). Broke `typecheck` (and
+  therefore `next build`) on `dev` since before 2026-09-01, same
+  invisibility. Filled in with the existing `FALLBACK_PASSWORD_POLICY`
+  constant. PR #380.
+- **bug-0284** (Medium, root cause of the two above) —
+  `typecheck.yml`/`unit-tests.yml`/`e2e.yml` triggered on `push` only to
+  `master`, not `dev`, despite already running on PRs against `dev`. Added
+  `dev` to each workflow's push branches so it gets the same direct CI
+  signal `master` has. PR #381.
+
+### Docs
+
+- Daily code review bundle for 2026-09-08 (this entry, plus
+  `TODO_2026-09-08.md`, `BUGS_2026-09-08.md`, and a README refresh
+  documenting local dev setup and required env vars).
+## [Unreleased] — 2026-09-16
+
+`render-deploy-automation` (16 commits) merged into `dev`: a new
+`packages/deploy-render` package plus `.github/workflows/deploy-render.yml`
+automate Render.com deployment for `sassy-auth-server` and
+`sassy-auth-admin` — no more manual dashboard secret entry or a manual
+`db:seed` shell session per deploy. On push to `master`, the workflow
+generates and persists any missing production secrets (RSA JWT keypair,
+`BETTER_AUTH_SECRET`, `SEED_ADMIN_PASSWORD`) as GitHub Environment
+secrets, provisions the Neon database via its API if `DATABASE_URL`
+isn't set yet, merges the resulting values with `render.yaml`'s static
+config and pushes them to Render, waits for the deploy to go live, and
+triggers the platform seed as a one-off Render Job. `render.yaml`
+remains the source of truth for service topology; only the previously
+manual parts are now automated. `sassy-resource-server` (the FastAPI
+demo app) stays out of scope and deployable by hand. Full design in
+[`docs/superpowers/specs/2026-09-16-render-deploy-automation-design.md`](./docs/superpowers/specs/2026-09-16-render-deploy-automation-design.md).
+
+Built via subagent-driven development with a spec-compliance + code-quality
+review after every task; three real issues were caught and fixed before
+merge: a missing GitHub-secret write-verification call, generated secrets
+being printed in cleartext to the workflow's job summary (fixed to log
+names only — GitHub secrets are write-only, so values are never shown),
+and — caught only in a final whole-branch pass — a critical bug where the
+naive env-var sync would have silently wiped any operator-set optional
+secrets (e.g. `RESEND_API_KEY`, social sign-in credentials) on every
+automated deploy, fixed by fetching and merging with Render's existing
+env vars instead of blindly replacing them.
+
+### Docs
+
+- `DEPLOYMENT.md` — added a "One-time setup for automated deploys"
+  section describing the pipeline and the three secrets an operator still
+  creates by hand (`RENDER_API_KEY`, `NEON_API_KEY`, `GH_SECRETS_PAT`);
+  trimmed the now-superseded manual secret-generation and manual
+  first-time-seed instructions.
 
 ## [Unreleased] — 2026-09-04
 
@@ -778,7 +863,7 @@ Ships the toast/refresh admin UX, the OAuth issuer DRY refactor, and the E2E rac
 - **`DiscoveryController.getOAuthAuthorizationServerMetadata`** — now calls `resolveIssuer()` (was reading `process.env.BETTER_AUTH_URL` directly). (`apps/auth-server/src/token/discovery.controller.ts`)
 - **`RolesService.listRoles` / `getRole` read gates** — accept `platform.users.manage` in addition to `platform.roles.manage` / `org.roles.manage`, so the `/users` admin page can populate the role picker in the user-access drawer without needing a cross-page grant. Mirrors the orgs/permissions read pattern. Matrix test rotation and unit tests updated. (`apps/auth-server/src/roles/roles.service.ts`, `apps/auth-server/src/roles/roles.service.spec.ts`, `apps/auth-server/test/matrix/permissions-matrix.ts`)
 - **`raceSuccessOrError` (E2E)** — all 5 admin-e2e page objects (`apps`, `orgs`, `permissions`, `roles`, `users`) scope error detection to `[data-sonner-toaster], [role="dialog"], [role="alertdialog"]` instead of the whole page. Next.js Dev Tools mounts a persistent empty `role="alert"` placeholder at the page root; a global `page.getByRole('alert')` matched it on every poll and made the error race always win.
-- **OAuth authorize E2E route mock** — `oauth-authorize-flow.spec.ts` narrows the `page.route` stub from `${origin}/**` to exactly `origin === redirectUriOrigin && pathname === '/cb'`. The broad mock intercepted `/api/token/oauth/authorize` itself when `platformApp.url` shares the auth-server's origin (the default `BETTER_AUTH_URL=http://localhost:3000` case), causing the test to hang on the authorize endpoint with an empty body.
+- **OAuth authorize E2E route mock** — `oauth-authorize-flow.spec.ts` narrows the `page.route` stub from `${origin}/**` to exactly `origin === redirectUriOrigin && pathname === '/cb'`. The broad mock intercepted `/api/token/oauth/authorize` itself when `platformApp.url` shares the auth-server's origin (the default `BETTER_AUTH_URL=https://localhost:3010` case), causing the test to hang on the authorize endpoint with an empty body.
 - **Playwright workers** — `CI_TESTS ? 1 : 1` (both branches serialize). Preserves the earlier local finding that Next.js dev-mode route compilation gets overwhelmed on cold-start parallel first-hits at 30s test timeout.
 
 ### Known open bugs

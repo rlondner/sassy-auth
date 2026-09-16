@@ -91,6 +91,7 @@ export interface App {
   publicId: string;
   name: string;
   url: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
@@ -103,11 +104,16 @@ export interface App {
   defaultRoleId?: string | null;
   passwordPolicyOverride: PasswordPolicy | null;
   effectivePasswordPolicy: PasswordPolicy;
+  webhookUrl?: string | null;
+  // The secret itself is never sent to the admin console — only whether one
+  // is configured, mirroring isConfidential/clientSecretHash above.
+  hasWebhookSecret?: boolean;
 }
 
 export interface CreateAppPayload {
   name: string;
   url: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
@@ -116,12 +122,14 @@ export interface CreateAppPayload {
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
+  logo?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
   defaultOrgId?: string | null;
   defaultRoleId?: string | null;
   passwordPolicyOverride?: PasswordPolicy | null;
+  webhookUrl?: string | null;
 }
 
 export interface ListAppsParams {

@@ -45,11 +45,11 @@ describe('assertRedirectUriAllowed — set-valued matching', () => {
       url: 'https://app.example.com',
       redirectUris: [
         { uri: 'https://app.example.com/cb', kind: 'login' },
-        { uri: 'http://localhost:3000/cb', kind: 'login' },
+        { uri: 'https://localhost:3010/cb', kind: 'login' },
       ],
     };
 
-    expect(() => assertRedirectUriAllowed('http://localhost:3000/cb', app)).not.toThrow();
+    expect(() => assertRedirectUriAllowed('https://localhost:3010/cb', app)).not.toThrow();
     expect(() => assertRedirectUriAllowed('https://app.example.com/cb', app)).not.toThrow();
   });
 

@@ -45,4 +45,9 @@ export class AppsController {
   rotateClientSecret(@Req() req: Request, @Param('publicId') publicId: string) {
     return this.apps.rotateClientSecret(callerBaId(req), publicId);
   }
+
+  @Post(':publicId/webhook-secret')
+  rotateWebhookSecret(@Req() req: Request, @Param('publicId') publicId: string) {
+    return this.apps.rotateWebhookSecret(callerBaId(req), publicId);
+  }
 }

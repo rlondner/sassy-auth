@@ -18,6 +18,7 @@ import {
 import { createAppAction } from '@/app/(admin)/apps/actions'
 import type { RedirectUri } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
+import { AppLogoField } from './app-logo-field'
 
 interface Props {
   open: boolean
@@ -29,6 +30,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState('')
   const [url, setUrl] = React.useState('')
+  const [logo, setLogo] = React.useState<string | null>(null)
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>([])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(false)
@@ -39,6 +41,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
     if (!open) {
       setName('')
       setUrl('')
+      setLogo(null)
       setRedirectUris([])
       setTwoFactorTrustDays(null)
       setRequireTwoFactor(false)
@@ -57,6 +60,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       const result = await createAppAction({
         name: name.trim(),
         url: url.trim(),
+        logo,
         redirectUris,
         twoFactorTrustDays,
         requireTwoFactor,
@@ -104,6 +108,9 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.urlHint')}
               </p>
+            </div>
+            <div>
+              <AppLogoField value={logo} onValueChange={setLogo} />
             </div>
             <div>
               <Label>{t('apps.fields.redirectUris')}</Label>
