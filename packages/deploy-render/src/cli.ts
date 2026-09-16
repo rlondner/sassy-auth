@@ -82,10 +82,12 @@ async function main(): Promise<void> {
   const secretsResult = await ensureSecrets(githubCfg);
   if (secretsResult.generated.length > 0) {
     writeJobSummary([
-      '## New secrets generated — save these now',
-      'These are stored as GitHub Environment secrets and will not be shown again.',
+      '## New secrets generated',
+      'These are now stored as GitHub Environment secrets (production) and were not printed anywhere — GitHub secrets are write-only after creation, so there is no way to view them again through this pipeline.',
       '',
-      ...secretsResult.generated.map((s) => `- \`${s.name}\`: \`${s.value}\``),
+      ...secretsResult.generated.map((s) => `- \`${s.name}\``),
+      '',
+      'If any of these need rotating in the future, delete the secret from the repo\'s "production" Environment on GitHub and re-run this workflow — it will generate and store a fresh value automatically (this invalidates existing JWTs/sessions for the RSA keypair and BETTER_AUTH_SECRET respectively; see DEPLOYMENT.md).',
     ]);
   }
 
