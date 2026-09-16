@@ -12,6 +12,7 @@
     "seed:vibecast-migration": "ts-node -r tsconfig-paths/register src/seed/vibecast-migration.ts"
   },
   "dependencies": {
+    "@better-auth/utils": "^0.4.0",
     "@nestjs/common": "^10.3.0",
     "@nestjs/core": "^10.3.0",
     "@nestjs/platform-express": "^10.3.0",
