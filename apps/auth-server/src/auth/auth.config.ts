@@ -21,7 +21,7 @@ import { recordFederationEvent } from '../social/record-federation-event';
 import { readIsPrivateEmail } from '../social/apple-private-relay-context';
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
 import { notifyActivation } from '../activation/notify-activation';
-import { getGlobalPasswordPolicy, resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH } from './password-policy';
+import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -329,15 +329,21 @@ export const auth = betterAuth({
     // (never-persisted) user so sign-up cannot be used to enumerate accounts.
     // RegistrationService checks for that explicitly — see its 409 path.
     autoSignIn: false,
-    // Belt-and-braces baseline matching the global policy's length bounds.
+    // Belt-and-braces baseline, NOT the global policy's minLength (bug found
+    // by the "per-app password policy override" e2e spec: pinning this to
+    // getGlobalPasswordPolicy(...).minLength rejected every app-level
+    // override that relaxes the minimum below the global default, since
     // BetterAuth reads these two options into ctx.context.password.config
     // (dist/context/create-context.mjs) and enforces them natively on
-    // sign-up/update-user/reset-password (defaults would otherwise be 8/128
-    // — too permissive for this policy). The hooks.before matcher below is
-    // the actual complexity enforcement for /reset-password; this covers
-    // any other BetterAuth-native path that consults these two options
-    // directly.
-    minPasswordLength: getGlobalPasswordPolicy(process.env).minLength,
+    // sign-up/update-user/reset-password — a SECOND, app-unaware length
+    // check running after validatePasswordOrThrow had already accepted the
+    // password against the correct app-specific policy). Use the absolute
+    // floor any override is allowed to set instead (defaults would
+    // otherwise be 8/128 — too permissive for this policy). The
+    // hooks.before matcher below is the actual complexity+app-aware-length
+    // enforcement for /reset-password; this covers any other
+    // BetterAuth-native path that consults these two options directly.
+    minPasswordLength: MIN_PASSWORD_LENGTH_FLOOR,
     maxPasswordLength: MAX_PASSWORD_LENGTH,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
     // Without this, BetterAuth's /reset-password endpoint changes the
