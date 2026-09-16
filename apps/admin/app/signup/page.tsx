@@ -1,38 +1,10 @@
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
-import type { PasswordPolicy } from '@/lib/types'
+import { fetchAppInfo } from '@/lib/app-info'
 import { SignupForm } from './signup-form'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
-
 export const dynamic = 'force-dynamic'
-
-export async function fetchAppInfo(
-  clientId: string,
-): Promise<{ name: string | null; hasDefaultOrg: boolean; passwordPolicy: PasswordPolicy | null; logo: string | null }> {
-  try {
-    const res = await fetch(`${AUTH_SERVER}/api/register/app?appPublicId=${encodeURIComponent(clientId)}`, {
-      cache: 'no-store',
-    })
-    if (!res.ok) {
-      // Fail toward hasDefaultOrg: false, not true: a Company name field shown
-      // but ignored by the server is harmless, whereas defaulting to true could
-      // hide a required field and produce a signup-blocking dead end.
-      return { name: null, hasDefaultOrg: false, passwordPolicy: null, logo: null }
-    }
-    const body = (await res.json()) as { name?: string; hasDefaultOrg?: boolean; passwordPolicy?: PasswordPolicy; logo?: string | null }
-    return {
-      name: typeof body.name === 'string' ? body.name : null,
-      hasDefaultOrg: body.hasDefaultOrg === true,
-      passwordPolicy: body.passwordPolicy ?? null,
-      logo: typeof body.logo === 'string' ? body.logo : null,
-    }
-  } catch {
-    // Same reasoning as the !res.ok branch above: fail toward false.
-    return { name: null, hasDefaultOrg: false, passwordPolicy: null, logo: null }
-  }
-}
 
 export default async function SignupPage({
   searchParams,
@@ -59,7 +31,7 @@ export default async function SignupPage({
   return (
     <AuthCard
       title={appName ? t('signup.titleWithApp', { appName }) : t('signup.title')}
-      subtitle={t('signup.subtitle')}
+      subtitle={hasDefaultOrg ? t('signup.subtitleDefaultOrg') : t('signup.subtitle')}
       logoUrl={logo}
       logoAlt={appName ?? t('signup.title')}
       footer={

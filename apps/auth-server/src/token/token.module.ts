@@ -10,5 +10,6 @@ import { OauthCodeCleanupService } from './oauth-code-cleanup.service';
   // bug-0220: OauthCodeCleanupService is not injected anywhere — it is a
   // lifecycle-only provider whose OnModuleInit starts the expired-code sweep.
   providers: [TokenService, OauthService, OauthCodeCleanupService],
+  exports: [OauthService],
 })
 export class TokenModule {}

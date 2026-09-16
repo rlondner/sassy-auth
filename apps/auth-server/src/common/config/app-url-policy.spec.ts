@@ -41,6 +41,22 @@ describe('app-url-policy', () => {
     it('rejects bare host with no dot', () => {
       expect(isAppUrlAllowed('https://intranet')).toBe(false);
     });
+    it('rejects private/link-local/cloud-metadata IPv4 literals', () => {
+      expect(isAppUrlAllowed('https://169.254.169.254/latest/meta-data/')).toBe(false); // cloud metadata
+      expect(isAppUrlAllowed('https://10.0.4.12:8080/admin')).toBe(false); // RFC 1918
+      expect(isAppUrlAllowed('https://172.16.0.5')).toBe(false); // RFC 1918
+      expect(isAppUrlAllowed('https://192.168.1.1')).toBe(false); // RFC 1918
+      expect(isAppUrlAllowed('https://100.64.0.1')).toBe(false); // CGNAT
+      expect(isAppUrlAllowed('https://0.0.0.0')).toBe(false);
+    });
+    it('rejects private/link-local IPv6 literals', () => {
+      expect(isAppUrlAllowed('https://[fe80::1]')).toBe(false);
+      expect(isAppUrlAllowed('https://[fd00::1]')).toBe(false);
+    });
+    it('still accepts public IPv4/host addresses that merely start with a private-looking octet', () => {
+      expect(isAppUrlAllowed('https://172.32.0.1')).toBe(true); // outside 172.16.0.0/12
+      expect(isAppUrlAllowed('https://198.51.100.5')).toBe(true); // public example range
+    });
     it('rejects non-string, empty, and malformed', () => {
       expect(isAppUrlAllowed(undefined)).toBe(false);
       expect(isAppUrlAllowed('')).toBe(false);

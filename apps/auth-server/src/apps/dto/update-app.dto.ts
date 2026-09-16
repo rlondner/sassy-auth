@@ -68,4 +68,12 @@ export class UpdateAppDto {
   @ApiPropertyOptional({ type: Object })
   @IsOptional()
   passwordPolicyOverride?: PasswordPolicy | null;
+
+  /**
+   * Target URL for the activation webhook (see
+   * apps/auth-server/src/activation/notify-activation.ts). null clears it,
+   * which stops delivery — the account still activates normally, it just
+   * isn't reported to this app anymore.
+   */
+  @IsOptional() @IsAppUrl() @MaxLength(2048) webhookUrl?: string | null;
 }
