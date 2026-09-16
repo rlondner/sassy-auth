@@ -73,6 +73,35 @@ describe('org-scoped API keys', () => {
       },
     });
   });
+});
+
+describe('createProject with a region', () => {
+  it('includes region_id in the request body when configured', async () => {
+    const regionCfg: NeonConfig = { ...neonCfg, regionId: 'aws-us-east-2' };
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ project: { id: 'p3', name: 'sassy-auth-production' } }),
+    } as Response);
+    await createProject(regionCfg, fetchFn);
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body).toEqual({
+      project: {
+        name: 'sassy-auth-production',
+        region_id: 'aws-us-east-2',
+        branch: { database_name: 'sassyauth', role_name: 'sassyauth_owner' },
+      },
+    });
+  });
+
+  it('omits region_id when not configured', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ project: { id: 'p3', name: 'sassy-auth-production' } }),
+    } as Response);
+    await createProject(neonCfg, fetchFn);
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body.project).not.toHaveProperty('region_id');
+  });
 
   it('omits org_id when not configured', async () => {
     const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ projects: [] }) } as Response);

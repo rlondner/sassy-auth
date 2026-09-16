@@ -71,6 +71,9 @@ async function main(): Promise<void> {
     roleName: 'sassyauth_owner',
     // Only required when NEON_API_KEY is an organization API key.
     orgId: process.env.NEON_ORG_ID || undefined,
+    // Matches the Render services' region (see render.yaml) — keeps the app and its
+    // database in the same region instead of Neon's own default.
+    regionId: 'aws-us-east-2',
   };
   const renderCfg: RenderConfig = { apiKey: requireEnv('RENDER_API_KEY') };
 

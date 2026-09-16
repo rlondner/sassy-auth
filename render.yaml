@@ -57,9 +57,15 @@ services:
     buildCommand: >-
       corepack enable &&
       corepack prepare pnpm@9.0.0 --activate &&
-      pnpm install --frozen-lockfile &&
+      NODE_ENV=development pnpm install --frozen-lockfile &&
       pnpm --filter @sassy-auth/db --filter @sassy-auth/types build &&
       pnpm --filter @sassy-auth/auth-server build
+    # NODE_ENV=development on the install step only: the production NODE_ENV value from
+    # sassy-auth-production (below) is present during the build too, and pnpm skips
+    # devDependencies — including @nestjs/cli, needed for `nest build` — whenever it sees
+    # NODE_ENV=production. The override doesn't affect the actual running process; that
+    # gets its NODE_ENV from the service env vars, not this build-time shell prefix.
+    #
     # Requires a paid instance type (Starter or above). On Free, move this
     # command to the end of buildCommand — see DEPLOYMENT.md.
     preDeployCommand: cd packages/db && npx prisma migrate deploy
@@ -108,8 +114,10 @@ services:
     buildCommand: >-
       corepack enable &&
       corepack prepare pnpm@9.0.0 --activate &&
-      pnpm install --frozen-lockfile &&
+      NODE_ENV=development pnpm install --frozen-lockfile &&
       pnpm --filter @sassy-auth/admin build
+    # See the matching comment on sassy-auth-server's buildCommand — same NODE_ENV/pnpm
+    # devDependencies gotcha, needed here for `next build`'s devDependencies (typescript).
     startCommand: cd apps/admin && npx next start -p $PORT
     healthCheckPath: /login
     domains:
