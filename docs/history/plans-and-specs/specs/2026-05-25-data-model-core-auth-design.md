@@ -159,7 +159,7 @@ async function bootstrap() {
   // BetterAuth handles /api/auth/* before NestJS sees the request
   expressApp.all('/api/auth/*', toNodeHandler(auth));
 
-  await app.listen(3000);
+  await app.listen(3010);
 }
 ```
 

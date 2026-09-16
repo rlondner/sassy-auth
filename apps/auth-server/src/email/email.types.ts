@@ -3,6 +3,8 @@ export interface EmailMessage {
   subject: string;
   html: string;
   text: string;
+  /** Per-send override; falls back to EmailService's EMAIL_FROM default when absent. */
+  from?: string;
 }
 
 export interface OutgoingEmail extends EmailMessage {

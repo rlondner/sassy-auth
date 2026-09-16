@@ -1,8 +1,18 @@
 // Stub for better-auth/api — exposes the APIError class that auth.config uses.
+// Mirrors better-call's real APIError shape (see
+// node_modules/better-call/dist/error.mjs — InternalAPIError stores the
+// second constructor arg verbatim as `this.body`) closely enough that specs
+// asserting on a thrown error's `.body.code` behave the same against this
+// mock as they would against the real library.
 export class APIError extends Error {
-  constructor(code: string, options?: { message?: string }) {
-    super(options?.message ?? code);
+  status: string;
+  body?: { message?: string; code?: string; [key: string]: unknown };
+
+  constructor(status: string, body?: { message?: string; code?: string; [key: string]: unknown }) {
+    super(body?.message ?? status);
     this.name = 'APIError';
+    this.status = status;
+    this.body = body;
   }
 }
 

@@ -49,8 +49,8 @@ RUN pnpm install --frozen-lockfile \
  && pnpm --filter @sassy-auth/db --filter @sassy-auth/types build \
  && chmod +x /app/docker/entrypoint.sh
 
-# 3000 = auth-server (NestJS), 3001 = admin console (Next.js).
-EXPOSE 3000 3001
+# 3010 = auth-server (NestJS), 3001 = admin console (Next.js).
+EXPOSE 3010 3001
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
 CMD ["pnpm", "dev"]

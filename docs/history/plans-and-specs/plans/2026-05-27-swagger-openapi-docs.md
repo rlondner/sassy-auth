@@ -173,7 +173,7 @@ pnpm --filter @sassy-auth/auth-server dev
 In another terminal, hit the plugin's schema endpoint:
 
 ```
-curl -s http://localhost:3000/api/auth/open-api/generate-schema | head -c 200
+curl -s https://localhost:3010/api/auth/open-api/generate-schema | head -c 200
 ```
 
 Expected: a JSON document beginning with something like `{"openapi":"3.1.0","info":{...`. Stop the server (Ctrl+C in the first terminal).
@@ -793,7 +793,7 @@ Locate this section inside `bootstrap()`:
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new SentryExceptionFilter(loggerService));
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3010);
 ```
 
 Replace it with:
@@ -828,7 +828,7 @@ Replace it with:
     jsonDocumentUrl: 'api/docs-json',
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3010);
 ```
 
 Key points:
@@ -873,18 +873,18 @@ This task isn't code — it's a checklist that exercises the golden path before 
 pnpm --filter @sassy-auth/auth-server dev
 ```
 
-Expected: log line "Auth server listening on port 3000" (or whatever `PORT` is set to). No warnings about failing to fetch the BetterAuth schema.
+Expected: log line "Auth server listening on port 3010" (or whatever `PORT` is set to). No warnings about failing to fetch the BetterAuth schema.
 
 - [ ] **Step 2: Open the docs UI**
 
-Visit `http://localhost:3000/api/docs` in a browser.
+Visit `https://localhost:3010/api/docs` in a browser.
 
 Expected: Swagger UI renders. Section headers (sorted alphabetically): **Auth**, **Invitations**, **Orgs**, **Roles**, **Token**, **Users**. Each section expands to show its endpoints. The Authorize button is visible in the top right, listing `cookieAuth (apiKey in cookie)`.
 
 - [ ] **Step 3: Confirm the raw spec is valid JSON**
 
 ```
-curl -s http://localhost:3000/api/docs-json | head -c 200
+curl -s https://localhost:3010/api/docs-json | head -c 200
 ```
 
 Expected: a JSON document starting with `{"openapi":"3.0.0",` (or 3.1.x) followed by `"info":{...`. No HTML.
@@ -910,7 +910,7 @@ Scroll to `Auth → POST /api/auth/sign-in/email`. Click "Try it out". In the re
 { "email": "admin@example.com", "password": "your-seeded-password" }
 ```
 
-Click "Execute". Expected: status `200`, response body shows a session/user object. Open browser DevTools → Application → Cookies → `http://localhost:3000`. Confirm a cookie named `better-auth.session_token` (or similar — the actual name depends on BetterAuth's config) is present.
+Click "Execute". Expected: status `200`, response body shows a session/user object. Open browser DevTools → Application → Cookies → `https://localhost:3010`. Confirm a cookie named `better-auth.session_token` (or similar — the actual name depends on BetterAuth's config) is present.
 
 - [ ] **Step 7: Authenticated call returns 200**
 

@@ -1,6 +1,7 @@
 import { getRoles, getApps, getMyPermissions, getMyProfile } from '@/lib/api'
 import { RolesTable } from '@/components/roles-table'
 import { AccessDeniedPanel } from '@/components/access-denied-panel'
+import { FALLBACK_PASSWORD_POLICY } from '@/lib/types'
 
 export default async function RolesPage() {
   const [permsResult, profileResult] = await Promise.allSettled([
@@ -23,7 +24,17 @@ export default async function RolesPage() {
       ? getApps({ page: 1, pageSize: 200 })
       : Promise.resolve({
           items: profile
-            ? [{ publicId: profile.app.id, name: profile.app.name, url: '', isPlatform: profile.app.isPlatform, requireTwoFactor: false }]
+            ? [
+                {
+                  publicId: profile.app.id,
+                  name: profile.app.name,
+                  url: '',
+                  isPlatform: profile.app.isPlatform,
+                  requireTwoFactor: false,
+                  passwordPolicyOverride: null,
+                  effectivePasswordPolicy: FALLBACK_PASSWORD_POLICY,
+                },
+              ]
             : [],
           total: 0,
           page: 1,

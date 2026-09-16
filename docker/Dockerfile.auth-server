@@ -28,6 +28,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/auth-server/package.json apps/auth-server/
 COPY packages/db/package.json packages/db/
 COPY packages/db/schema.prisma packages/db/
+COPY packages/db/prisma.config.ts packages/db/
 COPY packages/db/migrations packages/db/migrations
 COPY packages/db/tsconfig.json packages/db/
 COPY packages/types/package.json packages/types/
@@ -64,6 +65,6 @@ COPY --from=build /app/packages/types/package.json ./packages/types/package.json
 COPY docker/entrypoint-auth-server-prod.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 3000
+EXPOSE 3010
 
 ENTRYPOINT ["/entrypoint.sh"]

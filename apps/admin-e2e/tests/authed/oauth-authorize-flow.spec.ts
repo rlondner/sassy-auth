@@ -47,7 +47,7 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     await page.goto(
       buildAuthorizeUrl({
         client_id: 'ZZZZZ', // No sa_app row has this publicId.
-        redirect_uri: `${process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'}/cb`,
+        redirect_uri: `${process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'}/cb`,
         code_challenge: challenge,
         code_challenge_method: 'S256',
         state: 'pw-state-nonexistent',
@@ -60,7 +60,7 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     expect(finalUrl.searchParams.get('code')).toBe('APP_NOT_FOUND')
   })
 
-  test('client_id pointing at an app the user is not scoped to redirects to /oauth-error?code=USER_ORG_MISMATCH', async ({
+  test('client_id pointing at an app the user is not scoped to redirects to the client with access_denied', async ({
     page,
     request,
   }) => {
@@ -69,6 +69,14 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     // (different org, different sa_app row). The Sqid is valid and the app
     // exists, so the controller doesn't throw APP_NOT_FOUND — it gets all
     // the way to the org/app match check and throws USER_ORG_MISMATCH.
+    //
+    // Task 10 (token.controller.ts, RFC 6749 §4.1.2.1): once redirect_uri
+    // has been validated — as it has here, since it origin-matches the
+    // app's own url — errors redirect back to the CLIENT as
+    // `error=access_denied&error_description=USER_ORG_MISMATCH`, not to
+    // ${ADMIN_URL}/oauth-error. See token.controller.spec.ts's
+    // "redirects access_denied to the client when user org does not match
+    // app" for the unit-level equivalent.
     //
     // Requires at least one non-platform app to exist. Run the seed with
     // SEED_DEMO=1 to provision the `resourceserver01` demo, or create any
@@ -94,10 +102,10 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     )
 
     const finalUrl = new URL(page.url())
-    expect(finalUrl.origin).toBe(new URL(ADMIN_URL).origin)
-    expect(finalUrl.pathname).toBe('/oauth-error')
-    expect(finalUrl.searchParams.get('code')).toBe('USER_ORG_MISMATCH')
-    expect(finalUrl.searchParams.get('app')).toBe(otherApp!.publicId)
+    expect(finalUrl.origin + finalUrl.pathname).toBe(`${otherApp!.url.replace(/\/$/, '')}/cb`)
+    expect(finalUrl.searchParams.get('error')).toBe('access_denied')
+    expect(finalUrl.searchParams.get('error_description')).toBe('USER_ORG_MISMATCH')
+    expect(finalUrl.searchParams.get('state')).toBe('pw-state-org-mismatch')
   })
 
   test('missing PKCE parameters redirects to /oauth-error?code=invalid_request', async ({
@@ -138,7 +146,7 @@ test.describe('OAuth authorize → admin /oauth-error redirect (super-admin auth
     // Narrow the stub to exactly /cb on the redirect_uri origin. A broader
     // `${origin}/**` mock intercepts /api/token/oauth/authorize itself when
     // platformApp.url shares the auth-server's origin (BETTER_AUTH_URL=
-    // http://localhost:3000 by default), so the browser never reaches the
+    // https://localhost:3010 by default), so the browser never reaches the
     // real authorize endpoint and the test sits on /api/token/oauth/authorize
     // with an empty body.
     const redirectUriOrigin = new URL(redirectUri).origin

@@ -1,5 +1,5 @@
 import { ExecutionContext, HttpException } from '@nestjs/common';
-import { RateLimitGuard } from './rate-limit.guard';
+import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
 
 function makeCtx(ip: string): ExecutionContext {
   return {
@@ -108,5 +108,28 @@ describe('RateLimitGuard', () => {
     for (let i = 0; i < 50; i++) {
       expect(guard.canActivate(ctx)).toBe(true);
     }
+  });
+
+  // Regression test for the review finding this fixes: RateLimitGuard (used
+  // by POST /api/register) and AppLookupRateLimitGuard (used by GET
+  // /api/register/app) must be separate DI singletons with independent
+  // in-memory stores, so exhausting one's budget does not affect the other's.
+  it('does not share its rate-limit budget with AppLookupRateLimitGuard', () => {
+    process.env.REGISTER_RATE_LIMIT = '2';
+    process.env.REGISTER_RATE_WINDOW_MS = '3600000';
+    const postGuard = new RateLimitGuard();
+    const appLookupGuard = new AppLookupRateLimitGuard();
+    const ctx = makeCtx('10.0.0.6');
+
+    // Exhaust the POST /api/register guard's budget for this IP.
+    expect(postGuard.canActivate(ctx)).toBe(true);
+    expect(postGuard.canActivate(ctx)).toBe(true);
+    expect(() => postGuard.canActivate(ctx)).toThrow(HttpException);
+
+    // The GET /api/register/app guard, for the same IP, should still have
+    // its own full budget since it does not share state with postGuard.
+    expect(appLookupGuard.canActivate(ctx)).toBe(true);
+    expect(appLookupGuard.canActivate(ctx)).toBe(true);
+    expect(() => appLookupGuard.canActivate(ctx)).toThrow(HttpException);
   });
 });

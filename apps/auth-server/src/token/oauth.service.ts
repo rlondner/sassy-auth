@@ -41,9 +41,12 @@ export class OauthService {
     userId: string,
     appPublicId: string,
     redirectUri: string,
-    codeChallenge: string,
-    codeChallengeMethod: 'S256',
+    codeChallenge: string | null,
+    codeChallengeMethod: 'S256' | null,
     amr: string[],
+    nonce: string | null,
+    scope: string,
+    authTime: Date,
     idp?: string,
   ): Promise<string> {
     const code = crypto.randomBytes(32).toString('hex');
@@ -56,6 +59,9 @@ export class OauthService {
         codeChallenge,
         codeChallengeMethod,
         amr: JSON.stringify(amr),
+        nonce,
+        scope,
+        authTime,
         idp: idp ?? null,
         expiresAt: new Date(Date.now() + CODE_TTL_MS),
       },
@@ -67,8 +73,17 @@ export class OauthService {
     code: string,
     appPublicId: string,
     redirectUri: string,
-    codeVerifier: string,
-  ): Promise<{ userId: string; appPublicId: string; amr: string[]; idp?: string }> {
+    codeVerifier: string | undefined,
+  ): Promise<{
+    userId: string;
+    appPublicId: string;
+    amr: string[];
+    nonce: string | null;
+    scope: string;
+    authTime: Date;
+    hadChallenge: boolean;
+    idp?: string;
+  }> {
     // Atomic delete-and-return: race-safe against concurrent
     // exchanges. P2025 = record not found = INVALID_GRANT.
     // Any successful delete removes the row regardless of the
@@ -78,10 +93,13 @@ export class OauthService {
       userId: string;
       appPublicId: string;
       redirectUri: string;
-      codeChallenge: string;
-      codeChallengeMethod: string;
+      codeChallenge: string | null;
+      codeChallengeMethod: string | null;
       expiresAt: Date;
       amr: string;
+      nonce: string | null;
+      scope: string;
+      authTime: Date;
       idp: string | null;
     };
     try {
@@ -106,19 +124,31 @@ export class OauthService {
       throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
     }
 
-    const expected = Buffer.from(entry.codeChallenge, 'utf8');
-    const actual = Buffer.from(s256(codeVerifier), 'utf8');
-    if (
-      expected.length !== actual.length ||
-      !crypto.timingSafeEqual(expected, actual)
-    ) {
-      throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
+    // A challenge-less code is only reachable for confidential clients; the
+    // caller (TokenController) is responsible for having authenticated them.
+    // See the /token invariant test in Task 9.
+    if (entry.codeChallenge) {
+      if (!codeVerifier) {
+        throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
+      }
+      const expected = Buffer.from(entry.codeChallenge, 'utf8');
+      const actual = Buffer.from(s256(codeVerifier), 'utf8');
+      if (
+        expected.length !== actual.length ||
+        !crypto.timingSafeEqual(expected, actual)
+      ) {
+        throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
+      }
     }
 
     return {
       userId: entry.userId,
       appPublicId: entry.appPublicId,
       amr: safeParseAmr(entry.amr),
+      nonce: entry.nonce,
+      scope: entry.scope,
+      authTime: entry.authTime,
+      hadChallenge: entry.codeChallenge !== null,
       idp: entry.idp ?? undefined,
     };
   }

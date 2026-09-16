@@ -99,12 +99,12 @@ describe('app-url-policy', () => {
       expect(isAppUrlAllowed('http://app.example.com')).toBe(false);
     });
     it('rejects localhost and *.localhost', () => {
-      expect(isAppUrlAllowed('https://localhost:3000')).toBe(false);
+      expect(isAppUrlAllowed('https://localhost:3010')).toBe(false);
       expect(isAppUrlAllowed('https://api.localhost')).toBe(false);
     });
     it('rejects loopback IPs', () => {
-      expect(isAppUrlAllowed('https://127.0.0.1:3000')).toBe(false);
-      expect(isAppUrlAllowed('http://[::1]:3000')).toBe(false);
+      expect(isAppUrlAllowed('https://127.0.0.1:3010')).toBe(false);
+      expect(isAppUrlAllowed('http://[::1]:3010')).toBe(false);
     });
     it('rejects bare host with no dot', () => {
       expect(isAppUrlAllowed('https://intranet')).toBe(false);
@@ -120,7 +120,7 @@ describe('app-url-policy', () => {
   describe('isAppUrlAllowed (insecure mode)', () => {
     beforeEach(() => { process.env.SASSY_AUTH_ALLOW_INSECURE_APP_URLS = 'true'; });
     it('accepts http localhost', () => {
-      expect(isAppUrlAllowed('http://localhost:3000/cb')).toBe(true);
+      expect(isAppUrlAllowed('https://localhost:3010/cb')).toBe(true);
     });
     it('accepts loopback IP', () => {
       expect(isAppUrlAllowed('http://127.0.0.1:8080')).toBe(true);
@@ -241,14 +241,14 @@ describe('IsAppUrl', () => {
 
   it('fails for http localhost in secure mode', () => {
     delete process.env.SASSY_AUTH_ALLOW_INSECURE_APP_URLS;
-    const errs = validateSync(makeWith('http://localhost:3000'));
+    const errs = validateSync(makeWith('https://localhost:3010'));
     expect(errs).toHaveLength(1);
     expect(errs[0].constraints?.isAppUrl).toContain('https');
   });
 
   it('passes for http localhost in insecure mode', () => {
     process.env.SASSY_AUTH_ALLOW_INSECURE_APP_URLS = 'true';
-    expect(validateSync(makeWith('http://localhost:3000'))).toHaveLength(0);
+    expect(validateSync(makeWith('https://localhost:3010'))).toHaveLength(0);
   });
 });
 ```
@@ -361,7 +361,7 @@ describe('App DTO validation (secure mode)', () => {
   });
 
   it('rejects an http app url in secure mode', () => {
-    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'http://localhost:3000' });
+    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'https://localhost:3010' });
     expect(validateSync(dto).length).toBeGreaterThan(0);
   });
 

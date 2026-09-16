@@ -140,6 +140,41 @@ describe('signIn upstream status mapping', () => {
 
     expect(result).toEqual({ error: 'serverUnavailable' })
   })
+
+  // The session-create gate (auth.config.ts's databaseHooks.session.create.before)
+  // throws FORBIDDEN with a `code` field in its JSON body distinguishing an
+  // unverified account from a deactivated one. A generic 'inactive' for both
+  // tells a user who just needs to click a verification link that their
+  // account was deactivated, which is both wrong and unhelpful.
+  it('maps a 403 with code ACCOUNT_UNVERIFIED to the unverified error', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(403, { code: 'ACCOUNT_UNVERIFIED' }),
+    )
+
+    const result = await signIn(formData({ email: 'a@b.io', password: 'pw' }))
+
+    expect(result).toEqual({ error: 'unverified' })
+  })
+
+  it('maps a 403 with code ACCOUNT_INACTIVE to the inactive error', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(403, { code: 'ACCOUNT_INACTIVE' }),
+    )
+
+    const result = await signIn(formData({ email: 'a@b.io', password: 'pw' }))
+
+    expect(result).toEqual({ error: 'inactive' })
+  })
+
+  it('maps a 403 with no body to the inactive error', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(403),
+    )
+
+    const result = await signIn(formData({ email: 'a@b.io', password: 'pw' }))
+
+    expect(result).toEqual({ error: 'inactive' })
+  })
 })
 
 describe('signIn two-factor challenge', () => {

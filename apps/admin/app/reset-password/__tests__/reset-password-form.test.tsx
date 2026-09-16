@@ -3,10 +3,28 @@ import { NextIntlClientProvider } from 'next-intl'
 import messages from '@/messages/en.json'
 import { ResetPasswordForm } from '../reset-password-form'
 import { resetPasswordSubmitAction } from '../actions'
+import { getPasswordPolicyForResetToken } from '@/lib/api-public'
 
 jest.mock('../actions', () => ({ resetPasswordSubmitAction: jest.fn() }))
 
+// Matches the convention in accept-invite-form.test.tsx for mocking
+// @/lib/api-public functions.
+jest.mock('@/lib/api-public', () => ({
+  getPasswordPolicyForResetToken: jest.fn(),
+}))
+
 const mockSubmit = resetPasswordSubmitAction as jest.MockedFunction<any>
+const mockGetPolicy = getPasswordPolicyForResetToken as jest.MockedFunction<any>
+
+const POLICY = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecial: false,
+  minNumbers: 1,
+  minSpecial: 0,
+}
 
 function renderForm() {
   return render(
@@ -14,6 +32,13 @@ function renderForm() {
       <ResetPasswordForm token="tok" />
     </NextIntlClientProvider>,
   )
+}
+
+// Ensure the mounting effect's getPasswordPolicyForResetToken call has
+// resolved (or rejected) and its state update has settled before any
+// assertions run, so React doesn't warn about updates outside act().
+async function waitForPolicyFetch() {
+  await waitFor(() => expect(mockGetPolicy).toHaveBeenCalledWith('tok'))
 }
 
 function fillAndSubmit(password: string, confirm = password) {
@@ -24,8 +49,9 @@ function fillAndSubmit(password: string, confirm = password) {
     screen.getByLabelText(messages.resetPassword.confirmPassword),
     { target: { value: confirm } },
   )
-  // Submit the form directly: the inputs carry `required` / `minLength`, and
-  // going through a button click would let jsdom's constraint validation
+  // Submit the form directly: the inputs carry `required`, the submit button
+  // is disabled whenever the live policy check fails or passwords mismatch,
+  // and going through a button click would let jsdom's constraint validation
   // pre-empt the component's own checks, which are what these cases exercise.
   fireEvent.submit(screen.getByRole('button').closest('form')!)
 }
@@ -34,11 +60,13 @@ const VALID = 'Str0ngPassw0rd'
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockGetPolicy.mockResolvedValue(POLICY)
 })
 
 describe('ResetPasswordForm client-side validation', () => {
   it('rejects mismatched passwords without calling the action', async () => {
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID, 'Different123')
 
@@ -50,17 +78,55 @@ describe('ResetPasswordForm client-side validation', () => {
 
   it('rejects a password under 12 characters without calling the action', async () => {
     renderForm()
+    await waitForPolicyFetch()
 
+    // Too short now folds into the single policy-complexity check rather
+    // than its own dedicated error key.
     fillAndSubmit('Sh0rtPass')
 
     expect(screen.getByTestId('reset-error')).toHaveTextContent(
-      messages.resetPassword.tooShort,
+      messages.resetPassword.complexity,
     )
     expect(mockSubmit).not.toHaveBeenCalled()
   })
 
+  it('disables the submit button for a weak password and enables it for a strong matching one', async () => {
+    renderForm()
+    await waitForPolicyFetch()
+
+    fireEvent.change(screen.getByLabelText(messages.resetPassword.password), {
+      target: { value: 'weakpassword' },
+    })
+    fireEvent.change(screen.getByLabelText(messages.resetPassword.confirmPassword), {
+      target: { value: 'weakpassword' },
+    })
+    expect(screen.getByRole('button')).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText(messages.resetPassword.password), {
+      target: { value: VALID },
+    })
+    fireEvent.change(screen.getByLabelText(messages.resetPassword.confirmPassword), {
+      target: { value: VALID },
+    })
+    expect(screen.getByRole('button')).not.toBeDisabled()
+  })
+
+  it('falls back to the default policy when the client-side policy fetch fails', async () => {
+    mockGetPolicy.mockRejectedValue(new Error('network error'))
+    mockSubmit.mockResolvedValue({ ok: true })
+    renderForm()
+    await waitForPolicyFetch()
+
+    fillAndSubmit(VALID)
+
+    await waitFor(() =>
+      expect(mockSubmit).toHaveBeenCalledWith('tok', VALID),
+    )
+  })
+
   it('rejects a password missing a character class without calling the action', async () => {
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit('alllowercaseletters')
 
@@ -75,6 +141,7 @@ describe('ResetPasswordForm submission', () => {
   it('shows the success panel when the action succeeds', async () => {
     mockSubmit.mockResolvedValue({ ok: true })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 
@@ -87,6 +154,7 @@ describe('ResetPasswordForm submission', () => {
   it('shows the invalid-link message when the token is rejected', async () => {
     mockSubmit.mockResolvedValue({ error: 'invalidToken' })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 
@@ -100,6 +168,7 @@ describe('ResetPasswordForm submission', () => {
   it('does not blame the link when the request was throttled', async () => {
     mockSubmit.mockResolvedValue({ error: 'tooManyRequests' })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 
@@ -117,6 +186,7 @@ describe('ResetPasswordForm submission', () => {
   it('does not blame the link when the server is unreachable', async () => {
     mockSubmit.mockResolvedValue({ error: 'serverUnavailable' })
     renderForm()
+    await waitForPolicyFetch()
 
     fillAndSubmit(VALID)
 

@@ -11,7 +11,7 @@ jest.mock('@sassy-auth/db', () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
-    saApp: { findUnique: jest.fn() },
+    saApp: { findUnique: jest.fn(), findFirst: jest.fn() },
     saPermission: { findMany: jest.fn() },
     saRolePermission: { count: jest.fn(), groupBy: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn() },
     saUserRole: { count: jest.fn(), groupBy: jest.fn() },
@@ -413,6 +413,17 @@ describe('RolesService', () => {
       mocks.saRole.findUnique.mockResolvedValue({ id: 1, publicId: 'sq_r1', name: 'Editor' });
       (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error('Unexpected DB error'));
       await expect(makeService().deleteRole('ba-caller', 'sq_r1')).rejects.toThrow('Unexpected DB error');
+    });
+
+    it('reports the app name when the role is that app\'s default (not "assigned to N users")', async () => {
+      mocks.saRole.findUnique.mockResolvedValue({ id: 7, publicId: 'role7' });
+      const p2003 = Object.assign(new Error('FK violation'), { code: 'P2003' });
+      (prisma.$transaction as jest.Mock).mockRejectedValue(p2003);
+      mocks.saUserRole.count.mockResolvedValue(0);
+      mocks.saApp.findFirst.mockResolvedValue({ name: 'Resource Server' });
+      await expect(makeService().deleteRole('ba-caller', 'role7')).rejects.toThrow(
+        /default role for app "Resource Server"/,
+      );
     });
   });
 });

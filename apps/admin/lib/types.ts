@@ -1,3 +1,22 @@
+import type { PasswordPolicy, ActivationEmailBranding } from '@sassy-auth/types'
+
+export type { PasswordPolicy }
+export type { ActivationEmailBranding }
+
+// Matches the server's global default password policy. Used by signup and
+// reset-password forms when a per-app/per-request policy hasn't been
+// resolved yet (or its fetch failed), so the live checklist still has
+// something sane to render instead of crashing.
+export const FALLBACK_PASSWORD_POLICY: PasswordPolicy = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecial: false,
+  minNumbers: 1,
+  minSpecial: 0,
+}
+
 export interface User {
   id: string
   firstName: string
@@ -6,7 +25,7 @@ export interface User {
   phoneNumber: string | null
   username: string | null
   orgId: string
-  status: 'active' | 'pending' | 'inactive'
+  status: 'active' | 'pending' | 'inactive' | 'unverified'
   // bug-0186: both fields are now real. The API always returns them:
   // `createdAt` is a NOT-NULL DB column; `lastLoginAt` is nullable in
   // the DB (null means "never signed in") and preserved as such over
@@ -61,22 +80,43 @@ export interface InvitationInfo {
   firstName: string
   email: string
   expired: boolean
+  passwordPolicy: PasswordPolicy
+}
+
+export interface RedirectUri {
+  uri: string;
+  kind: 'login' | 'post_logout';
 }
 
 export interface App {
   publicId: string;
   name: string;
   url: string;
-  callbackUrl?: string | null;
+  logo?: string | null;
+  redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
   requireTwoFactor: boolean;
+  // Client type is derived from whether a secret hash exists server-side —
+  // the hash itself is never sent to the admin console.
+  isConfidential?: boolean;
+  clientSecretUpdatedAt?: string | null;
+  defaultOrgId?: string | null;
+  defaultRoleId?: string | null;
+  passwordPolicyOverride: PasswordPolicy | null;
+  effectivePasswordPolicy: PasswordPolicy;
+  webhookUrl?: string | null;
+  // The secret itself is never sent to the admin console — only whether one
+  // is configured, mirroring isConfidential/clientSecretHash above.
+  hasWebhookSecret?: boolean;
+  activationEmailOverride: ActivationEmailBranding | null;
 }
 
 export interface CreateAppPayload {
   name: string;
   url: string;
-  callbackUrl?: string | null;
+  logo?: string | null;
+  redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
 }
@@ -84,9 +124,15 @@ export interface CreateAppPayload {
 export interface UpdateAppPayload {
   name?: string;
   url?: string;
-  callbackUrl?: string | null;
+  logo?: string | null;
+  redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
+  defaultOrgId?: string | null;
+  defaultRoleId?: string | null;
+  passwordPolicyOverride?: PasswordPolicy | null;
+  webhookUrl?: string | null;
+  activationEmailOverride?: ActivationEmailBranding | null;
 }
 
 export interface ListAppsParams {

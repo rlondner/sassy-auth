@@ -18,6 +18,17 @@ jest.mock('@/app/(admin)/apps/actions', () => ({
   updateSocialProvidersAction: jest.fn(),
 }))
 
+// AppEditDrawer also fetches this app's orgs/roles for the default-org/role
+// selects, gated the same way behind `open` (see comment above). None of
+// these tests open the edit drawer, so these are never resolved — just
+// present so the module shape matches actions.ts's exports.
+jest.mock('@/app/(admin)/orgs/actions', () => ({
+  listOrgsAction: jest.fn(),
+}))
+jest.mock('@/app/(admin)/roles/actions', () => ({
+  listRolesAction: jest.fn(),
+}))
+
 // Radix DropdownMenu does not open in jsdom (it depends on pointer-events
 // detection which jsdom does not implement). Replace it with a trivial
 // always-open passthrough so menu items are queryable. This preserves the
@@ -48,10 +59,20 @@ jest.mock('@sassy-auth/ui', () => {
   }
 })
 
+const DEFAULT_PASSWORD_POLICY = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecial: false,
+  minNumbers: 1,
+  minSpecial: 0,
+}
+
 const initial = {
   items: [
-    { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false },
-    { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth.example.com', isPlatform: true, requireTwoFactor: false },
+    { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: DEFAULT_PASSWORD_POLICY, activationEmailOverride: null },
+    { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth.example.com', isPlatform: true, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: DEFAULT_PASSWORD_POLICY, activationEmailOverride: null },
   ],
   total: 2,
   page: 1,

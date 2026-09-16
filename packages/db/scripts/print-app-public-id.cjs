@@ -18,11 +18,16 @@ const path = require('path');
 const APP_NAME = process.env.APP_NAME || 'resourceserver01';
 const OUT_FILE = process.env.OUT_FILE || '/tmp/sassy-e2e-rs-client-id.txt';
 
-// @prisma/client resolves relative to packages/db (this file's cwd when
-// invoked via `pnpm --filter @sassy-auth/db exec node scripts/...`).
-const { PrismaClient } = require('@prisma/client');
-
-const p = new PrismaClient();
+// Reuse the already-constructed `prisma` singleton (Prisma 7 generated
+// client + @prisma/adapter-pg) that packages/db/index.ts exports, rather
+// than duplicating the adapter-construction logic here. This requires
+// packages/db to have been built first (`pnpm --filter @sassy-auth/db
+// build`), which the e2e workflow already does in its "Build shared
+// packages" step, well before this script runs. `require` resolves this
+// relative path against this file's own location (packages/db/scripts/),
+// not the process cwd, so `../dist/index.js` correctly points at
+// packages/db/dist/index.js regardless of how the script is invoked.
+const { prisma: p } = require('../dist/index.js');
 
 p.saApp.findUnique({ where: { name: APP_NAME } })
   .then((app) => {

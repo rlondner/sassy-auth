@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --port 3001 --experimental-https",
     "build": "next build",
     "start": "next start --port 3001",
     "test": "OTEL_SDK_DISABLED=true node ../../scripts/log-test.mjs admin jest",
@@ -11,14 +11,17 @@
     "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.1.0",
+    "@next/env": "^15.5.24",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
     "@opentelemetry/sdk-trace-base": "^2.11.0",
+    "@sassy-auth/types": "workspace:*",
     "@sassy-auth/ui": "workspace:*",
     "@sentry/nextjs": "^10.54.0",
     "@tanstack/react-table": "^8.20.0",
     "lucide-react": "^0.577.0",
-    "next": "^15.0.0",
+    "next": "^15.5.24",
     "next-intl": "^3.26.0",
     "next-themes": "^0.4.6",
     "qrcode.react": "^4.2.0",
@@ -50,7 +53,8 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
       "^@sassy-auth/ui$": "<rootDir>/../../packages/ui/src/index.ts",
-      "^server-only$": "<rootDir>/__mocks__/server-only.ts"
+      "^server-only$": "<rootDir>/__mocks__/server-only.ts",
+      "^@marsidev/react-turnstile$": "<rootDir>/__mocks__/turnstile.tsx"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(@sassy-auth)/)"

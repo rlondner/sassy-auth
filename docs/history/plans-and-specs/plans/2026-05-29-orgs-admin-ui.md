@@ -854,7 +854,7 @@ Expected: no errors.
 - [ ] **Step 3: Boot the dev server and hit one endpoint manually**
 
 Run (in one terminal): `cd apps/auth-server && pnpm dev`
-Run (in another, after server is up): `curl -i -b 'better-auth.session_token=<your local session>' 'http://localhost:3000/api/orgs?pageSize=5'`
+Run (in another, after server is up): `curl -i -b 'better-auth.session_token=<your local session>' 'https://localhost:3010/api/orgs?pageSize=5'`
 Expected: HTTP 200 with `{ items: [...], total, page, pageSize }`.
 
 If the implementor doesn't have a session cookie handy, skip this step — the unit tests already cover the wiring.

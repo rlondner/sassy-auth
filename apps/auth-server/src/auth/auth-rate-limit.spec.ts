@@ -1,5 +1,7 @@
 import { createAuthRateLimiter, isSensitiveAuthPath } from './auth-rate-limit';
 
+const ENV_KEYS = ['NODE_ENV', 'AUTH_RATE_LIMIT', 'AUTH_RATE_WINDOW_MS'] as const;
+
 type FakeRes = {
   statusCode?: number;
   body?: unknown;
@@ -196,5 +198,67 @@ describe('createAuthRateLimiter', () => {
     limiter(makeReq('/api/auth/sign-in/email', '10.9.9.9'), makeRes(), jest.fn());
 
     expect(limiter.size()).toBe(1);
+  });
+});
+
+describe('createDefaultAuthRateLimiter', () => {
+  const original: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) original[key] = process.env[key];
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+    jest.resetModules();
+  });
+
+  function load() {
+    // Re-import so this module and its rate-limit-config dependency
+    // re-evaluate against the env vars set for this test.
+    return jest.requireActual('./auth-rate-limit') as typeof import('./auth-rate-limit');
+  }
+
+  // This middleware sits in front of BetterAuth and previously hardcoded its
+  // own bucket size, so raising AUTH_RATE_LIMIT (e.g. for local e2e runs
+  // that sign in as several seeded admins back-to-back) had no effect on it
+  // even though it did affect the Nest `auth` throttler bucket.
+  it('honors AUTH_RATE_LIMIT / AUTH_RATE_WINDOW_MS instead of a hardcoded bucket', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUTH_RATE_LIMIT = '2';
+    process.env.AUTH_RATE_WINDOW_MS = '5000';
+    jest.resetModules();
+
+    const { createDefaultAuthRateLimiter } = load();
+    const limiter = createDefaultAuthRateLimiter();
+    const next = jest.fn();
+
+    limiter(makeReq('/api/auth/sign-in/email'), makeRes(), next);
+    limiter(makeReq('/api/auth/sign-in/email'), makeRes(), next);
+    const blocked = makeRes();
+    limiter(makeReq('/api/auth/sign-in/email'), blocked, next);
+
+    expect(next).toHaveBeenCalledTimes(2);
+    expect(blocked.statusCode).toBe(429);
+  });
+
+  it('stays effectively disabled under NODE_ENV=test regardless of env overrides', () => {
+    process.env.NODE_ENV = 'test';
+    process.env.AUTH_RATE_LIMIT = '1';
+    process.env.AUTH_RATE_WINDOW_MS = '1';
+    jest.resetModules();
+
+    const { createDefaultAuthRateLimiter } = load();
+    const limiter = createDefaultAuthRateLimiter();
+    const next = jest.fn();
+
+    for (let i = 0; i < 50; i++) {
+      limiter(makeReq('/api/auth/sign-in/email'), makeRes(), next);
+    }
+
+    expect(next).toHaveBeenCalledTimes(50);
   });
 });

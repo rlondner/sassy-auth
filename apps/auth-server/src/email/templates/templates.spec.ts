@@ -1,6 +1,7 @@
 import { invitationEmail } from './invitation.template';
 import { passwordResetEmail } from './password-reset.template';
 import { signInCodeEmail } from './sign-in-code.template';
+import { verificationEmail } from './verify-email.template';
 
 describe('email templates', () => {
   it('invitationEmail embeds the invite URL and name in html + text', () => {
@@ -27,5 +28,76 @@ describe('email templates', () => {
     expect(parts.html).toContain('123456');
     expect(parts.text).toContain('5');
     expect(parts.html).toContain('5');
+  });
+
+  it('verificationEmail uses the default subject/message and embeds appName, URL, name, and a button when no branding is given', () => {
+    const out = verificationEmail({ firstName: 'Jane', verifyUrl: 'https://x/verify-email?token=abc', appName: 'Vibecast' });
+    expect(out.subject).toBe('Verify your Vibecast email address');
+    expect(out.html).toContain('https://x/verify-email?token=abc');
+    expect(out.html).toContain('Confirm your email address to finish setting up your account:');
+    expect(out.html).toContain('<table'); // the system-rendered button
+    expect(out.text).toContain('https://x/verify-email?token=abc');
+    expect(out.text).toContain('Jane');
+    expect(out.from).toBeUndefined();
+  });
+
+  it('verificationEmail renders a custom subject/message with placeholders', () => {
+    const out = verificationEmail({
+      firstName: 'Jane',
+      verifyUrl: 'https://x/verify-email?token=abc',
+      appName: 'Vibecast',
+      branding: { subject: 'Confirm your {{appName}} account, {{firstName}}!', message: 'Welcome to {{appName}}! Click below to confirm {{firstName}}.' },
+    });
+    expect(out.subject).toBe('Confirm your Vibecast account, Jane!');
+    expect(out.html).toContain('Welcome to Vibecast! Click below to confirm Jane.');
+    expect(out.text).toContain('Welcome to Vibecast! Click below to confirm Jane.');
+  });
+
+  it('verificationEmail computes from from fromName + fromAddress', () => {
+    const out = verificationEmail({
+      firstName: 'Jane', verifyUrl: 'https://x/verify', appName: 'Vibecast',
+      branding: { fromName: 'Vibecast', fromAddress: 'no-reply@vibecast.io' },
+    });
+    expect(out.from).toBe('Vibecast <no-reply@vibecast.io>');
+  });
+
+  it('verificationEmail computes from from fromAddress alone', () => {
+    const out = verificationEmail({
+      firstName: 'Jane', verifyUrl: 'https://x/verify', appName: 'Vibecast',
+      branding: { fromAddress: 'no-reply@vibecast.io' },
+    });
+    expect(out.from).toBe('no-reply@vibecast.io');
+  });
+
+  it('verificationEmail computes from from fromName alone', () => {
+    const out = verificationEmail({
+      firstName: 'Jane', verifyUrl: 'https://x/verify', appName: 'Vibecast',
+      branding: { fromName: 'Vibecast' },
+    });
+    expect(out.from).toBe('Vibecast');
+  });
+
+  it('verificationEmail escapes HTML in a custom message (bug-0291: stored HTML injection via activationEmailOverride.message)', () => {
+    const out = verificationEmail({
+      firstName: 'Jane',
+      verifyUrl: 'https://x/verify-email?token=abc',
+      appName: 'Vibecast',
+      branding: { message: '<a href="https://evil.example/phish">Click here</a> & "confirm" now' },
+    });
+    expect(out.html).not.toContain('<a href="https://evil.example/phish">');
+    expect(out.html).toContain('&lt;a href=&quot;https://evil.example/phish&quot;&gt;Click here&lt;/a&gt; &amp; &quot;confirm&quot; now');
+    // The real confirm button/link must still be present and untouched.
+    expect(out.html).toContain('https://x/verify-email?token=abc');
+    // text stays a plain, unescaped copy — no HTML rendering there to inject into.
+    expect(out.text).toContain('<a href="https://evil.example/phish">Click here</a> & "confirm" now');
+  });
+
+  it('verificationEmail falls back to the default subject/message when branding fields are whitespace-only', () => {
+    const out = verificationEmail({
+      firstName: 'Jane', verifyUrl: 'https://x/verify', appName: 'Vibecast',
+      branding: { subject: '   ', message: '   ' },
+    });
+    expect(out.subject).toBe('Verify your Vibecast email address');
+    expect(out.html).toContain('Confirm your email address to finish setting up your account:');
   });
 });

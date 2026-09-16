@@ -1,10 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider     = "prisma-client"
+  output       = "./generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ── BetterAuth tables (managed by BetterAuth Prisma adapter) ──────────────────
@@ -107,6 +108,7 @@ enum UserStatus {
   active
   pending
   inactive
+  unverified
 }
 
 model SaApp {
@@ -114,14 +116,51 @@ model SaApp {
   publicId    String         @unique
   name        String         @unique
   url         String
-  callbackUrl        String?
+  /// Full data URI (e.g. "data:image/png;base64,...."). null = no logo set.
+  logo        String?
   twoFactorTrustDays Int?
   requireTwoFactor   Boolean        @default(false)
   isPlatform         Boolean        @default(false)
+  /// Complete PasswordPolicy JSON override (see @sassy-auth/types). null
+  /// means "inherit the global env-derived policy" — never partial.
+  passwordPolicyOverride Json?
+  // Presence of a secret hash is what makes a client confidential. There is no
+  // separate client-type flag, so the two cannot contradict each other.
+  clientSecretHash      String?
+  clientSecretUpdatedAt DateTime?
+  // Signing secret and delivery target for the activation webhook (see
+  // apps/auth-server/src/activation/notify-activation.ts). webhookSecret is
+  // stored in plaintext, unlike clientSecretHash, because it is used to SIGN
+  // outgoing requests rather than verify incoming credentials — the server
+  // must be able to read it back.
+  webhookUrl    String?
+  webhookSecret String?
+  /// Partial ActivationEmailBranding JSON override (see @sassy-auth/types).
+  /// Unlike passwordPolicyOverride, this is field-level, not all-or-nothing:
+  /// null, or any field omitted within it, means "use the platform default"
+  /// for that field.
+  activationEmailOverride Json?
   orgs        SaOrg[]
   permissions SaPermission[]
   roles       SaRole[]
+  redirectUris    SaAppRedirectUri[]
   socialProviders SaSocialProvider[]
+  defaultOrgId    Int?
+  defaultOrg      SaOrg?  @relation("AppDefaultOrg", fields: [defaultOrgId], references: [id], onDelete: Restrict)
+  defaultRoleId   Int?
+  defaultRole     SaRole? @relation("AppDefaultRole", fields: [defaultRoleId], references: [id], onDelete: Restrict)
+}
+
+model SaAppRedirectUri {
+  id    Int    @id @default(autoincrement())
+  appId Int
+  uri   String
+  /// 'login' | 'post_logout'
+  kind  String
+  app   SaApp  @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, uri, kind])
+  @@index([appId, kind])
 }
 
 model SaOrg {
@@ -132,6 +171,7 @@ model SaOrg {
   app        SaApp    @relation(fields: [appId], references: [id])
   isPlatform Boolean  @default(false)
   users      SaUser[]
+  defaultForApps SaApp[] @relation("AppDefaultOrg")
 
   @@unique([appId, name])
 }
@@ -220,6 +260,7 @@ model SaRole {
   app         SaApp              @relation(fields: [appId], references: [id])
   permissions SaRolePermission[]
   users       SaUserRole[]
+  defaultForApps SaApp[] @relation("AppDefaultRole")
 
   @@unique([appId, name])
   @@index([appId])
@@ -269,8 +310,14 @@ model SaOauthCode {
   userId              String
   appPublicId         String
   redirectUri         String
-  codeChallenge       String
-  codeChallengeMethod String
+  // Nullable so confidential clients may omit PKCE. A code with no challenge is
+  // only exchangeable by a request that authenticates with a client secret —
+  // enforced at /authorize and again at /token.
+  codeChallenge       String?
+  codeChallengeMethod String?
+  nonce               String?
+  scope               String   @default("")
+  authTime            DateTime @default(now())
   amr                 String   @default("[\"pwd\"]")
   idp                 String?
   expiresAt           DateTime

@@ -3,6 +3,12 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { AppsService } from './apps.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
+import { getGlobalPasswordPolicy } from '../auth/password-policy';
+
+// The env-derived global default policy — used to assert `effectivePasswordPolicy`
+// on apps that have no passwordPolicyOverride set, without hardcoding values
+// that would drift from password-policy.ts's own defaults.
+const globalPasswordPolicy = getGlobalPasswordPolicy(process.env);
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -10,9 +16,18 @@ jest.mock('@sassy-auth/db', () => ({
       findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn(),
       create: jest.fn(), update: jest.fn(), delete: jest.fn(),
     },
+    saAppRedirectUri: {
+      deleteMany: jest.fn(), createMany: jest.fn(),
+    },
+    saOrg: { findUnique: jest.fn() },
+    saRole: { findUnique: jest.fn() },
     $transaction: jest.fn(),
   },
-  Prisma: {},
+  // Real Prisma.JsonNull is a branded sentinel object distinguishing "set
+  // this JSON column to SQL NULL" from "field omitted" (undefined). Mocked
+  // here as a distinct object so assertValidPasswordPolicyOverride-adjacent
+  // update-data assertions can check for it by reference.
+  Prisma: { JsonNull: { __prismaJsonNull: true } },
 }));
 jest.mock('../common/permissions/check-permission', () => ({
   checkPermission: jest.fn().mockResolvedValue(undefined),
@@ -21,6 +36,9 @@ jest.mock('../common/permissions/check-permission', () => ({
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saApp: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
+  saAppRedirectUri: { deleteMany: jest.Mock; createMany: jest.Mock };
+  saOrg: { findUnique: jest.Mock };
+  saRole: { findUnique: jest.Mock };
   $transaction: jest.Mock;
 };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -34,8 +52,8 @@ const loggerFake: Partial<LoggerService> = {
   getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() } as never),
 };
 
-const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false };
-const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', callbackUrl: null, isPlatform: true, twoFactorTrustDays: null, requireTwoFactor: false };
+const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false };
+const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', isPlatform: true, twoFactorTrustDays: null, requireTwoFactor: false };
 
 describe('AppsService', () => {
   let service: AppsService;
@@ -51,6 +69,12 @@ describe('AppsService', () => {
     service = module.get(AppsService);
     jest.clearAllMocks();
     (checkPermission as jest.Mock).mockResolvedValue(undefined);
+    // Default: run the transaction callback against the same mocked prisma
+    // client, so existing tests that stub saApp.update / saAppRedirectUri
+    // directly keep working now that updateApp (like createApp) writes
+    // through prisma.$transaction. Tests that care about transactional
+    // atomicity specifically override this with a distinct tx client.
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
   });
 
   it('listApps returns paginated items and total', async () => {
@@ -58,7 +82,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, webhookUrl: null, hasWebhookSecret: false, activationEmailOverride: null }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -78,10 +102,16 @@ describe('AppsService', () => {
   it('getApp returns the formatted row when found', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     const result = await service.getApp('ba-caller', 'sq_1');
-    expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({ where: { publicId: 'sq_1' } });
+    expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      include: { redirectUris: true, defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
     expect(result).toEqual({
-      publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com',
-      callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false,
+      publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null,
+      isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [],
+      isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null,
+      passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy,
+      webhookUrl: null, hasWebhookSecret: false, activationEmailOverride: null,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -106,6 +136,24 @@ describe('AppsService', () => {
     }));
   });
 
+  // Finding 2 (final review): the admin console's apps table never renders
+  // logos, so listApps must not ship every row's full base64 blob. Both the
+  // Prisma query (an explicit `select` that omits `logo`) and the formatted
+  // response are covered here: even a mocked DB row that *does* carry a
+  // `logo` value must come back as `logo: null` in every item, and the
+  // query itself must never request the column.
+  it('listApps never selects logo and always returns logo: null in every row, even if the DB row has one', async () => {
+    mockPrisma.saApp.findMany.mockResolvedValue([{ ...appRow, logo: 'data:image/png;base64,LEAKED=' }]);
+    mockPrisma.saApp.count.mockResolvedValue(1);
+    const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].logo).toBeNull();
+    const call = mockPrisma.saApp.findMany.mock.calls[0][0];
+    expect(call.select).toBeDefined();
+    expect(call.select.logo).toBeUndefined();
+    expect(call.include).toBeUndefined();
+  });
+
   it('createApp generates publicId via two-step transaction', async () => {
     mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
     mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
@@ -116,27 +164,14 @@ describe('AppsService', () => {
         publicId: expect.stringMatching(/^pending-/),
         name: 'Customer Portal',
         url: 'https://portal.example.com',
-        callbackUrl: null,
+        logo: null,
         isPlatform: false,
         twoFactorTrustDays: null,
         requireTwoFactor: false,
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false });
-  });
-
-  it('createApp stores a provided callbackUrl', async () => {
-    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
-    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
-    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, callbackUrl: 'https://portal.example.com/cb' });
-    const result = await service.createApp('ba-caller', {
-      name: 'Customer Portal', url: 'https://portal.example.com', callbackUrl: 'https://portal.example.com/cb',
-    });
-    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ callbackUrl: 'https://portal.example.com/cb' }),
-    }));
-    expect(result.callbackUrl).toBe('https://portal.example.com/cb');
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, webhookUrl: null, hasWebhookSecret: false, activationEmailOverride: null });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -152,14 +187,139 @@ describe('AppsService', () => {
     expect(result.twoFactorTrustDays).toBe(30);
   });
 
+  it('createApp stores a provided logo', async () => {
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, logo: 'data:image/png;base64,AAA=' });
+    const result = await service.createApp('ba-caller', {
+      name: 'Customer Portal', url: 'https://portal.example.com', logo: 'data:image/png;base64,AAA=',
+    });
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ logo: 'data:image/png;base64,AAA=' }),
+    }));
+    expect(result.logo).toBe('data:image/png;base64,AAA=');
+  });
+
+  it('createApp defaults logo to null when omitted', async () => {
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
+    mockPrisma.saApp.update.mockResolvedValue(appRow);
+    await service.createApp('ba-caller', { name: 'Customer Portal', url: 'https://portal.example.com' });
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ logo: null }),
+    }));
+  });
+
+  it('updateApp sets logo when provided', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, logo: 'data:image/png;base64,BBB=' });
+    await service.updateApp('ba-caller', 'sq_1', { logo: 'data:image/png;base64,BBB=' });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { logo: 'data:image/png;base64,BBB=' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp clears logo when given null', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, logo: null });
+    await service.updateApp('ba-caller', 'sq_1', { logo: null });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { logo: null },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp omits logo from update data when DTO omits it', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, name: 'Renamed' });
+    await service.updateApp('ba-caller', 'sq_1', { name: 'Renamed' });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { name: 'Renamed' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp sets activationEmailOverride when provided', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    const override = { fromName: 'Vibecast', fromAddress: 'no-reply@vibecast.io', subject: 'Confirm your {{appName}} account' };
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, activationEmailOverride: override });
+    const result = await service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: override });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { activationEmailOverride: override },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+    expect(result.activationEmailOverride).toEqual(override);
+  });
+
+  it('updateApp clears activationEmailOverride when given null', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, activationEmailOverride: null });
+    await service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: null });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { activationEmailOverride: { __prismaJsonNull: true } },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp rejects an activationEmailOverride with a non-string field', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { fromName: 123 as unknown as string } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp rejects an activationEmailOverride field containing a line break', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { subject: 'Hi\r\nBcc: attacker@evil.com' } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp rejects a malformed fromAddress', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { fromAddress: 'not-an-email' } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp accepts a well-formed fromAddress', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, activationEmailOverride: { fromAddress: 'no-reply@vibecast.io' } });
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { fromAddress: 'no-reply@vibecast.io' } }),
+    ).resolves.toBeDefined();
+  });
+
+  it('getApp/listApps formatting defaults activationEmailOverride to null when absent', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, defaultOrg: null, defaultRole: null });
+    const result = await service.getApp('ba-caller', 'sq_1');
+    expect(result.activationEmailOverride).toBeNull();
+  });
+
   it('createApp throws ConflictException on P2002', async () => {
     mockPrisma.$transaction.mockRejectedValue({ code: 'P2002' });
     await expect(service.createApp('ba-caller', { name: 'x', url: 'https://x' })).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('updateApp throws BadRequestException when name, url, callbackUrl, and twoFactorTrustDays are all absent', async () => {
+  it('updateApp throws BadRequestException when every updatable field is absent', async () => {
     await expect(service.updateApp('ba-caller', 'sq_1', {})).rejects.toBeInstanceOf(BadRequestException);
     expect(mockPrisma.saApp.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('updateApp with only logo does NOT throw BadRequestException (reaches update)', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, logo: 'data:image/png;base64,CCC=' });
+    await expect(service.updateApp('ba-caller', 'sq_1', { logo: 'data:image/png;base64,CCC=' })).resolves.toBeDefined();
+    expect(mockPrisma.saApp.update).toHaveBeenCalled();
   });
 
   it('updateApp with only twoFactorTrustDays does NOT throw BadRequestException (reaches update)', async () => {
@@ -176,6 +336,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { twoFactorTrustDays: 30 },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });
 
@@ -186,6 +347,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { twoFactorTrustDays: null },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });
 
@@ -196,6 +358,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { name: 'Renamed' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });
 
@@ -214,24 +377,157 @@ describe('AppsService', () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     mockPrisma.saApp.update.mockResolvedValue({ ...appRow, name: 'Renamed' });
     const result = await service.updateApp('ba-caller', 'sq_1', { name: 'Renamed' });
-    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { publicId: 'sq_1' }, data: { name: 'Renamed' } });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { name: 'Renamed' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
     expect(result.name).toBe('Renamed');
   });
 
-  it('updateApp clears callbackUrl when given empty string', async () => {
+  it('updateApp sets webhookUrl when provided (webhookSecret is never DTO-settable — see rotateWebhookSecret)', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
-    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, callbackUrl: null });
-    await service.updateApp('ba-caller', 'sq_1', { callbackUrl: '' });
+    mockPrisma.saApp.update.mockResolvedValue({
+      ...appRow,
+      webhookUrl: 'https://relying-party.example.com/webhooks/activation',
+    });
+    const result = await service.updateApp('ba-caller', 'sq_1', {
+      webhookUrl: 'https://relying-party.example.com/webhooks/activation',
+    });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
-      data: { callbackUrl: null },
+      data: {
+        webhookUrl: 'https://relying-party.example.com/webhooks/activation',
+      },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
+    expect(result.webhookUrl).toBe('https://relying-party.example.com/webhooks/activation');
+  });
+
+  it('updateApp clearing webhookUrl cascades to clear webhookSecret too, so a webhook is never left half-configured', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, webhookUrl: 'https://old.example.com', webhookSecret: 'old-secret' });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, webhookUrl: null, webhookSecret: null });
+    const result = await service.updateApp('ba-caller', 'sq_1', { webhookUrl: null });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { webhookUrl: null, webhookSecret: null },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+    expect(result.webhookUrl).toBeNull();
+    expect(result.hasWebhookSecret).toBe(false);
+  });
+
+  it('updateApp succeeds setting only webhookUrl when webhookSecret was already set from a prior rotation', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, webhookUrl: null, webhookSecret: 'already-set-secret' });
+    mockPrisma.saApp.update.mockResolvedValue({
+      ...appRow,
+      webhookUrl: 'https://relying-party.example.com/webhooks/activation',
+      webhookSecret: 'already-set-secret',
+    });
+    const result = await service.updateApp('ba-caller', 'sq_1', {
+      webhookUrl: 'https://relying-party.example.com/webhooks/activation',
+    });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { webhookUrl: 'https://relying-party.example.com/webhooks/activation' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+    expect(result.webhookUrl).toBe('https://relying-party.example.com/webhooks/activation');
+    expect(result.hasWebhookSecret).toBe(true);
+  });
+
+  it('getApp reports hasWebhookSecret without exposing the plaintext secret', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({
+      ...appRow,
+      webhookUrl: 'https://relying-party.example.com/webhooks/activation',
+      webhookSecret: 'whsec_abc123',
+      redirectUris: [],
+    });
+    const result = await service.getApp('ba-caller', 'sq_1');
+    expect(result.webhookUrl).toBe('https://relying-party.example.com/webhooks/activation');
+    expect(result.hasWebhookSecret).toBe(true);
+    expect((result as Record<string, unknown>).webhookSecret).toBeUndefined();
   });
 
   it('updateApp throws ConflictException on P2002', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     mockPrisma.saApp.update.mockRejectedValue({ code: 'P2002' });
     await expect(service.updateApp('ba-caller', 'sq_1', { name: 'dup' })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('sets defaultOrgId when the org belongs to this app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 50, appId: appRow.id });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultOrgId: 50, defaultOrg: { publicId: 'org_pub_50' } });
+    const result = await service.updateApp('ba-caller', 'sq_1', { defaultOrgId: 'org_pub_50' });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ defaultOrgId: 50 }) }),
+    );
+    expect(result.defaultOrgId).toBe('org_pub_50');
+  });
+
+  it('rejects defaultOrgId when the org belongs to a different app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saOrg.findUnique.mockResolvedValue({ id: 50, appId: 999 });
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { defaultOrgId: 'org_pub_50' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects defaultOrgId that does not exist', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saOrg.findUnique.mockResolvedValue(null);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { defaultOrgId: 'nope' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('clears defaultOrgId when explicitly set to null', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultOrgId: null });
+    await service.updateApp('ba-caller', 'sq_1', { defaultOrgId: null });
+    expect(mockPrisma.saOrg.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ defaultOrgId: null }) }),
+    );
+  });
+
+  it('sets defaultRoleId when the role belongs to this app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saRole.findUnique.mockResolvedValue({ id: 7, appId: appRow.id });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultRoleId: 7, defaultRole: { publicId: 'role_pub_7' } });
+    const result = await service.updateApp('ba-caller', 'sq_1', { defaultRoleId: 'role_pub_7' });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ defaultRoleId: 7 }) }),
+    );
+    expect(result.defaultRoleId).toBe('role_pub_7');
+  });
+
+  it('rejects defaultRoleId when the role belongs to a different app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saRole.findUnique.mockResolvedValue({ id: 7, appId: 999 });
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { defaultRoleId: 'role_pub_7' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects defaultRoleId that does not exist', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saRole.findUnique.mockResolvedValue(null);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { defaultRoleId: 'nope' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('clears defaultRoleId when explicitly set to null', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, defaultRoleId: null });
+    await service.updateApp('ba-caller', 'sq_1', { defaultRoleId: null });
+    expect(mockPrisma.saRole.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ defaultRoleId: null }) }),
+    );
   });
 
   it('deleteApp rejects platform apps with ForbiddenException', async () => {
@@ -276,6 +572,7 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { requireTwoFactor: false },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });
 
@@ -308,6 +605,290 @@ describe('AppsService', () => {
       const unexpected = new Error('Network failure');
       mockPrisma.saApp.delete.mockRejectedValueOnce(unexpected);
       await expect(service.deleteApp('ba-caller', 'sq_1')).rejects.toThrow('Network failure');
+    });
+  });
+
+  it('replaces the redirect URI set on update', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+    mockPrisma.saApp.update.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    await service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://app.example.com/bye', kind: 'post_logout' },
+      ],
+    });
+
+    expect(mockPrisma.saAppRedirectUri.deleteMany).toHaveBeenCalledWith({ where: { appId: 7 } });
+    expect(mockPrisma.saAppRedirectUri.createMany).toHaveBeenCalledWith({
+      data: [
+        { appId: 7, uri: 'https://app.example.com/cb', kind: 'login' },
+        { appId: 7, uri: 'https://app.example.com/bye', kind: 'post_logout' },
+      ],
+    });
+  });
+
+  it('rejects a redirect URI that is not an absolute http(s) URL', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    await expect(
+      service.updateApp('admin-ba-id', 'a_7', {
+        redirectUris: [{ uri: 'javascript:alert(1)', kind: 'login' }],
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('updateApp rejects a duplicate {uri, kind} pair with a distinct BadRequestException, not the app-name-conflict message, and never touches the DB', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    const call = service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+      ],
+    });
+
+    await expect(call).rejects.toBeInstanceOf(BadRequestException);
+    await expect(call).rejects.not.toBeInstanceOf(ConflictException);
+    await expect(call).rejects.toThrow(/duplicate/i);
+    // Validation happens before any write — the whole point is to make this
+    // P2002-shaped failure unreachable from user input.
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.createMany).not.toHaveBeenCalled();
+  });
+
+  it('createApp rejects a duplicate {uri, kind} pair before any write', async () => {
+    const call = service.createApp('ba-caller', {
+      name: 'X',
+      url: 'https://x.example',
+      redirectUris: [
+        { uri: 'https://x.example/cb', kind: 'post_logout' },
+        { uri: 'https://x.example/cb', kind: 'post_logout' },
+      ],
+    });
+
+    await expect(call).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('updateApp writes the app row and redirect URIs inside the same transaction, not against the outer prisma client', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    // Use a tx client distinct from mockPrisma so we can prove the app-row
+    // update and the redirect-URI writes both go through the callback's
+    // `tx` argument (i.e. one atomic transaction), not the top-level client.
+    const txClient = {
+      saApp: { update: jest.fn().mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false }) },
+      saAppRedirectUri: { deleteMany: jest.fn(), createMany: jest.fn() },
+    };
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof txClient) => unknown) => cb(txClient));
+
+    await service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+    });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(txClient.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'a_7' },
+      data: {},
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+    expect(txClient.saAppRedirectUri.deleteMany).toHaveBeenCalledWith({ where: { appId: 7 } });
+    expect(txClient.saAppRedirectUri.createMany).toHaveBeenCalledWith({
+      data: [{ appId: 7, uri: 'https://app.example.com/cb', kind: 'login' }],
+    });
+    // Nothing should have been written via the outer (non-transactional) client.
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.saAppRedirectUri.createMany).not.toHaveBeenCalled();
+  });
+
+  it('updateApp rolls back the app-row update when the redirect-URI write fails (transaction rejects as a whole)', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+    // Simulate the transaction failing partway through (e.g. a DB-level
+    // unique-constraint race on saAppRedirectUri that in-memory validation
+    // didn't catch). Because the whole body runs inside prisma.$transaction,
+    // Prisma rolls back the app-row update too — the caller never observes
+    // a state where the app row changed but redirect URIs were wiped.
+    mockPrisma.$transaction.mockRejectedValue({ code: 'P2002', meta: { target: ['appId', 'uri', 'kind'] } });
+
+    await expect(
+      service.updateApp('admin-ba-id', 'a_7', {
+        redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  // ── Task 9: confidential clients — rotateClientSecret ────────────────────
+
+  describe('rotateClientSecret', () => {
+    it('generates a new secret, hashes it, stores the hash, and returns the plaintext once', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.saApp.update.mockResolvedValue({ ...appRow, clientSecretHash: 'hashed', clientSecretUpdatedAt: new Date() });
+
+      const result = await service.rotateClientSecret('ba-caller', 'sq_1');
+
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.apps.manage');
+      expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        data: { clientSecretHash: expect.any(String), clientSecretUpdatedAt: expect.any(Date) },
+      });
+      // The plaintext returned to the caller must be exactly what was hashed
+      // and stored — not, say, the stored hash itself (which would leak the
+      // hash to an admin-console response and defeat its purpose).
+      expect(typeof result.clientSecret).toBe('string');
+      expect(result.clientSecret.length).toBeGreaterThan(20);
+      const storedHash = mockPrisma.saApp.update.mock.calls[0][0].data.clientSecretHash;
+      expect(storedHash).not.toBe(result.clientSecret);
+    });
+
+    it('throws NotFoundException when the app does not exist', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+      await expect(service.rotateClientSecret('ba-caller', 'nope')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('returns a different secret on each call (no reuse)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.saApp.update.mockResolvedValue(appRow);
+
+      const first = await service.rotateClientSecret('ba-caller', 'sq_1');
+      const second = await service.rotateClientSecret('ba-caller', 'sq_1');
+
+      expect(first.clientSecret).not.toBe(second.clientSecret);
+    });
+  });
+
+  describe('rotateWebhookSecret', () => {
+    it('generates and stores a random secret, returning the plaintext once', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, webhookUrl: 'https://rp.example.com/hooks' });
+      mockPrisma.saApp.update.mockResolvedValue({ ...appRow, webhookUrl: 'https://rp.example.com/hooks', webhookSecret: 'stored' });
+
+      const result = await service.rotateWebhookSecret('ba-caller', 'sq_1');
+
+      expect(checkPermission).toHaveBeenCalledWith('ba-caller', 'platform.apps.manage');
+      expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        data: { webhookSecret: expect.any(String) },
+      });
+      expect(typeof result.webhookSecret).toBe('string');
+      expect(result.webhookSecret.length).toBeGreaterThan(20);
+    });
+
+    it('throws BadRequestException when no webhookUrl is configured yet', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, webhookUrl: null });
+      await expect(service.rotateWebhookSecret('ba-caller', 'sq_1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the app does not exist', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(null);
+      await expect(service.rotateWebhookSecret('ba-caller', 'nope')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('returns a different secret on each call (no reuse)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, webhookUrl: 'https://rp.example.com/hooks' });
+      mockPrisma.saApp.update.mockResolvedValue(appRow);
+
+      const first = await service.rotateWebhookSecret('ba-caller', 'sq_1');
+      const second = await service.rotateWebhookSecret('ba-caller', 'sq_1');
+
+      expect(first.webhookSecret).not.toBe(second.webhookSecret);
+    });
+  });
+
+  // ── Task 8: per-app password policy override ─────────────────────────────
+
+  describe('updateApp — passwordPolicyOverride', () => {
+    const VALID_OVERRIDE = {
+      minLength: 16, requireUppercase: true, requireLowercase: true,
+      requireNumber: true, requireSpecial: true, minNumbers: 2, minSpecial: 1,
+    };
+
+    it('rejects minLength below 8', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: { ...VALID_OVERRIDE, minLength: 4 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects minLength above 128', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: { ...VALID_OVERRIDE, minLength: 200 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects minNumbers greater than minLength', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: { ...VALID_OVERRIDE, minLength: 8, minNumbers: 20 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a negative minSpecial', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: { ...VALID_OVERRIDE, minSpecial: -1 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a policy missing required fields (would silently reject every password if stored)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', {
+          // @ts-expect-error — intentionally incomplete to test the shape guard
+          passwordPolicyOverride: { minLength: 16 },
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a policy with a wrong-typed field', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      await expect(
+        service.updateApp('caller-ba-id', 'sq_1', {
+          // @ts-expect-error — intentionally wrong-typed to test the shape guard
+          passwordPolicyOverride: { ...VALID_OVERRIDE, requireSpecial: 'false' },
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+    });
+
+    it('persists a valid override and returns it in the formatted app', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockPrisma.saApp.update.mockResolvedValue({ ...appRow, passwordPolicyOverride: VALID_OVERRIDE });
+
+      const result = await service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: VALID_OVERRIDE });
+
+      expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        data: { passwordPolicyOverride: VALID_OVERRIDE },
+        include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+      });
+      expect(result.passwordPolicyOverride).toEqual(VALID_OVERRIDE);
+      expect(result.effectivePasswordPolicy).toEqual(VALID_OVERRIDE);
+    });
+
+    it('clears an existing override when passed null', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, passwordPolicyOverride: VALID_OVERRIDE });
+      mockPrisma.saApp.update.mockResolvedValue({ ...appRow, passwordPolicyOverride: null });
+
+      const result = await service.updateApp('caller-ba-id', 'sq_1', { passwordPolicyOverride: null });
+
+      expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+        where: { publicId: 'sq_1' },
+        data: { passwordPolicyOverride: { __prismaJsonNull: true } },
+        include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+      });
+      expect(result.passwordPolicyOverride).toBeNull();
+      expect(result.effectivePasswordPolicy.minLength).toBe(12); // global default
     });
   });
 });

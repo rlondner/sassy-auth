@@ -16,6 +16,9 @@ import {
   Label,
 } from '@sassy-auth/ui'
 import { createAppAction } from '@/app/(admin)/apps/actions'
+import type { RedirectUri } from '@/lib/types'
+import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
+import { AppLogoField } from './app-logo-field'
 
 interface Props {
   open: boolean
@@ -27,7 +30,8 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
   const [name, setName] = React.useState('')
   const [url, setUrl] = React.useState('')
-  const [callbackUrl, setCallbackUrl] = React.useState('')
+  const [logo, setLogo] = React.useState<string | null>(null)
+  const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>([])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(false)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -37,7 +41,8 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
     if (!open) {
       setName('')
       setUrl('')
-      setCallbackUrl('')
+      setLogo(null)
+      setRedirectUris([])
       setTwoFactorTrustDays(null)
       setRequireTwoFactor(false)
       setErrorKey(null)
@@ -55,7 +60,8 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       const result = await createAppAction({
         name: name.trim(),
         url: url.trim(),
-        callbackUrl: callbackUrl.trim() || null,
+        logo,
+        redirectUris,
         twoFactorTrustDays,
         requireTwoFactor,
       })
@@ -104,17 +110,16 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
               </p>
             </div>
             <div>
-              <Label htmlFor="appCallbackUrl">{t('apps.fields.callbackUrl')}</Label>
-              <Input
-                id="appCallbackUrl"
-                type="url"
-                value={callbackUrl}
-                onChange={(e) => setCallbackUrl(e.target.value)}
-                placeholder="https://app.example.com/auth/callback"
-              />
+              <AppLogoField value={logo} onValueChange={setLogo} />
+            </div>
+            <div>
+              <Label>{t('apps.fields.redirectUris')}</Label>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.callbackUrlHint')}
+                {t('apps.fields.redirectUrisHint')}
               </p>
+              <div className="mt-2">
+                <RedirectUriRowsEditor rows={redirectUris} onRowsChange={setRedirectUris} />
+              </div>
             </div>
             <div>
               <Label htmlFor="appTrustDays">{t('apps.fields.twoFactorTrustDays')}</Label>

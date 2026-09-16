@@ -2,7 +2,7 @@ name: Dependency & CVE Scan (Trivy)
 
 on:
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
   schedule:
     # Daily at midnight UTC. CVE databases update constantly;
     # this catches new vulnerabilities even if no code changes occur.
@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Generate SARIF Report
         uses: aquasecurity/trivy-action@master

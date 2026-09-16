@@ -24,7 +24,7 @@ const publicPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
 
 process.env.RSA_PRIVATE_KEY = Buffer.from(privatePem).toString('base64');
 process.env.RSA_PUBLIC_KEY = Buffer.from(publicPem).toString('base64');
-process.env.BETTER_AUTH_URL = 'http://localhost:3000';
+process.env.BETTER_AUTH_URL = 'https://localhost:3010';
 process.env.BETTER_AUTH_SECRET = 'test-secret-at-least-32-chars-long!!';
 
 describe('SassyAuth E2E', () => {
@@ -168,8 +168,9 @@ describe('SassyAuth E2E', () => {
 
       expect(decoded.sub).toBe(userPublicId);
       expect(decoded.aud).toBe(platformAppPublicId);
-      expect(decoded.iss).toBe('http://localhost:3000');
+      expect(decoded.iss).toBe('https://localhost:3010');
       expect(typeof decoded.scope).toBe('string');
+      expect(Array.isArray(decoded.permissions)).toBe(true);
     });
 
     it('returns 401 for wrong password', async () => {
@@ -207,6 +208,41 @@ describe('SassyAuth E2E', () => {
       expect(reconstructedPem).toBe(publicPem);
     });
 
+    // Regression for a bug Task 12's openid-client e2e proof found: the
+    // OIDC discovery route was added to DiscoveryController (Task 5) but
+    // never added to configureNestApp()'s setGlobalPrefix `exclude` list, so
+    // it was silently served at /api/.well-known/openid-configuration
+    // instead of the RFC-mandated host root. Unit tests for
+    // DiscoveryController didn't catch it because they hand-roll their own
+    // setGlobalPrefix call rather than going through the real
+    // configureNestApp() this app boots with — this test uses the real one.
+    it('serves /.well-known/openid-configuration at the host root, not under /api', async () => {
+      const res = await request(httpServer).get('/.well-known/openid-configuration').expect(200);
+      expect(res.body.issuer).toBeTruthy();
+      expect(res.body.userinfo_endpoint).toContain('/api/token/oauth/userinfo');
+
+      await request(httpServer).get('/api/.well-known/openid-configuration').expect(404);
+    });
+
+    // Regression for a bug Task 12's openid-client e2e proof found:
+    // OauthTokenExchangeDto never declared `grant_type`, so the global
+    // ValidationPipe's `forbidNonWhitelisted` rejected the RFC 6749 §4.1.3
+    // grant_type param every spec-compliant client sends, with every real
+    // token exchange returning 400.
+    it('POST /api/token/oauth/token rejects a request with no grant_type', async () => {
+      const platformApp = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
+      const res = await request(httpServer)
+        .post('/api/token/oauth/token')
+        .send({
+          code: 'irrelevant',
+          client_id: platformApp.publicId,
+          code_verifier: 'a'.repeat(64),
+          redirect_uri: `${platformApp.url.replace(/\/$/, '')}/cb`,
+        })
+        .expect(400);
+      expect(JSON.stringify(res.body)).toContain('grant_type');
+    });
+
     it('POST /api/token/oauth/token returns 401 for invalid code', async () => {
       // The DTO uses @IsUrl({ require_tld: false }) so localhost URLs work in
       // dev/test without any test-side URL mutation.
@@ -214,6 +250,7 @@ describe('SassyAuth E2E', () => {
       const res = await request(httpServer)
         .post('/api/token/oauth/token')
         .send({
+          grant_type: 'authorization_code',
           code: 'definitely-not-a-real-code',
           client_id: platformApp.publicId,
           code_verifier: 'a'.repeat(64),
@@ -248,7 +285,7 @@ describe('SassyAuth E2E', () => {
 
         // 2. Look up the platform app's publicId from the seed.
         // OauthTokenExchangeDto now uses @IsUrl({ require_tld: false }) so the
-        // seeded http://localhost:3000 URL is accepted as-is for the redirect_uri
+        // seeded https://localhost:3010 URL is accepted as-is for the redirect_uri
         // origin match — no test-side mutation needed.
         const app = await prisma.saApp.findFirstOrThrow({ where: { isPlatform: true } });
 
@@ -275,20 +312,25 @@ describe('SassyAuth E2E', () => {
         const tokenRes = await request(httpServer)
           .post('/api/token/oauth/token')
           .send({
+            grant_type: 'authorization_code',
             code,
             client_id: app.publicId,
             code_verifier: verifier,
             redirect_uri: redirectUri,
           })
-          .expect(201);
+          // RFC 6749 §5.1: a successful token response is 200 OK, not Nest's
+          // default 201 for POST — found by Task 12's openid-client e2e proof,
+          // which rejects a 201 outright.
+          .expect(200);
         expect(tokenRes.body.access_token).toBeTruthy();
 
-        // 5. Verify the JWT carries `scope` (string) and not `permissions`.
+        // 5. Verify the JWT carries `scope` (string, granted OIDC scopes) and
+        // `permissions` (array, effective permissions for the audience app).
         const decoded = jwt.verify(tokenRes.body.access_token, publicPem, {
           algorithms: ['RS256'],
         }) as Record<string, unknown>;
         expect(typeof decoded.scope).toBe('string');
-        expect('permissions' in decoded).toBe(false);
+        expect(Array.isArray(decoded.permissions)).toBe(true);
 
         // 6. The JWT header `kid` must match the JWKS key — JWKS-based
         // verifiers (e.g. FastAPI's PyJWKClient) look up the signing key by
@@ -468,7 +510,7 @@ describe('SassyAuth E2E', () => {
   // ── CORS preflight on public NestJS controllers ──────────────────────────
   // Regression guard for the accept-invite browser flow: the admin app at
   // http://localhost:3001 POSTs JSON to /api/invitations/:token/accept, which
-  // triggers a CORS preflight on the auth-server at http://localhost:3000.
+  // triggers a CORS preflight on the auth-server at https://localhost:3010.
   // configureNestApp() must wire app.enableCors() with TRUSTED_ORIGINS so the
   // preflight is answered with the matching Access-Control-Allow-Origin;
   // otherwise the browser surfaces a "Failed to fetch" with no useful trace.

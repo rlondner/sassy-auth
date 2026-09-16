@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { DiscoveryController } from './discovery.controller';
 import {
-  OAUTH_AS_METADATA_PATH,
+  WELL_KNOWN_METADATA_PATHS,
   buildOAuthAuthorizationServerMetadata,
 } from './oauth-metadata';
 
@@ -28,10 +28,10 @@ describe('DiscoveryController', () => {
       controllers: [DiscoveryController],
     }).compile();
     const instance = moduleRef.createNestApplication();
-    // Mirror the production wiring in configure-nest-app.ts: the /api global
-    // prefix applies to everything EXCEPT the well-known discovery doc, which
-    // RFC 8414 mandates be served at the host root.
-    instance.setGlobalPrefix('api', { exclude: [OAUTH_AS_METADATA_PATH] });
+    // Uses the same exported constant configure-nest-app.ts applies in
+    // production, rather than a locally-duplicated list, so this test can't
+    // silently drift from what's actually excluded from the /api prefix.
+    instance.setGlobalPrefix('api', { exclude: WELL_KNOWN_METADATA_PATHS });
     await instance.init();
     return instance;
   }
@@ -54,26 +54,26 @@ describe('DiscoveryController', () => {
   });
 
   it('serves the RFC 8414 metadata at /.well-known/oauth-authorization-server (root, not /api/...)', async () => {
-    app = await buildApp('http://localhost:3000');
+    app = await buildApp('https://localhost:3010');
     const res = await request(app.getHttpServer()).get('/.well-known/oauth-authorization-server');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(buildOAuthAuthorizationServerMetadata('http://localhost:3000'));
-    expect(res.body.issuer).toBe('http://localhost:3000');
-    expect(res.body.authorization_endpoint).toBe('http://localhost:3000/api/token/oauth/authorize');
-    expect(res.body.token_endpoint).toBe('http://localhost:3000/api/token/oauth/token');
-    expect(res.body.jwks_uri).toBe('http://localhost:3000/api/token/jwks');
+    expect(res.body).toEqual(buildOAuthAuthorizationServerMetadata('https://localhost:3010'));
+    expect(res.body.issuer).toBe('https://localhost:3010');
+    expect(res.body.authorization_endpoint).toBe('https://localhost:3010/api/token/oauth/authorize');
+    expect(res.body.token_endpoint).toBe('https://localhost:3010/api/token/oauth/token');
+    expect(res.body.jwks_uri).toBe('https://localhost:3010/api/token/jwks');
   });
 
   it('does NOT serve the metadata under the /api prefix', async () => {
-    app = await buildApp('http://localhost:3000');
+    app = await buildApp('https://localhost:3010');
     const res = await request(app.getHttpServer()).get('/api/.well-known/oauth-authorization-server');
     expect(res.status).toBe(404);
   });
 
   it('regenerates the doc per request — picking up a changed BETTER_AUTH_URL without a reboot', async () => {
-    app = await buildApp('http://localhost:3000');
+    app = await buildApp('https://localhost:3010');
     const before = await request(app.getHttpServer()).get('/.well-known/oauth-authorization-server');
-    expect(before.body.issuer).toBe('http://localhost:3000');
+    expect(before.body.issuer).toBe('https://localhost:3010');
 
     // Without restarting the Nest app, change the env var the controller reads.
     process.env.BETTER_AUTH_URL = 'https://auth.prod.example.com';
@@ -97,7 +97,15 @@ describe('DiscoveryController', () => {
   });
 
   it('does NOT warn when BETTER_AUTH_URL is set', async () => {
-    app = await buildApp('http://localhost:3000');
+    app = await buildApp('https://localhost:3010');
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('serves the OIDC metadata at /.well-known/openid-configuration (root, not /api/...)', async () => {
+    app = await buildApp('https://localhost:3010');
+    const res = await request(app.getHttpServer()).get('/.well-known/openid-configuration');
+    expect(res.status).toBe(200);
+    expect(res.body.issuer).toBe('https://localhost:3010');
+    expect(res.body.userinfo_endpoint).toBe('https://localhost:3010/api/token/oauth/userinfo');
   });
 });

@@ -4,37 +4,26 @@ import { AcceptInvitationDto } from './accept-invitation.dto';
 
 function validate(password: unknown) {
   const dto = plainToInstance(AcceptInvitationDto, { password });
-  return validateSync(dto);
+  return validateSync(dto).filter((e) => e.property === 'password');
 }
 
-describe('AcceptInvitationDto', () => {
-  it('accepts a strong 12+ char password with all required classes', () => {
-    const errors = validate('Str0ngPassword!');
-    expect(errors).toHaveLength(0);
+// Complexity is now policy-driven and resolved per-invitation's app in
+// InvitationsService — see invitations.service.spec.ts. The DTO only guards
+// shape and the fixed DoS-prevention length cap (bug-0184).
+describe('AcceptInvitationDto password field', () => {
+  it('accepts any non-empty string up to the max length', () => {
+    expect(validate('a')).toHaveLength(0);
   });
 
-  it('rejects a password shorter than 12 chars', () => {
-    const errors = validate('Sh0rt!');
-    expect(errors.length).toBeGreaterThan(0);
+  it('rejects an empty password', () => {
+    expect(validate('').length).toBeGreaterThan(0);
   });
 
-  it('rejects a 12-char password without an uppercase letter', () => {
-    const errors = validate('alllower1234');
-    expect(errors.length).toBeGreaterThan(0);
+  it('rejects a password over 256 characters', () => {
+    expect(validate('a'.repeat(257)).length).toBeGreaterThan(0);
   });
 
-  it('rejects a 12-char password without a lowercase letter', () => {
-    const errors = validate('ALLUPPER1234');
-    expect(errors.length).toBeGreaterThan(0);
-  });
-
-  it('rejects a 12-char password without a digit', () => {
-    const errors = validate('NoDigitsHere!');
-    expect(errors.length).toBeGreaterThan(0);
-  });
-
-  it('rejects a non-string password', () => {
-    const errors = validate(12345678901234);
-    expect(errors.length).toBeGreaterThan(0);
+  it('accepts a password at exactly 256 characters', () => {
+    expect(validate('a'.repeat(256))).toHaveLength(0);
   });
 });

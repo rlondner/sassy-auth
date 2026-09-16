@@ -4,6 +4,511 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-16
+
+Landed the branded-activation-emails feature (PR #394,
+`feat/branded-activation-emails`) plus five follow-on commits on `dev`,
+three of them fixes for defects that PR's own e2e coverage — and the CI
+pipeline finally reaching the `Run e2e` step at all — surfaced.
+
+**Branded activation emails (PR #394).** Apps can now override the
+activation (email-verification) email's `fromName`, `fromAddress`,
+`subject`, and `message` from the admin console's app-edit drawer, via a
+new nullable `SaApp.activationEmailOverride` JSONB column (migration
+`20260916053740_add_activation_email_override` — additive, no default
+needed since the column is nullable and every existing row already reads
+back as "no override"). `apps.service.ts` gained
+`assertValidActivationEmailOverride`, mirroring the existing
+`assertValidPasswordPolicyOverride` manual-validation-in-service pattern:
+every field must be a string with no embedded `\r`/`\n` (an email-header-
+injection guard, since `fromName`/`fromAddress`/`subject` end up in raw
+headers) and `fromAddress` must match a basic email pattern.
+`verify-email.template.ts` renders the override through the existing
+`{{token}}`-substitution `renderTemplate()` helper, falling back to the
+platform defaults field-by-field when an override field is absent or
+whitespace-only.
+
+**`0b39feb`** fixed a comment in `auth.config.ts` left stale by the PR
+above: it used to say no write path validated `activationEmailOverride`'s
+shape; `assertValidActivationEmailOverride` now does, though the runtime
+cast at the read site is still not a hard guarantee — updated the comment
+to say so precisely instead of asserting something no longer true.
+
+**`d08df0a`** fixed four (not a typo for six — see below) of the failures
+that appeared now that CI's `e2e.yml` finally reaches its `Run e2e` step
+for the first time in weeks (previously masked by earlier-failing build
+gates): the FastAPI resource server's `/auth/callback` token exchange
+never sent `grant_type`, which the token DTO has required since Task 12,
+so every RS round-trip and the 2FA-enforcement spec depending on it
+400'd; `e2e.yml` never set `NEXT_PUBLIC_AUTH_SERVER_URL`, so
+`api-public.ts` — bundled into client JS, where only `NEXT_PUBLIC_`-
+prefixed vars survive — inlined its hardcoded `https://localhost:3010`
+fallback instead of the job's plain-`http` server, breaking every
+browser-side accept-invite/reset-password/signup fetch with
+`ERR_SSL_PROTOCOL_ERROR`; `e2e.yml` never set Cloudflare's documented
+always-pass Turnstile test keypair, so the `/signup` captcha widget threw
+on an empty sitekey; and `oauth-authorize-flow.spec.ts`'s
+`USER_ORG_MISMATCH` case still asserted the pre-Task-10 admin-redirect
+behavior, when Task 10 had already changed validated-`redirect_uri`
+errors to go back to the client per RFC 6749 §4.1.2.1 (matching
+`token.controller.spec.ts`'s unit coverage all along). The commit
+message's "6 e2e failures" refers to the total count of previously-red
+specs these four root-cause fixes cleared, not four separate defects with
+one left over — no fifth or sixth code change was needed.
+
+**`ced81c8`** fixed a fifth, timing-only failure the above didn't touch:
+`signup-form.tsx`'s submit button isn't gated on `captchaToken`, and even
+the CI always-pass Turnstile widget solves asynchronously (it loads
+Cloudflare's script first), so the e2e helper's `fillAndSubmit` clicked
+submit immediately after filling the form, racing the widget and hitting
+`handleSubmit`'s null-`captchaToken` early return before any network call
+ran. Now waits on Cloudflare's injected `cf-turnstile-response` hidden
+input to carry a token before submitting.
+
+**`3153f8b`** fixed the "per-app password policy override" e2e spec's
+last failure: `registration.service.ts` already enforces the correct
+per-app policy via `validatePasswordOrThrow` before ever calling
+`auth.api.signUpEmail`, but BetterAuth's own native `minPasswordLength`
+was pinned to the *global* default (12) rather than the override floor,
+so BetterAuth's second, app-unaware length check re-rejected any override
+that legitimately relaxed the minimum below 12 — even after the correct
+app-aware check had already accepted the password. Pinned
+`minPasswordLength` to the same absolute floor (8,
+`MIN_PASSWORD_LENGTH_FLOOR`) that `assertValidPasswordPolicyOverride`
+already enforces on any override, rather than to the global policy's
+value.
+
+Filed and fixed **bug-0291** (High): the new `activationEmailOverride
+.message` field was spliced into the activation email's HTML body
+unescaped, letting any caller with `platform.apps.manage` inject arbitrary
+markup into every activation email sent to that app's end users (a stored
+HTML injection, not self-XSS — the injecting party and the affected users
+differ). Fixed in PR #395 with a narrow `escapeHtml()` at the one HTML
+interpolation site. See
+[BUGS_2026-09-16.md](./docs/history/bugs/BUGS_2026-09-16.md) and
+[TODO_2026-09-16.md](./docs/history/todo/TODO_2026-09-16.md).
+
+### Added
+
+- **Branded per-app activation emails** — `fromName`, `fromAddress`,
+  `subject`, and `message` overrides, configurable from the admin
+  console's app-edit drawer. PR #394.
+
+### Fixed (5 issues, 1 filed as a new bug)
+
+- **bug-0291** (High) — `activationEmailOverride.message` rendered
+  unescaped in the activation email's HTML body, allowing stored HTML
+  injection into end-user-facing email from any `platform.apps.manage`
+  caller. PR #395 (open, unmerged).
+- FastAPI RS's `/auth/callback` token exchange omitted the
+  DTO-required `grant_type`, 400ing the RS round-trip and 2FA-enforcement
+  e2e specs. `d08df0a`.
+- CI's `e2e.yml` never set `NEXT_PUBLIC_AUTH_SERVER_URL`, so client-bundled
+  fetches fell back to a hardcoded `https://` URL and hit
+  `ERR_SSL_PROTOCOL_ERROR` against the job's plain-`http` server. `d08df0a`.
+- CI's `e2e.yml` never set the Turnstile test keypair, throwing on an empty
+  sitekey for every `/signup` spec. `d08df0a`.
+- `oauth-authorize-flow.spec.ts` asserted stale pre-Task-10 redirect
+  behavior for `USER_ORG_MISMATCH`. `d08df0a`.
+- Signup e2e helper submitted before the (asynchronous, even when
+  always-pass) Turnstile widget had solved, racing the client's
+  null-token guard. `ced81c8`.
+- BetterAuth's native `minPasswordLength` was pinned to the global
+  policy's minimum instead of the per-app override floor, re-rejecting
+  valid relaxed-minimum overrides after the app-aware check had already
+  accepted them. `3153f8b`.
+
+### Docs
+
+- `auth.config.ts`: corrected a comment that said no write path validated
+  `activationEmailOverride`'s shape — `AppsService
+  .assertValidActivationEmailOverride` has since 64c8de6. `0b39feb`.
+
+## [Unreleased] — 2026-09-15
+
+Three commits landed directly on `dev` in the last 24h (no PR — `dev` has
+no branch protection, still open from 2026-09-04), all implementing real
+HTTPS for `apps/auth-server` in local dev: `dev(sec): added certificates
+to run API with https` (`0002a11`) wires mkcert certs into
+`NestFactory.create`'s `httpsOptions`; `fix(auth): keep unprefixed session
+cookie name in dev under https` (`953e42d`) pins BetterAuth's
+`useSecureCookies` to the same `NODE_ENV === 'production'` condition as
+`defaultCookieAttributes.secure` — without it, BetterAuth derives
+`useSecureCookies` independently from `BETTER_AUTH_URL`'s `https://`
+scheme and silently renames the session cookie to
+`__Secure-better-auth.session_token`, which admin's dozen or so hardcoded
+`'better-auth.session_token'` lookups don't match, so every sign-in
+"succeeded" upstream while the admin login form reported "Sign-in
+service is unavailable"; and `removed --experimental-https from
+package.json` (`723ccfb`) drops Nest's now-redundant `--experimental-https`
+flag from `apps/auth-server`'s `dev` script now that TLS is wired
+explicitly.
+
+This is the direct successor to the not-yet-merged bug-0287 fix (PR #386,
+which reverted the scheme back to `http://` because `main.ts` had no TLS
+wiring at the time) — that PR's premise no longer holds now that `main.ts`
+actually serves HTTPS, and it should be closed or rebased rather than
+merged; see TODO.
+
+Filed and fixed **bug-0290** (Critical): the certificate-loading code
+`0002a11` added had no existence check and crashed the whole process with
+an uncaught `ENOENT` whenever the mkcert certs were absent — true of a
+fresh clone, of `docker compose up` (the Dockerfile deliberately runs with
+`NODE_ENV` unset), and of CI's `admin-e2e` job (`NODE_ENV: test`). Fixed
+in PR #392 with a graceful plain-HTTP fallback plus a new README section
+documenting the mkcert setup step. See
+[BUGS_2026-09-15.md](./docs/history/bugs/BUGS_2026-09-15.md) and
+[TODO_2026-09-15.md](./docs/history/todo/TODO_2026-09-15.md).
+
+### Fixed (1 bug)
+
+- **bug-0290** (Critical) — `apps/auth-server`'s dev HTTPS bootstrap
+  crashed on boot (uncaught `ENOENT`) whenever the gitignored, per-machine
+  mkcert dev certificates were absent — breaking a fresh clone's `pnpm
+  dev`, `docker compose up`, and (once the pre-existing bug-0282 build
+  blocker clears) CI e2e. Now falls back to plain HTTP with a warning
+  instead of crashing; cert resolution extracted to a unit-tested
+  `https-options.ts` module. PR #392.
+
+### Docs
+
+- README: documented the `apps/auth-server` mkcert dev-certificate setup
+  step (previously undocumented — `apps/admin`'s `--experimental-https` is
+  a different, self-generating mechanism and needed no equivalent step).
+  PR #392.
+## [Unreleased] — 2026-09-14
+
+No commits landed on `dev` in the last 24 hours — the branch has been idle
+since `ccf2cea` (2026-09-10). Reviewed `dev`'s current `typecheck` state
+directly instead, since several of the 9 PRs now open against `dev` show a
+red `typecheck`/`admin-e2e` check despite having no code changes that could
+explain it. Traced this to bug-0283's fix (PR #380) still being unmerged,
+and found the same root cause extends to 9 more test files bug-0283 didn't
+cover. See [BUGS_2026-09-14.md](./docs/history/bugs/BUGS_2026-09-14.md) and
+[TODO_2026-09-14.md](./docs/history/todo/TODO_2026-09-14.md) — the latter
+flags the growing 9-PR unmerged backlog itself as the top risk right now,
+ahead of any individual defect.
+
+### Fixed (2 bugs)
+
+- **bug-0288** (High) — 7 admin test files built `App`-typed mock objects
+  missing the `passwordPolicyOverride`/`effectivePasswordPolicy` fields
+  added 2026-09-05, the same gap bug-0283 fixed for one production call
+  site but not for tests. This is the actual reason `typecheck` has been
+  red on `dev`'s own baseline (and therefore on every PR built against it)
+  since before this window. PR #388.
+- **bug-0289** (Medium) — 2 admin test files built `User`-typed mock
+  objects missing `createdAt`/`lastLoginAt` (required since bug-0186),
+  same failure class as bug-0288 against a different type. PR #389.
+
+### Docs
+
+- Daily code review bundle for 2026-09-14 (this entry, plus
+  `TODO_2026-09-14.md`, `BUGS_2026-09-14.md`). Root README was reviewed
+  for currency against the 2026-09-10 port migration (`ccf2cea`) and found
+  already fully updated to `:3010` — no changes needed.
+## [Unreleased] — 2026-09-10
+
+Only one commit landed on `dev` in the last 24 hours: `ccf2cea`,
+renumbering the auth-server's default port from `3000` to `3010`
+across ~90 files (`.env.example`, Docker/Compose, CI, the Playwright
+e2e fixtures, `.flox/`, and docs). The port renumber itself is fine,
+but the same find/replace also swapped every touched
+`http://localhost:3000` default to `https://localhost:3010` — the
+auth-server (`apps/auth-server/src/main.ts`) never gained TLS support,
+so it only ever serves plain HTTP. Fixed with a normal PR against
+`dev`. See [BUGS_2026-09-10.md](./docs/history/bugs/BUGS_2026-09-10.md)
+and [TODO_2026-09-10.md](./docs/history/todo/TODO_2026-09-10.md).
+
+### Fixed (1 bug)
+
+- **bug-0287** (High) — every operational default that pointed at
+  `https://localhost:3010` (`.env.example`, `docker-compose.yml`,
+  `docker/entrypoint.sh`, `.github/workflows/e2e.yml`, the Playwright
+  e2e fixtures' fallback URLs, `.flox/env/manifest.{toml,lock}`,
+  `README.md`, `BEGINNER_README.md`) reverted to `http://`, matching
+  what the server actually serves. PR #386.
+
+### Internal
+
+- Daily review docs bundle. `docs/history/code_reviews/CR_2026-09-10.md`
+  replaces a stale copy left by an earlier failed attempt at today's
+  review (sandbox shell mount error, no commits reviewed).
+## [Unreleased] — 2026-09-09
+
+Local `dev` had drifted 5 commits behind `origin/dev` (fast-forwarded
+cleanly to `53b2360` "feat(admin): add responsive sheet width tiers, ship
+HCI review doc"). This run reviewed the still-open `feat/activation-webhook`
+(PR #378) and the recently-rewritten admin login/reset-password/
+forgot-password forms, finding two bugs — both fixed with normal PRs
+against `dev`. Also flagged: a growing backlog of unmerged PRs on `dev`
+(seven open as of today, several from 2026-09-08 still unmerged) and an
+orphaned local worktree with in-progress, uncommitted work on the same
+webhook-SSRF area bug-0285 also touches. See
+[BUGS_2026-09-09.md](./docs/history/bugs/BUGS_2026-09-09.md) and
+[TODO_2026-09-09.md](./docs/history/todo/TODO_2026-09-09.md).
+
+### Fixed (2 bugs)
+
+- **bug-0285** (High) — `isAppUrlAllowed()`
+  (`apps/auth-server/src/common/config/app-url-policy.ts`) only rejected
+  `http://`, `localhost`/`*.localhost`, and the two literal loopback
+  addresses — any other dotted hostname passed, including RFC 1918 private
+  ranges, RFC 3927 link-local space, and the `169.254.169.254`
+  cloud-metadata address. A tenant-scoped app admin could point an app's
+  `url` (or the not-yet-merged PR #378's `webhookUrl`) at an internal
+  address, making any future server-side request to it an SSRF vector.
+  Added private-IP-literal range checks (IPv4 and IPv6) alongside the
+  existing loopback/localhost guards. PR #383.
+- **bug-0286** (Medium) — `apps/admin/messages/fr.json` was missing 10
+  keys present in `en.json` (`login.error.unverified`,
+  `users.status.unverified`, `apps.fields.defaultOrg*`/`defaultRole*`,
+  `signup.errors.captcha*`), causing untranslated fallback text for
+  French-locale users on the login-error, users-table, app-config, and
+  signup-captcha screens — the second time this bug class has shipped in a
+  few days. Added the missing keys plus a `messages-parity.test.ts`
+  regression test asserting the two locale files stay in sync. PR #384.
+
+### Docs
+
+- Daily code review bundle for 2026-09-09 (this entry, plus
+  `TODO_2026-09-09.md`, `BUGS_2026-09-09.md`, and a README sync adding
+  `NEXT_PUBLIC_AUTH_SERVER_URL` plus new "Password policy" and "Signup
+  captcha" sections documenting `PASSWORD_*`, `TURNSTILE_SECRET_KEY`, and
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — all already in `.env.example` but
+  missing from the README's Environment Variables table).
+## [Unreleased] — 2026-09-08
+
+Two features landed on `dev`: signup captcha (Cloudflare Turnstile, 6
+commits — `TurnstileService` verification in `RegistrationService`, admin
+signup-form widget, 422→`captchaFailed` mapping) and OIDC spec-correctness
+fixes (exact `redirect_uri` matching, consolidated well-known path
+exclusion, an e2e round-trip test against a stock `openid-client` that
+found and fixed 3 spec bugs), both merged via `feat/oidc-compatibility` →
+`dev` (`e4d4510`). A third feature, activation webhooks + pending-account
+signup (10 commits — `SaApp.webhookUrl`/`webhookSecret` columns, webhook
+delivery on email verification/invitation-accept/admin-reactivation, a
+signup-flow code that lets pending users redeem tokens), is open as PR
+#378 against `dev`, not yet merged.
+
+Reviewing PR #378 surfaced that its `typecheck` and `admin-e2e` CI checks
+were both failing — not from anything in the PR's own diff, but from two
+pre-existing defects already on `dev` that had zero CI signal because
+`typecheck`/`unit-tests`/`e2e` only ran on push to `master`, never `dev`.
+Filed and fixed all three: the two silent build breaks plus the CI-trigger
+gap that hid them. See
+[BUGS_2026-09-08.md](./docs/history/bugs/BUGS_2026-09-08.md) and
+[TODO_2026-09-08.md](./docs/history/todo/TODO_2026-09-08.md).
+
+### Fixed (3 bugs)
+
+- **bug-0282** (High) — `app/signup/page.tsx` exported `fetchAppInfo` as a
+  named export alongside its default page component. Next's App Router
+  rejects any `page.tsx` export outside its recognized allow-list, so
+  `next build` has failed since the function landed 2026-09-05 —
+  invisible for 3 days for the CI-trigger reason above. Extracted the
+  function to `fetch-app-info.ts`. PR #379.
+- **bug-0283** (High) — `app/(admin)/roles/page.tsx`'s non-platform app
+  picker builds an `App[]` by hand and never picked up
+  `passwordPolicyOverride`/`effectivePasswordPolicy` after they became
+  required `App` fields (`430f870`, 2026-09-05). Broke `typecheck` (and
+  therefore `next build`) on `dev` since before 2026-09-01, same
+  invisibility. Filled in with the existing `FALLBACK_PASSWORD_POLICY`
+  constant. PR #380.
+- **bug-0284** (Medium, root cause of the two above) —
+  `typecheck.yml`/`unit-tests.yml`/`e2e.yml` triggered on `push` only to
+  `master`, not `dev`, despite already running on PRs against `dev`. Added
+  `dev` to each workflow's push branches so it gets the same direct CI
+  signal `master` has. PR #381.
+
+### Docs
+
+- Daily code review bundle for 2026-09-08 (this entry, plus
+  `TODO_2026-09-08.md`, `BUGS_2026-09-08.md`, and a README refresh
+  documenting local dev setup and required env vars).
+## [Unreleased] — 2026-09-16
+
+`render-deploy-automation` (16 commits) merged into `dev`: a new
+`packages/deploy-render` package plus `.github/workflows/deploy-render.yml`
+automate Render.com deployment for `sassy-auth-server` and
+`sassy-auth-admin` — no more manual dashboard secret entry or a manual
+`db:seed` shell session per deploy. On push to `master`, the workflow
+generates and persists any missing production secrets (RSA JWT keypair,
+`BETTER_AUTH_SECRET`, `SEED_ADMIN_PASSWORD`) as GitHub Environment
+secrets, provisions the Neon database via its API if `DATABASE_URL`
+isn't set yet, merges the resulting values with `render.yaml`'s static
+config and pushes them to Render, waits for the deploy to go live, and
+triggers the platform seed as a one-off Render Job. `render.yaml`
+remains the source of truth for service topology; only the previously
+manual parts are now automated. `sassy-resource-server` (the FastAPI
+demo app) stays out of scope and deployable by hand. Full design in
+[`docs/superpowers/specs/2026-09-16-render-deploy-automation-design.md`](./docs/superpowers/specs/2026-09-16-render-deploy-automation-design.md).
+
+Built via subagent-driven development with a spec-compliance + code-quality
+review after every task; three real issues were caught and fixed before
+merge: a missing GitHub-secret write-verification call, generated secrets
+being printed in cleartext to the workflow's job summary (fixed to log
+names only — GitHub secrets are write-only, so values are never shown),
+and — caught only in a final whole-branch pass — a critical bug where the
+naive env-var sync would have silently wiped any operator-set optional
+secrets (e.g. `RESEND_API_KEY`, social sign-in credentials) on every
+automated deploy, fixed by fetching and merging with Render's existing
+env vars instead of blindly replacing them.
+
+### Docs
+
+- `DEPLOYMENT.md` — added a "One-time setup for automated deploys"
+  section describing the pipeline and the three secrets an operator still
+  creates by hand (`RENDER_API_KEY`, `NEON_API_KEY`, `GH_SECRETS_PAT`);
+  trimmed the now-superseded manual secret-generation and manual
+  first-time-seed instructions.
+
+## [Unreleased] — 2026-09-04
+
+CI now runs on PRs targeting `dev`, not just `master` (`33e074c`). The
+big landing of the window: `prisma-7-migration` (7 commits, Prisma
+5→6→7 — `prisma-client` generator with CJS output, mandatory
+`@prisma/adapter-pg` driver adapter, new `packages/db/prisma.config.ts`
+replacing the CLI's removed implicit env/schema resolution, plus Docker
+and CI updates) merged into `dev` as PR #374 partway through this
+review. This run re-verified the merged result directly rather than the
+stale unmerged-branch diff it was originally briefed on, and found two
+bugs in it — both fixed with normal PRs against `dev`. See
+[BUGS_2026-09-04.md](./docs/history/bugs/BUGS_2026-09-04.md) and
+[TODO_2026-09-04.md](./docs/history/todo/TODO_2026-09-04.md).
+
+### Fixed (2 bugs)
+
+- **bug-0280** (Medium) — `packages/db/prisma.config.ts` had no
+  equivalent to `index.ts`'s fail-fast `DATABASE_URL` guard, so a missing
+  env var surfaced as an opaque Prisma CLI error at `generate`/`migrate
+  deploy` time instead. Mirrored the guard; `typecheck.yml` (which builds
+  `packages/db` but never previously needed a database) now sets a dummy
+  `DATABASE_URL` for the same reason `unit-tests.yml` already does. PR
+  #375.
+- **bug-0281** (High) — the e2e workflow's FastAPI RS dependency install
+  step hand-listed a stale package subset instead of installing from
+  `pyproject.toml`, missing `opentelemetry` entirely. Live-broken: this
+  is what actually failed the `prisma-7-migration` PR's `e2e` check
+  (`ModuleNotFoundError: No module named 'opentelemetry'`) — unrelated to
+  that PR's own changes, and merged anyway since `dev` has no branch
+  protection (see TODO). Fixed by installing from `pyproject.toml`
+  directly (`pip install .`), matching what local dev's `uv sync` already
+  does. PR #376.
+
+### Docs
+
+- Daily code review bundle for 2026-09-04 (this entry, plus
+  `TODO_2026-09-04.md`, `BUGS_2026-09-04.md`, and a `Makefile` shortcuts
+  callout added to the root README's "Running Tests" section).
+
+## [Unreleased] — 2026-09-03
+
+`feat/oidc-compatibility` finished merging into `dev` (`8db2fd7`),
+including RP-Initiated Logout — resolving the "speced but not implemented"
+gap flagged 2026-09-02. Also landed: two vibecast seed-permission commits
+and an app-vs-org settings-permission split. Reviewed in full but not
+merged anywhere: `feature/admin-signup` (12 commits, self-serve signup end
+to end — admin console `/signup` page, `POST /api/register`
+firstName/lastName support, a public app-name lookup, a signup link on
+`/login`); two bugs found on it were fixed directly on the branch. One bug
+found on `dev` itself has a normal fix PR. See
+[BUGS_2026-09-03.md](./docs/history/bugs/BUGS_2026-09-03.md) and
+[TODO_2026-09-03.md](./docs/history/todo/TODO_2026-09-03.md).
+
+### Fixed (1 bug)
+
+- **bug-0278** (High) — `@Throttle({ auth: { limit: 10, ttl: 60_000 } })`
+  on `POST /api/token/direct/login`, `GET /api/token/oauth/authorize`, and
+  every `InvitationsController` route hardcoded literal numbers instead of
+  reading `AUTH_RATE_LIMIT` / `AUTH_RATE_WINDOW_MS` — the env vars
+  yesterday's `a259450` added specifically to make these limits
+  configurable had zero effect on any of them, since an explicit
+  `{ limit, ttl }` on a route's `@Throttle()` overrides the named bucket's
+  module config rather than just selecting it. Extracted a shared
+  `common/config/rate-limit-config.ts` so the module-level throttler config
+  and every per-route override read the same values. PR #372.
+
+### Found (1 bug on `dev`, 2 on the unmerged `feature/admin-signup` branch)
+
+- **bug-0278** — see Fixed above.
+- **bug-0279** (Medium, `feature/admin-signup` only) — the new
+  `GET /api/register/app` app-name lookup carried no rate limiting and is a
+  distinguishable-response enumeration oracle for `appPublicId`, unlike the
+  sibling endpoint its own docstring claims parity with. Fixed directly on
+  the branch (`RateLimitGuard` reused from `POST /api/register`).
+- **bug-0280** (High, `feature/admin-signup` only) — the new
+  `RegisterDto.password` only required 8 characters with no complexity
+  check, regressing the 12-char + upper/lower/digit policy `bug-0007`
+  established elsewhere. Fixed directly on the branch (same
+  `MinLength`/`Matches` pattern as `AcceptInvitationDto`).
+
+### Docs
+
+- Daily code review bundle for 2026-09-03 (this entry, plus
+  `TODO_2026-09-03.md` and `BUGS_2026-09-03.md`).
+
+## [Unreleased] — 2026-09-02
+
+The first substantial `dev` diff since 2026-08-25: OIDC compatibility
+landed in full (RFC 8414 + OIDC discovery, `id_token` issuance,
+`/userinfo`, nonce/scope carried on authorization codes, PKCE
+timing-safe comparison restored, `redirect_uri` matched against a
+registered per-app set), followed same-day by a two-commit fix for the
+login `next=` redirect and a new configurable-rate-limits feature. Also
+in this window: the long-stuck daily-review PR backlog (`#349`–`#365`,
+tracked since 2026-08-24) finally merged into `master`, and two Sentry
+bugs were fixed directly. See
+[BUGS_2026-09-02.md](./docs/history/bugs/BUGS_2026-09-02.md) and
+[TODO_2026-09-02.md](./docs/history/todo/TODO_2026-09-02.md).
+
+### Added
+
+- **OIDC compatibility**: `/.well-known/openid-configuration` discovery
+  document; RS256-signed `id_token` issuance when the `openid` scope is
+  granted (with `at_hash`, `auth_time`, `amr`, and `nonce` carried
+  through from the authorization request); a `/userinfo` endpoint gated
+  by the presented access token's own `scope` claim; `nonce` and granted
+  `scope` now persist on `SaOauthCode` end-to-end. `redirect_uri` is now
+  matched against a registered per-app set (`SaAppRedirectUri`) with a
+  same-origin fallback preserved for apps with none registered.
+- **Configurable rate limits**: `DEFAULT_RATE_LIMIT`/
+  `DEFAULT_RATE_WINDOW_MS` and `AUTH_RATE_LIMIT`/`AUTH_RATE_WINDOW_MS`
+  now control the two NestJS throttler buckets via `.env`, instead of
+  being hardcoded. Misconfiguration (unset, blank, zero, negative,
+  non-numeric) falls back to the previous hardcoded defaults rather than
+  disabling the limiter.
+
+### Fixed (2 bugs from Sentry + 1 from this review)
+
+- **Sentry-reported issues** — two bugs found via Sentry error tracking
+  and a broken Sentry instrumentation setup were fixed directly on
+  `dev` (`f270388`, `82123e4`).
+- **OAuth login `next=` redirect** — the admin-console login/enrollment
+  redirect's `next=` value was built from a bare route fragment
+  (`oauth/authorize?...`), which the admin app's `validateNextUrl`
+  rejects, silently falling back to `/users` instead of resuming the
+  OAuth flow after sign-in. Fixed in two steps: first to the full
+  site-relative path, then to a fully absolute URL back to this auth
+  server's own origin (the admin console runs on a different origin, so
+  a relative path 404s against the wrong host).
+- **bug-0277** (Medium) — `/.well-known/openid-configuration` advertised
+  an `end_session_endpoint` at `/api/token/oauth/logout` with no
+  controller route behind it (RP-Initiated Logout was speced but never
+  implemented). Removed the false advertisement. PR #370.
+
+### Found (1 bug)
+
+- **bug-0277** — see Fixed above.
+
+### Docs
+
+- The daily-review backlog merge, README OIDC section, and rate-limit
+  env var docs are covered in this same review cycle's docs PR — see
+  the README diff for the new "OIDC support" subsection and updated
+  "What SassyAuth is not" wording (id_token/`/userinfo`/discovery are no
+  longer accurate to describe as absent).
+
 ## [Unreleased] — 2026-08-28
 
 No commits landed on `master` in the last 24 hours (`master` has been at
@@ -588,7 +1093,7 @@ Ships the toast/refresh admin UX, the OAuth issuer DRY refactor, and the E2E rac
 - **`DiscoveryController.getOAuthAuthorizationServerMetadata`** — now calls `resolveIssuer()` (was reading `process.env.BETTER_AUTH_URL` directly). (`apps/auth-server/src/token/discovery.controller.ts`)
 - **`RolesService.listRoles` / `getRole` read gates** — accept `platform.users.manage` in addition to `platform.roles.manage` / `org.roles.manage`, so the `/users` admin page can populate the role picker in the user-access drawer without needing a cross-page grant. Mirrors the orgs/permissions read pattern. Matrix test rotation and unit tests updated. (`apps/auth-server/src/roles/roles.service.ts`, `apps/auth-server/src/roles/roles.service.spec.ts`, `apps/auth-server/test/matrix/permissions-matrix.ts`)
 - **`raceSuccessOrError` (E2E)** — all 5 admin-e2e page objects (`apps`, `orgs`, `permissions`, `roles`, `users`) scope error detection to `[data-sonner-toaster], [role="dialog"], [role="alertdialog"]` instead of the whole page. Next.js Dev Tools mounts a persistent empty `role="alert"` placeholder at the page root; a global `page.getByRole('alert')` matched it on every poll and made the error race always win.
-- **OAuth authorize E2E route mock** — `oauth-authorize-flow.spec.ts` narrows the `page.route` stub from `${origin}/**` to exactly `origin === redirectUriOrigin && pathname === '/cb'`. The broad mock intercepted `/api/token/oauth/authorize` itself when `platformApp.url` shares the auth-server's origin (the default `BETTER_AUTH_URL=http://localhost:3000` case), causing the test to hang on the authorize endpoint with an empty body.
+- **OAuth authorize E2E route mock** — `oauth-authorize-flow.spec.ts` narrows the `page.route` stub from `${origin}/**` to exactly `origin === redirectUriOrigin && pathname === '/cb'`. The broad mock intercepted `/api/token/oauth/authorize` itself when `platformApp.url` shares the auth-server's origin (the default `BETTER_AUTH_URL=https://localhost:3010` case), causing the test to hang on the authorize endpoint with an empty body.
 - **Playwright workers** — `CI_TESTS ? 1 : 1` (both branches serialize). Preserves the earlier local finding that Next.js dev-mode route compilation gets overwhelmed on cold-start parallel first-hits at 30s test timeout.
 
 ### Known open bugs

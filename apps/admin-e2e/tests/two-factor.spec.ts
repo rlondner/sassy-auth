@@ -61,7 +61,7 @@ const TFA_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 const ORGS_EMAIL    = 'o@sa.io'
 const ORGS_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Pass@word1234'
 
-const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 // Namespaced /tmp paths prevent collisions across concurrent runs on the same host.
 // process.pid is stable for the full run (workers:1, single process).
@@ -133,7 +133,7 @@ test.describe('2FA — enroll', () => {
       })
       const superPage = await superCtx.newPage()
       try {
-        const adminUrl = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+        const adminUrl = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
         const usersRes = await superPage.request.get(`${adminUrl}/api/users`)
         if (usersRes.ok()) {
           const body = await usersRes.json() as

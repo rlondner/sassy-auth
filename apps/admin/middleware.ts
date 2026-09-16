@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AUTH_SERVER_URL } from '@/lib/config'
 
-const PUBLIC_PATHS = ['/login', '/accept-invite', '/oauth-error', '/forgot-password', '/reset-password']
+const PUBLIC_PATHS = ['/login', '/accept-invite', '/signup', '/oauth-error', '/forgot-password', '/reset-password']
 
 // bug-0165: cache session validation results for a short TTL so we
 // don't round-trip to the auth-server on every authenticated request.

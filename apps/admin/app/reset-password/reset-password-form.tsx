@@ -3,7 +3,11 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { Button } from '@sassy-auth/ui'
+import { AuthCard, Button, FormField } from '@sassy-auth/ui'
+import { evaluatePasswordPolicy } from '@sassy-auth/types'
+import { getPasswordPolicyForResetToken } from '@/lib/api-public'
+import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
+import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
 import { resetPasswordSubmitAction } from './actions'
 
 export function ResetPasswordForm({ token }: { token: string }) {
@@ -13,13 +17,36 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
+  // FALLBACK_PASSWORD_POLICY: used until the client-side policy fetch
+  // resolves, and kept on fetch failure — the server-side hooks.before
+  // enforcement (Task 7) is the real gate regardless of what this checklist
+  // shows.
+  const [policy, setPolicy] = React.useState<PasswordPolicy>(FALLBACK_PASSWORD_POLICY)
+
+  React.useEffect(() => {
+    let cancelled = false
+    getPasswordPolicyForResetToken(token)
+      .then((fetched) => {
+        if (cancelled) return
+        setPolicy(fetched)
+      })
+      .catch(() => {
+        // Silently keep FALLBACK_POLICY: the server-side hooks.before
+        // enforcement is the real gate regardless of what this checklist
+        // shows.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
+
+  const policyMet = evaluatePasswordPolicy(password, policy).every((r) => r.met)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     if (password !== confirm) { setError(t('mismatch')); return }
-    if (password.length < 12) { setError(t('tooShort')); return }
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(password)) { setError(t('complexity')); return }
+    if (!policyMet) { setError(t('complexity')); return }
     setSubmitting(true)
     const res = await resetPasswordSubmitAction(token, password)
     setSubmitting(false)
@@ -36,34 +63,51 @@ export function ResetPasswordForm({ token }: { token: string }) {
     setSuccess(true)
   }
 
+  if (success) {
+    return (
+      <AuthCard
+        footer={
+          <Link href="/login" className="text-label-md text-primary hover:underline">
+            {t('backToLogin')}
+          </Link>
+        }
+      >
+        <p data-testid="reset-success" className="text-center text-body-md text-foreground">{t('success')}</p>
+      </AuthCard>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
-      <div className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm">
-        {success ? (
-          <div className="text-center">
-            <p data-testid="reset-success" className="text-body-md text-[var(--foreground)]">{t('success')}</p>
-            <div className="mt-4"><Link href="/login" className="text-label-md text-[var(--primary)] hover:underline">{t('backToLogin')}</Link></div>
-          </div>
-        ) : (
-          <>
-            <h1 className="mb-6 text-center text-headline-sm text-[var(--foreground)]">{t('title')}</h1>
-            <form onSubmit={onSubmit} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="password" className="text-label-md font-semibold">{t('password')}</label>
-                <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={12}
-                  className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="confirm-password" className="text-label-md font-semibold">{t('confirmPassword')}</label>
-                <input id="confirm-password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required
-                  className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
-              </div>
-              {error && <p data-testid="reset-error" className="text-label-md text-[var(--destructive)]">{error}</p>}
-              <Button type="submit" className="w-full" disabled={submitting}>{submitting ? '…' : t('submit')}</Button>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
+    <AuthCard title={t('title')}>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <FormField
+            id="password"
+            type="password"
+            label={t('password')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <PasswordRequirementsChecklist password={password} policy={policy} />
+        </div>
+        <FormField
+          id="confirm-password"
+          type="password"
+          label={t('confirmPassword')}
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          required
+        />
+        {error && <p data-testid="reset-error" className="text-label-md text-destructive">{error}</p>}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={submitting || !policyMet || password !== confirm || password.length === 0}
+        >
+          {submitting ? '…' : t('submit')}
+        </Button>
+      </form>
+    </AuthCard>
   )
 }

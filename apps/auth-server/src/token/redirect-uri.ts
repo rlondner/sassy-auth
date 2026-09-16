@@ -3,16 +3,11 @@ import { TokenErrorCode } from '@sassy-auth/types';
 
 export interface RedirectUriApp {
   url: string;
-  callbackUrl?: string | null;
+  redirectUris?: Array<{ uri: string; kind: string }> | null;
 }
 
 function reject(): never {
   throw new BadRequestException(TokenErrorCode.INVALID_REDIRECT_URI);
-}
-
-/** Trim a single trailing slash from a non-root path so `/cb` == `/cb/`. */
-function normalizePath(pathname: string): string {
-  return pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
 }
 
 function isExactMatch(redirectUri: string, callbackUrl: string): boolean {
@@ -27,20 +22,26 @@ function isExactMatch(redirectUri: string, callbackUrl: string): boolean {
   return (
     a.protocol === b.protocol &&
     a.host === b.host && // host includes port
-    normalizePath(a.pathname) === normalizePath(b.pathname) &&
+    a.pathname === b.pathname &&
     a.search === b.search
   );
 }
 
+function registered(app: RedirectUriApp, kind: string): string[] {
+  return (app.redirectUris ?? []).filter((r) => r.kind === kind).map((r) => r.uri);
+}
+
 /**
- * Validates a PKCE `redirect_uri` against an app.
- * - When `app.callbackUrl` is set (non-empty): require an exact match
- *   (protocol + host + port + path + query), tolerant of a single trailing slash.
- * - Otherwise ("default"): require the same origin as `app.url` (any path).
+ * Validates a login `redirect_uri` against an app.
+ * - One or more registered `login` URIs: require an exact match against the set
+ *   (protocol + host + port + path + query), per RFC 6749 §3.1.2.3.
+ * - None registered: require the same origin as `app.url` (any path). This is the
+ *   pre-OIDC fallback, preserved so the migration changes no app's behaviour.
  */
 export function assertRedirectUriAllowed(redirectUri: string, app: RedirectUriApp): void {
-  if (app.callbackUrl) {
-    if (!isExactMatch(redirectUri, app.callbackUrl)) reject();
+  const allowed = registered(app, 'login');
+  if (allowed.length > 0) {
+    if (!allowed.some((uri) => isExactMatch(redirectUri, uri))) reject();
     return;
   }
   let redirectOrigin: string;
@@ -52,4 +53,14 @@ export function assertRedirectUriAllowed(redirectUri: string, app: RedirectUriAp
     reject();
   }
   if (redirectOrigin !== appOrigin) reject();
+}
+
+/**
+ * Validates a `post_logout_redirect_uri`. Unlike login redirects there is no
+ * same-origin fallback: an unregistered URI is always rejected, because a
+ * logout redirect has no pre-OIDC behaviour to preserve.
+ */
+export function assertPostLogoutRedirectUriAllowed(uri: string, app: RedirectUriApp): void {
+  const allowed = registered(app, 'post_logout');
+  if (!allowed.some((candidate) => isExactMatch(uri, candidate))) reject();
 }

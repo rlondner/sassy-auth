@@ -1,8 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { TokenErrorCode } from '@sassy-auth/types';
-import { assertRedirectUriAllowed } from './redirect-uri';
+import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed } from './redirect-uri';
 
-describe('assertRedirectUriAllowed — default (no callbackUrl): origin match', () => {
+describe('assertRedirectUriAllowed — no registered URIs: origin fallback', () => {
   it('accepts exact origin with any path', () => {
     expect(() =>
       assertRedirectUriAllowed('https://example.com/auth/callback', { url: 'https://example.com' }),
@@ -37,38 +37,79 @@ describe('assertRedirectUriAllowed — default (no callbackUrl): origin match', 
       expect((e as Error).message).toContain(TokenErrorCode.INVALID_REDIRECT_URI);
     }
   });
-  it('treats empty-string callbackUrl as default (origin match)', () => {
-    expect(() =>
-      assertRedirectUriAllowed('https://example.com/cb', { url: 'https://example.com', callbackUrl: '' }),
-    ).not.toThrow();
+});
+
+describe('assertRedirectUriAllowed — set-valued matching', () => {
+  it('accepts any registered login URI', () => {
+    const app = {
+      url: 'https://app.example.com',
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://localhost:3010/cb', kind: 'login' },
+      ],
+    };
+
+    expect(() => assertRedirectUriAllowed('https://localhost:3010/cb', app)).not.toThrow();
+    expect(() => assertRedirectUriAllowed('https://app.example.com/cb', app)).not.toThrow();
+  });
+
+  it('rejects a same-origin path once URIs are registered', () => {
+    const app = {
+      url: 'https://app.example.com',
+      redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+    };
+
+    expect(() => assertRedirectUriAllowed('https://app.example.com/evil', app)).toThrow();
+  });
+
+  it('ignores post_logout URIs when matching a login redirect', () => {
+    const app = {
+      url: 'https://app.example.com',
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://app.example.com/bye', kind: 'post_logout' },
+      ],
+    };
+
+    expect(() => assertRedirectUriAllowed('https://app.example.com/bye', app)).toThrow();
+  });
+
+  it('falls back to same-origin matching when no login URIs are registered', () => {
+    const app = { url: 'https://app.example.com', redirectUris: [] };
+
+    expect(() => assertRedirectUriAllowed('https://app.example.com/anything', app)).not.toThrow();
+    expect(() => assertRedirectUriAllowed('https://evil.example.com/cb', app)).toThrow();
+  });
+
+  it('rejects a trailing-slash variant of a registered URI — RFC 6749 §3.1.2.3 requires exact string matching', () => {
+    const app = {
+      url: 'https://app.example.com',
+      redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+    };
+
+    expect(() => assertRedirectUriAllowed('https://app.example.com/cb/', app)).toThrow(
+      BadRequestException,
+    );
   });
 });
 
-describe('assertRedirectUriAllowed — explicit callbackUrl: exact match', () => {
-  const app = { url: 'https://example.com', callbackUrl: 'https://example.com/auth/cb' };
+describe('assertPostLogoutRedirectUriAllowed', () => {
+  it('accepts only registered post_logout URIs', () => {
+    const app = {
+      url: 'https://app.example.com',
+      redirectUris: [
+        { uri: 'https://app.example.com/cb', kind: 'login' },
+        { uri: 'https://app.example.com/bye', kind: 'post_logout' },
+      ],
+    };
 
-  it('accepts an exactly equal redirect_uri', () => {
-    expect(() => assertRedirectUriAllowed('https://example.com/auth/cb', app)).not.toThrow();
+    expect(() => assertPostLogoutRedirectUriAllowed('https://app.example.com/bye', app)).not.toThrow();
+    expect(() => assertPostLogoutRedirectUriAllowed('https://app.example.com/cb', app)).toThrow();
   });
-  it('accepts a trailing-slash variant (tolerant)', () => {
-    expect(() => assertRedirectUriAllowed('https://example.com/auth/cb/', app)).not.toThrow();
-  });
-  it('accepts when stored value has the trailing slash and request does not', () => {
-    const app2 = { url: 'https://example.com', callbackUrl: 'https://example.com/auth/cb/' };
-    expect(() => assertRedirectUriAllowed('https://example.com/auth/cb', app2)).not.toThrow();
-  });
-  it('rejects a different path', () => {
-    expect(() => assertRedirectUriAllowed('https://example.com/other', app)).toThrow(BadRequestException);
-  });
-  it('rejects a different query string', () => {
-    const app2 = { url: 'https://example.com', callbackUrl: 'https://example.com/cb?x=1' };
-    expect(() => assertRedirectUriAllowed('https://example.com/cb?x=2', app2)).toThrow(BadRequestException);
-  });
-  it('rejects a different host/port/scheme', () => {
-    expect(() => assertRedirectUriAllowed('https://example.com:8443/auth/cb', app)).toThrow(BadRequestException);
-    expect(() => assertRedirectUriAllowed('http://example.com/auth/cb', app)).toThrow(BadRequestException);
-  });
-  it('rejects a malformed redirect_uri', () => {
-    expect(() => assertRedirectUriAllowed('not a url', app)).toThrow(BadRequestException);
+
+  it('has no same-origin fallback — an unregistered URI is always rejected', () => {
+    const app = { url: 'https://app.example.com', redirectUris: [] };
+
+    expect(() => assertPostLogoutRedirectUriAllowed('https://app.example.com/bye', app)).toThrow();
   });
 });

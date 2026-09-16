@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
 loadEnv({ path: resolve(process.cwd(), '../../.env.local') });
@@ -14,8 +15,13 @@ import { runWithPrivateRelayCapture } from './social/apple-private-relay-context
 import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import { mergeOpenApiDocs } from './docs/openapi';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { applyRedocExtensions, mergeOpenApiDocs } from './docs/openapi';
+import { renderRedocPage } from './docs/redoc-page';
+import { renderRedocInitScript } from './docs/redoc-init';
 import { BETTER_AUTH_SESSION_COOKIE } from './common/constants';
+import { resolveHttpsOptions } from './https-options';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = require('../package.json');
 
@@ -69,6 +75,8 @@ function validateStartupEnv(): void {
 
 async function bootstrap() {
   validateStartupEnv();
+  const isDev = process.env.NODE_ENV !== 'production';
+  const httpsOptions = resolveHttpsOptions(isDev, path.join(__dirname, '..', 'secrets'));
   const expressApp = express();
 
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.
@@ -102,7 +110,7 @@ async function bootstrap() {
   // (better-auth/dist/context/create-context.mjs); it never sets
   // `Access-Control-Allow-Origin`. Verified live: an OPTIONS preflight to
   // `/api/auth/sign-in/social` from a cross-origin admin (its own port,
-  // e.g. :3001 talking to the auth-server's :3000 — the exact topology
+  // e.g. :3001 talking to the auth-server's :3010 — the exact topology
   // TRUSTED_ORIGINS/.env.local already documents as the deployment
   // default) returned a bare 404, and the browser then blocked the actual
   // POST with "No 'Access-Control-Allow-Origin' header is present". That
@@ -133,10 +141,38 @@ async function bootstrap() {
     runWithPrivateRelayCapture(() => authNodeHandler(req, res)),
   );
 
+  // Final review finding 1: mount an explicit JSON body parser on the raw
+  // Express app BEFORE NestFactory.create runs. Nest's ExpressAdapter, given
+  // no `bodyParser` option, mounts its own default `express.json()` with
+  // Express's default 100kb limit — well under the ~342KB a 250KB logo data
+  // URI needs (base64 is ~4/3 the raw size, plus the `data:image/...;base64,`
+  // prefix), making the app-logo feature's advertised cap unreachable. A
+  // middleware registered here runs first and satisfies the request before
+  // Nest's own parser gets a chance to reject it at 100kb. 1mb is a
+  // deliberate ceiling — comfortably above the logo cap without opening up
+  // unbounded JSON bodies on other endpoints.
+  //
+  // Registered AFTER the `/api/auth/*` handler above (not before): that
+  // route fully handles and ends matching requests itself via
+  // `toNodeHandler(auth)`, which needs the raw, unconsumed request stream to
+  // parse BetterAuth's own body. Registering express.json() ahead of it
+  // would consume that stream first (Express runs `.use()` middleware in
+  // registration order for every matching path, `express.json()` included),
+  // leaving BetterAuth with an already-drained body. Placing it after means
+  // it's simply never reached for `/api/auth/*` requests, since that route
+  // never calls `next()`.
+  expressApp.use(express.json({ limit: '1mb' }));
+  // Some OIDC relying-party libraries POST to the end_session_endpoint with a
+  // form-urlencoded body (mirroring the GET query params) rather than
+  // following the spec's front-channel GET redirect — TokenController.oauthLogout
+  // accepts both, so the body needs to actually be parsed either way.
+  expressApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
   const loggerService = new LoggerService();
 
   const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp), {
     logger: loggerService,
+    httpsOptions,
   });
 
   configureNestApp(app, loggerService);
@@ -153,7 +189,15 @@ async function bootstrap() {
   if (process.env.NODE_ENV !== 'production') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Sassy Auth API')
-      .setDescription('Multi-tenant auth and user management')
+      .setDescription(
+        [
+          '## Overview',
+          'Multi-tenant auth and user management.',
+          '',
+          '## Authentication',
+          `BetterAuth routes (\`/api/auth/*\`) issue a \`${BETTER_AUTH_SESSION_COOKIE}\` session cookie, which the Management API endpoints below require.`,
+        ].join('\n'),
+      )
       .setVersion(pkg.version)
       .addCookieAuth(
         BETTER_AUTH_SESSION_COOKIE,
@@ -184,14 +228,52 @@ async function bootstrap() {
       );
     }
 
-    SwaggerModule.setup('api/docs', app, mergedDoc, {
+    // Adds ReDoc's x-logo / x-tagGroups extensions. Swagger UI ignores unknown
+    // x-* keys, so the same enriched document backs every doc surface below.
+    const enrichedDoc = applyRedocExtensions(mergedDoc);
+
+    SwaggerModule.setup('api/docs', app, enrichedDoc, {
       swaggerOptions: { withCredentials: true, persistAuthorization: true },
       jsonDocumentUrl: 'api/docs-json',
+      yamlDocumentUrl: 'api/docs-yaml',
+    });
+
+    const redocLogo = readFileSync(join(__dirname, 'docs/assets/redoc-logo.jpg'));
+    expressApp.get('/api/redoc-logo.jpg', (_req, res) => {
+      res.type('image/jpeg').send(redocLogo);
+    });
+    // Served same-origin, not from a CDN: helmet()'s default CSP (script-src
+    // 'self', set unconditionally in configureNestApp — including in dev)
+    // blocks cross-origin <script> tags, the same reason Swagger UI above
+    // self-hosts its JS from swagger-ui-dist instead of unpkg.
+    const redocBundle = readFileSync(require.resolve('redoc/bundles/redoc.standalone.js'));
+    expressApp.get('/api/redoc-bundle.js', (_req, res) => {
+      res.type('application/javascript').send(redocBundle);
+    });
+    expressApp.get('/api/redoc-init.js', (_req, res) => {
+      res.type('application/javascript').send(renderRedocInitScript());
+    });
+    expressApp.get('/api/redoc', (_req, res) => {
+      // ReDoc needs two narrow additions to helmet()'s default CSP (see the
+      // script-src note above): worker-src for the blob: web worker it spawns
+      // to build its search index (falls back to script-src 'self' otherwise,
+      // which blocks blob: workers), and img-src for the "powered by ReDoc"
+      // badge it fetches from cdn.redoc.ly. Scoped to this one response, not
+      // helmet()'s global config, so it can't weaken CSP anywhere else.
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; base-uri 'self'; font-src 'self' https: data:; " +
+          "form-action 'self'; frame-ancestors 'self'; object-src 'none'; " +
+          "script-src 'self'; script-src-attr 'none'; style-src 'self' https: 'unsafe-inline'; " +
+          "worker-src 'self' blob:; img-src 'self' data: https://cdn.redoc.ly; " +
+          'upgrade-insecure-requests',
+      );
+      res.type('html').send(renderRedocPage());
     });
   }
 
-  await app.listen(process.env.PORT ?? 3000);
-  loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3000}`, 'Bootstrap');
+  await app.listen(process.env.PORT ?? 3010);
+  loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3010}`, 'Bootstrap');
 }
 
 bootstrap().catch((err) => {

@@ -4,15 +4,138 @@ import { NextIntlClientProvider } from 'next-intl'
 import en from '@/messages/en.json'
 import { AppEditDrawer } from '../app-edit-drawer'
 import * as actions from '@/app/(admin)/apps/actions'
+import * as orgsActions from '@/app/(admin)/orgs/actions'
+import * as rolesActions from '@/app/(admin)/roles/actions'
+import type { PasswordPolicy } from '@/lib/types'
 
 jest.mock('@/app/(admin)/apps/actions', () => ({
   updateAppAction: jest.fn(),
+  getAppAction: jest.fn(),
   getSocialProviderSettingsAction: jest.fn(),
   updateSocialProvidersAction: jest.fn(),
+  rotateClientSecretAction: jest.fn(),
 }))
+jest.mock('@/app/(admin)/orgs/actions', () => ({
+  listOrgsAction: jest.fn(),
+}))
+jest.mock('@/app/(admin)/roles/actions', () => ({
+  listRolesAction: jest.fn(),
+}))
+
+// Radix Select is awkward to drive in JSDOM (it relies on pointer events that
+// JSDOM does not implement). Swap it for a thin native <select> shim so tests
+// can call fireEvent.change to pick an org/role. Other primitives are
+// re-exported from the real package. Mirrors the shim in
+// user-create-drawer.test.tsx.
+jest.mock('@sassy-auth/ui', () => {
+  const actual = jest.requireActual('@sassy-auth/ui')
+  type ChildrenProps = { children?: React.ReactNode }
+  type SelectProps = ChildrenProps & {
+    value?: string
+    onValueChange?: (value: string) => void
+  }
+  type SelectItemProps = ChildrenProps & { value: string }
+  type SelectValueProps = { placeholder?: string }
+  const SelectContext = React.createContext<{
+    value: string
+    onValueChange: (value: string) => void
+    placeholder: string
+  }>({ value: '', onValueChange: () => undefined, placeholder: '' })
+
+  function Select({ value = '', onValueChange = () => undefined, children }: SelectProps) {
+    const [placeholder, setPlaceholder] = React.useState('')
+    return (
+      <SelectContext.Provider value={{ value, onValueChange, placeholder }}>
+        <select
+          aria-label={placeholder || 'select'}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        >
+          <option value="" disabled>{placeholder || 'Select'}</option>
+          {React.Children.toArray(children).flatMap((child) => {
+            if (!React.isValidElement(child)) return []
+            // <SelectContent> wraps the items.
+            const grandchildren = (child.props as ChildrenProps).children
+            return React.Children.toArray(grandchildren)
+          })}
+        </select>
+        {/* render hidden helpers so SelectValue can set the placeholder via effect */}
+        <div hidden>{children}</div>
+        <SelectPlaceholderSink onPlaceholder={setPlaceholder}>{children}</SelectPlaceholderSink>
+      </SelectContext.Provider>
+    )
+  }
+
+  function SelectPlaceholderSink({
+    children,
+    onPlaceholder,
+  }: {
+    children?: React.ReactNode
+    onPlaceholder: (value: string) => void
+  }) {
+    React.useEffect(() => {
+      let found = ''
+      const walk = (nodes: React.ReactNode) => {
+        React.Children.forEach(nodes, (node) => {
+          if (!React.isValidElement(node)) return
+          const props = node.props as Record<string, unknown> | undefined
+          if (props && typeof props.placeholder === 'string') {
+            found = props.placeholder
+          }
+          if (props && props.children) walk(props.children as React.ReactNode)
+        })
+      }
+      walk(children)
+      onPlaceholder(found)
+    }, [children, onPlaceholder])
+    return null
+  }
+
+  function SelectTrigger({ children }: ChildrenProps) {
+    return <>{children}</>
+  }
+  function SelectContent({ children }: ChildrenProps) {
+    return <>{children}</>
+  }
+  function SelectValue(_props: SelectValueProps) {
+    return null
+  }
+  function SelectItem({ value, children }: SelectItemProps) {
+    return <option value={value}>{children}</option>
+  }
+
+  return {
+    ...actual,
+    Select,
+    SelectTrigger,
+    SelectContent,
+    SelectValue,
+    SelectItem,
+  }
+})
+
 Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } })
 
-const app = { publicId: 'sq_1', name: 'Old', url: 'https://old.example', isPlatform: false, requireTwoFactor: false }
+const EFFECTIVE_PASSWORD_POLICY: PasswordPolicy = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecial: false,
+  minNumbers: 1,
+  minSpecial: 0,
+}
+
+const app = {
+  publicId: 'sq_1',
+  name: 'Old',
+  url: 'https://old.example',
+  isPlatform: false,
+  requireTwoFactor: false,
+  passwordPolicyOverride: null,
+  effectivePasswordPolicy: EFFECTIVE_PASSWORD_POLICY,
+  activationEmailOverride: null,
+}
 
 function withIntl(node: React.ReactNode) {
   return (
@@ -25,7 +148,14 @@ function withIntl(node: React.ReactNode) {
 describe('AppEditDrawer', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    // Finding 2 (final review): the list response no longer carries `logo`,
+    // so the drawer fetches the single-app record on open to seed it. This
+    // default keeps existing tests, which build their fixtures without a
+    // real logo, behaving as before (`app.logo` is undefined either way).
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({ app })
     ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({ available: [], enabled: [] })
+    ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
+    ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
   })
 
   it('renders the publicId as read-only and copies on click', async () => {
@@ -57,6 +187,88 @@ describe('AppEditDrawer', () => {
       expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', { name: 'New' }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  // Finding 2 (final review): GET /api/apps (the list AppsTable sources
+  // `selected` — and therefore this drawer's `app` prop — from) no longer
+  // sends `logo`, to avoid shipping every row's base64 blob on page load.
+  // The drawer must backfill it via a dedicated single-app fetch so editing
+  // an app that already has a logo doesn't show it as empty, and must not
+  // mark the form dirty (or resend the logo) purely because that fetch
+  // resolved.
+  it('backfills the logo from getAppAction and does not mark the form dirty from that alone', async () => {
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, logo: 'data:image/png;base64,EXISTING=' },
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    await waitFor(() =>
+      expect(screen.getByRole('img')).toHaveAttribute('src', 'data:image/png;base64,EXISTING='),
+    )
+    expect(screen.getByRole('button', { name: en.apps.drawer.save })).toBeDisabled()
+  })
+
+  it('includes a changed logo in the update payload', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: { ...app, name: 'X2' } })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    const file = new File(['a'.repeat(10)], 'logo.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.logo), { target: { files: [file] } })
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ logo: expect.stringMatching(/^data:image\/png;base64,/) }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  // Task 4: the single callbackUrl input is gone — apps now register a
+  // repeatable list of login/post_logout redirect URIs.
+  it('shows the no-login-URIs warning when the app has none registered', () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expect(screen.getByText(en.apps.fields.noLoginUrisWarning)).toBeInTheDocument()
+  })
+
+  it('adds a redirect URI row, fills it in, and submits it in the patch', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }] },
+    })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.fields.addRedirectUri }))
+    fireEvent.change(screen.getByLabelText(en.apps.fields.redirectUris), {
+      target: { value: 'https://app.example.com/cb' },
+    })
+    expect(screen.queryByText(en.apps.fields.noLoginUrisWarning)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', {
+        redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' }],
+      }),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  it('removes a redirect URI row', () => {
+    const appWithUri = {
+      ...app,
+      redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' as const }],
+    }
+    render(withIntl(<AppEditDrawer app={appWithUri} open onOpenChange={() => undefined} />))
+    expect(screen.queryByText(en.apps.fields.noLoginUrisWarning)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.fields.removeRedirectUri }))
+    expect(screen.getByText(en.apps.fields.noLoginUrisWarning)).toBeInTheDocument()
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    expect(save).toBeEnabled()
   })
 
   it('renders social sign-in checkboxes from the fetched list, checked by default', async () => {
@@ -154,5 +366,228 @@ describe('AppEditDrawer', () => {
     await waitFor(() =>
       expect(actions.getSocialProviderSettingsAction).toHaveBeenCalledWith('sq_1'),
     )
+  })
+
+  // Task 9: confidential clients — the admin console's client-secret UI.
+
+  it('shows "no client secret" for a public app and a Generate button', () => {
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expect(screen.getByText(en.apps.fields.noClientSecret)).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: en.apps.fields.generateClientSecret }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the rotation date and a Regenerate button for a confidential app', () => {
+    const confidentialApp = { ...app, isConfidential: true, clientSecretUpdatedAt: '2026-08-01T00:00:00Z' }
+    render(withIntl(<AppEditDrawer app={confidentialApp} open onOpenChange={() => undefined} />))
+    expect(
+      screen.getByRole('button', { name: en.apps.fields.regenerateClientSecret }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(en.apps.fields.noClientSecret)).not.toBeInTheDocument()
+  })
+
+  it('generating a client secret displays the plaintext once, with a copy control and warning', async () => {
+    ;(actions.rotateClientSecretAction as jest.Mock).mockResolvedValue({
+      clientSecret: 'plaintext-secret-value',
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.fields.generateClientSecret }))
+
+    await waitFor(() =>
+      expect(actions.rotateClientSecretAction).toHaveBeenCalledWith('sq_1'),
+    )
+    const secretInput = (await screen.findByDisplayValue(
+      'plaintext-secret-value',
+    )) as HTMLInputElement
+    expect(secretInput.readOnly).toBe(true)
+    expect(screen.getByText(en.apps.fields.clientSecretWarning)).toBeInTheDocument()
+
+    // Both the publicId field and the new-secret field render a "Copy"
+    // button with the same accessible name; the secret's copy button is
+    // the one rendered nearest the secret input.
+    const copyButtons = screen.getAllByRole('button', { name: en.apps.actions.copy })
+    fireEvent.click(copyButtons[copyButtons.length - 1])
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('plaintext-secret-value'),
+    )
+  })
+
+  // Task 13: default org / default role selects, populated from this app's
+  // own orgs/roles.
+
+  it("renders Default organization and Default role selects populated from this app's orgs/roles", async () => {
+    ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({
+      items: [{ publicId: 'org1', name: 'Citadel', isPlatform: false, userCount: 0, app: { publicId: 'sq_1', name: 'App' } }],
+      total: 1,
+      page: 1,
+      pageSize: 200,
+    })
+    ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({
+      items: [{ publicId: 'role1', name: 'Managers', app: { publicId: 'sq_1', name: 'App' }, permissionCount: 0, userCount: 0 }],
+      total: 1,
+      page: 1,
+      pageSize: 200,
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    await waitFor(() => expect(screen.getAllByText('Citadel').length).toBeGreaterThan(0))
+    expect(screen.getAllByText('Managers').length).toBeGreaterThan(0)
+    expect(orgsActions.listOrgsAction).toHaveBeenCalledWith({ appId: 'sq_1', pageSize: 200 })
+    expect(rolesActions.listRolesAction).toHaveBeenCalledWith({ appId: 'sq_1', pageSize: 200 })
+  })
+
+  it('includes defaultOrgId/defaultRoleId in the PATCH payload when changed', async () => {
+    ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({
+      items: [{ publicId: 'org1', name: 'Citadel', isPlatform: false, userCount: 0, app: { publicId: 'sq_1', name: 'App' } }],
+      total: 1,
+      page: 1,
+      pageSize: 200,
+    })
+    ;(rolesActions.listRolesAction as jest.Mock).mockResolvedValue({
+      items: [{ publicId: 'role1', name: 'Managers', app: { publicId: 'sq_1', name: 'App' }, permissionCount: 0, userCount: 0 }],
+      total: 1,
+      page: 1,
+      pageSize: 200,
+    })
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    await waitFor(() => expect(screen.getAllByText('Citadel').length).toBeGreaterThan(0))
+
+    fireEvent.change(screen.getByLabelText(en.apps.fields.defaultOrgNone), { target: { value: 'org1' } })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.defaultRoleNone), { target: { value: 'role1' } })
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ defaultOrgId: 'org1', defaultRoleId: 'role1' }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  // Task 12: collapsible per-app password policy section.
+
+  describe('password policy section', () => {
+    it('renders collapsed with the override toggle off by default', () => {
+      render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      const toggle = screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle) as HTMLInputElement
+      expect(toggle.checked).toBe(false)
+      expect(screen.queryByLabelText(en.apps.fields.passwordPolicyMinLength)).not.toBeInTheDocument()
+    })
+
+    it('expands the policy fields when the override toggle is turned on', () => {
+      render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle))
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinLength)).toBeInTheDocument()
+    })
+
+    it('disables minNumbers/minSpecial inputs when their require-* checkbox is unchecked', () => {
+      render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle))
+
+      // Base fixture's effective policy has requireNumber: true, requireSpecial: false.
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinNumbers)).toBeEnabled()
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinSpecial)).toBeDisabled()
+
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyRequireNumber))
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinNumbers)).toBeDisabled()
+
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyRequireSpecial))
+      expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinSpecial)).toBeEnabled()
+    })
+
+    it('marks the form dirty and includes passwordPolicyOverride in the save payload when enabled and edited', async () => {
+      ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app })
+      const onOpenChange = jest.fn()
+      render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+      const save = screen.getByRole('button', { name: en.apps.drawer.save })
+      expect(save).toBeDisabled()
+
+      fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle))
+      expect(save).toBeEnabled()
+
+      const minLength = screen.getByLabelText(en.apps.fields.passwordPolicyMinLength)
+      fireEvent.change(minLength, { target: { value: '16' } })
+
+      fireEvent.click(save)
+
+      await waitFor(() =>
+        expect(actions.updateAppAction).toHaveBeenCalledWith(
+          'sq_1',
+          expect.objectContaining({
+            passwordPolicyOverride: expect.objectContaining({ minLength: 16 }),
+          }),
+        ),
+      )
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    })
+
+    it('sends null to clear an existing override when the toggle is turned back off', async () => {
+      const appWithOverride = {
+        ...app,
+        passwordPolicyOverride: {
+          minLength: 16,
+          requireUppercase: true,
+          requireLowercase: true,
+          requireNumber: true,
+          requireSpecial: true,
+          minNumbers: 2,
+          minSpecial: 1,
+        },
+      }
+      ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: appWithOverride })
+      const onOpenChange = jest.fn()
+      render(withIntl(<AppEditDrawer app={appWithOverride} open onOpenChange={onOpenChange} />))
+
+      const toggle = screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle) as HTMLInputElement
+      expect(toggle.checked).toBe(true)
+
+      fireEvent.click(toggle)
+      expect(screen.queryByLabelText(en.apps.fields.passwordPolicyMinLength)).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+      await waitFor(() =>
+        expect(actions.updateAppAction).toHaveBeenCalledWith(
+          'sq_1',
+          expect.objectContaining({ passwordPolicyOverride: null }),
+        ),
+      )
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    })
+  })
+
+  // Code quality review (finding 2): a partially-set activationEmailOverride
+  // (only one field populated) that gets cleared entirely in the form must
+  // collapse to `null` in the patch, not an object with an empty string.
+  it('clears a partially-set activationEmailOverride to null when the only field is emptied', async () => {
+    const appWithPartialOverride = {
+      ...app,
+      activationEmailOverride: { fromName: 'Vibecast' },
+    }
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: appWithPartialOverride })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={appWithPartialOverride} open onOpenChange={onOpenChange} />))
+
+    const fromName = screen.getByLabelText(en.apps.fields.activationEmailFromName) as HTMLInputElement
+    expect(fromName.value).toBe('Vibecast')
+    fireEvent.change(fromName, { target: { value: '' } })
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ activationEmailOverride: null }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 })

@@ -76,6 +76,7 @@ GitHub Actions runs the suite via `.github/workflows/e2e.yml`. The workflow:
 | `lib/i18n.ts` | Dot-path lookup against `apps/admin/messages/en.json`. |
 | `lib/fixtures.ts` | Auto-applied diagnostics fixture; re-exports `test` and `expect`. |
 | `tests/login.spec.ts` | First spec — `s@sa.io` signs in, redirects to `/users`. Races URL vs. rendered error so UI errors become the failure reason. |
+| `tests/signup.spec.ts` | Registration ("/register") flow — via `/signup`, the app's actual registration UI. Skipped unless `RS_CLIENT_ID`/`SASSY_CLIENT_ID` is set, same gate as `rs-round-trip.spec.ts`. |
 | `tests/authed/` | Reserved for future logged-in specs that opt into the `chromium-authed` project. |
 
 ## Adding a new test

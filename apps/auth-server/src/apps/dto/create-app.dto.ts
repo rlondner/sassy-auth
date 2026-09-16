@@ -1,16 +1,20 @@
-import { IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
+import { IsAppLogo } from '../../common/config/is-app-logo.decorator';
 
 export class CreateAppDto {
   @IsString() @MinLength(1) @MaxLength(120) name!: string;
   @IsAppUrl() @MaxLength(2048) url!: string;
 
-  // Optional exact-match callback URL. Omitted / null / '' all mean "default"
-  // (origin match against `url`) and skip validation.
-  @ValidateIf((o) => o.callbackUrl !== undefined && o.callbackUrl !== null && o.callbackUrl !== '')
-  @IsAppUrl()
-  @MaxLength(2048)
-  callbackUrl?: string | null;
+  /**
+   * Full data URI (e.g. "data:image/png;base64,..."), validated by
+   * IsAppLogo against the shared @sassy-auth/types size/type rule.
+   * Omitted or null means no logo.
+   */
+  @IsOptional()
+  @IsAppLogo()
+  logo?: string | null;
 
   /**
    * Per-app 2FA trust / re-prompt interval in days.
@@ -25,4 +29,13 @@ export class CreateAppDto {
   twoFactorTrustDays?: number | null;
 
   @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
+
+  /**
+   * Registered login / post_logout redirect URIs for this app. Validated as
+   * absolute http(s) URLs in AppsService — see assertValidRedirectUris.
+   */
+  @ApiPropertyOptional({ type: [Object] })
+  @IsOptional()
+  @IsArray()
+  redirectUris?: Array<{ uri: string; kind: 'login' | 'post_logout' }>;
 }

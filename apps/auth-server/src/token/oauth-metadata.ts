@@ -16,6 +16,16 @@ export const JWKS_ROUTE = 'jwks';
 // discovery URLs from it) so the two cannot drift.
 export const NEST_GLOBAL_PREFIX = 'api';
 
+// The site-relative path (leading slash, full mount prefix) of the authorize
+// endpoint, as actually served. OAUTH_AUTHORIZE_ROUTE alone is only the
+// per-controller route fragment Nest's @Get() decorator takes — it omits the
+// global prefix and the controller path, so it is NOT a valid `next` value
+// for a same-origin redirect back into this endpoint (the admin app's
+// validateNextUrl rejects anything that doesn't start with "/" or match an
+// allowlisted absolute origin). Use this constant wherever the authorize
+// endpoint is referenced as a redirect target.
+export const OAUTH_AUTHORIZE_PATH = `/${NEST_GLOBAL_PREFIX}/${TOKEN_CONTROLLER_PATH}/${OAUTH_AUTHORIZE_ROUTE}`;
+
 // RFC 8414 well-known URI. Must be served at the host root, not under /api.
 export const OAUTH_AS_METADATA_PATH = '.well-known/oauth-authorization-server';
 
@@ -38,8 +48,9 @@ export function resolveIssuer(): string {
 const RESPONSE_TYPES_SUPPORTED = ['code'] as const;
 const GRANT_TYPES_SUPPORTED = ['authorization_code'] as const;
 const CODE_CHALLENGE_METHODS_SUPPORTED = ['S256'] as const;
-// Public PKCE clients only — there is no client_secret-based auth on /token.
-const TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED = ['none'] as const;
+const TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED = [
+  'none', 'client_secret_basic', 'client_secret_post',
+] as const;
 
 export interface OAuthAuthorizationServerMetadata {
   issuer: string;
@@ -71,4 +82,63 @@ export function buildOAuthAuthorizationServerMetadata(
 
 function stripTrailingSlash(s: string): string {
   return s.endsWith('/') ? s.slice(0, -1) : s;
+}
+
+export const OAUTH_USERINFO_ROUTE = 'oauth/userinfo';
+export const OAUTH_LOGOUT_ROUTE = 'oauth/logout';
+
+// OIDC Discovery well-known URI. Like RFC 8414, served at the host root.
+export const OIDC_METADATA_PATH = '.well-known/openid-configuration';
+
+// Single source of truth for which well-known paths must bypass the /api
+// global prefix, consumed by both configure-nest-app.ts (which enforces it)
+// and discovery.controller.spec.ts (which verifies it) so the two cannot
+// silently drift apart again.
+export const WELL_KNOWN_METADATA_PATHS = [OAUTH_AS_METADATA_PATH, OIDC_METADATA_PATH];
+
+const SCOPES_SUPPORTED = ['openid', 'profile', 'email'] as const;
+const SUBJECT_TYPES_SUPPORTED = ['public'] as const;
+const ID_TOKEN_SIGNING_ALGS = ['RS256'] as const;
+const CLAIMS_SUPPORTED = [
+  'sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'amr', 'at_hash',
+  'org', 'name', 'given_name', 'family_name', 'email', 'email_verified',
+] as const;
+
+export interface OpenIdConfiguration {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  userinfo_endpoint: string;
+  end_session_endpoint: string;
+  jwks_uri: string;
+  scopes_supported: readonly string[];
+  response_types_supported: readonly string[];
+  grant_types_supported: readonly string[];
+  subject_types_supported: readonly string[];
+  id_token_signing_alg_values_supported: readonly string[];
+  code_challenge_methods_supported: readonly string[];
+  token_endpoint_auth_methods_supported: readonly string[];
+  claims_supported: readonly string[];
+}
+
+export function buildOpenIdConfiguration(issuer: string): OpenIdConfiguration {
+  const oauth = buildOAuthAuthorizationServerMetadata(issuer);
+  const base = stripTrailingSlash(issuer);
+  const tokenRoot = `${base}/${NEST_GLOBAL_PREFIX}/${TOKEN_CONTROLLER_PATH}`;
+  return {
+    issuer: oauth.issuer,
+    authorization_endpoint: oauth.authorization_endpoint,
+    token_endpoint: oauth.token_endpoint,
+    jwks_uri: oauth.jwks_uri,
+    userinfo_endpoint: `${tokenRoot}/${OAUTH_USERINFO_ROUTE}`,
+    end_session_endpoint: `${tokenRoot}/${OAUTH_LOGOUT_ROUTE}`,
+    scopes_supported: [...SCOPES_SUPPORTED],
+    response_types_supported: oauth.response_types_supported,
+    grant_types_supported: oauth.grant_types_supported,
+    subject_types_supported: [...SUBJECT_TYPES_SUPPORTED],
+    id_token_signing_alg_values_supported: [...ID_TOKEN_SIGNING_ALGS],
+    code_challenge_methods_supported: oauth.code_challenge_methods_supported,
+    token_endpoint_auth_methods_supported: oauth.token_endpoint_auth_methods_supported,
+    claims_supported: [...CLAIMS_SUPPORTED],
+  };
 }

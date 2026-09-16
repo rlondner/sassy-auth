@@ -2121,8 +2121,8 @@ pnpm --filter @sassy-auth/auth-server dev
 Then verify with curl (replace `<cookie>` with a valid BetterAuth session from the seed user):
 
 ```bash
-curl -s -H "Cookie: better-auth.session_token=<cookie>" http://localhost:3000/api/users | jq .
-curl -s http://localhost:3000/api/invitations/nonexistent-token
+curl -s -H "Cookie: better-auth.session_token=<cookie>" https://localhost:3010/api/users | jq .
+curl -s https://localhost:3010/api/invitations/nonexistent-token
 ```
 
 Expected: `GET /api/users` returns array; `GET /api/invitations/nonexistent-token` returns 404.

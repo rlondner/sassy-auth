@@ -4,7 +4,12 @@
 
 // Mock the heavy dependencies so we can import auth.config in jest.
 jest.mock('@sassy-auth/db', () => ({
-  prisma: {},
+  prisma: {
+    saUser: {
+      findUnique: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+  },
 }));
 jest.mock('better-auth/adapters/prisma', () => ({
   prismaAdapter: () => ({}),
@@ -14,6 +19,9 @@ jest.mock('../email/email.singleton', () => ({
 }));
 jest.mock('./otp-test-store', () => ({ otpTestStore: {} }));
 jest.mock('./otp-sender', () => ({ sendSignInOtp: jest.fn() }));
+jest.mock('../activation/notify-activation', () => ({
+  notifyActivation: jest.fn().mockResolvedValue(undefined),
+}));
 
 describe('auth.config — twoFactor plugin', () => {
   it('includes the twoFactor plugin in the plugins array', async () => {
@@ -233,5 +241,182 @@ describe('auth.config — hooks.after handler body (task-8 fix round 1, review f
         reason: 'private_relay',
       }),
     );
+  });
+});
+
+describe('auth.config — emailVerification', () => {
+  afterEach(() => {
+    jest.dontMock('../email/email.singleton');
+    jest.resetModules();
+  });
+
+  it('disables auto sign-in after verification, consistent with autoSignIn: false', async () => {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as Record<string, unknown>;
+    expect(ev['autoSignInAfterVerification']).toBe(false);
+  });
+
+  it('sendVerificationEmail resolves the owning SaApp and brands the email with its name and override', async () => {
+    const sendMock = jest.fn().mockResolvedValue({ sent: true });
+    jest.doMock('../email/email.singleton', () => ({ getEmailer: () => ({ send: sendMock }) }));
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique.mockResolvedValue({
+      org: { app: { name: 'Vibecast', activationEmailOverride: { fromName: 'Vibecast', fromAddress: 'no-reply@vibecast.io' } } },
+    });
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as {
+      sendVerificationEmail: (args: { user: { id: string; email: string; name?: string }; url: string }) => Promise<void>;
+    };
+    await ev.sendVerificationEmail({ user: { id: 'ba-user-1', email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
+    expect(prisma.saUser.findUnique).toHaveBeenCalledWith({
+      where: { betterAuthUserId: 'ba-user-1' },
+      select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
+    });
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'jane@example.com',
+        subject: 'Verify your Vibecast email address',
+        from: 'Vibecast <no-reply@vibecast.io>',
+        html: expect.stringContaining('https://x/verify-email?token=abc'),
+      }),
+    );
+  });
+
+  it('sendVerificationEmail falls back to "Sassy Auth" and no branding when the SaUser lookup finds nothing', async () => {
+    const sendMock = jest.fn().mockResolvedValue({ sent: true });
+    jest.doMock('../email/email.singleton', () => ({ getEmailer: () => ({ send: sendMock }) }));
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique.mockResolvedValue(null);
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as {
+      sendVerificationEmail: (args: { user: { id: string; email: string; name?: string }; url: string }) => Promise<void>;
+    };
+    await ev.sendVerificationEmail({ user: { id: 'ba-unknown', email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
+    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ subject: 'Verify your Sassy Auth email address' }));
+  });
+
+  it('afterEmailVerification flips a matching unverified SaUser to active', async () => {
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
+    await ev.afterEmailVerification({ id: 'ba-user-1' });
+    expect(prisma.saUser.updateMany).toHaveBeenCalledWith({
+      where: { betterAuthUserId: 'ba-user-1', status: 'unverified' },
+      data: { status: 'active' },
+    });
+  });
+
+  it('notifies the activation webhook when email verification promotes unverified -> active', async () => {
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { notifyActivation: mockNotifyActivation } = require('../activation/notify-activation');
+    mockNotifyActivation.mockClear();
+    prisma.saUser.updateMany.mockClear();
+    prisma.saUser.findUnique.mockClear();
+    prisma.saUser.updateMany.mockResolvedValue({ count: 1 });
+    prisma.saUser.findUnique.mockResolvedValue({ id: 1, publicId: 'usr_1', orgId: 5 });
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
+    await ev.afterEmailVerification({ id: 'ba-1' });
+    expect(mockNotifyActivation).toHaveBeenCalledWith({ id: 1, publicId: 'usr_1', orgId: 5 });
+  });
+
+  it('does not notify the activation webhook when the user was already verified (updateMany matches nothing)', async () => {
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { notifyActivation: mockNotifyActivation } = require('../activation/notify-activation');
+    mockNotifyActivation.mockClear();
+    prisma.saUser.updateMany.mockClear();
+    prisma.saUser.updateMany.mockResolvedValue({ count: 0 });
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
+    await ev.afterEmailVerification({ id: 'ba-1' });
+    expect(mockNotifyActivation).not.toHaveBeenCalled();
+  });
+});
+
+jest.mock('./resolve-app-for-reset-token', () => ({
+  resolveAppForResetToken: jest.fn(),
+}));
+
+describe('auth.config — hooks.before (reset-password policy enforcement)', () => {
+  async function loadBeforeHook() {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const hooks = options['hooks'] as Record<string, unknown>;
+    return hooks['before'] as (ctx: {
+      path?: string;
+      body?: { token?: string; newPassword?: string };
+      query?: { token?: string };
+    }) => Promise<void>;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('ignores a non-reset-password path', async () => {
+    const before = await loadBeforeHook();
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    await before({ path: '/sign-in/email' });
+    expect(resolveAppForResetToken).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the token resolves to no app (defers to BetterAuth\'s own INVALID_TOKEN)', async () => {
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    resolveAppForResetToken.mockResolvedValue(null);
+    const before = await loadBeforeHook();
+    await expect(before({ path: '/reset-password', body: { token: 'tok', newPassword: 'x' } })).resolves.toBeUndefined();
+  });
+
+  it('throws when the new password violates the resolved app\'s policy', async () => {
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    resolveAppForResetToken.mockResolvedValue({ id: 1, passwordPolicyOverride: null });
+    const before = await loadBeforeHook();
+    await expect(
+      before({ path: '/reset-password', body: { token: 'tok', newPassword: 'short' } }),
+    ).rejects.toMatchObject({ body: { code: 'PASSWORD_POLICY_VIOLATION' } });
+  });
+
+  it('does not throw when the new password satisfies the resolved policy', async () => {
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    resolveAppForResetToken.mockResolvedValue({ id: 1, passwordPolicyOverride: null });
+    const before = await loadBeforeHook();
+    await expect(
+      before({ path: '/reset-password', body: { token: 'tok', newPassword: 'Str0ngPassword' } }),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('auth.config — session gate FORBIDDEN code (real invocation)', () => {
+  async function loadSessionCreateBefore() {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const databaseHooks = options['databaseHooks'] as {
+      session: { create: { before: (session: { userId: string }, ctx?: unknown) => Promise<unknown> } };
+    };
+    return databaseHooks.session.create.before;
+  }
+
+  it('throws code: ACCOUNT_UNVERIFIED when the SaUser status is unverified', async () => {
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique = jest.fn().mockResolvedValue({ status: 'unverified' });
+    const before = await loadSessionCreateBefore();
+    await expect(before({ userId: 'ba-1' })).rejects.toMatchObject({ body: { code: 'ACCOUNT_UNVERIFIED' } });
+  });
+
+  it('throws code: ACCOUNT_INACTIVE when the SaUser status is inactive', async () => {
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique = jest.fn().mockResolvedValue({ status: 'inactive' });
+    const before = await loadSessionCreateBefore();
+    await expect(before({ userId: 'ba-1' })).rejects.toMatchObject({ body: { code: 'ACCOUNT_INACTIVE' } });
   });
 });

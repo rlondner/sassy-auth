@@ -48,6 +48,9 @@ apps/auth-server/.env
 .worktrees/
 .claude/worktrees/
 
+# Prisma
+packages/db/generated/
+
 .gstack/
 /tmp
 .claude/scheduled_tasks.lock
@@ -55,3 +58,7 @@ apps/auth-server/.env
 /.roborev/
 # Local Claude Code settings (machine-specific)
 .claude/settings.local.json
+apps/admin/certificates/
+apps/admin/mkcert/
+apps/auth-server/secrets/localhost-key.pem
+apps/auth-server/secrets/localhost.pem

@@ -19,7 +19,9 @@
     "confirm": "Confirmer",
     "itemsPerPage": "Éléments par page",
     "copyFailed": "Échec de la copie — accès au presse-papiers refusé",
-    "moreActions": "Plus d'actions"
+    "moreActions": "Plus d'actions",
+    "yes": "Oui",
+    "no": "Non"
   },
   "apps": {
     "title": "Applications",
@@ -39,24 +41,86 @@
     "fields": {
       "name": "Nom de l’application",
       "url": "URL de l’application",
-      "callbackUrl": "URL de rappel",
-      "callbackUrlHint": "Laissez vide pour accepter tout rappel sous l’URL de l’application. Indiquez une URL complète pour exiger une correspondance exacte du redirect_uri.",
-      "callbackUrlDefault": "Par défaut (tout chemin sous l’URL de l’application)",
+      "redirectUris": "URI de redirection",
+      "redirectUrisHint": "URI de connexion et de déconnexion explicites vers lesquelles cette application est autorisée à rediriger.",
+      "redirectUriPlaceholder": "https://app.example.com/auth/callback",
+      "redirectUriKindLabel": "Type d’URI de redirection",
+      "redirectUriKindLogin": "Connexion",
+      "redirectUriKindPostLogout": "Déconnexion",
+      "addRedirectUri": "Ajouter une URI de redirection",
+      "removeRedirectUri": "Supprimer l’URI de redirection",
+      "noLoginUrisWarning": "Aucune URI de redirection enregistrée — tout chemin sur l’origine de cette application est actuellement accepté. Enregistrez des URI explicites pour restreindre cela.",
+      "loginRedirectUris": "URI de redirection de connexion",
+      "postLogoutRedirectUris": "URI de redirection de déconnexion",
+      "noRedirectUris": "Aucune URI de redirection enregistrée — tout chemin sur l’origine de cette application est actuellement accepté.",
       "publicId": "ID Public",
       "urlHint": "URL de base principale de cette application.",
+      "logo": "Logo de l'application",
+      "logoHint": "Affiché sur les pages de connexion et d'inscription de cette application. PNG, JPEG, WebP ou SVG, 250 Ko maximum.",
+      "removeLogo": "Supprimer le logo",
+      "noLogo": "Aucun logo configuré",
       "twoFactorTrustDays": "Intervalle de confiance 2FA (jours)",
       "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
+      "twoFactorTrustDaysSystemDefault": "Valeur par défaut système",
       "twoFactorTrustDaysHint": "Durée de confiance du navigateur après un défi 2FA. Laissez vide pour utiliser la valeur par défaut système.",
       "requireTwoFactor": "Exiger l'authentification à deux facteurs",
       "requireTwoFactorHint": "Les utilisateurs se connectant à cette application devront activer la 2FA avant de continuer.",
+      "defaultOrg": "Organisation par défaut",
+      "defaultOrgHint": "Les nouvelles inscriptions en libre-service sur cette application rejoignent automatiquement cette organisation au lieu d’en créer une nouvelle. Laissez vide pour que chaque inscription crée sa propre organisation.",
+      "defaultOrgNone": "Aucune — les inscriptions créent une nouvelle organisation",
+      "defaultRole": "Rôle par défaut",
+      "defaultRoleHint": "Attribué automatiquement à chaque inscription en libre-service sur cette application, qu’elle rejoigne l’organisation par défaut ou en crée une nouvelle.",
+      "defaultRoleNone": "Aucun — aucun rôle attribué",
       "socialProviders": "Connexion sociale",
       "socialProvidersHint": "Choisissez les fournisseurs d’identité sociale proposés sur l’écran de connexion de cette application.",
+      "socialProvidersNone": "Aucun fournisseur social activé",
       "socialProviderNames": {
         "google": "Google",
         "microsoft": "Microsoft",
         "apple": "Apple",
         "stub": "IdP de test"
-      }
+      },
+      "clientSecret": "Secret client",
+      "clientSecretHint": "Les clients confidentiels (applications côté serveur) peuvent échanger des codes d'autorisation sans PKCE en s'authentifiant avec ce secret. Les clients publics (SPA, applications mobiles) ne devraient pas en avoir.",
+      "generateClientSecret": "Générer un secret client",
+      "regenerateClientSecret": "Régénérer le secret client",
+      "clientSecretWarning": "Copiez ce secret maintenant — il ne sera plus affiché.",
+      "clientSecretUpdatedAt": "Secret régénéré le {date}",
+      "noClientSecret": "Aucun secret client configuré — il s'agit d'un client public.",
+      "webhookUrl": "URL du webhook",
+      "webhookUrlHint": "Le serveur d'authentification envoie un événement account.activated à cette URL lorsqu'un utilisateur de cette application devient actif. Laissez vide pour désactiver l'envoi.",
+      "webhookUrlPlaceholder": "https://app.example.com/webhooks/sassy-auth",
+      "noWebhookUrl": "Aucun webhook configuré",
+      "webhookSecret": "Secret du webhook",
+      "webhookSecretHint": "Utilisé pour signer les charges utiles du webhook (X-Sassy-Signature). Généré par le serveur — enregistrez d'abord une URL de webhook, puis générez un secret.",
+      "generateWebhookSecret": "Générer un secret de webhook",
+      "regenerateWebhookSecret": "Régénérer le secret de webhook",
+      "webhookSecretWarning": "Copiez ce secret maintenant — il ne sera plus affiché ensuite.",
+      "webhookSecretNeedsUrlHint": "Enregistrez une URL de webhook avant de générer un secret.",
+      "webhookSecretConfigured": "Un secret est configuré.",
+      "noWebhookSecret": "Aucun secret configuré.",
+      "activationEmail": "E-mail d'activation",
+      "activationEmailHint": "Personnalisez l'e-mail envoyé lorsqu'une nouvelle inscription doit confirmer son adresse. Les variables '{{firstName}}' et '{{appName}}' sont disponibles dans l'objet et le message.",
+      "activationEmailFromName": "Nom de l'expéditeur",
+      "activationEmailFromNamePlaceholder": "ex. Vibecast",
+      "activationEmailFromAddress": "Adresse de l'expéditeur",
+      "activationEmailFromAddressPlaceholder": "no-reply@votreapp.com",
+      "activationEmailFromAddressHint": "Doit appartenir à un domaine vérifié auprès de votre fournisseur d'e-mail, sinon l'envoi échouera silencieusement.",
+      "activationEmailSubject": "Objet",
+      "activationEmailSubjectPlaceholder": "Vérifiez votre adresse e-mail '{{appName}}'",
+      "activationEmailMessage": "Message",
+      "activationEmailMessagePlaceholder": "Confirmez votre adresse e-mail pour terminer la création de votre compte :",
+      "activationEmailMessageHint": "Affiché au-dessus du bouton de confirmation, qui est toujours ajouté automatiquement.",
+      "passwordPolicy": "Politique de mot de passe",
+      "passwordPolicyOverrideToggle": "Remplacer la politique globale pour cette application",
+      "passwordPolicyInherited": "Politique globale héritée : {summary}",
+      "passwordPolicyMinLength": "Longueur minimale",
+      "passwordPolicyRequireUppercase": "Exiger une lettre majuscule",
+      "passwordPolicyRequireLowercase": "Exiger une lettre minuscule",
+      "passwordPolicyRequireNumber": "Exiger un chiffre",
+      "passwordPolicyRequireSpecial": "Exiger un caractère spécial",
+      "passwordPolicyMinNumbers": "Nombre minimum de chiffres",
+      "passwordPolicyMinSpecial": "Nombre minimum de caractères spéciaux"
     },
     "actions": {
       "view": "Voir",
@@ -88,7 +152,10 @@
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "urlInvalid": "Veuillez saisir une URL valide.",
       "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
-      "nameRequired": "Le nom de l’application est requis."
+      "logoInvalidType": "Veuillez choisir une image PNG, JPEG, WebP ou SVG.",
+      "logoTooLarge": "Cette image est trop volumineuse. Veuillez en choisir une de moins de 250 Ko.",
+      "nameRequired": "Le nom de l’application est requis.",
+      "activationEmailInvalid": "Veuillez vérifier les paramètres de l'e-mail d'activation — l'adresse d'expéditeur doit être une adresse e-mail valide et aucun champ ne doit contenir de saut de ligne."
     },
     "badges": {
       "platform": "Plateforme"
@@ -359,6 +426,7 @@
     "status": {
       "active": "Actif",
       "pending": "En attente",
+      "unverified": "Non vérifié",
       "inactive": "Inactif"
     },
     "noResults": "Aucun utilisateur trouvé.",
@@ -479,10 +547,13 @@
   "login": {
     "title": "Console d’administration",
     "subtitle": "Connectez-vous pour continuer",
+    "logoAlt": "Logo de l'entreprise",
     "email": "Adresse e-mail",
     "password": "Mot de passe",
     "submit": "Se connecter",
     "forgotPassword": "Mot de passe oublié ?",
+    "signupPrompt": "Vous n'avez pas de compte ?",
+    "signupLink": "S'inscrire",
     "useCode": "Se connecter avec un code",
     "socialDivider": "ou continuer avec",
     "socialGoogle": "Continuer avec Google",
@@ -504,6 +575,7 @@
     "error": {
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
       "inactive": "Ce compte a été désactivé.",
+      "unverified": "Veuillez vérifier votre e-mail et cliquer sur le lien de vérification avant de vous connecter.",
       "serverUnavailable": "Le service de connexion est indisponible. Veuillez réessayer dans un instant.",
       "tooManyRequests": "Trop de tentatives de connexion. Veuillez patienter une minute et réessayer.",
       "invalidCode": "Code invalide ou expiré."
@@ -522,6 +594,48 @@
       "passwordTooShort": "Le mot de passe doit contenir au moins 12 caractères.",
       "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
       "genericError": "Une erreur est survenue."
+    }
+  },
+  "signup": {
+    "title": "Créez votre compte",
+    "titleWithApp": "Créez votre compte pour {appName}",
+    "subtitle": "Configurez votre organisation pour commencer.",
+    "subtitleDefaultOrg": "Créez votre compte pour commencer.",
+    "invalidLink": "Ce lien d'inscription a expiré ou est invalide. Contactez l'application concernée pour en obtenir un nouveau.",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "companyName": "Nom de l'entreprise",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "submit": "Créer le compte",
+    "backToLogin": "Retour à la connexion",
+    "checkEmail": {
+      "title": "Vérifiez votre e-mail",
+      "subtitle": "Nous avons envoyé un lien de vérification à {email}.",
+      "missingEmail": "Nous n'avons pas pu déterminer quelle adresse vérifier. Recommencez l'inscription.",
+      "resendButton": "Renvoyer l'e-mail",
+      "resendCooldown": "Renvoyer dans {seconds}s",
+      "resendSent": "E-mail de vérification envoyé.",
+      "resendError": "Impossible de renvoyer l'e-mail. Veuillez réessayer dans un instant.",
+      "backToLogin": "Retour à la connexion"
+    },
+    "verified": {
+      "title": "Adresse e-mail vérifiée",
+      "subtitle": "Votre compte est prêt. Vous pouvez maintenant vous connecter.",
+      "continueToLogin": "Continuer vers la connexion"
+    },
+    "errors": {
+      "passwordMismatch": "Les mots de passe ne correspondent pas.",
+      "passwordTooShort": "Le mot de passe doit comporter au moins 12 caractères.",
+      "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
+      "captchaRequired": "Veuillez compléter le captcha avant de valider.",
+      "captchaFailed": "Nous n'avons pas pu vérifier que vous n'êtes pas un robot. Veuillez réessayer le captcha.",
+      "appNotFound": "Nous n'avons pas trouvé l'application pour ce lien d'inscription.",
+      "emailTaken": "Un compte existe déjà avec cette adresse e-mail.",
+      "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
+      "serverUnavailable": "Impossible de joindre le serveur. Veuillez réessayer dans un instant.",
+      "validationError": "Impossible de créer votre compte. Vérifiez vos informations et réessayez."
     }
   },
   "security": {
@@ -651,6 +765,17 @@
         "body": "Vous avez choisi « Masquer mon adresse e-mail » d'Apple : nous avons reçu une adresse relais qui ne correspond à aucune invitation.",
         "hint": "Reconnectez-vous avec Apple et choisissez « Partager mon adresse e-mail »."
       }
+    }
+  },
+  "password": {
+    "rules": {
+      "minLength": "Au moins {count} caractères",
+      "requireUppercase": "Au moins une lettre majuscule",
+      "requireLowercase": "Au moins une lettre minuscule",
+      "requireNumber": "Au moins un chiffre",
+      "requireSpecial": "Au moins un caractère spécial",
+      "minNumbers": "Au moins {count} chiffres",
+      "minSpecial": "Au moins {count} caractères spéciaux"
     }
   }
 }

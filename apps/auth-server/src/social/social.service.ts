@@ -4,7 +4,7 @@ import { availableSocialProviders } from './build-social-providers';
 import { resolveEnabledProviders, type SocialProviderId } from './resolve-enabled-providers';
 
 type Db = {
-  saApp: { findUnique(args: unknown): Promise<{ id: number; isPlatform?: boolean } | null> };
+  saApp: { findUnique(args: unknown): Promise<{ id: number; isPlatform?: boolean; logo?: string | null } | null> };
   saSocialProvider: {
     findMany(args?: unknown): Promise<{ appId: number | null; provider: string; enabled: boolean }[]>;
     upsert(args: unknown): Promise<unknown>;
@@ -63,13 +63,25 @@ export class SocialService {
   }
 
   /**
+   * The logo to show on the login screen for this app, or null if the app
+   * has none or the client_id is unknown/absent. Mirrors listForApp's
+   * enumeration-safety rule: an unknown client_id yields null, never a
+   * throw, so this stays indistinguishable from "app has no logo".
+   */
+  async getLogoForApp(clientId: string | undefined): Promise<string | null> {
+    if (!clientId) return null;
+    const app = await this.db.saApp.findUnique({ where: { publicId: clientId }, select: { id: true, logo: true } });
+    return app?.logo ?? null;
+  }
+
+  /**
    * Replace an app's provider opt-ins. Writes a row for EVERY available
    * provider — enabled or disabled — so an explicit "off" survives a later
    * change to the global default.
    *
    * Mirrors AppsService.updateApp/deleteApp: the platform app's identity
    * providers cannot be repointed through this endpoint, exactly like its
-   * name/url/callbackUrl/2FA settings — same `ForbiddenException` message,
+   * name/url/redirectUris/2FA settings — same `ForbiddenException` message,
    * same reasoning (the console hides the Edit action for the platform app,
    * but that is only a UI nicety; the API must refuse the write directly so
    * a raw HTTP call can't bypass it).

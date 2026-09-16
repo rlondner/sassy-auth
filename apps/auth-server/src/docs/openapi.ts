@@ -44,3 +44,53 @@ export function mergeOpenApiDocs(
     tags: mergedTags,
   } as OpenAPIObject;
 }
+
+/**
+ * Stamps ReDoc's vendor extensions (x-logo, x-tagGroups) onto an already-merged
+ * OpenAPI document. Harmless for Swagger UI, which ignores unknown x-* keys, so
+ * the same enriched document backs /api/docs, /api/docs-json, /api/docs-yaml,
+ * and /api/redoc.
+ */
+export function applyRedocExtensions(doc: OpenAPIObject): OpenAPIObject {
+  // Nest's DocumentBuilder never populates the document's top-level `tags[]`
+  // from @ApiTags() alone (that only tags individual operations, not the
+  // document) — only explicit .addTag() calls would. So group membership is
+  // derived from where each tag is actually used across `paths`, not from
+  // doc.tags, otherwise a tag ReDoc would render un-grouped (and therefore
+  // hide entirely, per x-tagGroups' "ungrouped tag is invisible" rule).
+  //
+  // BetterAuth's open-api plugin also spreads its own routes across several
+  // tags (Default, Magic-link, Email-otp, Two-factor, ...) rather than one
+  // "Auth" tag, so tag *name* can't tell Authentication and Management API
+  // routes apart. Path prefix can: every BetterAuth route is re-rooted under
+  // /api/auth/* by mergeOpenApiDocs above, and no Nest route lives there.
+  const authTags = new Set<string>();
+  const managementTags = new Set<string>();
+  for (const [path, pathItem] of Object.entries(doc.paths ?? {})) {
+    const bucket = path.startsWith(BETTER_AUTH_PATH_PREFIX) ? authTags : managementTags;
+    for (const operation of Object.values(pathItem as Record<string, { tags?: string[] }>)) {
+      for (const tag of operation?.tags ?? []) bucket.add(tag);
+    }
+  }
+
+  const tagGroups = [
+    { name: 'Authentication', tags: [...authTags] },
+    { name: 'Management API', tags: [...managementTags] },
+  ].filter((group) => group.tags.length > 0);
+
+  return {
+    ...doc,
+    // x-logo is an Info Object extension (nests under `info`), not a root
+    // one — unlike x-tagGroups, which is root-level. Misplacing it at the
+    // root leaves ReDoc's sidebar with no logo request at all, silently.
+    info: {
+      ...doc.info,
+      'x-logo': {
+        url: '/api/redoc-logo.jpg',
+        backgroundColor: '#ffffff',
+        altText: 'SassyAuth',
+      },
+    },
+    'x-tagGroups': tagGroups,
+  } as OpenAPIObject;
+}

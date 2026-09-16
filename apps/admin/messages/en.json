@@ -19,7 +19,9 @@
     "confirm": "Confirm",
     "itemsPerPage": "Items per page",
     "copyFailed": "Failed to copy — clipboard access denied",
-    "moreActions": "More actions"
+    "moreActions": "More actions",
+    "yes": "Yes",
+    "no": "No"
   },
   "apps": {
     "title": "Applications",
@@ -39,24 +41,86 @@
     "fields": {
       "name": "App Name",
       "url": "App URL",
-      "callbackUrl": "Callback URL",
-      "callbackUrlHint": "Leave blank to accept any callback under the app's URL. Set a full URL to require an exact redirect_uri match.",
-      "callbackUrlDefault": "Default (any path under app URL)",
+      "redirectUris": "Redirect URIs",
+      "redirectUrisHint": "Explicit login and post-logout URIs this app is allowed to redirect to.",
+      "redirectUriPlaceholder": "https://app.example.com/auth/callback",
+      "redirectUriKindLabel": "Redirect URI type",
+      "redirectUriKindLogin": "Login",
+      "redirectUriKindPostLogout": "Post-logout",
+      "addRedirectUri": "Add redirect URI",
+      "removeRedirectUri": "Remove redirect URI",
+      "noLoginUrisWarning": "No redirect URIs registered — any path on this app's origin is currently accepted. Register explicit URIs to restrict this.",
+      "loginRedirectUris": "Login redirect URIs",
+      "postLogoutRedirectUris": "Post-logout redirect URIs",
+      "noRedirectUris": "No redirect URIs registered — any path on this app's origin is currently accepted.",
       "publicId": "Public ID",
       "urlHint": "The primary base URL for this application.",
+      "logo": "App logo",
+      "logoHint": "Shown on this app's sign in and sign up pages. PNG, JPEG, WebP, or SVG, up to 250KB.",
+      "removeLogo": "Remove logo",
+      "noLogo": "No logo configured",
       "twoFactorTrustDays": "2FA trust interval (days)",
       "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
+      "twoFactorTrustDaysSystemDefault": "System default",
       "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server.",
       "requireTwoFactor": "Require two-factor authentication",
       "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue.",
+      "defaultOrg": "Default organization",
+      "defaultOrgHint": "New self-serve sign-ups on this app automatically join this org instead of founding a new one. Leave unset to let each sign-up create its own org.",
+      "defaultOrgNone": "None — sign-ups create a new org",
+      "defaultRole": "Default role",
+      "defaultRoleHint": "Automatically assigned to every self-serve sign-up on this app, whether they join the default org or found a new one.",
+      "defaultRoleNone": "None — no role assigned",
       "socialProviders": "Social sign-in",
       "socialProvidersHint": "Choose which social identity providers this app's login screen offers.",
+      "socialProvidersNone": "No social providers enabled",
       "socialProviderNames": {
         "google": "Google",
         "microsoft": "Microsoft",
         "apple": "Apple",
         "stub": "Test IdP"
-      }
+      },
+      "clientSecret": "Client secret",
+      "clientSecretHint": "Confidential clients (server-side apps) can exchange authorization codes without PKCE by authenticating with this secret. Public clients (SPAs, mobile apps) should not have one.",
+      "generateClientSecret": "Generate client secret",
+      "regenerateClientSecret": "Regenerate client secret",
+      "clientSecretWarning": "Copy this secret now — it will not be shown again.",
+      "clientSecretUpdatedAt": "Secret last rotated {date}",
+      "noClientSecret": "No client secret configured — this is a public client.",
+      "webhookUrl": "Webhook URL",
+      "webhookUrlHint": "The auth-server POSTs an account.activated event here whenever one of this app's users becomes active. Leave blank to disable delivery.",
+      "webhookUrlPlaceholder": "https://app.example.com/webhooks/sassy-auth",
+      "noWebhookUrl": "No webhook configured",
+      "webhookSecret": "Webhook secret",
+      "webhookSecretHint": "Used to sign webhook payloads (X-Sassy-Signature). Server-generated — save a webhook URL first, then generate a secret.",
+      "generateWebhookSecret": "Generate webhook secret",
+      "regenerateWebhookSecret": "Regenerate webhook secret",
+      "webhookSecretWarning": "Copy this secret now — it will not be shown again.",
+      "webhookSecretNeedsUrlHint": "Save a webhook URL before generating a secret.",
+      "webhookSecretConfigured": "A secret is configured.",
+      "noWebhookSecret": "No secret configured.",
+      "activationEmail": "Activation email",
+      "activationEmailHint": "Customize the email sent when a new sign-up needs to confirm their address. Placeholders '{{firstName}}' and '{{appName}}' are available in the subject and message.",
+      "activationEmailFromName": "From name",
+      "activationEmailFromNamePlaceholder": "e.g. Vibecast",
+      "activationEmailFromAddress": "From address",
+      "activationEmailFromAddressPlaceholder": "no-reply@yourapp.com",
+      "activationEmailFromAddressHint": "Must be on a domain verified with your email provider, or activation emails will silently fail to send.",
+      "activationEmailSubject": "Subject",
+      "activationEmailSubjectPlaceholder": "Verify your '{{appName}}' email address",
+      "activationEmailMessage": "Message",
+      "activationEmailMessagePlaceholder": "Confirm your email address to finish setting up your account:",
+      "activationEmailMessageHint": "Shown above the confirmation button, which is always added automatically.",
+      "passwordPolicy": "Password Policy",
+      "passwordPolicyOverrideToggle": "Override global password policy for this app",
+      "passwordPolicyInherited": "Inheriting the global policy: {summary}",
+      "passwordPolicyMinLength": "Minimum length",
+      "passwordPolicyRequireUppercase": "Require an uppercase letter",
+      "passwordPolicyRequireLowercase": "Require a lowercase letter",
+      "passwordPolicyRequireNumber": "Require a number",
+      "passwordPolicyRequireSpecial": "Require a special character",
+      "passwordPolicyMinNumbers": "Minimum numbers",
+      "passwordPolicyMinSpecial": "Minimum special characters"
     },
     "actions": {
       "view": "View",
@@ -88,7 +152,10 @@
       "generic": "Something went wrong. Please try again.",
       "urlInvalid": "Please enter a valid URL.",
       "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
-      "nameRequired": "App name is required."
+      "logoInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
+      "logoTooLarge": "That image is too large. Please choose one under 250KB.",
+      "nameRequired": "App name is required.",
+      "activationEmailInvalid": "Please check the activation email settings — the from address must be a valid email, and no field may contain a line break."
     },
     "badges": {
       "platform": "Platform"
@@ -359,6 +426,7 @@
     "status": {
       "active": "Active",
       "pending": "Pending",
+      "unverified": "Unverified",
       "inactive": "Inactive"
     },
     "noResults": "No users found.",
@@ -479,10 +547,13 @@
   "login": {
     "title": "Admin Console",
     "subtitle": "Sign in to continue",
+    "logoAlt": "Company logo",
     "email": "Email Address",
     "password": "Password",
     "submit": "Sign In",
     "forgotPassword": "Forgot password?",
+    "signupPrompt": "Don't have an account?",
+    "signupLink": "Sign up",
     "useCode": "Sign in with a code instead",
     "socialDivider": "or continue with",
     "socialGoogle": "Continue with Google",
@@ -504,6 +575,7 @@
     "error": {
       "invalidCredentials": "Invalid email or password.",
       "inactive": "This account has been deactivated.",
+      "unverified": "Please check your email and click the verification link before signing in.",
       "serverUnavailable": "Sign-in service is unavailable. Please try again in a moment.",
       "tooManyRequests": "Too many sign-in attempts. Please wait a minute and try again.",
       "invalidCode": "Invalid or expired code."
@@ -522,6 +594,48 @@
       "passwordTooShort": "Password must be at least 12 characters.",
       "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
       "genericError": "Something went wrong."
+    }
+  },
+  "signup": {
+    "title": "Create your account",
+    "titleWithApp": "Create your account with {appName}",
+    "subtitle": "Set up your organization to get started.",
+    "subtitleDefaultOrg": "Create your account to get started.",
+    "invalidLink": "This signup link has expired or is invalid. Contact the app you're signing up for to get a new one.",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "companyName": "Company Name",
+    "email": "Email Address",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "submit": "Create account",
+    "backToLogin": "Back to sign in",
+    "checkEmail": {
+      "title": "Check your email",
+      "subtitle": "We sent a verification link to {email}.",
+      "missingEmail": "We couldn't tell which address to check. Start the signup process again.",
+      "resendButton": "Resend email",
+      "resendCooldown": "Resend in {seconds}s",
+      "resendSent": "Verification email sent.",
+      "resendError": "We couldn't resend the email. Please try again in a moment.",
+      "backToLogin": "Back to sign in"
+    },
+    "verified": {
+      "title": "Email verified",
+      "subtitle": "Your account is ready. You can now sign in.",
+      "continueToLogin": "Continue to sign in"
+    },
+    "errors": {
+      "passwordMismatch": "Passwords do not match.",
+      "passwordTooShort": "Password must be at least 12 characters.",
+      "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",
+      "captchaRequired": "Please complete the captcha before submitting.",
+      "captchaFailed": "We couldn't verify you're not a robot. Please try the captcha again.",
+      "appNotFound": "We couldn't find the app for this signup link.",
+      "emailTaken": "An account with this email already exists.",
+      "tooManyRequests": "Too many attempts. Please wait a minute and try again.",
+      "serverUnavailable": "We could not reach the server. Please try again in a moment.",
+      "validationError": "We couldn't create your account. Please check your details and try again."
     }
   },
   "security": {
@@ -651,6 +765,17 @@
         "body": "You chose Apple's Hide My Email, so we received a relay address that doesn't match any invitation.",
         "hint": "Sign in with Apple again and choose \"Share My Email\"."
       }
+    }
+  },
+  "password": {
+    "rules": {
+      "minLength": "At least {count} characters",
+      "requireUppercase": "At least one uppercase letter",
+      "requireLowercase": "At least one lowercase letter",
+      "requireNumber": "At least one number",
+      "requireSpecial": "At least one special character",
+      "minNumbers": "At least {count} numbers",
+      "minSpecial": "At least {count} special characters"
     }
   }
 }
