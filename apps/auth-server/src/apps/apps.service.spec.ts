@@ -275,6 +275,30 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
   });
 
+  it('updateApp rejects an activationEmailOverride field containing a line break', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { subject: 'Hi\r\nBcc: attacker@evil.com' } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp rejects a malformed fromAddress', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { fromAddress: 'not-an-email' } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp accepts a well-formed fromAddress', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, activationEmailOverride: { fromAddress: 'no-reply@vibecast.io' } });
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { fromAddress: 'no-reply@vibecast.io' } }),
+    ).resolves.toBeDefined();
+  });
+
   it('getApp/listApps formatting defaults activationEmailOverride to null when absent', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, defaultOrg: null, defaultRole: null });
     const result = await service.getApp('ba-caller', 'sq_1');
