@@ -707,6 +707,25 @@ curl https://localhost:3010/api/token/oauth/userinfo \
 { "sub": "<userPublicId>", "email": "user@example.com", "email_verified": true }
 ```
 
+Every response always includes:
+
+| Claim    | Description                                                                 |
+| -------- | ----------------------------------------------------------------------------- |
+| `sub`    | The user's public ID, taken from the access token's own `sub` claim.          |
+| `status` | The user's current account status (e.g. `active`), read fresh from the database on every call — not cached in the token. |
+
+Before returning anything, the endpoint re-checks the user in the database and rejects with `401 invalid_grant` if the account is `inactive` or no longer exists — even if the access token itself hasn't expired yet.
+
+The rest of the claims are gated by the scopes granted at authorize time (`&scope=...`), mirrored from the same `buildScopedClaims` logic used for `id_token` issuance:
+
+| Scope granted | Additional claims returned                                    |
+| -------------- | --------------------------------------------------------------- |
+| `profile`      | `name`, `given_name`, `family_name`                            |
+| `email`        | `email`, `email_verified`                                       |
+| neither        | none — response is just `{ sub, status }`                       |
+
+Requesting `profile` and `email` together returns all five extra claims in one call.
+
 ---
 
 ## JWKS and Token Verification
