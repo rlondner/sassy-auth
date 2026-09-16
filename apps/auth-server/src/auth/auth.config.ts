@@ -366,10 +366,10 @@ export const auth = betterAuth({
         select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
       });
       const appName = saUser?.org.app.name ?? 'Sassy Auth';
-      // No write path validates this JSON column's shape yet (that lands with
-      // the admin-UI follow-up) — the cast is trusted on the strength of the
-      // DB being the only writer today, and verificationEmail()'s optional
-      // chaining degrades to defaults on any malformed/missing field.
+      // AppsService.assertValidActivationEmailOverride is the only write path
+      // and shape-checks every field, but this cast still isn't a runtime
+      // guarantee — verificationEmail()'s optional chaining degrades to
+      // defaults on any malformed/missing field regardless.
       const branding = (saUser?.org.app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
       await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url, appName, branding }) });
     },
