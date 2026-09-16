@@ -26,6 +26,11 @@ const REQUIRED_SECRET_ENV_VARS = [
 
 interface DeployTarget {
   githubEnvironment: string;
+  // Blueprint file this target's static env var values are read from. Production and
+  // staging live in separate Render accounts (each with its own RENDER_API_KEY, scoped
+  // per GitHub Environment), so each has its own blueprint file — a single file listing
+  // both would let a Blueprint apply in one account see the other account's services.
+  renderYamlFile: string;
   renderGroupName: string;
   authServerName: string;
   adminName: string;
@@ -38,12 +43,14 @@ interface DeployTarget {
 const DEPLOY_TARGETS: Record<string, DeployTarget> = {
   production: {
     githubEnvironment: 'production',
+    renderYamlFile: 'render.yaml',
     renderGroupName: 'sassy-auth-production',
     authServerName: 'sassy-auth-server',
     adminName: 'sassy-auth-admin',
   },
   staging: {
     githubEnvironment: 'staging',
+    renderYamlFile: 'render.staging.yaml',
     renderGroupName: 'sassy-auth-staging',
     authServerName: 'sassy-auth-server-staging',
     adminName: 'sassy-auth-admin-staging',
@@ -158,7 +165,7 @@ async function main(): Promise<void> {
 
   // Assumes execution via ts-node from src/ (the "deploy" script) — three levels up reaches the
   // repo root; would need adjustment if ever run from a compiled dist/ build.
-  const renderYamlPath = path.resolve(__dirname, '../../../render.yaml');
+  const renderYamlPath = path.resolve(__dirname, '../../../', target.renderYamlFile);
   const doc = parseRenderYaml(fs.readFileSync(renderYamlPath, 'utf8'));
   const groupValues = staticGroupValues(doc, target.renderGroupName);
 

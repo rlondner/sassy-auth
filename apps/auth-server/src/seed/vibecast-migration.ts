@@ -32,9 +32,16 @@ import { resolveSeedPassword } from './seed-password';
  *     fixtures, not part of the vibecast construct itself.
  *
  * Safe to re-run: every step is find-or-create, and admin.env in
- * production must supply the URL/redirect env vars below and a real
- * SEED_ADMIN_PASSWORD (resolveSeedPassword refuses its dev default
- * outside NODE_ENV=development/test).
+ * production must supply a real SEED_ADMIN_PASSWORD (resolveSeedPassword
+ * refuses its dev default outside NODE_ENV=development/test).
+ *
+ * The app's url and login/logout redirect URIs are seeded from
+ * VIBECAST_APP_URL/VIBECAST_LOGIN_REDIRECT_URI/VIBECAST_LOGOUT_REDIRECT_URI
+ * only the first time the SaApp is created. Once it exists, those fields
+ * are owned by the SaApp record itself (editable via the admin console) —
+ * the env vars are not read again on subsequent runs, so they're no longer
+ * required (or wired) in render.yaml for environments where vibecast has
+ * already been provisioned.
  */
 
 const sqids = new Sqids({
@@ -58,16 +65,6 @@ function requireEnvOutsideProd(name: string, devFallback: string): string {
   }
   return devFallback;
 }
-
-const APP_URL = requireEnvOutsideProd('VIBECAST_APP_URL', 'https://localhost:3030');
-const LOGIN_REDIRECT_URI = requireEnvOutsideProd(
-  'VIBECAST_LOGIN_REDIRECT_URI',
-  'https://localhost:3030/api/auth/callback',
-);
-const LOGOUT_REDIRECT_URI = requireEnvOutsideProd(
-  'VIBECAST_LOGOUT_REDIRECT_URI',
-  'https://localhost:3030/api/auth/signout',
-);
 
 const DEFAULT_ORG_NAME = 'VibeCast Default Org';
 const DEFAULT_ROLE_NAME = 'vibecast.org.member';
@@ -155,6 +152,7 @@ async function ensureApp() {
     console.log(`App already exists: ${APP_NAME} (publicId=${existing.publicId})`);
     return existing;
   }
+  const url = requireEnvOutsideProd('VIBECAST_APP_URL', 'https://localhost:3030');
   const app = await prisma.$transaction((tx) =>
     createWithPublicId(
       () =>
@@ -162,7 +160,7 @@ async function ensureApp() {
           data: {
             publicId: generatePendingPublicId(),
             name: APP_NAME,
-            url: APP_URL,
+            url,
             isPlatform: false,
             requireTwoFactor: false,
           },
@@ -174,9 +172,17 @@ async function ensureApp() {
   return app;
 }
 
-async function ensureRedirectUri(appId: number, uri: string, kind: 'login' | 'post_logout') {
-  const existing = await prisma.saAppRedirectUri.findFirst({ where: { appId, uri, kind } });
+/**
+ * Ensures at least one redirect URI of this kind exists. Keyed on `kind`
+ * alone (not the URI value) — once one exists, it's owned by the SaApp
+ * record (editable via the admin console), so a re-run must not re-add the
+ * env var's value as a duplicate if an admin has since changed it.
+ */
+async function ensureRedirectUri(appId: number, kind: 'login' | 'post_logout', devFallback: string) {
+  const existing = await prisma.saAppRedirectUri.findFirst({ where: { appId, kind } });
   if (existing) return;
+  const envName = kind === 'login' ? 'VIBECAST_LOGIN_REDIRECT_URI' : 'VIBECAST_LOGOUT_REDIRECT_URI';
+  const uri = requireEnvOutsideProd(envName, devFallback);
   await prisma.saAppRedirectUri.create({ data: { appId, uri, kind } });
   console.log(`Added ${kind} redirect URI: ${uri}`);
 }
@@ -317,8 +323,8 @@ async function main() {
   console.log('Provisioning vibecast...');
 
   const app = await ensureApp();
-  await ensureRedirectUri(app.id, LOGIN_REDIRECT_URI, 'login');
-  await ensureRedirectUri(app.id, LOGOUT_REDIRECT_URI, 'post_logout');
+  await ensureRedirectUri(app.id, 'login', 'https://localhost:3030/api/auth/callback');
+  await ensureRedirectUri(app.id, 'post_logout', 'https://localhost:3030/api/auth/signout');
 
   const org = await ensureOrg(app.id);
   const permIdByName = await ensurePermissions(app.id);
