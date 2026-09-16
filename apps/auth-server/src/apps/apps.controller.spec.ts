@@ -12,6 +12,7 @@ const mockAppsService = {
   updateApp: jest.fn(),
   deleteApp: jest.fn(),
   rotateClientSecret: jest.fn(),
+  rotateWebhookSecret: jest.fn(),
 };
 
 function makeReq(baUserId = 'ba-caller') {
@@ -73,6 +74,15 @@ describe('AppsController', () => {
       const result = await controller.rotateClientSecret(makeReq('ba-5'), 'sq_1');
       expect(mockAppsService.rotateClientSecret).toHaveBeenCalledWith('ba-5', 'sq_1');
       expect(result).toEqual({ clientSecret: 'plaintext-secret' });
+    });
+  });
+
+  describe('rotateWebhookSecret', () => {
+    it('forwards caller id and publicId to AppsService.rotateWebhookSecret', async () => {
+      mockAppsService.rotateWebhookSecret.mockResolvedValue({ webhookSecret: 'plaintext-secret' });
+      const result = await controller.rotateWebhookSecret(makeReq('ba-6'), 'sq_1');
+      expect(mockAppsService.rotateWebhookSecret).toHaveBeenCalledWith('ba-6', 'sq_1');
+      expect(result).toEqual({ webhookSecret: 'plaintext-secret' });
     });
   });
 });

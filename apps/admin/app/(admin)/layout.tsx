@@ -5,7 +5,7 @@ import { AdminShell } from '@/components/admin-shell'
 import { getMyPermissions, getMyProfile } from '@/lib/api'
 import { getAvailableLocales, getLocale } from '@/lib/locale'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 async function getSession() {
   const cookieStore = await cookies()

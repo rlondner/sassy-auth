@@ -413,7 +413,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 const CI_TESTS = process.env.CI_TESTS === 'true'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
-const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export default defineConfig({
   testDir: './tests',
@@ -498,7 +498,7 @@ This task requires both apps and Postgres running. In separate terminals:
 pnpm dev
 ```
 
-Confirm `http://localhost:3000/api/token/jwks` and `http://localhost:3001/login` both respond (browser or `curl`).
+Confirm `https://localhost:3010/api/token/jwks` and `http://localhost:3001/login` both respond (browser or `curl`).
 
 If you have not seeded the DB on this checkout yet:
 
@@ -617,7 +617,7 @@ Expected error message (verbatim text):
 Login flow rendered an error to the user instead of redirecting: "Invalid email or password."
 ```
 
-Open the report and confirm `network.log` contains a line like `401 POST http://localhost:3000/api/auth/sign-in/email`.
+Open the report and confirm `network.log` contains a line like `401 POST https://localhost:3010/api/auth/sign-in/email`.
 
 Then REVERT the password by Editing the file back:
 
@@ -978,9 +978,9 @@ jobs:
     env:
       CI_TESTS: 'true'
       DATABASE_URL: postgresql://sassy:sassy@localhost:5432/sassy_e2e
-      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_URL: https://localhost:3010
       BETTER_AUTH_SECRET: test-secret-at-least-32-chars-long!!
-      AUTH_SERVER_URL: http://localhost:3000
+      AUTH_SERVER_URL: https://localhost:3010
       ADMIN_URL: http://localhost:3001
       NODE_ENV: test
 

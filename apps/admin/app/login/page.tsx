@@ -4,19 +4,19 @@ import { validateNextUrl } from '@/lib/safe-next'
 import { fetchSocialProviders } from '@/lib/social-providers'
 import { LoginForm } from './login-form'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 // The origin the BROWSER uses to reach the auth server, for social sign-in
 // redirects. This is deliberately separate from AUTH_SERVER_URL: that variable
 // is the origin the SERVER (this Next.js process) uses to reach the auth
 // server, which in containerised deployments is often an internal hostname
-// (e.g. a docker-network name like `http://auth-server:3000`) that a
+// (e.g. a docker-network name like `http://auth-server:3010`) that a
 // browser on the operator's network cannot resolve. PUBLIC_AUTH_SERVER_URL
 // lets operators state the publicly reachable origin separately when the two
 // differ. Do NOT collapse these into one variable — that "simplification"
 // breaks any deployment where the admin console and auth server talk to each
 // other over an internal network but the browser needs the public one.
-const PUBLIC_AUTH_SERVER = process.env.PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const PUBLIC_AUTH_SERVER = process.env.PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +57,7 @@ export default async function LoginPage({
     redirect(nextSafe)
   }
 
-  const providers = await fetchSocialProviders(nextSafe ?? '')
+  const { providers, logo } = await fetchSocialProviders(nextSafe ?? '')
 
-  return <LoginForm next={nextSafe ?? ''} providers={providers} authServerUrl={PUBLIC_AUTH_SERVER} />
+  return <LoginForm next={nextSafe ?? ''} providers={providers} logo={logo} authServerUrl={PUBLIC_AUTH_SERVER} />
 }

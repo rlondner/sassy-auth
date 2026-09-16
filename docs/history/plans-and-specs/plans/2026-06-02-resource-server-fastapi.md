@@ -4,7 +4,7 @@
 
 **Goal:** Add a Python/FastAPI resource server (`apps/resource-server-fastapi/`, port 8010, exposed via ngrok at `https://cheryl-crescentlike-monte.ngrok-free.dev`) that authenticates users against SassyAuth using OAuth 2.0 authorization-code with PKCE (S256), verifies the issued JWT via JWKS, and gates a dummy `/api/properties` endpoint on the `rs.properties.create` scope.
 
-**Architecture:** Three apps participate. The browser hits the FastAPI RS; Sign In redirects to the admin (`localhost:3001`) login page with a validated `next=` URL pointing at the auth-server (`localhost:3000`) `/api/token/oauth/authorize`. After BetterAuth login, the browser follows `next` to the auth-server which mints a PKCE-bound authorization code and bounces back to the RS `/auth/callback`. The RS exchanges the code (with `code_verifier`) for an RS256 JWT and embeds it into a page that stashes it in `sessionStorage` and tests the protected endpoint via `Authorization: Bearer`. The JWT's `scope` claim (space-separated permissions) is what `/api/properties` checks.
+**Architecture:** Three apps participate. The browser hits the FastAPI RS; Sign In redirects to the admin (`localhost:3001`) login page with a validated `next=` URL pointing at the auth-server (`localhost:3010`) `/api/token/oauth/authorize`. After BetterAuth login, the browser follows `next` to the auth-server which mints a PKCE-bound authorization code and bounces back to the RS `/auth/callback`. The RS exchanges the code (with `code_verifier`) for an RS256 JWT and embeds it into a page that stashes it in `sessionStorage` and tests the protected endpoint via `Authorization: Bearer`. The JWT's `scope` claim (space-separated permissions) is what `/api/properties` checks.
 
 **Tech Stack:** Node + NestJS + BetterAuth + Prisma (auth-server). Next.js (admin). Python 3.11 + FastAPI + uvicorn + httpx + PyJWT[crypto] + pydantic-settings + Jinja2 (RS). pytest for RS, Jest for auth-server and admin.
 
@@ -1106,7 +1106,7 @@ describe('validateNextUrl', () => {
   beforeEach(() => {
     process.env = {
       ...ORIGINAL_ENV,
-      AUTH_SERVER_URL: 'http://localhost:3000',
+      AUTH_SERVER_URL: 'https://localhost:3010',
       LOGIN_NEXT_ALLOWED_ORIGINS: '',
     }
   })
@@ -1135,7 +1135,7 @@ describe('validateNextUrl', () => {
   })
 
   it('accepts absolute URLs with allowed origin', () => {
-    const url = 'http://localhost:3000/api/token/oauth/authorize?client_id=x'
+    const url = 'https://localhost:3010/api/token/oauth/authorize?client_id=x'
     expect(validateNextUrl(url)).toBe(url)
   })
 
@@ -1145,7 +1145,7 @@ describe('validateNextUrl', () => {
 
   it('rejects userinfo URLs', () => {
     expect(
-      validateNextUrl('http://attacker@localhost:3000/api/token/oauth/authorize'),
+      validateNextUrl('http://attacker@localhost:3010/api/token/oauth/authorize'),
     ).toBeNull()
   })
 
@@ -1176,7 +1176,7 @@ Expected: FAIL — `safe-next` not found.
 
 ```typescript
 function allowlist(): string[] {
-  const base = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+  const base = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
   const extra = (process.env.LOGIN_NEXT_ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -1414,7 +1414,7 @@ asyncio_mode = "auto"
 
 ```bash
 # Auth server (NestJS) and admin UI (Next.js).
-AUTH_SERVER_URL=http://localhost:3000
+AUTH_SERVER_URL=https://localhost:3010
 ADMIN_URL=http://localhost:3001
 
 # sa_app.publicId for resourceserver01 in your local DB.
@@ -1425,7 +1425,7 @@ RS_BASE_URL=https://cheryl-crescentlike-monte.ngrok-free.dev
 REDIRECT_URI=https://cheryl-crescentlike-monte.ngrok-free.dev/auth/callback
 
 # JWT validation defaults to AUTH_SERVER_URL / SASSY_CLIENT_ID; override if needed.
-# EXPECTED_ISSUER=http://localhost:3000
+# EXPECTED_ISSUER=https://localhost:3010
 # EXPECTED_AUDIENCE=84LR
 
 PKCE_STATE_TTL_SECONDS=600
@@ -1459,7 +1459,7 @@ cp .env.example .env  # set SASSY_CLIENT_ID etc.
 uv run uvicorn app.main:app --port 8010 --reload
 ```
 
-Requires the auth-server (`localhost:3000`) and admin (`localhost:3001`) to be
+Requires the auth-server (`localhost:3010`) and admin (`localhost:3001`) to be
 running, and the demo seed (`SEED_DEMO=1 pnpm --filter @sassy-auth/auth-server seed`)
 to have populated `resourceserver01` + the two demo users.
 
@@ -1519,7 +1519,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    AUTH_SERVER_URL: str = "http://localhost:3000"
+    AUTH_SERVER_URL: str = "https://localhost:3010"
     ADMIN_URL: str = "http://localhost:3001"
     SASSY_CLIENT_ID: str
     RS_BASE_URL: str
@@ -1700,7 +1700,7 @@ def _stub_pyjwk(monkeypatch, pub_pem: str):
 def _claims(**overrides):
     now = int(time.time())
     base = {
-        "iss": "http://localhost:3000",
+        "iss": "https://localhost:3010",
         "sub": "user-1",
         "aud": "84LR",
         "iat": now,
@@ -2044,7 +2044,7 @@ def _mint(priv: str, scope: str) -> str:
     now = int(time.time())
     return jwt.encode(
         {
-            "iss": "http://localhost:3000",
+            "iss": "https://localhost:3010",
             "sub": "user-1",
             "aud": "84LR",
             "iat": now,
@@ -2430,7 +2430,7 @@ git commit -m "feat(rs): FastAPI app with PKCE, JWKS verification, /api/properti
 In three terminals (or one tmux session):
 
 ```bash
-# Terminal 1 — auth-server (port 3000)
+# Terminal 1 — auth-server (port 3010)
 pnpm --filter @sassy-auth/auth-server dev
 
 # Terminal 2 — admin (port 3001)
@@ -2470,11 +2470,11 @@ Expected: completes cleanly; `[demo] Done.` Existing rows untouched.
 
 1. After step 3, edit `sessionStorage.sa_access_token` (flip one char), reload → `Unauthorized`, network shows `401`.
 2. Trigger a callback with a mutated code: copy a fresh authorize URL, intercept the redirect, modify the `code=` param → token endpoint returns `401 invalid_grant`, FastAPI shows the error page.
-3. Direct hit: `curl -i "http://localhost:3000/api/token/oauth/authorize?client_id=84LR&redirect_uri=https://evil.example.com/cb&code_challenge=abc&code_challenge_method=S256"` → `400 invalid_redirect_uri`.
+3. Direct hit: `curl -i "https://localhost:3010/api/token/oauth/authorize?client_id=84LR&redirect_uri=https://evil.example.com/cb&code_challenge=abc&code_challenge_method=S256"` → `400 invalid_redirect_uri`.
 
 - [ ] **Step 6: Cookie share confirmation**
 
-After step 3, navigate directly to `http://localhost:3001/users` in a new tab. Should land logged in. (Confirms the BetterAuth cookie set on `localhost:3001` is sent to `localhost:3000`, validating the architecture's load-bearing assumption.)
+After step 3, navigate directly to `http://localhost:3001/users` in a new tab. Should land logged in. (Confirms the BetterAuth cookie set on `localhost:3001` is sent to `localhost:3010`, validating the architecture's load-bearing assumption.)
 
 - [ ] **Step 7: Sign off**
 

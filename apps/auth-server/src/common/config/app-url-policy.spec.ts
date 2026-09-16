@@ -31,15 +31,31 @@ describe('app-url-policy', () => {
       expect(isAppUrlAllowed('http://app.example.com')).toBe(false);
     });
     it('rejects localhost and *.localhost', () => {
-      expect(isAppUrlAllowed('https://localhost:3000')).toBe(false);
+      expect(isAppUrlAllowed('https://localhost:3010')).toBe(false);
       expect(isAppUrlAllowed('https://api.localhost')).toBe(false);
     });
     it('rejects loopback IPs', () => {
-      expect(isAppUrlAllowed('https://127.0.0.1:3000')).toBe(false);
-      expect(isAppUrlAllowed('http://[::1]:3000')).toBe(false);
+      expect(isAppUrlAllowed('https://127.0.0.1:3010')).toBe(false);
+      expect(isAppUrlAllowed('http://[::1]:3010')).toBe(false);
     });
     it('rejects bare host with no dot', () => {
       expect(isAppUrlAllowed('https://intranet')).toBe(false);
+    });
+    it('rejects private/link-local/cloud-metadata IPv4 literals', () => {
+      expect(isAppUrlAllowed('https://169.254.169.254/latest/meta-data/')).toBe(false); // cloud metadata
+      expect(isAppUrlAllowed('https://10.0.4.12:8080/admin')).toBe(false); // RFC 1918
+      expect(isAppUrlAllowed('https://172.16.0.5')).toBe(false); // RFC 1918
+      expect(isAppUrlAllowed('https://192.168.1.1')).toBe(false); // RFC 1918
+      expect(isAppUrlAllowed('https://100.64.0.1')).toBe(false); // CGNAT
+      expect(isAppUrlAllowed('https://0.0.0.0')).toBe(false);
+    });
+    it('rejects private/link-local IPv6 literals', () => {
+      expect(isAppUrlAllowed('https://[fe80::1]')).toBe(false);
+      expect(isAppUrlAllowed('https://[fd00::1]')).toBe(false);
+    });
+    it('still accepts public IPv4/host addresses that merely start with a private-looking octet', () => {
+      expect(isAppUrlAllowed('https://172.32.0.1')).toBe(true); // outside 172.16.0.0/12
+      expect(isAppUrlAllowed('https://198.51.100.5')).toBe(true); // public example range
     });
     it('rejects non-string, empty, and malformed', () => {
       expect(isAppUrlAllowed(undefined)).toBe(false);
@@ -52,7 +68,7 @@ describe('app-url-policy', () => {
   describe('isAppUrlAllowed (insecure mode)', () => {
     beforeEach(() => { process.env.SASSY_AUTH_ALLOW_INSECURE_APP_URLS = 'true'; });
     it('accepts http localhost', () => {
-      expect(isAppUrlAllowed('http://localhost:3000/cb')).toBe(true);
+      expect(isAppUrlAllowed('https://localhost:3010/cb')).toBe(true);
     });
     it('accepts loopback IP', () => {
       expect(isAppUrlAllowed('http://127.0.0.1:8080')).toBe(true);

@@ -12,7 +12,7 @@ import type { App } from '@/lib/types'
 import { PermissionRowsEditor, type PermOption } from './role-permission-rows-editor'
 
 interface Props {
-  apps: App[]
+  apps: Pick<App, 'publicId' | 'name'>[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void

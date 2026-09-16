@@ -8,7 +8,7 @@ import { expect, type APIRequestContext } from '@playwright/test'
  * and the admin's session-aware /login.
  */
 
-export const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+export const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 export const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 
 export function s256(verifier: string): string {

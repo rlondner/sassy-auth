@@ -28,7 +28,7 @@ why Apple's secret has no static env var — see
   {BETTER_AUTH_URL}/api/auth/callback/{provider}
   ```
 
-  e.g. `http://localhost:3000/api/auth/callback/google` in local development,
+  e.g. `https://localhost:3010/api/auth/callback/google` in local development,
   or `https://auth.example.com/api/auth/callback/microsoft` in production.
   Register exactly this URL with each provider's console.
 
@@ -52,7 +52,7 @@ Free — no paid account required.
    status, no Google verification review is required.
 4. Add the redirect URI: `{BETTER_AUTH_URL}/api/auth/callback/google` — for
    local development, plain-HTTP `localhost` is permitted
-   (`http://localhost:3000/api/auth/callback/google`).
+   (`https://localhost:3010/api/auth/callback/google`).
 
 | Console value  | Env var                |
 |----------------|-------------------------|
@@ -66,7 +66,7 @@ Free — no paid account required.
 1. Entra admin center → **App registrations → New registration**.
 2. Platform type **Web**, redirect URI
    `{BETTER_AUTH_URL}/api/auth/callback/microsoft` (e.g.
-   `http://localhost:3000/api/auth/callback/microsoft` locally).
+   `https://localhost:3010/api/auth/callback/microsoft` locally).
 3. **Certificates & secrets → New client secret**. Secrets expire (max
    24-month lifetime) — record the expiry date, since there is no automatic
    renewal for this one (unlike Apple's, which SassyAuth generates itself).

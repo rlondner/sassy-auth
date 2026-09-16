@@ -329,7 +329,7 @@ In one terminal:
 pnpm --filter @sassy-auth/auth-server start
 ```
 
-Wait for `Auth server listening on port 3000` in the log.
+Wait for `Auth server listening on port 3010` in the log.
 
 - [ ] **Step 4.2: Verify all 5 admins can sign in (acceptance #1)**
 
@@ -339,7 +339,7 @@ In a second terminal, run:
 for email in u@sa.io o@sa.io a@sa.io p@sa.io s@sa.io; do
   echo -n "$email -> "
   curl -s -o /dev/null -w '%{http_code}\n' \
-    -X POST http://localhost:3000/api/auth/sign-in/email \
+    -X POST https://localhost:3010/api/auth/sign-in/email \
     -H 'Content-Type: application/json' \
     -d "{\"email\":\"$email\",\"password\":\"Pass@word1234\"}"
 done
@@ -357,7 +357,7 @@ Convenience script — run from the repo root, requires `jq`:
 # Sign in as the super admin to get a session cookie
 COOKIE_JAR=$(mktemp)
 curl -s -c "$COOKIE_JAR" \
-  -X POST http://localhost:3000/api/auth/sign-in/email \
+  -X POST https://localhost:3010/api/auth/sign-in/email \
   -H 'Content-Type: application/json' \
   -d '{"email":"s@sa.io","password":"Pass@word1234"}' > /dev/null
 
@@ -367,7 +367,7 @@ for email in u@sa.io o@sa.io a@sa.io p@sa.io s@sa.io; do
     "SELECT s.\"publicId\" FROM \"SaUser\" s JOIN \"User\" u ON u.id = s.\"betterAuthUserId\" WHERE u.email = '$email';")
   echo -n "$email ($PUBLIC_ID) -> "
   curl -s -b "$COOKIE_JAR" \
-    "http://localhost:3000/api/users/$PUBLIC_ID/effective-permissions" | jq -c '.permissions'
+    "https://localhost:3010/api/users/$PUBLIC_ID/effective-permissions" | jq -c '.permissions'
 done
 rm "$COOKIE_JAR"
 ```

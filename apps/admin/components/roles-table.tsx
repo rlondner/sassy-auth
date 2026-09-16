@@ -20,7 +20,7 @@ import { PageHeader } from './page-header'
 
 interface Props {
   initial: ListRolesResponse
-  apps: App[]
+  apps: Pick<App, 'publicId' | 'name'>[]
   canWrite?: boolean
   canPickApp?: boolean
 }

@@ -27,7 +27,7 @@ describe('validateInvitation', () => {
     const result = await validateInvitation('plain-token')
 
     expect(result).toEqual(info)
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3000/api/invitations/plain-token')
+    expect(fetchMock).toHaveBeenCalledWith('https://localhost:3010/api/invitations/plain-token')
   })
 
   it('percent-encodes a token containing a slash so the request cannot traverse to a different endpoint', async () => {
@@ -37,7 +37,7 @@ describe('validateInvitation', () => {
     await validateInvitation('abc/../accept')
 
     const calledUrl = fetchMock.mock.calls[0][0] as string
-    expect(calledUrl).toBe('http://localhost:3000/api/invitations/abc%2F..%2Faccept')
+    expect(calledUrl).toBe('https://localhost:3010/api/invitations/abc%2F..%2Faccept')
   })
 
   it('does not include the token value in the thrown error on a non-ok response', async () => {
@@ -65,7 +65,7 @@ describe('acceptInvitation', () => {
     await expect(acceptInvitation('plain-token', 'hunter2')).resolves.toBeUndefined()
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3000/api/invitations/plain-token/accept',
+      'https://localhost:3010/api/invitations/plain-token/accept',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,7 +81,7 @@ describe('acceptInvitation', () => {
     await acceptInvitation('abc/../accept', 'pw')
 
     const calledUrl = fetchMock.mock.calls[0][0] as string
-    expect(calledUrl).toBe('http://localhost:3000/api/invitations/abc%2F..%2Faccept/accept')
+    expect(calledUrl).toBe('https://localhost:3010/api/invitations/abc%2F..%2Faccept/accept')
   })
 
   it('does not include the token value in the thrown error on a non-ok response', async () => {

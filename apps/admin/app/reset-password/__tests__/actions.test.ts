@@ -64,7 +64,7 @@ describe('resetPasswordSubmitAction', () => {
 
     const [url, init] = (global.fetch as jest.MockedFunction<typeof fetch>).mock
       .calls[0] as [string, RequestInit]
-    expect(url).toBe('http://localhost:3000/api/auth/reset-password')
+    expect(url).toBe('https://localhost:3010/api/auth/reset-password')
     expect(JSON.parse(init.body as string)).toEqual({
       token: 'tok',
       newPassword: 'Str0ngPassw0rd!',
@@ -148,7 +148,7 @@ describe('requestPasswordResetAction', () => {
 
     const [url, init] = (global.fetch as jest.MockedFunction<typeof fetch>).mock
       .calls[0] as [string, RequestInit]
-    expect(url).toBe('http://localhost:3000/api/auth/request-password-reset')
+    expect(url).toBe('https://localhost:3010/api/auth/request-password-reset')
     expect(JSON.parse(init.body as string)).toEqual({
       email: 'a@b.io',
       redirectTo: 'http://localhost:3001/reset-password',

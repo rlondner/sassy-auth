@@ -32,7 +32,7 @@ describe('buildOAuthAuthorizationServerMetadata', () => {
   });
 
   it('advertises the OAuth capabilities the auth-server actually implements', () => {
-    const doc = buildOAuthAuthorizationServerMetadata('http://localhost:3000');
+    const doc = buildOAuthAuthorizationServerMetadata('https://localhost:3010');
     expect(doc.response_types_supported).toEqual(['code']);
     expect(doc.grant_types_supported).toEqual(['authorization_code']);
     expect(doc.code_challenge_methods_supported).toEqual(['S256']);
@@ -42,15 +42,15 @@ describe('buildOAuthAuthorizationServerMetadata', () => {
   });
 
   it('handles a localhost issuer with a non-default port', () => {
-    const doc = buildOAuthAuthorizationServerMetadata('http://localhost:3000');
-    expect(doc.issuer).toBe('http://localhost:3000');
-    expect(doc.authorization_endpoint).toBe('http://localhost:3000/api/token/oauth/authorize');
-    expect(doc.token_endpoint).toBe('http://localhost:3000/api/token/oauth/token');
-    expect(doc.jwks_uri).toBe('http://localhost:3000/api/token/jwks');
+    const doc = buildOAuthAuthorizationServerMetadata('https://localhost:3010');
+    expect(doc.issuer).toBe('https://localhost:3010');
+    expect(doc.authorization_endpoint).toBe('https://localhost:3010/api/token/oauth/authorize');
+    expect(doc.token_endpoint).toBe('https://localhost:3010/api/token/oauth/token');
+    expect(doc.jwks_uri).toBe('https://localhost:3010/api/token/jwks');
   });
 
   it('produces only the fields documented in the OAuthAuthorizationServerMetadata interface', () => {
-    const doc = buildOAuthAuthorizationServerMetadata('http://localhost:3000');
+    const doc = buildOAuthAuthorizationServerMetadata('https://localhost:3010');
     expect(Object.keys(doc).sort()).toEqual(
       [
         'authorization_endpoint',
@@ -67,15 +67,15 @@ describe('buildOAuthAuthorizationServerMetadata', () => {
 });
 
 describe('buildOpenIdConfiguration', () => {
-  const doc = buildOpenIdConfiguration('http://localhost:3000');
+  const doc = buildOpenIdConfiguration('https://localhost:3010');
 
   it('advertises the OIDC endpoints under the API prefix', () => {
-    expect(doc.issuer).toBe('http://localhost:3000');
-    expect(doc.authorization_endpoint).toBe('http://localhost:3000/api/token/oauth/authorize');
-    expect(doc.token_endpoint).toBe('http://localhost:3000/api/token/oauth/token');
-    expect(doc.userinfo_endpoint).toBe('http://localhost:3000/api/token/oauth/userinfo');
-    expect(doc.end_session_endpoint).toBe('http://localhost:3000/api/token/oauth/logout');
-    expect(doc.jwks_uri).toBe('http://localhost:3000/api/token/jwks');
+    expect(doc.issuer).toBe('https://localhost:3010');
+    expect(doc.authorization_endpoint).toBe('https://localhost:3010/api/token/oauth/authorize');
+    expect(doc.token_endpoint).toBe('https://localhost:3010/api/token/oauth/token');
+    expect(doc.userinfo_endpoint).toBe('https://localhost:3010/api/token/oauth/userinfo');
+    expect(doc.end_session_endpoint).toBe('https://localhost:3010/api/token/oauth/logout');
+    expect(doc.jwks_uri).toBe('https://localhost:3010/api/token/jwks');
   });
 
   it('advertises the supported OIDC capabilities', () => {
@@ -96,7 +96,7 @@ describe('buildOpenIdConfiguration', () => {
   });
 
   it('shares endpoint URLs with the RFC 8414 document', () => {
-    const oauthDoc = buildOAuthAuthorizationServerMetadata('http://localhost:3000');
+    const oauthDoc = buildOAuthAuthorizationServerMetadata('https://localhost:3010');
     expect(doc.authorization_endpoint).toBe(oauthDoc.authorization_endpoint);
     expect(doc.token_endpoint).toBe(oauthDoc.token_endpoint);
     expect(doc.jwks_uri).toBe(oauthDoc.jwks_uri);
