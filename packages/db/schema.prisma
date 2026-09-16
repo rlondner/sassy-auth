@@ -135,7 +135,8 @@ model SaApp {
   // must be able to read it back.
   webhookUrl    String?
   webhookSecret String?
-  /// Complete ActivationEmailBranding JSON override (see @sassy-auth/types).
+  /// Partial ActivationEmailBranding JSON override (see @sassy-auth/types).
+  /// Unlike passwordPolicyOverride, this is field-level, not all-or-nothing:
   /// null, or any field omitted within it, means "use the platform default"
   /// for that field.
   activationEmailOverride Json?
