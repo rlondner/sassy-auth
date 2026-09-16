@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { isRedirectSentinel } from '@/lib/redirect-sentinel'
-import { createApp, updateApp, deleteApp, getApp, getApps, getSocialProviderSettings, setSocialProviders, rotateClientSecret } from '@/lib/api'
+import { createApp, updateApp, deleteApp, getApp, getApps, getSocialProviderSettings, setSocialProviders, rotateClientSecret, rotateWebhookSecret } from '@/lib/api'
 import type {
   App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse,
 } from '@/lib/types'
@@ -102,6 +102,21 @@ export async function rotateClientSecretAction(
 ): Promise<{ clientSecret: string } | ErrorResult> {
   try {
     const result = await rotateClientSecret(publicId)
+    revalidatePath('/apps')
+    return result
+  } catch (err) {
+    if (isRedirectSentinel(err)) throw err
+    return { errorKey: mapError(err instanceof Error ? err.message : '', 'update') }
+  }
+}
+
+// Used by the edit drawer's "Generate webhook secret" button — same
+// one-time-reveal pattern as rotateClientSecretAction above.
+export async function rotateWebhookSecretAction(
+  publicId: string,
+): Promise<{ webhookSecret: string } | ErrorResult> {
+  try {
+    const result = await rotateWebhookSecret(publicId)
     revalidatePath('/apps')
     return result
   } catch (err) {

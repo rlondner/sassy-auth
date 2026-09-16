@@ -486,7 +486,18 @@ export class TokenController {
     // The code was issued at /authorize time when the user was active, but they
     // could have been deactivated between /authorize and /token. Re-check here
     // so a mid-flow status change is honored.
-    if (saUser.status !== 'active') {
+    //
+    // Exception: a signup-flow code (amr=['signup'], minted directly by
+    // RegistrationService rather than through an authenticated /authorize
+    // request) is allowed to redeem for a still-pending/unverified account,
+    // so a freshly-registered user gets a working token before email
+    // verification. It still can't redeem for a since-disabled account.
+    const isSignupCode = exchangedAmr.includes('signup');
+    if (isSignupCode) {
+      if (saUser.status === 'inactive') {
+        throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+      }
+    } else if (saUser.status !== 'active') {
       throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
     }
 
@@ -814,12 +825,12 @@ export class TokenController {
     }
 
     const saUser = await prisma.saUser.findFirst({ where: { publicId: claims.sub } });
-    if (!saUser || saUser.status !== 'active') {
+    if (!saUser || saUser.status === 'inactive') {
       throw new UnauthorizedException(TokenErrorCode.USER_NOT_FOUND);
     }
 
     const scoped = await this.tokenService.buildScopedClaims(saUser.id, claims.scope ?? '');
-    return { sub: claims.sub, ...scoped };
+    return { sub: claims.sub, status: saUser.status, ...scoped };
   }
 
   /**
@@ -836,11 +847,64 @@ export class TokenController {
     @Query('post_logout_redirect_uri') postLogoutRedirectUri: string = '',
     @Query('state') state: string = '',
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.handleOauthLogout(idTokenHint, postLogoutRedirectUri, state, req, res);
+  }
+
+  /**
+   * POST /api/token/oauth/logout — same as above, for relying parties that
+   * POST a form-urlencoded body to the end_session_endpoint instead of
+   * following the spec's front-channel GET redirect. Not spec-mandated, but
+   * cheap to accept defensively since real-world OIDC client libraries vary.
+   */
+  @Post(OAUTH_LOGOUT_ROUTE)
+  @Redirect()
+  async oauthLogoutPost(
+    @Query('id_token_hint') idTokenHintQuery: string = '',
+    @Query('post_logout_redirect_uri') postLogoutRedirectUriQuery: string = '',
+    @Query('state') stateQuery: string = '',
+    @Body('id_token_hint') idTokenHintBody: string = '',
+    @Body('post_logout_redirect_uri') postLogoutRedirectUriBody: string = '',
+    @Body('state') stateBody: string = '',
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.handleOauthLogout(
+      idTokenHintQuery || idTokenHintBody,
+      postLogoutRedirectUriQuery || postLogoutRedirectUriBody,
+      stateQuery || stateBody,
+      req,
+      res,
+    );
+  }
+
+  private async handleOauthLogout(
+    idTokenHint: string,
+    postLogoutRedirectUri: string,
+    state: string,
+    req: Request,
+    res: Response,
   ) {
     // Terminate first, unconditionally. A failure to validate the hint must
     // never leave the user still signed in.
+    //
+    // `asResponse: true` is required, not cosmetic: called this way (as a
+    // server-side function rather than through the mounted route handler),
+    // better-auth's default return is the parsed JSON body only — the
+    // Set-Cookie header that actually clears `better-auth.session_token` in
+    // the browser is otherwise discarded. Without forwarding it onto `res`,
+    // this endpoint redirects with a 302 but never signs the browser out:
+    // the next navigation to the login page still carries a live session
+    // cookie and silently re-authenticates instead of showing the form.
     try {
-      await auth.api.signOut({ headers: fromNodeHeaders(req.headers) });
+      const signOutResponse = await auth.api.signOut({
+        headers: fromNodeHeaders(req.headers),
+        asResponse: true,
+      });
+      const setCookie = signOutResponse.headers.getSetCookie?.()
+        ?? signOutResponse.headers.get('set-cookie')?.split(/,(?=[^;]+?=)/);
+      if (setCookie?.length) res.setHeader('set-cookie', setCookie);
     } catch {
       // Already signed out, or no session — logout is idempotent.
     }

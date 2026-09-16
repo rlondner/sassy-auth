@@ -19,6 +19,7 @@ import { auth } from '../auth/auth.config';
 import { runWithResetUrlCapture } from '../auth/reset-url-context';
 import { EmailService } from '../email/email.service';
 import { invitationEmail } from '../email/templates/invitation.template';
+import { notifyActivation } from '../activation/notify-activation';
 
 const USER_INCLUDE = {
   betterAuthUser: { select: { email: true } },
@@ -344,6 +345,12 @@ export class UsersService {
     // everywhere at once (blocking new logins/tokens is enforced elsewhere).
     if (dto.status === 'inactive') {
       await prisma.session.deleteMany({ where: { userId: existing.betterAuthUserId } });
+    }
+
+    // Only fire the activation webhook on a genuine transition into 'active'
+    // — guard against re-firing on a no-op re-save of an already-active user.
+    if (dto.status === 'active' && existing.status !== 'active') {
+      await notifyActivation({ id: existing.id, publicId: existing.publicId, orgId: existing.orgId });
     }
 
     const changedFields = Object.keys(dto).filter((k) => dto[k as keyof typeof dto] !== undefined);
