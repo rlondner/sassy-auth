@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { magicLink, emailOTP, openAPI, twoFactor, genericOAuth } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
+import type { ActivationEmailBranding } from '@sassy-auth/types';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { verificationEmail } from '../email/templates/verify-email.template';
 import { getEmailer } from '../email/email.singleton';
@@ -365,9 +366,11 @@ export const auth = betterAuth({
         select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
       });
       const appName = saUser?.org.app.name ?? 'Sassy Auth';
-      const branding = (saUser?.org.app.activationEmailOverride ?? undefined) as
-        | import('@sassy-auth/types').ActivationEmailBranding
-        | undefined;
+      // No write path validates this JSON column's shape yet (that lands with
+      // the admin-UI follow-up) — the cast is trusted on the strength of the
+      // DB being the only writer today, and verificationEmail()'s optional
+      // chaining degrades to defaults on any malformed/missing field.
+      const branding = (saUser?.org.app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
       await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url, appName, branding }) });
     },
     afterEmailVerification: async (updatedUser: { id: string }) => {
