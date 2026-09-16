@@ -1,0 +1,120 @@
+# SassyAuth — Render Blueprint (staging account)
+#
+# Staging lives in its own, separate Render account from production — apply
+# this file there (Render Dashboard → New → Blueprint → connect this repo,
+# select render.staging.yaml). Do not connect this repo to the staging
+# account using render.yaml (the production file) or vice versa: each
+# account should only ever see the blueprint file meant for it.
+#
+# Deploys against a Neon branch (not a separate project) of the production
+# database. See DEPLOYMENT.md's "Staging environment" section for the full
+# one-time setup (GitHub Environment, secrets, DNS).
+# Custom domains and secret values are prompted on first sync (sync: false).
+
+envVarGroups:
+  - name: sassy-auth-staging
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: RSA_PRIVATE_KEY
+        sync: false
+      - key: RSA_PUBLIC_KEY
+        sync: false
+      - key: JWT_KEY_ID
+        value: sassy-auth-staging-1
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: BETTER_AUTH_URL
+        value: https://auth-api-staging.milissai.com
+      - key: AUTH_SERVER_URL
+        value: https://auth-api-staging.milissai.com
+      - key: ADMIN_URL
+        value: https://auth-staging.milissai.com
+      - key: TRUSTED_ORIGINS
+        value: https://auth-staging.milissai.com
+      # NODE_ENV stays "production" here too — it controls app runtime behavior (secure
+      # cookies, the seed script's production-only branches), not which environment this
+      # is. Deploy target/branch is what actually distinguishes staging from production.
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: EMAIL_FROM
+        value: no-reply@milissai.com
+
+services:
+  # ── Staging (auth server) ──────────────────────────────────────────────
+  # Mirrors sassy-auth-server in render.yaml — same build/start/preDeploy commands — but
+  # tracks `dev` and uses the sassy-auth-staging env group/domains. See DEPLOYMENT.md.
+  - type: web
+    name: sassy-auth-server-staging
+    runtime: node
+    plan: starter
+    region: ohio
+    branch: dev
+    buildCommand: >-
+      corepack enable &&
+      corepack prepare pnpm@9.0.0 --activate &&
+      NODE_ENV=development pnpm install --frozen-lockfile &&
+      pnpm --filter @sassy-auth/db --filter @sassy-auth/types build &&
+      pnpm --filter @sassy-auth/auth-server build
+    preDeployCommand: cd packages/db && npx prisma migrate deploy
+    startCommand: cd apps/auth-server && node dist/main.js
+    healthCheckPath: /.well-known/oauth-authorization-server
+    domains:
+      - auth-api-staging.milissai.com
+    envVars:
+      - fromGroup: sassy-auth-staging
+      - key: NODE_VERSION
+        value: "24"
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      # VibeCast app provisioning (vibecast-migration.ts) is a second Render Job run by
+      # the deploy workflow after every db:seed. The script only reads these the first
+      # time it creates the vibecast SaApp/redirect URIs — once created, those values are
+      # owned by the SaApp record instead (editable via the admin console), and these vars
+      # are ignored on every later run. See the comment atop vibecast-migration.ts.
+      #
+      # Staging's vibecast app is its own SaApp record (distinct from production's), so it
+      # points at app-stg.getvibecast.com rather than the production VibeCast app.
+      - key: VIBECAST_APP_URL
+        value: https://app-stg.getvibecast.com
+      - key: VIBECAST_LOGIN_REDIRECT_URI
+        value: https://app-stg.getvibecast.com/api/auth/callback
+      - key: VIBECAST_LOGOUT_REDIRECT_URI
+        value: https://app-stg.getvibecast.com/api/auth/signout
+      - key: RESEND_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_TENANT_ID
+        sync: false
+
+  # ── Staging (admin console) ────────────────────────────────────────────
+  - type: web
+    name: sassy-auth-admin-staging
+    runtime: node
+    plan: starter
+    region: ohio
+    branch: dev
+    buildCommand: >-
+      corepack enable &&
+      corepack prepare pnpm@9.0.0 --activate &&
+      NODE_ENV=development pnpm install --frozen-lockfile &&
+      pnpm --filter @sassy-auth/admin build
+    startCommand: cd apps/admin && npx next start -p $PORT
+    healthCheckPath: /login
+    domains:
+      - auth-staging.milissai.com
+    envVars:
+      - fromGroup: sassy-auth-staging
+      - key: NODE_VERSION
+        value: "24"
+      - key: PUBLIC_AUTH_SERVER_URL
+        value: https://auth-api-staging.milissai.com

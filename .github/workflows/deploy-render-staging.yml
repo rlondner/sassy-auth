@@ -37,8 +37,12 @@ jobs:
         env:
           DEPLOY_TARGET: staging
           GITHUB_REPOSITORY: ${{ github.repository }}
-          # Human-provisioned secrets: same values as production's, duplicated into the
-          # "staging" GitHub Environment since secrets are scoped per-Environment.
+          # Human-provisioned secrets, stored in the "staging" GitHub Environment (secrets
+          # are scoped per-Environment). GH_SECRETS_PAT, NEON_API_KEY, and NEON_ORG_ID are
+          # the same values as production's, duplicated here. RENDER_API_KEY is NOT the
+          # same as production's — staging deploys into its own, separate Render account,
+          # so this must be an API key generated from that account. See DEPLOYMENT.md's
+          # "Staging environment" section.
           DEPLOY_GITHUB_TOKEN: ${{ secrets.GH_SECRETS_PAT }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
