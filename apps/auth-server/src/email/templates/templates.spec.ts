@@ -77,6 +77,21 @@ describe('email templates', () => {
     expect(out.from).toBe('Vibecast');
   });
 
+  it('verificationEmail escapes HTML in a custom message (bug-0291: stored HTML injection via activationEmailOverride.message)', () => {
+    const out = verificationEmail({
+      firstName: 'Jane',
+      verifyUrl: 'https://x/verify-email?token=abc',
+      appName: 'Vibecast',
+      branding: { message: '<a href="https://evil.example/phish">Click here</a> & "confirm" now' },
+    });
+    expect(out.html).not.toContain('<a href="https://evil.example/phish">');
+    expect(out.html).toContain('&lt;a href=&quot;https://evil.example/phish&quot;&gt;Click here&lt;/a&gt; &amp; &quot;confirm&quot; now');
+    // The real confirm button/link must still be present and untouched.
+    expect(out.html).toContain('https://x/verify-email?token=abc');
+    // text stays a plain, unescaped copy — no HTML rendering there to inject into.
+    expect(out.text).toContain('<a href="https://evil.example/phish">Click here</a> & "confirm" now');
+  });
+
   it('verificationEmail falls back to the default subject/message when branding fields are whitespace-only', () => {
     const out = verificationEmail({
       firstName: 'Jane', verifyUrl: 'https://x/verify', appName: 'Vibecast',
