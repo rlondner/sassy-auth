@@ -60,3 +60,5 @@ packages/db/generated/
 .claude/settings.local.json
 apps/admin/certificates/
 apps/admin/mkcert/
+apps/auth-server/secrets/localhost-key.pem
+apps/auth-server/secrets/localhost.pem

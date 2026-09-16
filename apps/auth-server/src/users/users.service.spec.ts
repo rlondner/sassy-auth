@@ -56,6 +56,12 @@ jest.mock('../auth/auth.config', () => ({
   auth: { api: { requestPasswordReset: jest.fn().mockResolvedValue({ status: true }) } },
 }));
 
+jest.mock('../activation/notify-activation', () => ({
+  notifyActivation: jest.fn().mockResolvedValue(undefined),
+}));
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockNotifyActivation = require('../activation/notify-activation').notifyActivation as jest.Mock;
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockCheckPermission = require('../common/permissions/check-permission')
   .checkPermission as jest.Mock;
@@ -407,6 +413,33 @@ describe('UsersService', () => {
       mockPrisma.saUser.update.mockResolvedValue(makeSaUser({ status: 'active' }));
       const result = await service.updateUser('ba-caller', 'usr1', { status: 'active' });
       expect(result.status).toBe('active');
+    });
+
+    it('notifies the activation webhook when an admin re-activates an inactive user', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ id: 1, publicId: 'usr1', orgId: 7, status: 'inactive' }));
+      mockPrisma.saUser.update.mockResolvedValue(makeSaUser({ id: 1, publicId: 'usr1', orgId: 7, status: 'active' }));
+
+      await service.updateUser('ba-caller', 'usr1', { status: 'active' });
+
+      expect(mockNotifyActivation).toHaveBeenCalledWith({ id: 1, publicId: 'usr1', orgId: 7 });
+    });
+
+    it('does not notify the activation webhook for an unrelated field update', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ id: 1, publicId: 'usr1', orgId: 7, status: 'active' }));
+      mockPrisma.saUser.update.mockResolvedValue(makeSaUser({ id: 1, publicId: 'usr1', orgId: 7, status: 'active', firstName: 'Renamed' }));
+
+      await service.updateUser('ba-caller', 'usr1', { firstName: 'Renamed' });
+
+      expect(mockNotifyActivation).not.toHaveBeenCalled();
+    });
+
+    it('does not notify the activation webhook when the user was already active', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ id: 1, publicId: 'usr1', orgId: 7, status: 'active' }));
+      mockPrisma.saUser.update.mockResolvedValue(makeSaUser({ id: 1, publicId: 'usr1', orgId: 7, status: 'active' }));
+
+      await service.updateUser('ba-caller', 'usr1', { status: 'active' });
+
+      expect(mockNotifyActivation).not.toHaveBeenCalled();
     });
   });
 

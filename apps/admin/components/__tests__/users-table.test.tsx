@@ -57,8 +57,8 @@ jest.mock('@sassy-auth/ui', () => {
 })
 
 const mockUsers: User[] = [
-  { id: '1', firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', status: 'active', orgId: 'org1', phoneNumber: null, username: null },
-  { id: '2', firstName: 'Bob', lastName: 'Jones', email: 'bob@example.com', status: 'pending', orgId: 'org1', phoneNumber: null, username: null },
+  { id: '1', firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', status: 'active', orgId: 'org1', phoneNumber: null, username: null, createdAt: '2026-01-01T00:00:00.000Z', lastLoginAt: null },
+  { id: '2', firstName: 'Bob', lastName: 'Jones', email: 'bob@example.com', status: 'pending', orgId: 'org1', phoneNumber: null, username: null, createdAt: '2026-01-01T00:00:00.000Z', lastLoginAt: null },
 ]
 
 const mockOrgs: Org[] = [{ id: 'org1', name: 'Acme Corp', appId: 'app1', isPlatform: true }]
@@ -140,7 +140,7 @@ describe('UsersTable', () => {
   // admin to PATCH status: 'active' onto an unverified user.
   it('shows an Activate item for an unverified user and calls setUserStatusAction on click', async () => {
     const unverifiedUsers: User[] = [
-      { id: '3', firstName: 'Cara', lastName: 'Diaz', email: 'cara@example.com', status: 'unverified', orgId: 'org1', phoneNumber: null, username: null },
+      { id: '3', firstName: 'Cara', lastName: 'Diaz', email: 'cara@example.com', status: 'unverified', orgId: 'org1', phoneNumber: null, username: null, createdAt: '2026-01-01T00:00:00.000Z', lastLoginAt: null },
     ]
     render(withIntl(<UsersTable users={unverifiedUsers} orgs={mockOrgs} />))
 
