@@ -19,6 +19,29 @@ function renderButton(url: string): string {
   );
 }
 
+/**
+ * Escapes the five characters that matter for safe interpolation into HTML
+ * text content (not attributes). `branding.message` is admin-supplied
+ * per-app copy (apps.service.ts's assertValidActivationEmailOverride only
+ * checks type and rejects embedded newlines — it does not, and should not,
+ * reject markup, since some HTML-ish characters are legitimate copy) and
+ * was being spliced into `<p>${message}</p>` unescaped below: an app admin
+ * (anyone holding `platform.apps.manage`, not necessarily a fully trusted
+ * operator) could inject arbitrary markup — a fake link overlaying the real
+ * "Confirm your email address" button, a remote-loaded tracking `<img>`, or
+ * spoofed sender-look-alike content — into the activation email every
+ * end user of that app receives. Applied only to the HTML rendering; `text`
+ * stays a plain, unescaped copy of the same message.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function computeFrom(branding?: ActivationEmailBranding): string | undefined {
   const name = branding?.fromName?.trim();
   const address = branding?.fromAddress?.trim();
@@ -42,7 +65,7 @@ export function verificationEmail(args: {
     subject,
     text: `Hi ${firstName},\n\n${message}\n${verifyUrl}\n\nIf you didn't create this account, you can ignore this email.`,
     html:
-      `<p>Hi ${firstName},</p><p>${message}</p>${renderButton(verifyUrl)}` +
+      `<p>Hi ${firstName},</p><p>${escapeHtml(message)}</p>${renderButton(verifyUrl)}` +
       `<p style="word-break: break-all;"><a href="${verifyUrl}">${verifyUrl}</a></p>` +
       `<p>If you didn't create this account, you can ignore this email.</p>`,
     ...(from !== undefined && { from }),
