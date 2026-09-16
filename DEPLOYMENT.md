@@ -111,7 +111,19 @@ Neon is the only database in this layout. Do not provision Render Postgres unles
 
 ## 2. Generate secrets (one time)
 
-Secret generation is automated — see "One-time setup for automated deploys" above. This section is kept only as a reference for the values' shape, in case you need to generate one manually for local development (see §8).
+Production secret generation is automated (see "One-time setup for automated deploys" above) — you should not need to run these manually for a production deploy. They're kept here for local development (§8), where you generate your own `.env.local` values by hand.
+
+**RSA key pair** (JWT signing — `RSA_PRIVATE_KEY` / `RSA_PUBLIC_KEY`):
+
+```bash
+node -e "const c=require('crypto');const {privateKey,publicKey}=c.generateKeyPairSync('rsa',{modulusLength:2048});console.log('RSA_PRIVATE_KEY='+Buffer.from(privateKey.export({type:'pkcs8',format:'pem'})).toString('base64'));console.log('RSA_PUBLIC_KEY='+Buffer.from(publicKey.export({type:'spki',format:'pem'})).toString('base64'))"
+```
+
+**BetterAuth secret** (`BETTER_AUTH_SECRET`, 32+ random characters):
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
 ---
 
