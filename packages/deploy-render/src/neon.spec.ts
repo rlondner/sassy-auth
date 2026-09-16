@@ -68,7 +68,7 @@ describe('ensureNeonDatabase', () => {
 
   it('creates a project and stores the pooled URI when DATABASE_URL is missing', async () => {
     jest.spyOn(githubSecrets, 'secretExists').mockResolvedValue(false);
-    const setSpy = jest.spyOn(githubSecrets, 'setSecret').mockResolvedValue(undefined);
+    const setSpy = jest.spyOn(githubSecrets, 'setAndVerifySecret').mockResolvedValue(undefined);
     const fetchFn = jest
       .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ projects: [] }) } as Response)

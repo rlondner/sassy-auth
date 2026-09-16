@@ -1,4 +1,4 @@
-import { secretExists, setSecret, type GithubConfig } from './githubSecrets';
+import { secretExists, setAndVerifySecret, type GithubConfig } from './githubSecrets';
 import type { FetchLike } from './types';
 
 const NEON_API_BASE = 'https://console.neon.tech/api/v2';
@@ -80,6 +80,6 @@ export async function ensureNeonDatabase(
   }
 
   const uri = await getPooledConnectionUri(neonCfg, project.id, fetchFn);
-  await setSecret(githubCfg, 'DATABASE_URL', uri, fetchFn);
+  await setAndVerifySecret(githubCfg, 'DATABASE_URL', uri, fetchFn);
   return { created: true, databaseUrl: uri };
 }
