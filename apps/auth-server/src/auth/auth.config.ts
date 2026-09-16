@@ -358,9 +358,17 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    sendVerificationEmail: async ({ user, url }: { user: { email: string; name?: string }; url: string }) => {
+    sendVerificationEmail: async ({ user, url }: { user: { id: string; email: string; name?: string }; url: string }) => {
       const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
-      await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url }) });
+      const saUser = await prisma.saUser.findUnique({
+        where: { betterAuthUserId: user.id },
+        select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
+      });
+      const appName = saUser?.org.app.name ?? 'Sassy Auth';
+      const branding = (saUser?.org.app.activationEmailOverride ?? undefined) as
+        | import('@sassy-auth/types').ActivationEmailBranding
+        | undefined;
+      await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url, appName, branding }) });
     },
     afterEmailVerification: async (updatedUser: { id: string }) => {
       // No-op for any status other than 'unverified' — a 'pending' user
