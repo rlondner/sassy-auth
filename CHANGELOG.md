@@ -4,6 +4,126 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-16
+
+Landed the branded-activation-emails feature (PR #394,
+`feat/branded-activation-emails`) plus five follow-on commits on `dev`,
+three of them fixes for defects that PR's own e2e coverage — and the CI
+pipeline finally reaching the `Run e2e` step at all — surfaced.
+
+**Branded activation emails (PR #394).** Apps can now override the
+activation (email-verification) email's `fromName`, `fromAddress`,
+`subject`, and `message` from the admin console's app-edit drawer, via a
+new nullable `SaApp.activationEmailOverride` JSONB column (migration
+`20260916053740_add_activation_email_override` — additive, no default
+needed since the column is nullable and every existing row already reads
+back as "no override"). `apps.service.ts` gained
+`assertValidActivationEmailOverride`, mirroring the existing
+`assertValidPasswordPolicyOverride` manual-validation-in-service pattern:
+every field must be a string with no embedded `\r`/`\n` (an email-header-
+injection guard, since `fromName`/`fromAddress`/`subject` end up in raw
+headers) and `fromAddress` must match a basic email pattern.
+`verify-email.template.ts` renders the override through the existing
+`{{token}}`-substitution `renderTemplate()` helper, falling back to the
+platform defaults field-by-field when an override field is absent or
+whitespace-only.
+
+**`0b39feb`** fixed a comment in `auth.config.ts` left stale by the PR
+above: it used to say no write path validated `activationEmailOverride`'s
+shape; `assertValidActivationEmailOverride` now does, though the runtime
+cast at the read site is still not a hard guarantee — updated the comment
+to say so precisely instead of asserting something no longer true.
+
+**`d08df0a`** fixed four (not a typo for six — see below) of the failures
+that appeared now that CI's `e2e.yml` finally reaches its `Run e2e` step
+for the first time in weeks (previously masked by earlier-failing build
+gates): the FastAPI resource server's `/auth/callback` token exchange
+never sent `grant_type`, which the token DTO has required since Task 12,
+so every RS round-trip and the 2FA-enforcement spec depending on it
+400'd; `e2e.yml` never set `NEXT_PUBLIC_AUTH_SERVER_URL`, so
+`api-public.ts` — bundled into client JS, where only `NEXT_PUBLIC_`-
+prefixed vars survive — inlined its hardcoded `https://localhost:3010`
+fallback instead of the job's plain-`http` server, breaking every
+browser-side accept-invite/reset-password/signup fetch with
+`ERR_SSL_PROTOCOL_ERROR`; `e2e.yml` never set Cloudflare's documented
+always-pass Turnstile test keypair, so the `/signup` captcha widget threw
+on an empty sitekey; and `oauth-authorize-flow.spec.ts`'s
+`USER_ORG_MISMATCH` case still asserted the pre-Task-10 admin-redirect
+behavior, when Task 10 had already changed validated-`redirect_uri`
+errors to go back to the client per RFC 6749 §4.1.2.1 (matching
+`token.controller.spec.ts`'s unit coverage all along). The commit
+message's "6 e2e failures" refers to the total count of previously-red
+specs these four root-cause fixes cleared, not four separate defects with
+one left over — no fifth or sixth code change was needed.
+
+**`ced81c8`** fixed a fifth, timing-only failure the above didn't touch:
+`signup-form.tsx`'s submit button isn't gated on `captchaToken`, and even
+the CI always-pass Turnstile widget solves asynchronously (it loads
+Cloudflare's script first), so the e2e helper's `fillAndSubmit` clicked
+submit immediately after filling the form, racing the widget and hitting
+`handleSubmit`'s null-`captchaToken` early return before any network call
+ran. Now waits on Cloudflare's injected `cf-turnstile-response` hidden
+input to carry a token before submitting.
+
+**`3153f8b`** fixed the "per-app password policy override" e2e spec's
+last failure: `registration.service.ts` already enforces the correct
+per-app policy via `validatePasswordOrThrow` before ever calling
+`auth.api.signUpEmail`, but BetterAuth's own native `minPasswordLength`
+was pinned to the *global* default (12) rather than the override floor,
+so BetterAuth's second, app-unaware length check re-rejected any override
+that legitimately relaxed the minimum below 12 — even after the correct
+app-aware check had already accepted the password. Pinned
+`minPasswordLength` to the same absolute floor (8,
+`MIN_PASSWORD_LENGTH_FLOOR`) that `assertValidPasswordPolicyOverride`
+already enforces on any override, rather than to the global policy's
+value.
+
+Filed and fixed **bug-0291** (High): the new `activationEmailOverride
+.message` field was spliced into the activation email's HTML body
+unescaped, letting any caller with `platform.apps.manage` inject arbitrary
+markup into every activation email sent to that app's end users (a stored
+HTML injection, not self-XSS — the injecting party and the affected users
+differ). Fixed in PR #395 with a narrow `escapeHtml()` at the one HTML
+interpolation site. See
+[BUGS_2026-09-16.md](./docs/history/bugs/BUGS_2026-09-16.md) and
+[TODO_2026-09-16.md](./docs/history/todo/TODO_2026-09-16.md).
+
+### Added
+
+- **Branded per-app activation emails** — `fromName`, `fromAddress`,
+  `subject`, and `message` overrides, configurable from the admin
+  console's app-edit drawer. PR #394.
+
+### Fixed (5 issues, 1 filed as a new bug)
+
+- **bug-0291** (High) — `activationEmailOverride.message` rendered
+  unescaped in the activation email's HTML body, allowing stored HTML
+  injection into end-user-facing email from any `platform.apps.manage`
+  caller. PR #395 (open, unmerged).
+- FastAPI RS's `/auth/callback` token exchange omitted the
+  DTO-required `grant_type`, 400ing the RS round-trip and 2FA-enforcement
+  e2e specs. `d08df0a`.
+- CI's `e2e.yml` never set `NEXT_PUBLIC_AUTH_SERVER_URL`, so client-bundled
+  fetches fell back to a hardcoded `https://` URL and hit
+  `ERR_SSL_PROTOCOL_ERROR` against the job's plain-`http` server. `d08df0a`.
+- CI's `e2e.yml` never set the Turnstile test keypair, throwing on an empty
+  sitekey for every `/signup` spec. `d08df0a`.
+- `oauth-authorize-flow.spec.ts` asserted stale pre-Task-10 redirect
+  behavior for `USER_ORG_MISMATCH`. `d08df0a`.
+- Signup e2e helper submitted before the (asynchronous, even when
+  always-pass) Turnstile widget had solved, racing the client's
+  null-token guard. `ced81c8`.
+- BetterAuth's native `minPasswordLength` was pinned to the global
+  policy's minimum instead of the per-app override floor, re-rejecting
+  valid relaxed-minimum overrides after the app-aware check had already
+  accepted them. `3153f8b`.
+
+### Docs
+
+- `auth.config.ts`: corrected a comment that said no write path validated
+  `activationEmailOverride`'s shape — `AppsService
+  .assertValidActivationEmailOverride` has since 64c8de6. `0b39feb`.
+
 ## [Unreleased] — 2026-09-15
 
 Three commits landed directly on `dev` in the last 24h (no PR — `dev` has
