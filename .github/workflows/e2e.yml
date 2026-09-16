@@ -39,9 +39,17 @@ jobs:
       # ephemeral and torn down after every run.
       CI_TESTS: 'true'
       DATABASE_URL: postgresql://sassy:sassy@localhost:5432/sassy_e2e
-      BETTER_AUTH_URL: https://localhost:3010
+      # dev(sec) (commit 0002a11d) made the auth-server serve BETTER_AUTH_URL
+      # over https in any non-production NODE_ENV, using a locally mkcert'd
+      # cert (apps/auth-server/secrets/*.pem, gitignored). CI has no such
+      # cert, and main.ts now falls back to plain http when the files are
+      # absent (see that file) — so CI keeps using http here rather than
+      # standing up a self-signed cert that Node's TLS client, Next's
+      # server-side fetches, and Python's httpx/PyJWKClient in the FastAPI
+      # RS would all separately need to be told to trust.
+      BETTER_AUTH_URL: http://localhost:3010
       BETTER_AUTH_SECRET: test-secret-at-least-32-chars-long!!
-      AUTH_SERVER_URL: https://localhost:3010
+      AUTH_SERVER_URL: http://localhost:3010
       ADMIN_URL: http://localhost:3001
       NODE_ENV: test
 

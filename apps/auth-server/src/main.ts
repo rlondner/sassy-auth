@@ -74,11 +74,22 @@ async function bootstrap() {
   const isDev = process.env.NODE_ENV !== 'production';
   let httpsOptions: { key: Buffer; cert: Buffer } | undefined;
 
-    if (isDev) {
-    httpsOptions = {
-      key: fs.readFileSync(path.join(__dirname, '..', 'secrets', 'localhost-key.pem')),
-      cert: fs.readFileSync(path.join(__dirname, '..', 'secrets', 'localhost.pem')),
-    };
+  if (isDev) {
+    const keyPath = path.join(__dirname, '..', 'secrets', 'localhost-key.pem');
+    const certPath = path.join(__dirname, '..', 'secrets', 'localhost.pem');
+    // These are a developer's own mkcert'd files (gitignored, never
+    // committed) — CI and any other environment without them fall back to
+    // plain http rather than crash-looping on ENOENT.
+    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+      httpsOptions = {
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath),
+      };
+    } else {
+      console.warn(
+        `[dev-https] ${keyPath} / ${certPath} not found — starting over http. Run mkcert to enable local https.`,
+      );
+    }
   }
   const expressApp = express();
 
