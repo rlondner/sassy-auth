@@ -1,6 +1,6 @@
 # SassyAuth — Render Blueprint
 #
-# Deploys three web services against an external Neon Postgres database.
+# Deploys two web services against an external Neon Postgres database.
 # See DEPLOYMENT.md for DNS, secrets, first-time seed, and app registration.
 #
 # Apply: Render Dashboard → New → Blueprint → connect this repo.
@@ -34,9 +34,9 @@ envVarGroups:
         value: https://auth.milissai.com
 
       # BetterAuth CSRF + Nest CORS. Include every browser origin that talks
-      # to the auth-server (admin console + resource-server sample app).
+      # to the auth-server (admin console).
       - key: TRUSTED_ORIGINS
-        value: https://auth.milissai.com,https://testapp.milissai.com
+        value: https://auth.milissai.com
 
       # ── Production defaults ─────────────────────────────────────────────
       - key: NODE_ENV
@@ -119,36 +119,3 @@ services:
       # Browser-facing auth-server URL for social sign-in redirects on /login.
       - key: PUBLIC_AUTH_SERVER_URL
         value: https://auth-api.milissai.com
-      # Allow /login?next= redirects back to the sample resource server.
-      - key: LOGIN_NEXT_ALLOWED_ORIGINS
-        value: https://testapp.milissai.com
-
-  # ── Sample resource server (FastAPI) ──────────────────────────────────────
-  - type: web
-    name: sassy-resource-server
-    runtime: python
-    plan: starter
-    branch: master
-    rootDir: apps/resource-server-fastapi
-    buildCommand: pip install .
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /
-    domains:
-      - testapp.milissai.com
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
-      - key: AUTH_SERVER_URL
-        value: https://auth-api.milissai.com
-      - key: ADMIN_URL
-        value: https://auth.milissai.com
-      - key: RS_BASE_URL
-        value: https://testapp.milissai.com
-      - key: REDIRECT_URI
-        value: https://testapp.milissai.com/auth/callback
-      # sa_app.publicId for the resource-server app — set after seed or
-      # manual app registration in the admin console.
-      - key: SASSY_CLIENT_ID
-        sync: false
-      - key: LOG_LEVEL
-        value: info
