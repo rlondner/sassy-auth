@@ -1,6 +1,6 @@
 import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { PasswordPolicy } from '@sassy-auth/types';
+import { PasswordPolicy, ActivationEmailBranding } from '@sassy-auth/types';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 import { IsAppLogo } from '../../common/config/is-app-logo.decorator';
 
@@ -76,4 +76,15 @@ export class UpdateAppDto {
    * isn't reported to this app anymore.
    */
   @IsOptional() @IsAppUrl() @MaxLength(2048) webhookUrl?: string | null;
+
+  /**
+   * Per-app override for the activation email's subject/message/from (see
+   * @sassy-auth/types ActivationEmailBranding). Deep-validated in
+   * AppsService.assertValidActivationEmailOverride, following the same
+   * manual-validation-in-service pattern as passwordPolicyOverride above.
+   * null clears the override, reverting every field to the platform default.
+   */
+  @ApiPropertyOptional({ type: Object })
+  @IsOptional()
+  activationEmailOverride?: ActivationEmailBranding | null;
 }
