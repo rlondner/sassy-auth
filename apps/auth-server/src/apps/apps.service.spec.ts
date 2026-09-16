@@ -82,7 +82,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, webhookUrl: null, hasWebhookSecret: false }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, webhookUrl: null, hasWebhookSecret: false, activationEmailOverride: null }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -111,7 +111,7 @@ describe('AppsService', () => {
       isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [],
       isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null,
       passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy,
-      webhookUrl: null, hasWebhookSecret: false,
+      webhookUrl: null, hasWebhookSecret: false, activationEmailOverride: null,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -171,7 +171,7 @@ describe('AppsService', () => {
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, webhookUrl: null, hasWebhookSecret: false });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, webhookUrl: null, hasWebhookSecret: false, activationEmailOverride: null });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -241,6 +241,68 @@ describe('AppsService', () => {
       data: { name: 'Renamed' },
       include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
+  });
+
+  it('updateApp sets activationEmailOverride when provided', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    const override = { fromName: 'Vibecast', fromAddress: 'no-reply@vibecast.io', subject: 'Confirm your {{appName}} account' };
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, activationEmailOverride: override });
+    const result = await service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: override });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { activationEmailOverride: override },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+    expect(result.activationEmailOverride).toEqual(override);
+  });
+
+  it('updateApp clears activationEmailOverride when given null', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, activationEmailOverride: null });
+    await service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: null });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { activationEmailOverride: { __prismaJsonNull: true } },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp rejects an activationEmailOverride with a non-string field', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { fromName: 123 as unknown as string } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp rejects an activationEmailOverride field containing a line break', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { subject: 'Hi\r\nBcc: attacker@evil.com' } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp rejects a malformed fromAddress', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { fromAddress: 'not-an-email' } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
+  });
+
+  it('updateApp accepts a well-formed fromAddress', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, activationEmailOverride: { fromAddress: 'no-reply@vibecast.io' } });
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: { fromAddress: 'no-reply@vibecast.io' } }),
+    ).resolves.toBeDefined();
+  });
+
+  it('getApp/listApps formatting defaults activationEmailOverride to null when absent', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, defaultOrg: null, defaultRole: null });
+    const result = await service.getApp('ba-caller', 'sq_1');
+    expect(result.activationEmailOverride).toBeNull();
   });
 
   it('createApp throws ConflictException on P2002', async () => {

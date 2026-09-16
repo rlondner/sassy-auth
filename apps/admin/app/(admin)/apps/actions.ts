@@ -18,6 +18,13 @@ function mapError(message: string, kind: 'create' | 'update' | 'delete'): string
     if (kind !== 'delete') return 'apps.errors.platformProtected'
     return 'apps.errors.forbidden'
   }
+  // Trailing dot distinguishes an actual field-validation failure
+  // ("activationEmailOverride.fromAddress must be...") from the generic
+  // "at least one field must be provided" 400, which also names this field
+  // in its enumeration but isn't about its value.
+  if (message.includes('activationEmailOverride.')) {
+    return 'apps.errors.activationEmailInvalid'
+  }
   if (message.includes('400')) {
     return 'apps.errors.urlInsecure'
   }

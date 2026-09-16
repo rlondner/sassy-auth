@@ -1,6 +1,7 @@
-import type { PasswordPolicy } from '@sassy-auth/types'
+import type { PasswordPolicy, ActivationEmailBranding } from '@sassy-auth/types'
 
 export type { PasswordPolicy }
+export type { ActivationEmailBranding }
 
 // Matches the server's global default password policy. Used by signup and
 // reset-password forms when a per-app/per-request policy hasn't been
@@ -108,6 +109,7 @@ export interface App {
   // The secret itself is never sent to the admin console — only whether one
   // is configured, mirroring isConfidential/clientSecretHash above.
   hasWebhookSecret?: boolean;
+  activationEmailOverride: ActivationEmailBranding | null;
 }
 
 export interface CreateAppPayload {
@@ -130,6 +132,7 @@ export interface UpdateAppPayload {
   defaultRoleId?: string | null;
   passwordPolicyOverride?: PasswordPolicy | null;
   webhookUrl?: string | null;
+  activationEmailOverride?: ActivationEmailBranding | null;
 }
 
 export interface ListAppsParams {

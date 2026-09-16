@@ -68,3 +68,24 @@ export declare const APP_LOGO_ALLOWED_MIME_TYPES: readonly ["image/png", "image/
  * write hits the database) — one definition, two enforcement points.
  */
 export declare function isValidAppLogoDataUri(value: unknown): boolean;
+/**
+ * Per-app override for the activation (email-verification) email. Every
+ * field is optional and independently defaulted by the caller — omitted or
+ * undefined means "use the platform default" for that field.
+ */
+export interface ActivationEmailBranding {
+    fromName?: string;
+    /** Domain must be verified with the email provider (e.g. Resend), or sends will fail. */
+    fromAddress?: string;
+    subject?: string;
+    message?: string;
+}
+/**
+ * Literal `{{token}}` substitution — no conditionals, no loops. A token not
+ * present in `vars` is left in the output untouched, so a typo'd or removed
+ * placeholder degrades visibly rather than silently vanishing.
+ *
+ * Does no output-context escaping — a caller substituting a value into HTML
+ * (e.g. a user-supplied name) is responsible for escaping it first.
+ */
+export declare function renderTemplate(template: string, vars: Record<string, string>): string;

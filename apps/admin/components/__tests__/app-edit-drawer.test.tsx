@@ -134,6 +134,7 @@ const app = {
   requireTwoFactor: false,
   passwordPolicyOverride: null,
   effectivePasswordPolicy: EFFECTIVE_PASSWORD_POLICY,
+  activationEmailOverride: null,
 }
 
 function withIntl(node: React.ReactNode) {
@@ -561,5 +562,32 @@ describe('AppEditDrawer', () => {
       )
       await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     })
+  })
+
+  // Code quality review (finding 2): a partially-set activationEmailOverride
+  // (only one field populated) that gets cleared entirely in the form must
+  // collapse to `null` in the patch, not an object with an empty string.
+  it('clears a partially-set activationEmailOverride to null when the only field is emptied', async () => {
+    const appWithPartialOverride = {
+      ...app,
+      activationEmailOverride: { fromName: 'Vibecast' },
+    }
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: appWithPartialOverride })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={appWithPartialOverride} open onOpenChange={onOpenChange} />))
+
+    const fromName = screen.getByLabelText(en.apps.fields.activationEmailFromName) as HTMLInputElement
+    expect(fromName.value).toBe('Vibecast')
+    fireEvent.change(fromName, { target: { value: '' } })
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ activationEmailOverride: null }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 })

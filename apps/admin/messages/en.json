@@ -99,6 +99,18 @@
       "webhookSecretNeedsUrlHint": "Save a webhook URL before generating a secret.",
       "webhookSecretConfigured": "A secret is configured.",
       "noWebhookSecret": "No secret configured.",
+      "activationEmail": "Activation email",
+      "activationEmailHint": "Customize the email sent when a new sign-up needs to confirm their address. Placeholders '{{firstName}}' and '{{appName}}' are available in the subject and message.",
+      "activationEmailFromName": "From name",
+      "activationEmailFromNamePlaceholder": "e.g. Vibecast",
+      "activationEmailFromAddress": "From address",
+      "activationEmailFromAddressPlaceholder": "no-reply@yourapp.com",
+      "activationEmailFromAddressHint": "Must be on a domain verified with your email provider, or activation emails will silently fail to send.",
+      "activationEmailSubject": "Subject",
+      "activationEmailSubjectPlaceholder": "Verify your '{{appName}}' email address",
+      "activationEmailMessage": "Message",
+      "activationEmailMessagePlaceholder": "Confirm your email address to finish setting up your account:",
+      "activationEmailMessageHint": "Shown above the confirmation button, which is always added automatically.",
       "passwordPolicy": "Password Policy",
       "passwordPolicyOverrideToggle": "Override global password policy for this app",
       "passwordPolicyInherited": "Inheriting the global policy: {summary}",
@@ -142,7 +154,8 @@
       "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
       "logoInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
       "logoTooLarge": "That image is too large. Please choose one under 250KB.",
-      "nameRequired": "App name is required."
+      "nameRequired": "App name is required.",
+      "activationEmailInvalid": "Please check the activation email settings — the from address must be a valid email, and no field may contain a line break."
     },
     "badges": {
       "platform": "Platform"

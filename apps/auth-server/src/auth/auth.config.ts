@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { magicLink, emailOTP, openAPI, twoFactor, genericOAuth } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
+import type { ActivationEmailBranding } from '@sassy-auth/types';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { verificationEmail } from '../email/templates/verify-email.template';
 import { getEmailer } from '../email/email.singleton';
@@ -358,9 +359,19 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    sendVerificationEmail: async ({ user, url }: { user: { email: string; name?: string }; url: string }) => {
+    sendVerificationEmail: async ({ user, url }: { user: { id: string; email: string; name?: string }; url: string }) => {
       const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
-      await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url }) });
+      const saUser = await prisma.saUser.findUnique({
+        where: { betterAuthUserId: user.id },
+        select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
+      });
+      const appName = saUser?.org.app.name ?? 'Sassy Auth';
+      // AppsService.assertValidActivationEmailOverride is the only write path
+      // and shape-checks every field, but this cast still isn't a runtime
+      // guarantee — verificationEmail()'s optional chaining degrades to
+      // defaults on any malformed/missing field regardless.
+      const branding = (saUser?.org.app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
+      await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url, appName, branding }) });
     },
     afterEmailVerification: async (updatedUser: { id: string }) => {
       // No-op for any status other than 'unverified' — a 'pending' user

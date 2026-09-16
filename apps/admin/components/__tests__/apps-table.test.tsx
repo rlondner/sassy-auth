@@ -71,8 +71,8 @@ const DEFAULT_PASSWORD_POLICY = {
 
 const initial = {
   items: [
-    { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: DEFAULT_PASSWORD_POLICY },
-    { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth.example.com', isPlatform: true, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: DEFAULT_PASSWORD_POLICY },
+    { publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: DEFAULT_PASSWORD_POLICY, activationEmailOverride: null },
+    { publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth.example.com', isPlatform: true, requireTwoFactor: false, passwordPolicyOverride: null, effectivePasswordPolicy: DEFAULT_PASSWORD_POLICY, activationEmailOverride: null },
   ],
   total: 2,
   page: 1,
