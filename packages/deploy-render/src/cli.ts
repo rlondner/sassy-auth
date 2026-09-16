@@ -44,6 +44,15 @@ function toRenderEnvVars(values: Record<string, string>): RenderEnvVar[] {
   return Object.entries(values).map(([key, value]) => ({ key, value }));
 }
 
+async function withServiceContext<T>(serviceName: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`[${serviceName}] ${message}`);
+  }
+}
+
 async function main(): Promise<void> {
   const dryRun = process.argv.includes('--dry-run');
 
@@ -101,6 +110,8 @@ async function main(): Promise<void> {
     }
   }
 
+  // Assumes execution via ts-node from src/ (the "deploy" script) — three levels up reaches the
+  // repo root; would need adjustment if ever run from a compiled dist/ build.
   const renderYamlPath = path.resolve(__dirname, '../../../render.yaml');
   const doc = parseRenderYaml(fs.readFileSync(renderYamlPath, 'utf8'));
   const groupValues = staticGroupValues(doc, 'sassy-auth-production');
@@ -126,13 +137,19 @@ async function main(): Promise<void> {
   const authServerId = await findServiceIdByName(renderCfg, 'sassy-auth-server');
   const adminId = await findServiceIdByName(renderCfg, 'sassy-auth-admin');
 
-  await setEnvVars(renderCfg, authServerId, toRenderEnvVars(authServerValues));
-  await setEnvVars(renderCfg, adminId, toRenderEnvVars(adminValues));
+  await withServiceContext('sassy-auth-server', () =>
+    setEnvVars(renderCfg, authServerId, toRenderEnvVars(authServerValues)),
+  );
+  await withServiceContext('sassy-auth-admin', () =>
+    setEnvVars(renderCfg, adminId, toRenderEnvVars(adminValues)),
+  );
 
-  await waitForLiveDeploy(renderCfg, authServerId);
+  await withServiceContext('sassy-auth-server', () => waitForLiveDeploy(renderCfg, authServerId));
 
-  const job = await startJob(renderCfg, authServerId, 'pnpm --filter @sassy-auth/db db:seed');
-  await waitForJobCompletion(renderCfg, authServerId, job.id);
+  await withServiceContext('sassy-auth-server', async () => {
+    const job = await startJob(renderCfg, authServerId, 'pnpm --filter @sassy-auth/db db:seed');
+    await waitForJobCompletion(renderCfg, authServerId, job.id);
+  });
 
   console.log('Render deployment automation complete.');
 }
