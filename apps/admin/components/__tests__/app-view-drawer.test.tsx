@@ -124,6 +124,11 @@ describe('AppViewDrawer', () => {
     })
     ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({ available: ['google'], enabled: ['google'] })
     const appWithDefaults = { ...app, defaultOrgId: 'org_1', defaultRoleId: 'role_1' }
+    // The drawer renders from the freshly-fetched single-app record (falling
+    // back to the `app` prop until it resolves), so the mock must carry the
+    // same defaultOrgId/defaultRoleId as the prop — a real GET /api/apps/:id
+    // response would.
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({ app: appWithDefaults })
     render(withIntl(<AppViewDrawer app={appWithDefaults} open onOpenChange={() => undefined} onEdit={() => undefined} onDelete={() => undefined} />))
     await waitFor(() => expect(screen.getByText('Acme')).toBeInTheDocument())
     expect(screen.getByText('Admin')).toBeInTheDocument()

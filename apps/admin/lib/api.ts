@@ -266,6 +266,16 @@ export async function rotateClientSecret(publicId: string): Promise<{ clientSecr
   return result;
 }
 
+// Returns the new webhook secret in plaintext — same one-time-reveal pattern
+// as rotateClientSecret above. There is no free-text way to set this secret
+// anymore (see AppEditDrawer): it's always server-generated.
+export async function rotateWebhookSecret(publicId: string): Promise<{ webhookSecret: string }> {
+  const res = await apiFetch(`/api/apps/${publicId}/webhook-secret`, { method: 'POST' });
+  const result: { webhookSecret: string } = await res.json();
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Webhook secret rotated: ${publicId}`, level: 'info' });
+  return result;
+}
+
 // Backs the admin console's checkbox group: `available` is every provider
 // this deployment has credentials for (so an app that has opted a provider
 // off still shows a checkbox for it — see GET /api/social-providers above,

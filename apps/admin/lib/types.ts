@@ -130,7 +130,6 @@ export interface UpdateAppPayload {
   defaultRoleId?: string | null;
   passwordPolicyOverride?: PasswordPolicy | null;
   webhookUrl?: string | null;
-  webhookSecret?: string | null;
 }
 
 export interface ListAppsParams {

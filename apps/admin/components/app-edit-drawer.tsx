@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@sassy-auth/ui'
-import { updateAppAction, getAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction } from '@/app/(admin)/apps/actions'
+import { updateAppAction, getAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction, rotateWebhookSecretAction } from '@/app/(admin)/apps/actions'
 import { listOrgsAction } from '@/app/(admin)/orgs/actions'
 import { listRolesAction } from '@/app/(admin)/roles/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
@@ -57,11 +57,13 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     app.passwordPolicyOverride ?? app.effectivePasswordPolicy,
   )
   const [webhookUrl, setWebhookUrl] = React.useState<string>(app.webhookUrl ?? '')
-  // Blank means "leave the stored secret unchanged" — the secret itself is
-  // never sent to the admin console, so there's nothing to prefill here
-  // (mirrors the write-only treatment of clientSecret above).
-  const [webhookSecretInput, setWebhookSecretInput] = React.useState<string>('')
   const [hasWebhookSecret, setHasWebhookSecret] = React.useState<boolean>(app.hasWebhookSecret ?? false)
+  // Webhook secret rotation: same immediate, separate-from-save pattern as
+  // client secret rotation below — the plaintext only ever comes back once,
+  // at the moment of generation, and the server requires a webhookUrl to
+  // already be saved before it will mint one (see AppsService.rotateWebhookSecret).
+  const [newWebhookSecret, setNewWebhookSecret] = React.useState<string | null>(null)
+  const [rotatingWebhookSecret, setRotatingWebhookSecret] = React.useState(false)
   const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
   const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -103,10 +105,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setPasswordPolicyOverrideEnabled(app.passwordPolicyOverride !== null)
     setPasswordPolicy(app.passwordPolicyOverride ?? app.effectivePasswordPolicy)
     setWebhookUrl(app.webhookUrl ?? '')
-    setWebhookSecretInput('')
     setHasWebhookSecret(app.hasWebhookSecret ?? false)
     setErrorKey(null)
     setNewClientSecret(null)
+    setNewWebhookSecret(null)
     setClientSecretUpdatedAt(app.clientSecretUpdatedAt ?? null)
     // Gate the authenticated social-providers fetch on the drawer actually
     // being open: AppsTable keeps this component mounted (with `open`
@@ -177,6 +179,23 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     })
   }
 
+  function handleRotateWebhookSecret() {
+    setRotatingWebhookSecret(true)
+    startTransition(async () => {
+      const result = await rotateWebhookSecretAction(app.publicId)
+      setRotatingWebhookSecret(false)
+      if ('errorKey' in result) {
+        setErrorKey(result.errorKey)
+        return
+      }
+      // Shown exactly once — the server never returns the plaintext again
+      // after this response.
+      setNewWebhookSecret(result.webhookSecret)
+      setHasWebhookSecret(true)
+      toast.success(t('apps.toast.updated'))
+    })
+  }
+
   const socialDirty =
     checkedProviders.size !== initialProviders.length ||
     initialProviders.some((p) => !checkedProviders.has(p))
@@ -186,8 +205,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
   const webhookUrlDirty = webhookUrl.trim() !== (app.webhookUrl ?? '')
-  const webhookDirty = webhookUrlDirty || webhookSecretInput.trim() !== ''
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookDirty
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -200,7 +218,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; webhookSecret?: string | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
@@ -214,15 +232,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     }
     if (webhookUrlDirty) {
       const trimmedWebhookUrl = webhookUrl.trim()
+      // Clearing the URL cascades server-side to clear any stored secret too
+      // — a webhook is never left half-configured (see AppsService.updateApp).
       patch.webhookUrl = trimmedWebhookUrl === '' ? null : trimmedWebhookUrl
-      // The server rejects a webhook configured with only one of URL/secret
-      // set (see assertWebhookConfigNotHalfSet) — clearing the URL while a
-      // secret is still stored must clear the secret too, in the same PATCH.
-      if (trimmedWebhookUrl === '' && hasWebhookSecret && webhookSecretInput.trim() === '') {
-        patch.webhookSecret = null
-      }
     }
-    if (webhookSecretInput.trim() !== '') patch.webhookSecret = webhookSecretInput.trim()
     startTransition(async () => {
       // Two independent endpoints: /api/apps for the core fields, and
       // /api/social-providers/:clientId for the checkbox group — the
@@ -580,24 +593,58 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               </p>
             </div>
             <div>
-              <Label htmlFor="webhookSecret">{t('apps.fields.webhookSecret')}</Label>
-              <Input
-                id="webhookSecret"
-                type="password"
-                autoComplete="off"
-                value={webhookSecretInput}
-                onChange={(e) => setWebhookSecretInput(e.target.value)}
-                placeholder={
-                  hasWebhookSecret
-                    ? t('apps.fields.webhookSecretPlaceholderConfigured')
-                    : t('apps.fields.webhookSecretPlaceholderUnset')
-                }
-              />
+              <Label>{t('apps.fields.webhookSecret')}</Label>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {hasWebhookSecret ? t('apps.fields.webhookSecretConfigured') : t('apps.fields.noWebhookSecret')}
-                {' '}
                 {t('apps.fields.webhookSecretHint')}
               </p>
+              {newWebhookSecret ? (
+                <div className="mt-2">
+                  <div className="flex gap-2">
+                    <Input
+                      id="newWebhookSecret"
+                      value={newWebhookSecret}
+                      readOnly
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={t('apps.actions.copy')}
+                      onClick={() => void copy(newWebhookSecret, 'webhookSecret')}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        {copiedKey === 'webhookSecret' ? 'check' : 'content_copy'}
+                      </span>
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-label-sm text-destructive">
+                    {t('apps.fields.webhookSecretWarning')}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <p className="text-body-sm text-muted-foreground">
+                    {hasWebhookSecret ? t('apps.fields.webhookSecretConfigured') : t('apps.fields.noWebhookSecret')}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2"
+                    loading={rotatingWebhookSecret}
+                    disabled={!app.webhookUrl || webhookUrlDirty}
+                    onClick={handleRotateWebhookSecret}
+                  >
+                    {hasWebhookSecret
+                      ? t('apps.fields.regenerateWebhookSecret')
+                      : t('apps.fields.generateWebhookSecret')}
+                  </Button>
+                  {(!app.webhookUrl || webhookUrlDirty) && (
+                    <p className="mt-1 text-body-sm text-muted-foreground">
+                      {t('apps.fields.webhookSecretNeedsUrlHint')}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             {errorKey && (
               <p role="alert" className="text-body-sm text-destructive">

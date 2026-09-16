@@ -58,6 +58,8 @@ describe('notifyActivation', () => {
       userId: 'usr_1',
       appPublicId: 'app_1',
       activatedAt: expect.any(String),
+      timestamp: expect.any(Number),
+      nonce: expect.any(String),
     });
     expect(options.headers['X-Sassy-Signature']).toBe(`sha256=${signedBody('whsec_test', options.body)}`);
 

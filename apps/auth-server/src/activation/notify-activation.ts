@@ -84,6 +84,12 @@ export async function notifyActivation(saUser: { id: number; publicId: string; o
     userId: saUser.publicId,
     appPublicId: config.appPublicId,
     activatedAt: new Date().toISOString(),
+    // Both are covered by the signature below (it's computed over the whole
+    // body): `timestamp` lets the RP reject stale requests (a replay window
+    // check), `nonce` lets it dedupe an exact replay — or the driver's own
+    // same-event retry below — within that window.
+    timestamp: Date.now(),
+    nonce: crypto.randomBytes(16).toString('hex'),
   });
   const signature = crypto.createHmac('sha256', config.webhookSecret).update(body).digest('hex');
 

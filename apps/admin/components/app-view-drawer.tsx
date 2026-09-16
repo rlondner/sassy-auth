@@ -21,22 +21,28 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
   const t = useTranslations()
   const { copiedKey: copied, copy } = useCopyFeedback()
 
-  // GET /api/apps (the list `app` is sourced from) strips `logo` to avoid
-  // shipping every row's base64 blob on a page load — fetch the single-app
-  // record for the real value, same as the edit drawer does. Org/role names
-  // for defaultOrgId/defaultRoleId and the enabled social providers are
+  // The list `app` is sourced from can be stale for anything that changes
+  // outside the save/dirty flow — most notably a client-secret or
+  // webhook-secret rotation, which PATCHes the auth-server directly and
+  // never updates the parent table's row (see AppEditDrawer's
+  // handleRotate* — those intentionally skip `onSuccess` so an in-progress
+  // edit elsewhere in the drawer isn't reset). It also strips `logo` to
+  // avoid shipping every row's base64 blob on a page load. Re-fetching the
+  // single-app record on open and rendering from it (falling back to `app`
+  // until that resolves) picks up both cases. Org/role names for
+  // defaultOrgId/defaultRoleId and the enabled social providers are
   // likewise only available from their own endpoints.
-  const [logo, setLogo] = React.useState<string | null>(app.logo ?? null)
+  const [displayApp, setDisplayApp] = React.useState<App>(app)
   const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
   const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [enabledProviders, setEnabledProviders] = React.useState<string[]>([])
 
   React.useEffect(() => {
-    setLogo(app.logo ?? null)
+    setDisplayApp(app)
     if (!open) return
     let cancelled = false
     getAppAction(app.publicId).then((result) => {
-      if (!cancelled && 'app' in result) setLogo(result.app.logo ?? null)
+      if (!cancelled && 'app' in result) setDisplayApp(result.app)
     })
     getSocialProviderSettingsAction(app.publicId).then((result) => {
       if (!cancelled && 'enabled' in result) setEnabledProviders(result.enabled)
@@ -54,11 +60,11 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
     }
   }, [app, open])
 
-  const defaultOrgName = app.defaultOrgId
-    ? appOrgs.find((o) => o.publicId === app.defaultOrgId)?.name ?? app.defaultOrgId
+  const defaultOrgName = displayApp.defaultOrgId
+    ? appOrgs.find((o) => o.publicId === displayApp.defaultOrgId)?.name ?? displayApp.defaultOrgId
     : null
-  const defaultRoleName = app.defaultRoleId
-    ? appRoles.find((r) => r.publicId === app.defaultRoleId)?.name ?? app.defaultRoleId
+  const defaultRoleName = displayApp.defaultRoleId
+    ? appRoles.find((r) => r.publicId === displayApp.defaultRoleId)?.name ?? displayApp.defaultRoleId
     : null
 
   return (
@@ -69,11 +75,11 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             <div className="flex h-10 w-10 items-center justify-center rounded border border-border bg-muted text-primary">
               <span className="material-symbols-outlined text-[20px]">apps</span>
             </div>
-            <SheetTitle>{app.name}</SheetTitle>
-            {app.isPlatform && <Badge variant="secondary">{t('apps.badges.platform')}</Badge>}
+            <SheetTitle>{displayApp.name}</SheetTitle>
+            {displayApp.isPlatform && <Badge variant="secondary">{t('apps.badges.platform')}</Badge>}
           </div>
           <div className="flex items-center gap-2">
-            {!app.isPlatform && (
+            {!displayApp.isPlatform && (
               <ButtonGroup>
                 <Button size="sm" variant="outline" onClick={onEdit}>{t('apps.actions.edit')}</Button>
                 <Button size="sm" variant="outline" className="border-destructive text-destructive" onClick={onDelete}>
@@ -91,17 +97,17 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
         <SheetBody className="space-y-6">
           <DetailRow
             label={t('apps.fields.url')}
-            value={app.url}
-            onCopy={() => copy(app.url, 'url')}
+            value={displayApp.url}
+            onCopy={() => copy(displayApp.url, 'url')}
             copied={copied === 'url'}
             copyLabel={t('apps.actions.copy')}
           />
           <div>
             <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('apps.fields.logo')}</p>
             <div className="mt-1 flex items-center rounded border border-border bg-card px-3 py-2">
-              {logo ? (
+              {displayApp.logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo} alt={t('apps.fields.logo')} className="h-10 w-10 rounded border border-border object-contain" />
+                <img src={displayApp.logo} alt={t('apps.fields.logo')} className="h-10 w-10 rounded border border-border object-contain" />
               ) : (
                 <span className="text-body-sm text-muted-foreground">{t('apps.fields.noLogo')}</span>
               )}
@@ -109,7 +115,7 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
           </div>
           <RedirectUriGroup
             label={t('apps.fields.loginRedirectUris')}
-            uris={(app.redirectUris ?? []).filter((r) => r.kind === 'login')}
+            uris={(displayApp.redirectUris ?? []).filter((r) => r.kind === 'login')}
             copy={copy}
             copied={copied}
             copyLabel={t('apps.actions.copy')}
@@ -117,7 +123,7 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
           />
           <RedirectUriGroup
             label={t('apps.fields.postLogoutRedirectUris')}
-            uris={(app.redirectUris ?? []).filter((r) => r.kind === 'post_logout')}
+            uris={(displayApp.redirectUris ?? []).filter((r) => r.kind === 'post_logout')}
             copy={copy}
             copied={copied}
             copyLabel={t('apps.actions.copy')}
@@ -125,38 +131,38 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
           />
           <TextRow
             label={t('apps.fields.twoFactorTrustDays')}
-            value={app.twoFactorTrustDays != null ? String(app.twoFactorTrustDays) : t('apps.fields.twoFactorTrustDaysSystemDefault')}
+            value={displayApp.twoFactorTrustDays != null ? String(displayApp.twoFactorTrustDays) : t('apps.fields.twoFactorTrustDaysSystemDefault')}
           />
           <TextRow
             label={t('apps.fields.requireTwoFactor')}
-            value={app.requireTwoFactor ? t('common.yes') : t('common.no')}
+            value={displayApp.requireTwoFactor ? t('common.yes') : t('common.no')}
           />
           <div>
             <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('apps.fields.passwordPolicy')}</p>
-            {app.passwordPolicyOverride === null ? (
+            {displayApp.passwordPolicyOverride === null ? (
               <div className="mt-1 rounded border border-border bg-card px-3 py-2">
                 <span className="text-body-sm text-muted-foreground">
-                  {t('apps.fields.passwordPolicyInherited', { summary: `${app.effectivePasswordPolicy.minLength}+ chars` })}
+                  {t('apps.fields.passwordPolicyInherited', { summary: `${displayApp.effectivePasswordPolicy.minLength}+ chars` })}
                 </span>
               </div>
             ) : (
               <div className="mt-1 space-y-1">
-                <SubTextRow label={t('apps.fields.passwordPolicyMinLength')} value={String(app.passwordPolicyOverride.minLength)} />
-                <SubTextRow label={t('apps.fields.passwordPolicyRequireUppercase')} value={app.passwordPolicyOverride.requireUppercase ? t('common.yes') : t('common.no')} />
-                <SubTextRow label={t('apps.fields.passwordPolicyRequireLowercase')} value={app.passwordPolicyOverride.requireLowercase ? t('common.yes') : t('common.no')} />
+                <SubTextRow label={t('apps.fields.passwordPolicyMinLength')} value={String(displayApp.passwordPolicyOverride.minLength)} />
+                <SubTextRow label={t('apps.fields.passwordPolicyRequireUppercase')} value={displayApp.passwordPolicyOverride.requireUppercase ? t('common.yes') : t('common.no')} />
+                <SubTextRow label={t('apps.fields.passwordPolicyRequireLowercase')} value={displayApp.passwordPolicyOverride.requireLowercase ? t('common.yes') : t('common.no')} />
                 <SubTextRow
                   label={t('apps.fields.passwordPolicyRequireNumber')}
                   value={
-                    app.passwordPolicyOverride.requireNumber
-                      ? `${t('common.yes')} (${t('apps.fields.passwordPolicyMinNumbers')}: ${app.passwordPolicyOverride.minNumbers})`
+                    displayApp.passwordPolicyOverride.requireNumber
+                      ? `${t('common.yes')} (${t('apps.fields.passwordPolicyMinNumbers')}: ${displayApp.passwordPolicyOverride.minNumbers})`
                       : t('common.no')
                   }
                 />
                 <SubTextRow
                   label={t('apps.fields.passwordPolicyRequireSpecial')}
                   value={
-                    app.passwordPolicyOverride.requireSpecial
-                      ? `${t('common.yes')} (${t('apps.fields.passwordPolicyMinSpecial')}: ${app.passwordPolicyOverride.minSpecial})`
+                    displayApp.passwordPolicyOverride.requireSpecial
+                      ? `${t('common.yes')} (${t('apps.fields.passwordPolicyMinSpecial')}: ${displayApp.passwordPolicyOverride.minSpecial})`
                       : t('common.no')
                   }
                 />
@@ -185,27 +191,27 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
           </div>
           <DetailRow
             label={t('apps.fields.publicId')}
-            value={app.publicId}
+            value={displayApp.publicId}
             mono
-            onCopy={() => copy(app.publicId, 'sqid')}
+            onCopy={() => copy(displayApp.publicId, 'sqid')}
             copied={copied === 'sqid'}
             copyLabel={t('apps.actions.copy')}
           />
           <TextRow
             label={t('apps.fields.clientSecret')}
             value={
-              app.clientSecretUpdatedAt
-                ? t('apps.fields.clientSecretUpdatedAt', { date: new Date(app.clientSecretUpdatedAt).toLocaleString() })
+              displayApp.clientSecretUpdatedAt
+                ? t('apps.fields.clientSecretUpdatedAt', { date: new Date(displayApp.clientSecretUpdatedAt).toLocaleString() })
                 : t('apps.fields.noClientSecret')
             }
           />
           <TextRow
             label={t('apps.fields.webhookUrl')}
-            value={app.webhookUrl ?? t('apps.fields.noWebhookUrl')}
+            value={displayApp.webhookUrl ?? t('apps.fields.noWebhookUrl')}
           />
           <TextRow
             label={t('apps.fields.webhookSecret')}
-            value={app.hasWebhookSecret ? t('apps.fields.webhookSecretConfigured') : t('apps.fields.noWebhookSecret')}
+            value={displayApp.hasWebhookSecret ? t('apps.fields.webhookSecretConfigured') : t('apps.fields.noWebhookSecret')}
           />
         </SheetBody>
       </SheetContent>

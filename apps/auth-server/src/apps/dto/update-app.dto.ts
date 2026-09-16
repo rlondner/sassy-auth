@@ -76,11 +76,4 @@ export class UpdateAppDto {
    * isn't reported to this app anymore.
    */
   @IsOptional() @IsAppUrl() @MaxLength(2048) webhookUrl?: string | null;
-
-  /**
-   * Signing secret for the activation webhook's X-Sassy-Signature header.
-   * Stored in plaintext (unlike clientSecretHash) because it signs OUTGOING
-   * requests rather than verifying an incoming credential. null clears it.
-   */
-  @IsOptional() @IsString() @MinLength(16) @MaxLength(256) webhookSecret?: string | null;
 }
