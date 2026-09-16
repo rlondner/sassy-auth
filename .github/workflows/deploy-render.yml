@@ -16,10 +16,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
-    # waitForLiveDeploy (15s x 40 attempts = 10 min) and waitForJobCompletion
-    # (10s x 60 attempts = 10 min) can each run to their full timeout in the
+    # waitForLiveDeploy (15s x 40 attempts = 10 min) and the two sequential
+    # waitForJobCompletion calls — db:seed, then db:seed:vibecast (10s x 60
+    # attempts = 10 min each) — can each run to their full timeout in the
     # worst case, plus headroom for checkout/install and other CLI steps.
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 

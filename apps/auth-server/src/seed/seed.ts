@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import { prisma } from '@sassy-auth/db';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
@@ -9,6 +10,18 @@ const sqids = new Sqids({
   alphabet: process.env.SQIDS_ALPHABET || undefined,
   minLength: 4,
 });
+
+const isProd = (process.env.NODE_ENV ?? 'development') === 'production';
+
+/**
+ * Only used for the real production super admin (contact@milissai.com) —
+ * that account isn't a shared dev/test fixture, so it doesn't get the
+ * well-known SEED_ADMIN_PASSWORD. Nobody needs this value: the account is
+ * meant to be claimed via the forgot-password flow, so it is never logged.
+ */
+function generateRandomPassword(): string {
+  return crypto.randomBytes(24).toString('base64url');
+}
 
 const PLATFORM_PERMISSIONS = [
   'platform.orgs.manage',
@@ -26,22 +39,47 @@ type AdminGrant =
   | { kind: 'direct'; permission: string }
   | { kind: 'role'; role: string };
 
-const PLATFORM_ADMINS: ReadonlyArray<{
+const SUPER_ADMIN_ROLE_NAME = 'Platform Super Admin';
+
+type PlatformAdmin = {
   email: string;
   firstName: string;
   lastName: string;
   grant: AdminGrant;
-}> = [
+  /** Overrides the shared ADMIN_PASSWORD for this account. */
+  password?: string;
+};
+
+// Dev/test fixtures — share the well-known SEED_ADMIN_PASSWORD, used by
+// local dev, CI, and the Playwright e2e suite (see apps/admin-e2e/lib/admins.ts).
+// Never seeded in production: that password is documented in this repo, so
+// creating these accounts against a real deployment would ship a public
+// credential for platform-admin access.
+const DEV_TEST_ADMINS: readonly PlatformAdmin[] = [
   { email: 'u@sa.io', firstName: 'Users', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.users.manage' } },
   { email: 'o@sa.io', firstName: 'Orgs',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.orgs.manage' } },
   { email: 'a@sa.io', firstName: 'Apps',  lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.apps.manage' } },
   { email: 'r@sa.io', firstName: 'Roles', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.roles.manage' } },
   { email: 'p@sa.io', firstName: 'Perms', lastName: 'Admin', grant: { kind: 'direct', permission: 'platform.permissions.manage' } },
-  { email: 's@sa.io', firstName: 'Super', lastName: 'Admin', grant: { kind: 'role',   role: 'Platform Super Admin' } },
+  { email: 's@sa.io', firstName: 'Super', lastName: 'Admin', grant: { kind: 'role',   role: SUPER_ADMIN_ROLE_NAME } },
   { email: 'tfa@sa.io', firstName: 'TwoFactor', lastName: 'Test', grant: { kind: 'direct', permission: 'platform.users.manage' } },
 ];
 
-const SUPER_ADMIN_ROLE_NAME = 'Platform Super Admin';
+// The real production super admin — not a dev/test fixture, so it's only
+// seeded when NODE_ENV=production, and it gets its own randomly generated
+// password rather than the shared SEED_ADMIN_PASSWORD. Claim it via the
+// forgot-password flow after the first deploy.
+const PRODUCTION_ADMINS: readonly PlatformAdmin[] = [
+  {
+    email: 'contact@milissai.com',
+    firstName: 'MiLissAI',
+    lastName: 'Super Admin',
+    grant: { kind: 'role', role: SUPER_ADMIN_ROLE_NAME },
+    password: generateRandomPassword(),
+  },
+];
+
+const PLATFORM_ADMINS: readonly PlatformAdmin[] = isProd ? PRODUCTION_ADMINS : DEV_TEST_ADMINS;
 
 async function ensurePlatformSuperAdminRole(platformAppId: number) {
   let role = await prisma.saRole.findFirst({
@@ -116,13 +154,16 @@ async function seedPlatformAdmin(
   const result = await auth.api.signUpEmail({
     body: {
       email: admin.email,
-      password: ADMIN_PASSWORD,
+      password: admin.password ?? ADMIN_PASSWORD,
       name: `${admin.firstName} ${admin.lastName}`,
     },
   });
   const baUserId: string = result.user.id;
 
   await completeAdminSetup(admin, baUserId, platformOrgId, superAdminRoleId);
+  if (admin.password) {
+    console.log(`Created admin ${admin.email} with a randomly generated password — use the forgot-password flow to set your own.`);
+  }
 }
 
 /**

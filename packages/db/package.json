@@ -13,7 +13,8 @@
     "db:migrate": "dotenv -e ../../.env.local -- prisma migrate dev",
     "db:migrate:deploy": "dotenv -e ../../.env.local -- prisma migrate deploy",
     "db:push": "dotenv -e ../../.env.local -- prisma db push",
-    "db:seed": "dotenv -e ../../.env.local -- ts-node --transpile-only -r tsconfig-paths/register ../../apps/auth-server/src/seed/seed.ts"
+    "db:seed": "dotenv -e ../../.env.local -- ts-node --transpile-only -r tsconfig-paths/register ../../apps/auth-server/src/seed/seed.ts",
+    "db:seed:vibecast": "dotenv -e ../../.env.local -- ts-node --transpile-only -r tsconfig-paths/register ../../apps/auth-server/src/seed/vibecast-migration.ts"
   },
   "jest": {
     "moduleFileExtensions": ["js", "json", "ts"],

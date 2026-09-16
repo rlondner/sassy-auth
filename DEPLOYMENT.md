@@ -172,9 +172,13 @@ Running migrations in both places executes them twice per deploy — pick one lo
 
 ### 3.4 First-time seed
 
-Seeding is automated as a Render Job triggered by the deploy workflow after every successful deploy of `sassy-auth-server`. `db:seed` is idempotent, so re-running it on every deploy is safe.
+Seeding is automated as two Render Jobs triggered by the deploy workflow after every successful deploy of `sassy-auth-server`: `db:seed`, then `db:seed:vibecast`. Both are idempotent, so re-running them on every deploy is safe.
 
-This creates the platform app, org, permissions, and five platform admin users (`s@sa.io`, `u@sa.io`, …). Sign in at https://auth.milissai.com/login as `s@sa.io` with your `SEED_ADMIN_PASSWORD`.
+`db:seed` creates the platform app, org, permissions, the `Platform Super Admin` role (wired to every `platform.*` permission), and the platform admin users — the dev/test fixtures (`s@sa.io`, `u@sa.io`, …) plus the real production super admin `contact@milissai.com`. Sign in at https://auth.milissai.com/login as `s@sa.io` with your `SEED_ADMIN_PASSWORD`.
+
+`contact@milissai.com` is seeded only when `NODE_ENV=production` and gets its own randomly generated password instead of `SEED_ADMIN_PASSWORD` — that password is never logged or stored anywhere. Use the **forgot password** flow at https://auth.milissai.com/login to claim the account.
+
+`db:seed:vibecast` (`vibecast-migration.ts`) provisions the `vibecast` app, its `vibecast.*` permissions and roles, the "VibeCast Default Org", and the `admin@getvibecast.com` app admin. It requires `VIBECAST_APP_URL`, `VIBECAST_LOGIN_REDIRECT_URI`, and `VIBECAST_LOGOUT_REDIRECT_URI` (set as static values in `render.yaml`) — the script throws in production if any are unset.
 
 **Optional demo data** for the FastAPI sample (creates app `resourceserver01`, org `Citadel`, demo users) — this is not part of the automated pipeline; run it once from a Render shell on `sassy-auth-server` (**Shell** tab in the service dashboard, which inherits the service's environment variables):
 
@@ -217,6 +221,9 @@ Set that value as `SASSY_CLIENT_ID` on `sassy-resource-server` and redeploy.
 | Variable | Notes |
 |----------|-------|
 | `SEED_ADMIN_PASSWORD` | Required for seed in production |
+| `VIBECAST_APP_URL` | `https://app.getvibecast.com` — required by `db:seed:vibecast` in production |
+| `VIBECAST_LOGIN_REDIRECT_URI` | `https://app.getvibecast.com/api/auth/callback` |
+| `VIBECAST_LOGOUT_REDIRECT_URI` | `https://app.getvibecast.com/api/auth/signout` |
 | `RESEND_API_KEY` | Recommended email transport |
 | `REGISTER_RATE_LIMIT` | Default `10` — in-process; see [Known Limitations](README.md#known-limitations) |
 | `GOOGLE_*`, `MICROSOFT_*`, … | Optional social sign-in — redirect URIs use `https://auth-api.milissai.com/api/auth/callback/{provider}` |

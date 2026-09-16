@@ -73,6 +73,15 @@ services:
       # Required in production — seed refuses the dev default otherwise.
       - key: SEED_ADMIN_PASSWORD
         sync: false
+      # VibeCast app provisioning (vibecast-migration.ts), run as a second
+      # Render Job by the deploy workflow after every db:seed. Required in
+      # production or the seed script throws.
+      - key: VIBECAST_APP_URL
+        value: https://app.getvibecast.com
+      - key: VIBECAST_LOGIN_REDIRECT_URI
+        value: https://app.getvibecast.com/api/auth/callback
+      - key: VIBECAST_LOGOUT_REDIRECT_URI
+        value: https://app.getvibecast.com/api/auth/signout
       # Outbound mail — set RESEND_API_KEY (recommended) or SMTP vars.
       - key: RESEND_API_KEY
         sync: false

@@ -153,6 +153,15 @@ async function main(): Promise<void> {
     await waitForJobCompletion(renderCfg, authServerId, job.id);
   });
 
+  // Runs after db:seed so the platform app/org/Platform Super Admin role it
+  // creates already exist — vibecast-migration.ts only provisions the
+  // vibecast app, org, and admin. Both jobs are idempotent, so re-running
+  // them on every deploy is safe.
+  await withServiceContext('sassy-auth-server', async () => {
+    const job = await startJob(renderCfg, authServerId, 'pnpm --filter @sassy-auth/db db:seed:vibecast');
+    await waitForJobCompletion(renderCfg, authServerId, job.id);
+  });
+
   console.log('Render deployment automation complete.');
 }
 
