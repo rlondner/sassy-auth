@@ -1,4 +1,10 @@
-import { secretExists, setSecret, sealSecret, type GithubConfig } from './githubSecrets';
+import {
+  secretExists,
+  setSecret,
+  sealSecret,
+  setAndVerifySecret,
+  type GithubConfig,
+} from './githubSecrets';
 
 const cfg: GithubConfig = {
   owner: 'acme',
@@ -77,5 +83,45 @@ describe('setSecret', () => {
       .mockResolvedValueOnce({ ok: false, status: 403, text: async () => 'forbidden' } as Response);
 
     await expect(setSecret(cfg, 'BETTER_AUTH_SECRET', 'value', fetchFn)).rejects.toThrow(/403/);
+  });
+});
+
+describe('setAndVerifySecret', () => {
+  it('resolves when the secret is set and then reads back as present', async () => {
+    const fetchFn = jest
+      .fn()
+      // getEnvironmentPublicKey
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ key_id: '123', key: 'CoLnKzljvQBrRKzO4CIfjbty8y+FVN7leGFF9DEbnzY=' }),
+      } as Response)
+      // setSecret PUT
+      .mockResolvedValueOnce({ ok: true, status: 201, text: async () => '' } as Response)
+      // secretExists GET
+      .mockResolvedValueOnce({ ok: true, status: 200 } as Response);
+
+    await expect(
+      setAndVerifySecret(cfg, 'BETTER_AUTH_SECRET', 'super-secret-value', fetchFn),
+    ).resolves.toBeUndefined();
+
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws when the secret does not read back as present after writing', async () => {
+    const fetchFn = jest
+      .fn()
+      // getEnvironmentPublicKey
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ key_id: '123', key: 'CoLnKzljvQBrRKzO4CIfjbty8y+FVN7leGFF9DEbnzY=' }),
+      } as Response)
+      // setSecret PUT
+      .mockResolvedValueOnce({ ok: true, status: 201, text: async () => '' } as Response)
+      // secretExists GET returns 404
+      .mockResolvedValueOnce({ ok: false, status: 404 } as Response);
+
+    await expect(
+      setAndVerifySecret(cfg, 'BETTER_AUTH_SECRET', 'super-secret-value', fetchFn),
+    ).rejects.toThrow(/does not read back as present/);
   });
 });
