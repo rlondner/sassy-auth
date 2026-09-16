@@ -64,6 +64,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   // already be saved before it will mint one (see AppsService.rotateWebhookSecret).
   const [newWebhookSecret, setNewWebhookSecret] = React.useState<string | null>(null)
   const [rotatingWebhookSecret, setRotatingWebhookSecret] = React.useState(false)
+  const [activationFromName, setActivationFromName] = React.useState<string>(app.activationEmailOverride?.fromName ?? '')
+  const [activationFromAddress, setActivationFromAddress] = React.useState<string>(app.activationEmailOverride?.fromAddress ?? '')
+  const [activationSubject, setActivationSubject] = React.useState<string>(app.activationEmailOverride?.subject ?? '')
+  const [activationMessage, setActivationMessage] = React.useState<string>(app.activationEmailOverride?.message ?? '')
   const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
   const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -106,6 +110,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setPasswordPolicy(app.passwordPolicyOverride ?? app.effectivePasswordPolicy)
     setWebhookUrl(app.webhookUrl ?? '')
     setHasWebhookSecret(app.hasWebhookSecret ?? false)
+    setActivationFromName(app.activationEmailOverride?.fromName ?? '')
+    setActivationFromAddress(app.activationEmailOverride?.fromAddress ?? '')
+    setActivationSubject(app.activationEmailOverride?.subject ?? '')
+    setActivationMessage(app.activationEmailOverride?.message ?? '')
     setErrorKey(null)
     setNewClientSecret(null)
     setNewWebhookSecret(null)
@@ -205,7 +213,13 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
   const webhookUrlDirty = webhookUrl.trim() !== (app.webhookUrl ?? '')
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty
+  const activationOverrideBaseline = app.activationEmailOverride ?? { fromName: '', fromAddress: '', subject: '', message: '' }
+  const activationDirty =
+    activationFromName.trim() !== (activationOverrideBaseline.fromName ?? '') ||
+    activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
+    activationSubject.trim() !== (activationOverrideBaseline.subject ?? '') ||
+    activationMessage.trim() !== (activationOverrideBaseline.message ?? '')
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -218,7 +232,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
@@ -235,6 +249,18 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       // Clearing the URL cascades server-side to clear any stored secret too
       // — a webhook is never left half-configured (see AppsService.updateApp).
       patch.webhookUrl = trimmedWebhookUrl === '' ? null : trimmedWebhookUrl
+    }
+    if (activationDirty) {
+      const trimmed = {
+        fromName: activationFromName.trim(),
+        fromAddress: activationFromAddress.trim(),
+        subject: activationSubject.trim(),
+        message: activationMessage.trim(),
+      }
+      const allEmpty = Object.values(trimmed).every((v) => v === '')
+      patch.activationEmailOverride = allEmpty
+        ? null
+        : Object.fromEntries(Object.entries(trimmed).filter(([, v]) => v !== '')) as import('@/lib/types').ActivationEmailBranding
     }
     startTransition(async () => {
       // Two independent endpoints: /api/apps for the core fields, and
@@ -645,6 +671,57 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                   )}
                 </div>
               )}
+            </div>
+            <div>
+              <Label>{t('apps.fields.activationEmail')}</Label>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.activationEmailHint')}
+              </p>
+              <div className="mt-3 space-y-3 rounded border border-[var(--border)] p-3">
+                <div>
+                  <Label htmlFor="activationFromName">{t('apps.fields.activationEmailFromName')}</Label>
+                  <Input
+                    id="activationFromName"
+                    value={activationFromName}
+                    onChange={(e) => setActivationFromName(e.target.value)}
+                    placeholder={t('apps.fields.activationEmailFromNamePlaceholder')}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="activationFromAddress">{t('apps.fields.activationEmailFromAddress')}</Label>
+                  <Input
+                    id="activationFromAddress"
+                    type="email"
+                    value={activationFromAddress}
+                    onChange={(e) => setActivationFromAddress(e.target.value)}
+                    placeholder={t('apps.fields.activationEmailFromAddressPlaceholder')}
+                  />
+                  <p className="mt-1 text-body-sm text-muted-foreground">
+                    {t('apps.fields.activationEmailFromAddressHint')}
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="activationSubject">{t('apps.fields.activationEmailSubject')}</Label>
+                  <Input
+                    id="activationSubject"
+                    value={activationSubject}
+                    onChange={(e) => setActivationSubject(e.target.value)}
+                    placeholder={t('apps.fields.activationEmailSubjectPlaceholder')}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="activationMessage">{t('apps.fields.activationEmailMessage')}</Label>
+                  <Input
+                    id="activationMessage"
+                    value={activationMessage}
+                    onChange={(e) => setActivationMessage(e.target.value)}
+                    placeholder={t('apps.fields.activationEmailMessagePlaceholder')}
+                  />
+                  <p className="mt-1 text-body-sm text-muted-foreground">
+                    {t('apps.fields.activationEmailMessageHint')}
+                  </p>
+                </div>
+              </div>
             </div>
             {errorKey && (
               <p role="alert" className="text-body-sm text-destructive">
