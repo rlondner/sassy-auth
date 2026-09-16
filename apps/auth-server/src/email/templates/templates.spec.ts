@@ -76,4 +76,13 @@ describe('email templates', () => {
     });
     expect(out.from).toBe('Vibecast');
   });
+
+  it('verificationEmail falls back to the default subject/message when branding fields are whitespace-only', () => {
+    const out = verificationEmail({
+      firstName: 'Jane', verifyUrl: 'https://x/verify', appName: 'Vibecast',
+      branding: { subject: '   ', message: '   ' },
+    });
+    expect(out.subject).toBe('Verify your Vibecast email address');
+    expect(out.html).toContain('Confirm your email address to finish setting up your account:');
+  });
 });
