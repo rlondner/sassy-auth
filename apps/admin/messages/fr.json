@@ -154,7 +154,8 @@
       "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
       "logoInvalidType": "Veuillez choisir une image PNG, JPEG, WebP ou SVG.",
       "logoTooLarge": "Cette image est trop volumineuse. Veuillez en choisir une de moins de 250 Ko.",
-      "nameRequired": "Le nom de l’application est requis."
+      "nameRequired": "Le nom de l’application est requis.",
+      "activationEmailInvalid": "Veuillez vérifier les paramètres de l'e-mail d'activation — l'adresse d'expéditeur doit être une adresse e-mail valide et aucun champ ne doit contenir de saut de ligne."
     },
     "badges": {
       "platform": "Plateforme"

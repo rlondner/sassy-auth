@@ -154,7 +154,8 @@
       "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
       "logoInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
       "logoTooLarge": "That image is too large. Please choose one under 250KB.",
-      "nameRequired": "App name is required."
+      "nameRequired": "App name is required.",
+      "activationEmailInvalid": "Please check the activation email settings — the from address must be a valid email, and no field may contain a line break."
     },
     "badges": {
       "platform": "Platform"
