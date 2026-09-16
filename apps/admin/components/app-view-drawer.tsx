@@ -199,6 +199,14 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
                 : t('apps.fields.noClientSecret')
             }
           />
+          <TextRow
+            label={t('apps.fields.webhookUrl')}
+            value={app.webhookUrl ?? t('apps.fields.noWebhookUrl')}
+          />
+          <TextRow
+            label={t('apps.fields.webhookSecret')}
+            value={app.hasWebhookSecret ? t('apps.fields.webhookSecretConfigured') : t('apps.fields.noWebhookSecret')}
+          />
         </SheetBody>
       </SheetContent>
     </Sheet>

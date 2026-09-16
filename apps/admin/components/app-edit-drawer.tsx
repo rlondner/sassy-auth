@@ -56,6 +56,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [passwordPolicy, setPasswordPolicy] = React.useState<PasswordPolicy>(
     app.passwordPolicyOverride ?? app.effectivePasswordPolicy,
   )
+  const [webhookUrl, setWebhookUrl] = React.useState<string>(app.webhookUrl ?? '')
+  // Blank means "leave the stored secret unchanged" — the secret itself is
+  // never sent to the admin console, so there's nothing to prefill here
+  // (mirrors the write-only treatment of clientSecret above).
+  const [webhookSecretInput, setWebhookSecretInput] = React.useState<string>('')
+  const [hasWebhookSecret, setHasWebhookSecret] = React.useState<boolean>(app.hasWebhookSecret ?? false)
   const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
   const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -96,6 +102,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setDefaultRoleId(app.defaultRoleId ?? null)
     setPasswordPolicyOverrideEnabled(app.passwordPolicyOverride !== null)
     setPasswordPolicy(app.passwordPolicyOverride ?? app.effectivePasswordPolicy)
+    setWebhookUrl(app.webhookUrl ?? '')
+    setWebhookSecretInput('')
+    setHasWebhookSecret(app.hasWebhookSecret ?? false)
     setErrorKey(null)
     setNewClientSecret(null)
     setClientSecretUpdatedAt(app.clientSecretUpdatedAt ?? null)
@@ -176,7 +185,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const passwordPolicyDirty =
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty
+  const webhookUrlDirty = webhookUrl.trim() !== (app.webhookUrl ?? '')
+  const webhookDirty = webhookUrlDirty || webhookSecretInput.trim() !== ''
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -189,7 +200,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; webhookSecret?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
@@ -201,6 +212,17 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     if (passwordPolicyDirty) {
       patch.passwordPolicyOverride = passwordPolicyOverrideEnabled ? passwordPolicy : null
     }
+    if (webhookUrlDirty) {
+      const trimmedWebhookUrl = webhookUrl.trim()
+      patch.webhookUrl = trimmedWebhookUrl === '' ? null : trimmedWebhookUrl
+      // The server rejects a webhook configured with only one of URL/secret
+      // set (see assertWebhookConfigNotHalfSet) — clearing the URL while a
+      // secret is still stored must clear the secret too, in the same PATCH.
+      if (trimmedWebhookUrl === '' && hasWebhookSecret && webhookSecretInput.trim() === '') {
+        patch.webhookSecret = null
+      }
+    }
+    if (webhookSecretInput.trim() !== '') patch.webhookSecret = webhookSecretInput.trim()
     startTransition(async () => {
       // Two independent endpoints: /api/apps for the core fields, and
       // /api/social-providers/:clientId for the checkbox group — the
@@ -543,6 +565,39 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                   </Button>
                 </div>
               )}
+            </div>
+            <div>
+              <Label htmlFor="webhookUrl">{t('apps.fields.webhookUrl')}</Label>
+              <Input
+                id="webhookUrl"
+                type="url"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                placeholder={t('apps.fields.webhookUrlPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.webhookUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="webhookSecret">{t('apps.fields.webhookSecret')}</Label>
+              <Input
+                id="webhookSecret"
+                type="password"
+                autoComplete="off"
+                value={webhookSecretInput}
+                onChange={(e) => setWebhookSecretInput(e.target.value)}
+                placeholder={
+                  hasWebhookSecret
+                    ? t('apps.fields.webhookSecretPlaceholderConfigured')
+                    : t('apps.fields.webhookSecretPlaceholderUnset')
+                }
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {hasWebhookSecret ? t('apps.fields.webhookSecretConfigured') : t('apps.fields.noWebhookSecret')}
+                {' '}
+                {t('apps.fields.webhookSecretHint')}
+              </p>
             </div>
             {errorKey && (
               <p role="alert" className="text-body-sm text-destructive">
