@@ -2,6 +2,7 @@ import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLe
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PasswordPolicy } from '@sassy-auth/types';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
+import { IsAppLogo } from '../../common/config/is-app-logo.decorator';
 
 // "At least one of name / url" is enforced server-side in
 // AppsService.updateApp rather than in a DTO-level ValidateIf trick (which is
@@ -9,6 +10,15 @@ import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 export class UpdateAppDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(120) name?: string;
   @IsOptional() @IsAppUrl() @MaxLength(2048) url?: string;
+
+  /**
+   * Full data URI (e.g. "data:image/png;base64,..."), validated by
+   * IsAppLogo against the shared @sassy-auth/types size/type rule.
+   * `null` clears the logo.
+   */
+  @IsOptional()
+  @IsAppLogo()
+  logo?: string | null;
 
   /**
    * Per-app 2FA trust / re-prompt interval in days.
@@ -58,4 +68,12 @@ export class UpdateAppDto {
   @ApiPropertyOptional({ type: Object })
   @IsOptional()
   passwordPolicyOverride?: PasswordPolicy | null;
+
+  /**
+   * Target URL for the activation webhook (see
+   * apps/auth-server/src/activation/notify-activation.ts). null clears it,
+   * which stops delivery — the account still activates normally, it just
+   * isn't reported to this app anymore.
+   */
+  @IsOptional() @IsAppUrl() @MaxLength(2048) webhookUrl?: string | null;
 }

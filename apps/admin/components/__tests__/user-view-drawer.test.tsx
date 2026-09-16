@@ -25,6 +25,7 @@ jest.mock('@/app/(admin)/users/actions', () => ({
 const mockUser: User = {
   id: '1', firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com',
   status: 'active', orgId: 'org1', phoneNumber: null, username: null,
+  createdAt: '2026-01-01T00:00:00.000Z', lastLoginAt: null,
 }
 
 describe('UserViewDrawer', () => {

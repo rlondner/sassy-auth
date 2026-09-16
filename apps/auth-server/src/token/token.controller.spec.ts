@@ -850,6 +850,155 @@ describe('TokenController', () => {
         ),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('allows a signup-amr code to redeem for a pending user', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        scope: '',
+        amr: ['signup'],
+        hadChallenge: false,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'pending',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 10, publicId: 'sqid-10', url: 'https://app.example.com', clientSecretHash: 'hashed',
+      });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+
+      const result = await controller.oauthToken(
+        {
+          grant_type: 'authorization_code',
+          code: 'valid-signup-code',
+          client_id: 'sqid-10',
+          client_secret: 'the-real-secret',
+          redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq,
+        fakeTokenRes,
+      );
+
+      expect(result).toEqual({
+        access_token: 'oauth.jwt.token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: '',
+      });
+    });
+
+    it('allows a signup-amr code to redeem for an unverified user', async () => {
+      // 'unverified' is the actual status RegistrationService sets on a
+      // newly-created user (see registration.service.ts) — the real signup
+      // flow produces this status, not 'pending'.
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        scope: '',
+        amr: ['signup'],
+        hadChallenge: false,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'unverified',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 10, publicId: 'sqid-10', url: 'https://app.example.com', clientSecretHash: 'hashed',
+      });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+
+      const result = await controller.oauthToken(
+        {
+          grant_type: 'authorization_code',
+          code: 'valid-signup-code',
+          client_id: 'sqid-10',
+          client_secret: 'the-real-secret',
+          redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq,
+        fakeTokenRes,
+      );
+
+      expect(result).toEqual({
+        access_token: 'oauth.jwt.token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: '',
+      });
+    });
+
+    it('rejects a signup-amr code for an inactive user', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        scope: 'openid',
+        amr: ['signup'],
+        hadChallenge: false,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'inactive',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 10, publicId: 'sqid-10', url: 'https://app.example.com', clientSecretHash: 'hashed',
+      });
+
+      await expect(
+        controller.oauthToken(
+          {
+            grant_type: 'authorization_code',
+            code: 'valid-signup-code',
+            client_id: 'sqid-10',
+            client_secret: 'the-real-secret',
+            redirect_uri: 'https://app.example.com/callback',
+          },
+          fakeTokenReq,
+          fakeTokenRes,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('still requires active status for a non-signup code even when the user is pending', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1',
+        appPublicId: 'sqid-10',
+        scope: 'openid',
+        amr: ['pwd'],
+        hadChallenge: true,
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1,
+        publicId: 'sqid-1',
+        status: 'pending',
+        orgId: 5,
+        org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+
+      await expect(
+        controller.oauthToken(
+          {
+            grant_type: 'authorization_code',
+            code: 'valid-code',
+            client_id: 'sqid-10',
+            code_verifier: 'a'.repeat(64),
+            redirect_uri: 'https://app.example.com/callback',
+          },
+          fakeTokenReq,
+          fakeTokenRes,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
   // ── Task 9: confidential clients — §2 invariant ──────────────────────────
@@ -1185,6 +1334,32 @@ describe('TokenController', () => {
       expect(res.body.name).toBe('Ada Lovelace');
     });
 
+    it('returns status:pending for a signup-flow token instead of rejecting', async () => {
+      const token = signTestToken({ sub: 'u_2', aud: 'a_7', scope: 'openid' });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ id: 2, publicId: 'u_2', status: 'pending' });
+      mockTokenService.buildScopedClaims.mockResolvedValue({});
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ sub: 'u_2', status: 'pending' });
+    });
+
+    it('returns status:unverified for a just-registered user', async () => {
+      const token = signTestToken({ sub: 'u_3', aud: 'a_7', scope: 'openid' });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ id: 3, publicId: 'u_3', status: 'unverified' });
+      mockTokenService.buildScopedClaims.mockResolvedValue({});
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/userinfo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ sub: 'u_3', status: 'unverified' });
+    });
+
     it('cannot return a claim the token did not grant', async () => {
       const token = signTestToken({ sub: 'u_1', aud: 'a_7', scope: 'openid' });
       mockPrisma.saUser.findFirst.mockResolvedValue({ id: 1, publicId: 'u_1', status: 'active' });
@@ -1195,7 +1370,7 @@ describe('TokenController', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ sub: 'u_1' });
+      expect(res.body).toEqual({ sub: 'u_1', status: 'active' });
       expect(mockTokenService.buildScopedClaims).toHaveBeenCalledWith(expect.any(Number), 'openid');
     });
 
@@ -1316,6 +1491,83 @@ describe('TokenController', () => {
         .get('/api/token/oauth/logout')
         .query({ id_token_hint: 'not.a.token', post_logout_redirect_uri: 'https://app.example.com/bye' });
 
+      expect(res.headers.location).toContain('/logged-out');
+    });
+
+    it('forwards the session-clearing Set-Cookie header to the browser', async () => {
+      mockAuth.api.signOut.mockResolvedValue({
+        headers: new Headers({
+          'set-cookie': 'better-auth.session_token=; Max-Age=0; Path=/',
+        }),
+      });
+
+      const res = await request(app.getHttpServer()).get('/api/token/oauth/logout');
+
+      expect(mockAuth.api.signOut).toHaveBeenCalledWith(
+        expect.objectContaining({ asResponse: true }),
+      );
+      expect(res.headers['set-cookie']?.[0]).toContain('better-auth.session_token=;');
+    });
+  });
+
+  // ── POST /api/token/oauth/logout ─────────────────────────────────────────
+  // Not spec-mandated (RP-Initiated Logout is a front-channel GET redirect),
+  // but accepted defensively — some OIDC client libraries POST here instead.
+
+  describe('POST /api/token/oauth/logout', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        controllers: [TokenController],
+        providers: [
+          { provide: TokenService, useValue: mockTokenService },
+          { provide: OauthService, useValue: mockOauthService },
+          { provide: SqidService, useValue: mockSqidService },
+          { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api');
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockAuth.api.signOut.mockResolvedValue(undefined);
+    });
+
+    it('terminates the session and redirects, given a form-urlencoded body', async () => {
+      const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/token/oauth/logout')
+        .type('form')
+        .send({
+          id_token_hint: idToken,
+          post_logout_redirect_uri: 'https://app.example.com/bye',
+          state: 'xyz',
+        });
+
+      expect(mockAuth.api.signOut).toHaveBeenCalled();
+      expect(res.status).toBe(302);
+      const target = new URL(res.headers.location);
+      expect(target.origin + target.pathname).toBe('https://app.example.com/bye');
+      expect(target.searchParams.get('state')).toBe('xyz');
+    });
+
+    it('signs out and shows the logged-out page with no body', async () => {
+      const res = await request(app.getHttpServer()).post('/api/token/oauth/logout');
+
+      expect(mockAuth.api.signOut).toHaveBeenCalled();
       expect(res.headers.location).toContain('/logged-out');
     });
   });
