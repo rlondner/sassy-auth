@@ -14,11 +14,18 @@ import {
 // render.yaml's healthCheckPath is OAUTH_AS_METADATA_PATH — Render polls it
 // frequently (aggressively so right after a deploy, while confirming the new
 // instance is healthy). Without this, that polling — plus any other traffic
-// hitting either static metadata endpoint — counts against the same global
-// `default` throttle bucket as the rest of the API and can trip it, which
-// makes Render see failing health checks and restart the instance,
-// producing a self-inflicted restart loop instead of a stable deploy.
-@SkipThrottle()
+// hitting either static metadata endpoint — counts against the throttle
+// buckets registered in app.module.ts and can trip them, which makes Render
+// see failing health checks and restart the instance, producing a
+// self-inflicted restart loop instead of a stable deploy.
+//
+// Every named bucket must be listed explicitly — @SkipThrottle() with no
+// args only sets { default: true } (see @nestjs/throttler's source), so it
+// silently leaves any OTHER named bucket (here, `auth`, app.module.ts's
+// tight 10-req/60s bucket) still active. That's exactly what happened: this
+// controller was skipping `default` but still throttled by `auth`, so the
+// restart loop continued even after adding a no-args @SkipThrottle() here.
+@SkipThrottle({ default: true, auth: true })
 @ApiExcludeController()
 @Controller()
 export class DiscoveryController {
