@@ -12,6 +12,10 @@ export interface NeonConfig {
   // rejects GET/POST /projects with "org_id is required" otherwise.
   // Personal API keys don't need this.
   orgId?: string;
+  // Neon region id (e.g. "aws-us-east-2"). Only applied when creating a new project —
+  // Neon defaults to its own region (historically Oregon) otherwise, which is unlikely to
+  // match the Render services' region and adds cross-region latency to every query.
+  regionId?: string;
 }
 
 interface NeonProject {
@@ -50,6 +54,7 @@ export async function createProject(cfg: NeonConfig, fetchFn: FetchLike = fetch)
       project: {
         name: cfg.projectName,
         ...(cfg.orgId ? { org_id: cfg.orgId } : {}),
+        ...(cfg.regionId ? { region_id: cfg.regionId } : {}),
         // Without this, Neon provisions its own defaults (a "neondb" database owned by
         // "neondb_owner") instead of the names this pipeline expects.
         branch: { database_name: cfg.databaseName, role_name: cfg.roleName },
