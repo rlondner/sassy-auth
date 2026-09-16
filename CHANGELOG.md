@@ -4,6 +4,58 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-15
+
+Three commits landed directly on `dev` in the last 24h (no PR — `dev` has
+no branch protection, still open from 2026-09-04), all implementing real
+HTTPS for `apps/auth-server` in local dev: `dev(sec): added certificates
+to run API with https` (`0002a11`) wires mkcert certs into
+`NestFactory.create`'s `httpsOptions`; `fix(auth): keep unprefixed session
+cookie name in dev under https` (`953e42d`) pins BetterAuth's
+`useSecureCookies` to the same `NODE_ENV === 'production'` condition as
+`defaultCookieAttributes.secure` — without it, BetterAuth derives
+`useSecureCookies` independently from `BETTER_AUTH_URL`'s `https://`
+scheme and silently renames the session cookie to
+`__Secure-better-auth.session_token`, which admin's dozen or so hardcoded
+`'better-auth.session_token'` lookups don't match, so every sign-in
+"succeeded" upstream while the admin login form reported "Sign-in
+service is unavailable"; and `removed --experimental-https from
+package.json` (`723ccfb`) drops Nest's now-redundant `--experimental-https`
+flag from `apps/auth-server`'s `dev` script now that TLS is wired
+explicitly.
+
+This is the direct successor to the not-yet-merged bug-0287 fix (PR #386,
+which reverted the scheme back to `http://` because `main.ts` had no TLS
+wiring at the time) — that PR's premise no longer holds now that `main.ts`
+actually serves HTTPS, and it should be closed or rebased rather than
+merged; see TODO.
+
+Filed and fixed **bug-0290** (Critical): the certificate-loading code
+`0002a11` added had no existence check and crashed the whole process with
+an uncaught `ENOENT` whenever the mkcert certs were absent — true of a
+fresh clone, of `docker compose up` (the Dockerfile deliberately runs with
+`NODE_ENV` unset), and of CI's `admin-e2e` job (`NODE_ENV: test`). Fixed
+in PR #392 with a graceful plain-HTTP fallback plus a new README section
+documenting the mkcert setup step. See
+[BUGS_2026-09-15.md](./docs/history/bugs/BUGS_2026-09-15.md) and
+[TODO_2026-09-15.md](./docs/history/todo/TODO_2026-09-15.md).
+
+### Fixed (1 bug)
+
+- **bug-0290** (Critical) — `apps/auth-server`'s dev HTTPS bootstrap
+  crashed on boot (uncaught `ENOENT`) whenever the gitignored, per-machine
+  mkcert dev certificates were absent — breaking a fresh clone's `pnpm
+  dev`, `docker compose up`, and (once the pre-existing bug-0282 build
+  blocker clears) CI e2e. Now falls back to plain HTTP with a warning
+  instead of crashing; cert resolution extracted to a unit-tested
+  `https-options.ts` module. PR #392.
+
+### Docs
+
+- README: documented the `apps/auth-server` mkcert dev-certificate setup
+  step (previously undocumented — `apps/admin`'s `--experimental-https` is
+  a different, self-generating mechanism and needed no equivalent step).
+  PR #392.
 ## [Unreleased] — 2026-09-14
 
 No commits landed on `dev` in the last 24 hours — the branch has been idle
