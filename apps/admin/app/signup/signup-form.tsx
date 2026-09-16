@@ -1,9 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Button } from '@sassy-auth/ui'
+import { Button, FormField } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
 import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
 import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
@@ -28,6 +28,7 @@ const KNOWN_ERRORS = [
 
 export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: SignupFormProps) {
   const t = useTranslations()
+  const router = useRouter()
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
   const [companyName, setCompanyName] = React.useState('')
@@ -36,7 +37,6 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
   const [confirm, setConfirm] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
-  const [success, setSuccess] = React.useState(false)
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -65,7 +65,9 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
         setError(t(`signup.errors.${key as (typeof KNOWN_ERRORS)[number]}`))
         return
       }
-      setSuccess(true)
+      router.push(
+        `/signup/check-email?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ''}`,
+      )
     } catch {
       setError(t('signup.errors.validationError'))
     } finally {
@@ -73,95 +75,62 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
     }
   }
 
-  if (success) {
-    const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : '/login'
-    return (
-      <div className="text-center">
-        <div className="mb-4 flex justify-center">
-          <span className="material-symbols-outlined text-[48px] text-[var(--primary)]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-        </div>
-        <p className="text-body-md text-[var(--foreground)]">{t('signup.success')}</p>
-        <div className="mt-4">
-          <Link href={loginHref} className="text-label-md text-[var(--primary)] hover:underline">
-            {t('signup.continueToLogin')}
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="firstName" className="text-label-md font-semibold">{t('signup.firstName')}</label>
-          <input
-            id="firstName"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            required
-            className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="lastName" className="text-label-md font-semibold">{t('signup.lastName')}</label>
-          <input
-            id="lastName"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            required
-            className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          />
-        </div>
-      </div>
-      {!hasDefaultOrg && (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="companyName" className="text-label-md font-semibold">{t('signup.companyName')}</label>
-          <input
-            id="companyName"
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            required
-            className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          />
-        </div>
-      )}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="text-label-md font-semibold">{t('signup.email')}</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+        <FormField
+          id="firstName"
+          label={t('signup.firstName')}
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
           required
-          className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        />
+        <FormField
+          id="lastName"
+          label={t('signup.lastName')}
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+          required
         />
       </div>
+      {!hasDefaultOrg && (
+        <FormField
+          id="companyName"
+          label={t('signup.companyName')}
+          value={companyName}
+          onChange={(e) => setCompanyName(e.target.value)}
+          required
+        />
+      )}
+      <FormField
+        id="email"
+        type="email"
+        autoComplete="email"
+        label={t('signup.email')}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="text-label-md font-semibold">{t('signup.password')}</label>
-        <input
+        <FormField
           id="password"
           type="password"
+          label={t('signup.password')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         />
         <PasswordRequirementsChecklist password={password} policy={policy} />
       </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="confirm-password" className="text-label-md font-semibold">{t('signup.confirmPassword')}</label>
-        <input
-          id="confirm-password"
-          type="password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          required
-          className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        />
-      </div>
-      {error && <p data-testid="signup-error" className="text-label-md text-[var(--destructive)]">{error}</p>}
+      <FormField
+        id="confirm-password"
+        type="password"
+        label={t('signup.confirmPassword')}
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        required
+      />
+      {error && <p data-testid="signup-error" className="text-label-md text-destructive">{error}</p>}
       <Turnstile
         siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''}
         onSuccess={setCaptchaToken}

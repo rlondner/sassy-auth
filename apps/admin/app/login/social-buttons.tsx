@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Button } from '@sassy-auth/ui'
+import { Button, Separator } from '@sassy-auth/ui'
 
 const LABEL_KEY: Record<string, string> = {
   google: 'socialGoogle',
@@ -20,7 +20,7 @@ const LABEL_KEY: Record<string, string> = {
  * `NEXT_PUBLIC_` value gets inlined into the JS bundle at BUILD time, so a
  * single build could never be deployed to more than one auth-server origin,
  * and any deployment that forgot to set it at build time would silently
- * point every social button at `http://localhost:3000`. Reading it at
+ * point every social button at `https://localhost:3010`. Reading it at
  * request time on the server keeps it runtime-configurable.
  */
 export function SocialButtons({
@@ -117,9 +117,9 @@ export function SocialButtons({
         ))}
       </div>
       <div className="flex items-center gap-3">
-        <span className="h-px flex-1 bg-[var(--border)]" />
-        <span className="text-body-sm text-[var(--muted-foreground)]">{t('socialDivider')}</span>
-        <span className="h-px flex-1 bg-[var(--border)]" />
+        <Separator className="flex-1" />
+        <span className="text-body-sm text-muted-foreground">{t('socialDivider')}</span>
+        <Separator className="flex-1" />
       </div>
     </div>
   )

@@ -33,6 +33,7 @@ describe('AppCreateDrawer', () => {
       expect(actions.createAppAction).toHaveBeenCalledWith({
         name: 'X',
         url: 'https://x.example',
+        logo: null,
         redirectUris: [],
         // 2FA per-app enforcement (bug-free defaults for a fresh app): the
         // drawer always sends both fields so an unchecked box is an explicit
@@ -85,6 +86,26 @@ describe('AppCreateDrawer', () => {
         expect.objectContaining({
           redirectUris: [{ uri: 'https://x.example/cb', kind: 'login' }],
         }),
+      ),
+    )
+  })
+
+  it('includes a picked logo in the create payload', async () => {
+    ;(actions.createAppAction as jest.Mock).mockResolvedValue({
+      app: { publicId: 'sq_1', name: 'X', url: 'https://x.example', isPlatform: false },
+    })
+    render(withIntl(<AppCreateDrawer open onOpenChange={() => undefined} />))
+    fireEvent.change(screen.getByLabelText(en.apps.fields.name), { target: { value: 'X' } })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.url), { target: { value: 'https://x.example' } })
+
+    const file = new File(['a'.repeat(10)], 'logo.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.logo), { target: { files: [file] } })
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.createTitle }))
+    await waitFor(() =>
+      expect(actions.createAppAction).toHaveBeenCalledWith(
+        expect.objectContaining({ logo: expect.stringMatching(/^data:image\/png;base64,/) }),
       ),
     )
   })

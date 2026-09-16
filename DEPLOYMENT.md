@@ -311,7 +311,7 @@ The auth-server and admin are independent web services and can be scaled separat
 
 ## 8. Local mock deployment (custom ports)
 
-Use this layout to rehearse the production topology on one machine without occupying the default dev ports (`3000` / `3001`). It mirrors the three public URLs above but maps them to localhost with distinct ports.
+Use this layout to rehearse the production topology on one machine without occupying the default dev ports (`3010` / `3001`). It mirrors the three public URLs above but maps them to localhost with distinct ports.
 
 | Role | Local URL | Port |
 |------|-----------|------|
@@ -503,7 +503,7 @@ Multi-stage Dockerfiles build compiled artifacts (not dev servers). Each app is 
 
 | Image | Dockerfile | Default port |
 |-------|------------|--------------|
-| Auth server | [`docker/Dockerfile.auth-server`](docker/Dockerfile.auth-server) | 3000 |
+| Auth server | [`docker/Dockerfile.auth-server`](docker/Dockerfile.auth-server) | 3010 |
 | Admin console | [`docker/Dockerfile.admin`](docker/Dockerfile.admin) | 3001 |
 | Resource server | [`apps/resource-server-fastapi/Dockerfile`](apps/resource-server-fastapi/Dockerfile) | 8010 |
 
@@ -531,7 +531,7 @@ Set the same environment variables documented in [§4](#4-environment-variable-r
 
 ```bash
 # Auth server — migrations run automatically on container start
-docker run --rm -p 3000:3000 \
+docker run --rm -p 3010:3010 \
   -e DATABASE_URL="$DATABASE_URL" \
   -e RSA_PRIVATE_KEY="$RSA_PRIVATE_KEY" \
   -e RSA_PUBLIC_KEY="$RSA_PUBLIC_KEY" \
@@ -584,7 +584,7 @@ Apply the same pattern for `sassy-auth-admin` and `sassy-resource-server` (using
 To rehearse the [§8 local mock](#8-local-mock-deployment-custom-ports) using these images instead of `pnpm` directly, map the same custom ports and pass `http://localhost:…` URLs:
 
 ```bash
-docker run --rm -p 3100:3000 -e PORT=3000 ... sassy-auth-server
+docker run --rm -p 3100:3010 -e PORT=3010 ... sassy-auth-server
 docker run --rm -p 3101:3001 -e PORT=3001 ... sassy-auth-admin
 docker run --rm -p 8100:8010 -e PORT=8010 ... sassy-resource-server
 ```

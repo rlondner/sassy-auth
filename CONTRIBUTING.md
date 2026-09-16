@@ -22,7 +22,7 @@ key pair already filled in, then migrates and seeds:
 
 ```bash
 flox activate
-pnpm dev                                     # auth-server :3000, admin :3001
+pnpm dev                                     # auth-server :3010, admin :3001
 ```
 
 Note that Flox puts its Postgres cluster in `~/.local/share/sassy-auth/postgres`,
@@ -113,7 +113,7 @@ ideas — the project is just too small to maintain them.
 
 ```
 apps/
-  auth-server/              NestJS. Auth flows, tokens, management API. :3000
+  auth-server/              NestJS. Auth flows, tokens, management API. :3010
   admin/                    Next.js admin console. :3001
   admin-e2e/                Playwright suite
   resource-server-fastapi/  Sample resource server — example code, not a component

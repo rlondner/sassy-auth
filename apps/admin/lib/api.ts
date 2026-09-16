@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import type { User, Org, Role, Permission, CreateUserPayload, CreateUserResponse, App, CreateAppPayload, UpdateAppPayload, ListAppsParams, ListAppsResponse, OrgRow, CreateOrgPayload, UpdateOrgPayload, ListOrgsParams, ListOrgsResponse, InvitationInfo, MeProfile, PermissionRow, PermissionDetail, CreatePermissionPayload, UpdatePermissionPayload, ListPermissionsParams, ListPermissionsResponse, RoleRow, RoleDetail, CreateRolePayload, UpdateRolePayload, ListRolesParams, ListRolesResponse } from './types'
 
-const BASE = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const BASE = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const cookieStore = await cookies()
@@ -224,6 +224,16 @@ export async function getApps(params: ListAppsParams = {}): Promise<ListAppsResp
   if (params.q) sp.set('q', params.q);
   const qs = sp.toString();
   const res = await apiFetch(`/api/apps${qs ? `?${qs}` : ''}`);
+  return res.json();
+}
+
+// GET /api/apps/:publicId — unlike getApps (the paginated list, which omits
+// `logo` to avoid shipping every row's base64 blob), this single-app fetch
+// still returns it. Used by the edit drawer to seed its logo field with the
+// real current value, since the drawer's `app` prop otherwise only ever
+// comes from the (logo-less) list response.
+export async function getApp(publicId: string): Promise<App> {
+  const res = await apiFetch(`/api/apps/${publicId}`);
   return res.json();
 }
 

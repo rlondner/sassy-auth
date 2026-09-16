@@ -32,9 +32,9 @@ PGHOST = "localhost"
 PGPORT = "5432"
 PGUSER = "postgres"
 PGDATABASE = "sassyauth_0.1"
-BETTER_AUTH_URL = "http://localhost:3000"
+BETTER_AUTH_URL = "https://localhost:3010"
 ADMIN_URL = "http://localhost:3001"
-AUTH_SERVER_URL = "http://localhost:3000"
+AUTH_SERVER_URL = "https://localhost:3010"
 TRUSTED_ORIGINS = "http://localhost:3001"
 
 

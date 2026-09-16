@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - BetterAuth endpoints (already mounted under `/api/auth`): `POST /api/auth/request-password-reset` (`{ email, redirectTo }`), `POST /api/auth/reset-password` (`{ newPassword, token }`).
-- Admin talks to auth-server via `process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'`, forwarding the browser Origin with `getForwardedOrigin()` (see `apps/admin/lib/auth-origin.ts`) — mirror `apps/admin/app/login/actions.ts`.
+- Admin talks to auth-server via `process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'`, forwarding the browser Origin with `getForwardedOrigin()` (see `apps/admin/lib/auth-origin.ts`) — mirror `apps/admin/app/login/actions.ts`.
 - Reset link base is `process.env.ADMIN_URL ?? 'http://localhost:3001'`.
 - Password rules (mirror `accept-invite-form.tsx`): ≥12 chars, must contain upper + lower + digit; confirm must match.
 - Credential accounts are `Account` rows with `providerId === 'credential'`.
@@ -578,7 +578,7 @@ Create `apps/admin/app/forgot-password/actions.ts`:
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 const ADMIN_URL = process.env.ADMIN_URL ?? 'http://localhost:3001'
 
 export async function requestPasswordResetAction(formData: FormData): Promise<{ done: true }> {
@@ -716,7 +716,7 @@ Create `apps/admin/app/reset-password/actions.ts`:
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 
-const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export async function resetPasswordSubmitAction(
   token: string,

@@ -22,7 +22,7 @@ import { SEED_ADMINS } from './admins'
  * AUTH_SERVER_URL.
  */
 
-export const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'http://localhost:3000'
+export const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 // Mirrors PasswordPolicy from packages/types/index.ts. Duplicated rather than
 // imported: admin-e2e intentionally doesn't depend on the app build graph

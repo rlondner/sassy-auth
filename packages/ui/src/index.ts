@@ -59,6 +59,7 @@ export { StatusChip } from './components/status-chip'
 export { UserAvatar } from './components/user-avatar'
 export { DataTable } from './components/data-table'
 export { FormField } from './components/form-field'
+export { AuthCard, type AuthCardProps } from './components/auth-card'
 
 // Backward-compat wrapper — kept so existing call sites and tests don't churn.
 export { ConfirmDialog, type ConfirmDialogProps } from './components/confirm-dialog'

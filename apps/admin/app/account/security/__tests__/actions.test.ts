@@ -188,7 +188,7 @@ describe('enable2fa', () => {
 
     const [url, init] = (global.fetch as jest.MockedFunction<typeof fetch>).mock
       .calls[0] as [string, RequestInit]
-    expect(url).toBe('http://localhost:3000/api/auth/two-factor/enable')
+    expect(url).toBe('https://localhost:3010/api/auth/two-factor/enable')
     expect(JSON.parse(init.body as string)).toEqual({ password: 'pw' })
     const headers = init.headers as Record<string, string>
     expect(headers['Origin']).toBe('https://admin.example.com')
@@ -292,7 +292,7 @@ describe('confirmEnable', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2)
     const [url, init] = (global.fetch as jest.MockedFunction<typeof fetch>).mock
       .calls[1] as [string, RequestInit]
-    expect(url).toBe('http://localhost:3000/api/auth/revoke-other-sessions')
+    expect(url).toBe('https://localhost:3010/api/auth/revoke-other-sessions')
     expect(init.method).toBe('POST')
     const headers = init.headers as Record<string, string>
     expect(headers['Cookie']).toBe('better-auth.session_token=rotated-token')

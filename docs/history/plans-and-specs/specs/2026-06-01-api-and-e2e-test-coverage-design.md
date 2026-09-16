@@ -317,7 +317,7 @@ Runtime estimate: ~150 cells × ~3s = ~7–8 min serial, ~2–3 min with `fullyP
 2. `pnpm prisma migrate deploy --schema=packages/db/schema.prisma`.
 3. `pnpm --filter @sassy-auth/auth-server seed` — idempotent.
 
-### 8.2 Execution order (sequenced; Wave B and C share port 3000)
+### 8.2 Execution order (sequenced; Wave B and C share port 3010)
 
 ```
 Wave A: pnpm --filter @sassy-auth/auth-server test -- --coverage
@@ -406,7 +406,7 @@ Failures from environment (DB not migrated, dev server not up, seed conflict on 
 | Per-admin storageState files go stale (session expires, secret rotates) | Medium | `auth-state.setup.ts` is a `setup` project dependency — re-logs-in all 5 admins on every run. |
 | `fullyParallel: true` Playwright across 5 admin projects causes UNIQUE collisions on factories | Medium | Use `crypto.randomUUID().slice(0,8)` not `Date.now()`. |
 | Campaign surfaces 30+ bugs, `TEST_BUGS.md` balloons | Medium-low | Root-cause-dedup rule (§8.5) keeps the list short. If it does balloon, that's a useful signal. |
-| In-process Nest E2E and Playwright dev-server fight over port 3000 | High if concurrent | Sequenced — Wave B finishes (`app.close()`) before Wave C starts. |
+| In-process Nest E2E and Playwright dev-server fight over port 3010 | High if concurrent | Sequenced — Wave B finishes (`app.close()`) before Wave C starts. |
 | Wave A controller specs accidentally hit real Prisma | Low | Each spec uses Nest `Test.createTestingModule` with `useValue` mocks for the service. Pattern from `token.controller.spec.ts`. |
 | Matrix tests only test the test-data factories, not the product | Medium | The hand-written round-trips (§6.5) and per-area drawer flows (§7.3) verify real product behavior. Generated cells only check status codes — that's their purpose for 403 negatives. |
 

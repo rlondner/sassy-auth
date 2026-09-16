@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
 loadEnv({ path: resolve(process.cwd(), '../../.env.local') });
@@ -69,6 +71,15 @@ function validateStartupEnv(): void {
 
 async function bootstrap() {
   validateStartupEnv();
+  const isDev = process.env.NODE_ENV !== 'production';
+  let httpsOptions: { key: Buffer; cert: Buffer } | undefined;
+
+    if (isDev) {
+    httpsOptions = {
+      key: fs.readFileSync(path.join(__dirname, '..', 'secrets', 'localhost-key.pem')),
+      cert: fs.readFileSync(path.join(__dirname, '..', 'secrets', 'localhost.pem')),
+    };
+  }
   const expressApp = express();
 
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.
@@ -102,7 +113,7 @@ async function bootstrap() {
   // (better-auth/dist/context/create-context.mjs); it never sets
   // `Access-Control-Allow-Origin`. Verified live: an OPTIONS preflight to
   // `/api/auth/sign-in/social` from a cross-origin admin (its own port,
-  // e.g. :3001 talking to the auth-server's :3000 — the exact topology
+  // e.g. :3001 talking to the auth-server's :3010 — the exact topology
   // TRUSTED_ORIGINS/.env.local already documents as the deployment
   // default) returned a bare 404, and the browser then blocked the actual
   // POST with "No 'Access-Control-Allow-Origin' header is present". That
@@ -133,10 +144,33 @@ async function bootstrap() {
     runWithPrivateRelayCapture(() => authNodeHandler(req, res)),
   );
 
+  // Final review finding 1: mount an explicit JSON body parser on the raw
+  // Express app BEFORE NestFactory.create runs. Nest's ExpressAdapter, given
+  // no `bodyParser` option, mounts its own default `express.json()` with
+  // Express's default 100kb limit — well under the ~342KB a 250KB logo data
+  // URI needs (base64 is ~4/3 the raw size, plus the `data:image/...;base64,`
+  // prefix), making the app-logo feature's advertised cap unreachable. A
+  // middleware registered here runs first and satisfies the request before
+  // Nest's own parser gets a chance to reject it at 100kb. 1mb is a
+  // deliberate ceiling — comfortably above the logo cap without opening up
+  // unbounded JSON bodies on other endpoints.
+  //
+  // Registered AFTER the `/api/auth/*` handler above (not before): that
+  // route fully handles and ends matching requests itself via
+  // `toNodeHandler(auth)`, which needs the raw, unconsumed request stream to
+  // parse BetterAuth's own body. Registering express.json() ahead of it
+  // would consume that stream first (Express runs `.use()` middleware in
+  // registration order for every matching path, `express.json()` included),
+  // leaving BetterAuth with an already-drained body. Placing it after means
+  // it's simply never reached for `/api/auth/*` requests, since that route
+  // never calls `next()`.
+  expressApp.use(express.json({ limit: '1mb' }));
+
   const loggerService = new LoggerService();
 
   const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp), {
     logger: loggerService,
+    httpsOptions,
   });
 
   configureNestApp(app, loggerService);
@@ -190,8 +224,8 @@ async function bootstrap() {
     });
   }
 
-  await app.listen(process.env.PORT ?? 3000);
-  loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3000}`, 'Bootstrap');
+  await app.listen(process.env.PORT ?? 3010);
+  loggerService.log(`Auth server listening on port ${process.env.PORT ?? 3010}`, 'Bootstrap');
 }
 
 bootstrap().catch((err) => {

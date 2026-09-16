@@ -191,17 +191,18 @@ export class RegistrationService {
 
   async getAppName(
     appPublicId: string,
-  ): Promise<{ name: string; hasDefaultOrg: boolean; passwordPolicy: PasswordPolicy }> {
+  ): Promise<{ name: string; hasDefaultOrg: boolean; passwordPolicy: PasswordPolicy; logo: string | null }> {
     if (!appPublicId) throw new NotFoundException('App not found');
     const app = await prisma.saApp.findUnique({
       where: { publicId: appPublicId },
-      select: { name: true, defaultOrgId: true, passwordPolicyOverride: true },
+      select: { name: true, defaultOrgId: true, passwordPolicyOverride: true, logo: true },
     });
     if (!app) throw new NotFoundException('App not found');
     return {
       name: app.name,
       hasDefaultOrg: app.defaultOrgId !== null,
       passwordPolicy: resolvePasswordPolicy(app),
+      logo: app.logo ?? null,
     };
   }
 }

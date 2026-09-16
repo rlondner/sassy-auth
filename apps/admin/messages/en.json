@@ -19,7 +19,9 @@
     "confirm": "Confirm",
     "itemsPerPage": "Items per page",
     "copyFailed": "Failed to copy — clipboard access denied",
-    "moreActions": "More actions"
+    "moreActions": "More actions",
+    "yes": "Yes",
+    "no": "No"
   },
   "apps": {
     "title": "Applications",
@@ -53,8 +55,13 @@
       "noRedirectUris": "No redirect URIs registered — any path on this app's origin is currently accepted.",
       "publicId": "Public ID",
       "urlHint": "The primary base URL for this application.",
+      "logo": "App logo",
+      "logoHint": "Shown on this app's sign in and sign up pages. PNG, JPEG, WebP, or SVG, up to 250KB.",
+      "removeLogo": "Remove logo",
+      "noLogo": "No logo configured",
       "twoFactorTrustDays": "2FA trust interval (days)",
       "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
+      "twoFactorTrustDaysSystemDefault": "System default",
       "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server.",
       "requireTwoFactor": "Require two-factor authentication",
       "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue.",
@@ -66,6 +73,7 @@
       "defaultRoleNone": "None — no role assigned",
       "socialProviders": "Social sign-in",
       "socialProvidersHint": "Choose which social identity providers this app's login screen offers.",
+      "socialProvidersNone": "No social providers enabled",
       "socialProviderNames": {
         "google": "Google",
         "microsoft": "Microsoft",
@@ -120,6 +128,8 @@
       "generic": "Something went wrong. Please try again.",
       "urlInvalid": "Please enter a valid URL.",
       "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
+      "logoInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
+      "logoTooLarge": "That image is too large. Please choose one under 250KB.",
       "nameRequired": "App name is required."
     },
     "badges": {
@@ -512,6 +522,7 @@
   "login": {
     "title": "Admin Console",
     "subtitle": "Sign in to continue",
+    "logoAlt": "Company logo",
     "email": "Email Address",
     "password": "Password",
     "submit": "Sign In",
@@ -564,6 +575,7 @@
     "title": "Create your account",
     "titleWithApp": "Create your account with {appName}",
     "subtitle": "Set up your organization to get started.",
+    "subtitleDefaultOrg": "Create your account to get started.",
     "invalidLink": "This signup link has expired or is invalid. Contact the app you're signing up for to get a new one.",
     "firstName": "First Name",
     "lastName": "Last Name",
@@ -572,9 +584,17 @@
     "password": "Password",
     "confirmPassword": "Confirm Password",
     "submit": "Create account",
-    "success": "Account created! Check your email for a verification link before you can sign in.",
-    "continueToLogin": "Continue to sign in",
     "backToLogin": "Back to sign in",
+    "checkEmail": {
+      "title": "Check your email",
+      "subtitle": "We sent a verification link to {email}.",
+      "missingEmail": "We couldn't tell which address to check. Start the signup process again.",
+      "resendButton": "Resend email",
+      "resendCooldown": "Resend in {seconds}s",
+      "resendSent": "Verification email sent.",
+      "resendError": "We couldn't resend the email. Please try again in a moment.",
+      "backToLogin": "Back to sign in"
+    },
     "verified": {
       "title": "Email verified",
       "subtitle": "Your account is ready. You can now sign in.",

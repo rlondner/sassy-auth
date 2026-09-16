@@ -116,6 +116,8 @@ model SaApp {
   publicId    String         @unique
   name        String         @unique
   url         String
+  /// Full data URI (e.g. "data:image/png;base64,...."). null = no logo set.
+  logo        String?
   twoFactorTrustDays Int?
   requireTwoFactor   Boolean        @default(false)
   isPlatform         Boolean        @default(false)

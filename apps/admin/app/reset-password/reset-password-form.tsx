@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { Button } from '@sassy-auth/ui'
+import { AuthCard, Button, FormField } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
 import { getPasswordPolicyForResetToken } from '@/lib/api-public'
 import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
@@ -63,41 +63,51 @@ export function ResetPasswordForm({ token }: { token: string }) {
     setSuccess(true)
   }
 
+  if (success) {
+    return (
+      <AuthCard
+        footer={
+          <Link href="/login" className="text-label-md text-primary hover:underline">
+            {t('backToLogin')}
+          </Link>
+        }
+      >
+        <p data-testid="reset-success" className="text-center text-body-md text-foreground">{t('success')}</p>
+      </AuthCard>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
-      <div className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm">
-        {success ? (
-          <div className="text-center">
-            <p data-testid="reset-success" className="text-body-md text-[var(--foreground)]">{t('success')}</p>
-            <div className="mt-4"><Link href="/login" className="text-label-md text-[var(--primary)] hover:underline">{t('backToLogin')}</Link></div>
-          </div>
-        ) : (
-          <>
-            <h1 className="mb-6 text-center text-headline-sm text-[var(--foreground)]">{t('title')}</h1>
-            <form onSubmit={onSubmit} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="password" className="text-label-md font-semibold">{t('password')}</label>
-                <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-                  className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
-                <PasswordRequirementsChecklist password={password} policy={policy} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="confirm-password" className="text-label-md font-semibold">{t('confirmPassword')}</label>
-                <input id="confirm-password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required
-                  className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
-              </div>
-              {error && <p data-testid="reset-error" className="text-label-md text-[var(--destructive)]">{error}</p>}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={submitting || !policyMet || password !== confirm || password.length === 0}
-              >
-                {submitting ? '…' : t('submit')}
-              </Button>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
+    <AuthCard title={t('title')}>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <FormField
+            id="password"
+            type="password"
+            label={t('password')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <PasswordRequirementsChecklist password={password} policy={policy} />
+        </div>
+        <FormField
+          id="confirm-password"
+          type="password"
+          label={t('confirmPassword')}
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          required
+        />
+        {error && <p data-testid="reset-error" className="text-label-md text-destructive">{error}</p>}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={submitting || !policyMet || password !== confirm || password.length === 0}
+        >
+          {submitting ? '…' : t('submit')}
+        </Button>
+      </form>
+    </AuthCard>
   )
 }

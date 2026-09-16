@@ -8,7 +8,7 @@
  *   SASSY_CLIENT_ID=<publicId> \
  *   REDIRECT_URI=http://localhost:8010/auth/callback \
  *   RS_BASE_URL=http://localhost:8010 \
- *   AUTH_SERVER_URL=http://localhost:3000 \
+ *   AUTH_SERVER_URL=https://localhost:3010 \
  *   ADMIN_URL=http://localhost:3001 \
  *   uvicorn app.main:app --port 8010
  *
