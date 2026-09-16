@@ -191,9 +191,10 @@ describe('waitForLiveDeploy', () => {
 
 describe('triggerDeploy', () => {
   it('POSTs to the deploys endpoint and returns the created deploy', async () => {
-    const fetchFn = jest
-      .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ id: 'd9', status: 'created' }) } as Response);
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ id: 'd9', status: 'created' }),
+    } as Response);
     await expect(triggerDeploy(cfg, 'srv-2', fetchFn)).resolves.toEqual({ id: 'd9', status: 'created' });
     expect(fetchFn).toHaveBeenCalledWith(
       'https://api.render.com/v1/services/srv-2/deploys',
@@ -204,6 +205,18 @@ describe('triggerDeploy', () => {
   it('throws on a non-ok response', async () => {
     const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' } as Response);
     await expect(triggerDeploy(cfg, 'srv-2', fetchFn)).rejects.toThrow(/500/);
+  });
+
+  it('falls back to the latest deploy when the response body is empty', async () => {
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: true, text: async () => '' } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ deploy: { id: 'd9', status: 'queued' } }],
+      } as Response);
+    await expect(triggerDeploy(cfg, 'srv-2', fetchFn)).resolves.toEqual({ id: 'd9', status: 'queued' });
+    expect(fetchFn).toHaveBeenNthCalledWith(2, 'https://api.render.com/v1/services/srv-2/deploys?limit=1', expect.anything());
   });
 });
 
