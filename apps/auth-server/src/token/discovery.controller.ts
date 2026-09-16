@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   OAUTH_AS_METADATA_PATH,
   OIDC_METADATA_PATH,
@@ -10,6 +11,14 @@ import {
   resolveIssuer,
 } from './oauth-metadata';
 
+// render.yaml's healthCheckPath is OAUTH_AS_METADATA_PATH — Render polls it
+// frequently (aggressively so right after a deploy, while confirming the new
+// instance is healthy). Without this, that polling — plus any other traffic
+// hitting either static metadata endpoint — counts against the same global
+// `default` throttle bucket as the rest of the API and can trip it, which
+// makes Render see failing health checks and restart the instance,
+// producing a self-inflicted restart loop instead of a stable deploy.
+@SkipThrottle()
 @ApiExcludeController()
 @Controller()
 export class DiscoveryController {
