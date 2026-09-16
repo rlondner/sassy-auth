@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
@@ -18,6 +17,7 @@ import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { mergeOpenApiDocs } from './docs/openapi';
 import { BETTER_AUTH_SESSION_COOKIE } from './common/constants';
+import { resolveHttpsOptions } from './https-options';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = require('../package.json');
 
@@ -72,25 +72,7 @@ function validateStartupEnv(): void {
 async function bootstrap() {
   validateStartupEnv();
   const isDev = process.env.NODE_ENV !== 'production';
-  let httpsOptions: { key: Buffer; cert: Buffer } | undefined;
-
-  if (isDev) {
-    const keyPath = path.join(__dirname, '..', 'secrets', 'localhost-key.pem');
-    const certPath = path.join(__dirname, '..', 'secrets', 'localhost.pem');
-    // These are a developer's own mkcert'd files (gitignored, never
-    // committed) — CI and any other environment without them fall back to
-    // plain http rather than crash-looping on ENOENT.
-    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-      httpsOptions = {
-        key: fs.readFileSync(keyPath),
-        cert: fs.readFileSync(certPath),
-      };
-    } else {
-      console.warn(
-        `[dev-https] ${keyPath} / ${certPath} not found — starting over http. Run mkcert to enable local https.`,
-      );
-    }
-  }
+  const httpsOptions = resolveHttpsOptions(isDev, path.join(__dirname, '..', 'secrets'));
   const expressApp = express();
 
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.
