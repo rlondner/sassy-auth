@@ -19,6 +19,7 @@ function renderHeaders(apiKey: string): Record<string, string> {
   };
 }
 
+// limit=20 is Render's default page size; assumes fewer than 20 services share this name across the account.
 export async function findServiceIdByName(
   cfg: RenderConfig,
   name: string,
@@ -38,6 +39,7 @@ export async function findServiceIdByName(
   return match.service.id;
 }
 
+// Replaces the service's entire env var set (PUT semantics) — pass the full desired set, not a diff.
 export async function setEnvVars(
   cfg: RenderConfig,
   serviceId: string,
