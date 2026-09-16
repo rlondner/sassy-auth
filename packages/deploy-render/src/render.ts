@@ -56,6 +56,44 @@ export async function setEnvVars(
   }
 }
 
+export async function getEnvVars(
+  cfg: RenderConfig,
+  serviceId: string,
+  fetchFn: FetchLike = fetch,
+): Promise<RenderEnvVar[]> {
+  const res = await fetchFn(`${RENDER_API_BASE}/services/${serviceId}/env-vars`, {
+    headers: renderHeaders(cfg.apiKey),
+  });
+  if (!res.ok) {
+    throw new Error(`Render API error fetching env vars for ${serviceId}: ${res.status} ${await res.text()}`);
+  }
+  const body = (await res.json()) as Array<{ envVar: RenderEnvVar }>;
+  return body.map((entry) => entry.envVar);
+}
+
+// Desired values win on key collision; anything already set on Render that isn't in
+// `desired` is preserved (e.g. optional social-login/email secrets an operator set by
+// hand in the Render dashboard, which this pipeline doesn't manage).
+export function mergeEnvVars(existing: RenderEnvVar[], desired: RenderEnvVar[]): RenderEnvVar[] {
+  const merged = new Map<string, string>();
+  for (const envVar of existing) merged.set(envVar.key, envVar.value);
+  for (const envVar of desired) merged.set(envVar.key, envVar.value);
+  return Array.from(merged.entries()).map(([key, value]) => ({ key, value }));
+}
+
+// Fetches the service's current env vars, merges `desired` on top, and replaces the full
+// set via setEnvVars's PUT semantics — without this, setEnvVars alone would silently wipe
+// any env var this pipeline doesn't explicitly manage.
+export async function syncManagedEnvVars(
+  cfg: RenderConfig,
+  serviceId: string,
+  desired: RenderEnvVar[],
+  fetchFn: FetchLike = fetch,
+): Promise<void> {
+  const existing = await getEnvVars(cfg, serviceId, fetchFn);
+  await setEnvVars(cfg, serviceId, mergeEnvVars(existing, desired), fetchFn);
+}
+
 interface RenderDeploy {
   id: string;
   status: string;

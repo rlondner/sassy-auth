@@ -5,7 +5,7 @@ import { ensureSecrets } from './secrets';
 import { ensureNeonDatabase, type NeonConfig } from './neon';
 import {
   findServiceIdByName,
-  setEnvVars,
+  syncManagedEnvVars,
   waitForLiveDeploy,
   startJob,
   waitForJobCompletion,
@@ -140,10 +140,10 @@ async function main(): Promise<void> {
   const adminId = await findServiceIdByName(renderCfg, 'sassy-auth-admin');
 
   await withServiceContext('sassy-auth-server', () =>
-    setEnvVars(renderCfg, authServerId, toRenderEnvVars(authServerValues)),
+    syncManagedEnvVars(renderCfg, authServerId, toRenderEnvVars(authServerValues)),
   );
   await withServiceContext('sassy-auth-admin', () =>
-    setEnvVars(renderCfg, adminId, toRenderEnvVars(adminValues)),
+    syncManagedEnvVars(renderCfg, adminId, toRenderEnvVars(adminValues)),
   );
 
   await withServiceContext('sassy-auth-server', () => waitForLiveDeploy(renderCfg, authServerId));

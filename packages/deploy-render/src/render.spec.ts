@@ -1,6 +1,9 @@
 import {
   findServiceIdByName,
   setEnvVars,
+  getEnvVars,
+  mergeEnvVars,
+  syncManagedEnvVars,
   getLatestDeployStatus,
   waitForLiveDeploy,
   startJob,
@@ -41,6 +44,102 @@ describe('setEnvVars', () => {
   it('throws on a non-ok response', async () => {
     const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 422, text: async () => 'bad' } as Response);
     await expect(setEnvVars(cfg, 'srv-2', [], fetchFn)).rejects.toThrow(/422/);
+  });
+});
+
+describe('getEnvVars', () => {
+  it('parses the [{envVar: {key, value}}] response shape', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { envVar: { key: 'NODE_ENV', value: 'production' } },
+        { envVar: { key: 'RESEND_API_KEY', value: 'resend-secret' } },
+      ],
+    } as Response);
+    await expect(getEnvVars(cfg, 'srv-2', fetchFn)).resolves.toEqual([
+      { key: 'NODE_ENV', value: 'production' },
+      { key: 'RESEND_API_KEY', value: 'resend-secret' },
+    ]);
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://api.render.com/v1/services/srv-2/env-vars',
+      expect.objectContaining({ headers: expect.anything() }),
+    );
+  });
+
+  it('throws on a non-ok response', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' } as Response);
+    await expect(getEnvVars(cfg, 'srv-2', fetchFn)).rejects.toThrow(/500/);
+  });
+});
+
+describe('mergeEnvVars', () => {
+  it('lets desired override an existing key with the same name', () => {
+    const result = mergeEnvVars(
+      [{ key: 'FOO', value: 'old' }],
+      [{ key: 'FOO', value: 'new' }],
+    );
+    expect(result).toEqual([{ key: 'FOO', value: 'new' }]);
+  });
+
+  it('preserves a key only present in existing', () => {
+    const result = mergeEnvVars(
+      [{ key: 'RESEND_API_KEY', value: 'resend-secret' }],
+      [{ key: 'DATABASE_URL', value: 'postgres://...' }],
+    );
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { key: 'RESEND_API_KEY', value: 'resend-secret' },
+        { key: 'DATABASE_URL', value: 'postgres://...' },
+      ]),
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it('adds a key only present in desired', () => {
+    const result = mergeEnvVars([], [{ key: 'DATABASE_URL', value: 'postgres://...' }]);
+    expect(result).toEqual([{ key: 'DATABASE_URL', value: 'postgres://...' }]);
+  });
+
+  it('handles empty existing and empty desired', () => {
+    expect(mergeEnvVars([], [])).toEqual([]);
+    expect(mergeEnvVars([{ key: 'FOO', value: 'bar' }], [])).toEqual([{ key: 'FOO', value: 'bar' }]);
+  });
+});
+
+describe('syncManagedEnvVars', () => {
+  it('fetches existing env vars, merges desired on top, and PUTs the merged set', async () => {
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { envVar: { key: 'RESEND_API_KEY', value: 'resend-secret' } },
+          { envVar: { key: 'DATABASE_URL', value: 'old-url' } },
+        ],
+      } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200 } as Response);
+
+    await syncManagedEnvVars(cfg, 'srv-2', [{ key: 'DATABASE_URL', value: 'new-url' }], fetchFn);
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      1,
+      'https://api.render.com/v1/services/srv-2/env-vars',
+      expect.objectContaining({ headers: expect.anything() }),
+    );
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      2,
+      'https://api.render.com/v1/services/srv-2/env-vars',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+    const putBody = JSON.parse((fetchFn.mock.calls[1][1] as { body: string }).body);
+    expect(putBody).toEqual(
+      expect.arrayContaining([
+        { key: 'RESEND_API_KEY', value: 'resend-secret' },
+        { key: 'DATABASE_URL', value: 'new-url' },
+      ]),
+    );
+    expect(putBody).toHaveLength(2);
   });
 });
 
