@@ -141,7 +141,13 @@ export async function triggerDeploy(
   if (!res.ok) {
     throw new Error(`Render API error triggering deploy for ${serviceId}: ${res.status} ${await res.text()}`);
   }
-  return (await res.json()) as RenderDeploy;
+  const text = await res.text();
+  // Render's create-deploy endpoint responds with an empty body on success — fall back to
+  // the service's now-latest deploy, which is the one this call just created.
+  if (!text) {
+    return getLatestDeployStatus(cfg, serviceId, fetchFn);
+  }
+  return JSON.parse(text) as RenderDeploy;
 }
 
 export async function getDeployStatus(
