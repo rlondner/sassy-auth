@@ -24,6 +24,42 @@ const REQUIRED_SECRET_ENV_VARS = [
   'DATABASE_URL',
 ] as const;
 
+interface DeployTarget {
+  githubEnvironment: string;
+  renderGroupName: string;
+  authServerName: string;
+  adminName: string;
+  // Neon branch to provision/target — undefined means the project's default (production)
+  // branch. Both targets share the same Neon project; staging is a branch of it, not a
+  // separate project.
+  neonBranchName?: string;
+}
+
+const DEPLOY_TARGETS: Record<string, DeployTarget> = {
+  production: {
+    githubEnvironment: 'production',
+    renderGroupName: 'sassy-auth-production',
+    authServerName: 'sassy-auth-server',
+    adminName: 'sassy-auth-admin',
+  },
+  staging: {
+    githubEnvironment: 'staging',
+    renderGroupName: 'sassy-auth-staging',
+    authServerName: 'sassy-auth-server-staging',
+    adminName: 'sassy-auth-admin-staging',
+    neonBranchName: 'staging',
+  },
+};
+
+function resolveDeployTarget(): DeployTarget {
+  const name = process.env.DEPLOY_TARGET || 'production';
+  const target = DEPLOY_TARGETS[name];
+  if (!target) {
+    throw new Error(`Unknown DEPLOY_TARGET "${name}" — expected one of: ${Object.keys(DEPLOY_TARGETS).join(', ')}`);
+  }
+  return target;
+}
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -56,12 +92,13 @@ async function withServiceContext<T>(serviceName: string, fn: () => Promise<T>):
 
 async function main(): Promise<void> {
   const dryRun = process.argv.includes('--dry-run');
+  const target = resolveDeployTarget();
 
   const [owner, repo] = requireEnv('GITHUB_REPOSITORY').split('/');
   const githubCfg: GithubConfig = {
     owner,
     repo,
-    environment: 'production',
+    environment: target.githubEnvironment,
     token: requireEnv('DEPLOY_GITHUB_TOKEN'),
   };
   const neonCfg: NeonConfig = {
@@ -74,13 +111,14 @@ async function main(): Promise<void> {
     // Matches the Render services' region (see render.yaml) — keeps the app and its
     // database in the same region instead of Neon's own default.
     regionId: 'aws-us-east-2',
+    branchName: target.neonBranchName,
   };
   const renderCfg: RenderConfig = { apiKey: requireEnv('RENDER_API_KEY') };
 
   if (dryRun) {
     console.log(
-      'Dry run: would ensure secrets, provision Neon, sync Render env vars for ' +
-        'sassy-auth-server/sassy-auth-admin, wait for a live deploy, and trigger the seed job.',
+      `Dry run (${target.githubEnvironment}): would ensure secrets, provision Neon, sync Render env vars for ` +
+        `${target.authServerName}/${target.adminName}, wait for a live deploy, and trigger the seed job.`,
     );
     return;
   }
@@ -89,11 +127,11 @@ async function main(): Promise<void> {
   if (secretsResult.generated.length > 0) {
     writeJobSummary([
       '## New secrets generated',
-      'These are now stored as GitHub Environment secrets (production) and were not printed anywhere — GitHub secrets are write-only after creation, so there is no way to view them again through this pipeline.',
+      `These are now stored as GitHub Environment secrets (${target.githubEnvironment}) and were not printed anywhere — GitHub secrets are write-only after creation, so there is no way to view them again through this pipeline.`,
       '',
       ...secretsResult.generated.map((s) => `- \`${s.name}\``),
       '',
-      'If any of these need rotating in the future, delete the secret from the repo\'s "production" Environment on GitHub and re-run this workflow — it will generate and store a fresh value automatically (this invalidates existing JWTs/sessions for the RSA keypair and BETTER_AUTH_SECRET respectively; see DEPLOYMENT.md).',
+      `If any of these need rotating in the future, delete the secret from the repo's "${target.githubEnvironment}" Environment on GitHub and re-run this workflow — it will generate and store a fresh value automatically (this invalidates existing JWTs/sessions for the RSA keypair and BETTER_AUTH_SECRET respectively; see DEPLOYMENT.md).`,
     ]);
   }
 
@@ -122,11 +160,11 @@ async function main(): Promise<void> {
   // repo root; would need adjustment if ever run from a compiled dist/ build.
   const renderYamlPath = path.resolve(__dirname, '../../../render.yaml');
   const doc = parseRenderYaml(fs.readFileSync(renderYamlPath, 'utf8'));
-  const groupValues = staticGroupValues(doc, 'sassy-auth-production');
+  const groupValues = staticGroupValues(doc, target.renderGroupName);
 
   const authServerValues: Record<string, string> = {
     ...groupValues,
-    ...staticServiceValues(doc, 'sassy-auth-server'),
+    ...staticServiceValues(doc, target.authServerName),
     RSA_PRIVATE_KEY: secretValues.RSA_PRIVATE_KEY,
     RSA_PUBLIC_KEY: secretValues.RSA_PUBLIC_KEY,
     BETTER_AUTH_SECRET: secretValues.BETTER_AUTH_SECRET,
@@ -135,20 +173,20 @@ async function main(): Promise<void> {
   };
   const adminValues: Record<string, string> = {
     ...groupValues,
-    ...staticServiceValues(doc, 'sassy-auth-admin'),
+    ...staticServiceValues(doc, target.adminName),
     RSA_PRIVATE_KEY: secretValues.RSA_PRIVATE_KEY,
     RSA_PUBLIC_KEY: secretValues.RSA_PUBLIC_KEY,
     BETTER_AUTH_SECRET: secretValues.BETTER_AUTH_SECRET,
     DATABASE_URL: secretValues.DATABASE_URL,
   };
 
-  const authServerId = await findServiceIdByName(renderCfg, 'sassy-auth-server');
-  const adminId = await findServiceIdByName(renderCfg, 'sassy-auth-admin');
+  const authServerId = await findServiceIdByName(renderCfg, target.authServerName);
+  const adminId = await findServiceIdByName(renderCfg, target.adminName);
 
-  await withServiceContext('sassy-auth-server', () =>
+  await withServiceContext(target.authServerName, () =>
     syncManagedEnvVars(renderCfg, authServerId, toRenderEnvVars(authServerValues)),
   );
-  await withServiceContext('sassy-auth-admin', () =>
+  await withServiceContext(target.adminName, () =>
     syncManagedEnvVars(renderCfg, adminId, toRenderEnvVars(adminValues)),
   );
 
@@ -156,19 +194,19 @@ async function main(): Promise<void> {
   // autoDeploy would race this sync — that deploy can start (and fail its preDeployCommand,
   // e.g. `prisma migrate deploy` with no DATABASE_URL yet) before the sync above completes.
   // Trigger fresh deploys now, after secrets are in place, and wait on those specific deploys.
-  const authServerDeploy = await withServiceContext('sassy-auth-server', () =>
+  const authServerDeploy = await withServiceContext(target.authServerName, () =>
     triggerDeploy(renderCfg, authServerId),
   );
-  const adminDeploy = await withServiceContext('sassy-auth-admin', () => triggerDeploy(renderCfg, adminId));
+  const adminDeploy = await withServiceContext(target.adminName, () => triggerDeploy(renderCfg, adminId));
 
   // Waited in parallel, not sequentially — each can take up to ~10 minutes, and this job
   // has a fixed overall timeout (see deploy-render.yml) shared with the db:seed waits below.
   await Promise.all([
-    withServiceContext('sassy-auth-server', () => waitForDeploy(renderCfg, authServerId, authServerDeploy.id)),
-    withServiceContext('sassy-auth-admin', () => waitForDeploy(renderCfg, adminId, adminDeploy.id)),
+    withServiceContext(target.authServerName, () => waitForDeploy(renderCfg, authServerId, authServerDeploy.id)),
+    withServiceContext(target.adminName, () => waitForDeploy(renderCfg, adminId, adminDeploy.id)),
   ]);
 
-  await withServiceContext('sassy-auth-server', async () => {
+  await withServiceContext(target.authServerName, async () => {
     const job = await startJob(renderCfg, authServerId, 'pnpm --filter @sassy-auth/db db:seed');
     await waitForJobCompletion(renderCfg, authServerId, job.id);
   });
@@ -177,12 +215,12 @@ async function main(): Promise<void> {
   // creates already exist — vibecast-migration.ts only provisions the
   // vibecast app, org, and admin. Both jobs are idempotent, so re-running
   // them on every deploy is safe.
-  await withServiceContext('sassy-auth-server', async () => {
+  await withServiceContext(target.authServerName, async () => {
     const job = await startJob(renderCfg, authServerId, 'pnpm --filter @sassy-auth/db db:seed:vibecast');
     await waitForJobCompletion(renderCfg, authServerId, job.id);
   });
 
-  console.log('Render deployment automation complete.');
+  console.log(`Render deployment automation complete (${target.githubEnvironment}).`);
 }
 
 main().catch((err) => {

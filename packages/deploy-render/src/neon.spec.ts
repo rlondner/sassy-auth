@@ -117,11 +117,12 @@ describe('getPooledConnectionUri', () => {
       ok: true,
       json: async () => ({ uri: 'postgresql://user:pass@ep-xxx-pooler.neon.tech/sassyauth?sslmode=require' }),
     } as Response);
-    const uri = await getPooledConnectionUri(neonCfg, 'p2', fetchFn);
+    const uri = await getPooledConnectionUri(neonCfg, 'p2', 'br1', fetchFn);
     expect(uri).toContain('pooler');
     const calledUrl = fetchFn.mock.calls[0][0] as string;
     expect(calledUrl).toContain('pooled=true');
     expect(calledUrl).toContain('database_name=sassyauth');
+    expect(calledUrl).toContain('branch_id=br1');
   });
 });
 
@@ -199,5 +200,66 @@ describe('ensureNeonDatabase', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ branches: [] }) } as Response);
 
     await expect(ensureNeonDatabase(neonCfg, githubCfg, fetchFn)).rejects.toThrow(/no branches/);
+  });
+
+  describe('with branchName set (staging)', () => {
+    const stagingCfg: NeonConfig = { ...neonCfg, branchName: 'staging' };
+
+    it('creates the named branch off the default branch when it does not exist yet', async () => {
+      jest.spyOn(githubSecrets, 'secretExists').mockResolvedValue(false);
+      jest.spyOn(githubSecrets, 'setAndVerifySecret').mockResolvedValue(undefined);
+      const fetchFn = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ projects: [{ id: 'p2', name: 'sassy-auth-production' }] }) } as Response) // findProjectByName
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ branches: [{ id: 'br-prod', name: 'production', default: true }] }) } as Response) // getDefaultBranchId
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ branches: [{ id: 'br-prod', name: 'production', default: true }] }) } as Response) // findBranchByName: not found
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ branch: { id: 'br-staging', name: 'staging', default: false } }) } as Response) // createBranch
+        // copy-on-write: role/database already present on the new branch
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ roles: [{ name: 'sassyauth_owner' }] }) } as Response) // ensureRole
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ databases: [{ name: 'sassyauth' }] }) } as Response) // ensureDatabase
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ uri: 'postgresql://staging-uri' }) } as Response); // getPooledConnectionUri
+
+      const result = await ensureNeonDatabase(stagingCfg, githubCfg, fetchFn);
+
+      expect(result).toEqual({ created: true, databaseUrl: 'postgresql://staging-uri' });
+      expect(fetchFn).toHaveBeenNthCalledWith(
+        4,
+        'https://console.neon.tech/api/v2/projects/p2/branches',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(JSON.parse(fetchFn.mock.calls[3][1].body)).toEqual({
+        branch: { parent_id: 'br-prod', name: 'staging' },
+      });
+      const finalUrl = fetchFn.mock.calls[6][0] as string;
+      expect(finalUrl).toContain('branch_id=br-staging');
+    });
+
+    it('reuses the branch when one with that name already exists', async () => {
+      jest.spyOn(githubSecrets, 'secretExists').mockResolvedValue(false);
+      jest.spyOn(githubSecrets, 'setAndVerifySecret').mockResolvedValue(undefined);
+      const fetchFn = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ projects: [{ id: 'p2', name: 'sassy-auth-production' }] }) } as Response) // findProjectByName
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ branches: [{ id: 'br-prod', name: 'production', default: true }] }) } as Response) // getDefaultBranchId
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            branches: [
+              { id: 'br-prod', name: 'production', default: true },
+              { id: 'br-staging', name: 'staging', default: false },
+            ],
+          }),
+        } as Response) // findBranchByName: found — no createBranch call follows
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ roles: [{ name: 'sassyauth_owner' }] }) } as Response) // ensureRole
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ databases: [{ name: 'sassyauth' }] }) } as Response) // ensureDatabase
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ uri: 'postgresql://staging-uri' }) } as Response); // getPooledConnectionUri
+
+      const result = await ensureNeonDatabase(stagingCfg, githubCfg, fetchFn);
+
+      expect(result).toEqual({ created: true, databaseUrl: 'postgresql://staging-uri' });
+      expect(fetchFn).toHaveBeenCalledTimes(6);
+      const finalUrl = fetchFn.mock.calls[5][0] as string;
+      expect(finalUrl).toContain('branch_id=br-staging');
+    });
   });
 });

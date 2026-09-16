@@ -93,6 +93,52 @@ the full design.
 
 ---
 
+## Staging environment
+
+`sassy-auth-server-staging` and `sassy-auth-admin-staging` mirror the
+production services but deploy from `dev` instead of `master`, via
+`.github/workflows/deploy-render-staging.yml` and the same
+`packages/deploy-render` pipeline (`DEPLOY_TARGET=staging` selects staging's
+service names, env var group, and GitHub Environment — see `cli.ts`'s
+`DEPLOY_TARGETS`).
+
+**Promotion:** merging `dev` into `master` (the repo's existing PR flow) is
+what promotes a change from staging to production — there's no separate
+promotion mechanism. Staging simply deploys automatically, and earlier, on
+every push to `dev`.
+
+**Database:** staging uses a Neon **branch** named `staging`, created once
+off the production project's default branch (copy-on-write — starts with a
+real copy of prod's schema/data, including its `sassyauth_owner` role and
+`sassyauth` database, then diverges independently). It is **not**
+auto-reset — to refresh staging's data from current production, delete the
+`staging` branch in the Neon console and push to `dev`; the pipeline
+recreates it fresh from prod on the next run.
+
+One-time setup (mirrors the production setup above):
+
+1. Create a `staging` GitHub Environment. Copy the same `RENDER_API_KEY`,
+   `NEON_API_KEY`, `NEON_ORG_ID`, and `GH_SECRETS_PAT` values used for
+   `production` into it — same values, just duplicated, since GitHub scopes
+   secrets per Environment. `RSA_PRIVATE_KEY`, `RSA_PUBLIC_KEY`,
+   `BETTER_AUTH_SECRET`, `SEED_ADMIN_PASSWORD`, and `DATABASE_URL` are
+   independent from production's and get generated automatically by the
+   pipeline — do not copy those.
+2. Create the two staging services (matching `render.yaml`'s
+   `sassy-auth-server-staging` / `sassy-auth-admin-staging` entries) —
+   production's aren't actually Blueprint-managed today, so create staging's
+   the same direct way (e.g. `render services create`, matching the build/
+   start/preDeploy commands and `branch: dev` from `render.yaml`) rather than
+   via a Blueprint apply, to avoid Render's Blueprint sync trying to reconcile
+   the existing non-Blueprint production services.
+3. Point `auth-staging.milissai.com` / `auth-api-staging.milissai.com` CNAMEs
+   at the values Render shows once the services exist.
+4. Push to `dev` (or run the workflow manually) — the pipeline provisions the
+   Neon branch, generates staging's secrets, syncs env vars, deploys, and
+   seeds, exactly like production's first run.
+
+---
+
 ## 1. Neon database
 
 1. Create a project at [console.neon.tech](https://console.neon.tech).
