@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   };
   const neonCfg: NeonConfig = {
     apiKey: requireEnv('NEON_API_KEY'),
-    projectName: 'sassy-auth-production',
+    projectName: 'sassy-auth',
     databaseName: 'sassyauth',
     roleName: 'sassyauth_owner',
     // Only required when NEON_API_KEY is an organization API key.
@@ -118,7 +118,7 @@ async function main(): Promise<void> {
   // repo root; would need adjustment if ever run from a compiled dist/ build.
   const renderYamlPath = path.resolve(__dirname, '../../../render.yaml');
   const doc = parseRenderYaml(fs.readFileSync(renderYamlPath, 'utf8'));
-  const groupValues = staticGroupValues(doc, 'sassy-auth-production');
+  const groupValues = staticGroupValues(doc, 'sassy-auth');
 
   const authServerValues: Record<string, string> = {
     ...groupValues,
