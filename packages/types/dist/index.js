@@ -4,6 +4,7 @@ exports.APP_LOGO_ALLOWED_MIME_TYPES = exports.APP_LOGO_MAX_BYTES = exports.Token
 exports.detectIdentifierType = detectIdentifierType;
 exports.evaluatePasswordPolicy = evaluatePasswordPolicy;
 exports.isValidAppLogoDataUri = isValidAppLogoDataUri;
+exports.renderTemplate = renderTemplate;
 /** Machine-readable codes returned as the `error` field in 4xx JWT responses. */
 var TokenErrorCode;
 (function (TokenErrorCode) {
@@ -85,4 +86,12 @@ function isValidAppLogoDataUri(value) {
     const padding = base64Payload.endsWith('==') ? 2 : base64Payload.endsWith('=') ? 1 : 0;
     const decodedBytes = (base64Payload.length * 3) / 4 - padding;
     return decodedBytes <= exports.APP_LOGO_MAX_BYTES;
+}
+/**
+ * Literal `{{token}}` substitution — no conditionals, no loops. A token not
+ * present in `vars` is left in the output untouched, so a typo'd or removed
+ * placeholder degrades visibly rather than silently vanishing.
+ */
+function renderTemplate(template, vars) {
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => (key in vars ? vars[key] : match));
 }

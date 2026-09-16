@@ -141,3 +141,24 @@ export function isValidAppLogoDataUri(value: unknown): boolean {
   const decodedBytes = (base64Payload.length * 3) / 4 - padding;
   return decodedBytes <= APP_LOGO_MAX_BYTES;
 }
+
+/**
+ * Per-app override for the activation (email-verification) email. Every
+ * field is optional and independently defaulted by the caller — omitted or
+ * undefined means "use the platform default" for that field.
+ */
+export interface ActivationEmailBranding {
+  fromName?: string;
+  fromAddress?: string;
+  subject?: string;
+  message?: string;
+}
+
+/**
+ * Literal `{{token}}` substitution — no conditionals, no loops. A token not
+ * present in `vars` is left in the output untouched, so a typo'd or removed
+ * placeholder degrades visibly rather than silently vanishing.
+ */
+export function renderTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => (key in vars ? vars[key] : match));
+}
