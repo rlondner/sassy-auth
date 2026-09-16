@@ -239,6 +239,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
   - [JWKS and Token Verification](#jwks-and-token-verification)
   - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
   - [Social Sign-In](#social-sign-in)
+  - [Activation Webhook](#activation-webhook)
   - [API Reference](#api-reference)
   - [Self-serve Registration (`POST /api/register`)](#self-serve-registration-post-apiregister)
     - [Request](#request)
@@ -870,6 +871,67 @@ unknown `client_id`, so it cannot be used to enumerate registered apps.
 
 ---
 
+## Activation Webhook
+
+A SaApp can register a URL to be notified, server-to-server, the moment one of its users' accounts becomes `active` — instead of polling `/userinfo` or `/api/me` to find out.
+
+**Why a relying party would want this.** Say a SaaS product provisions a tenant workspace, seeds default data, and sends a "you're in" email once a customer's account is usable — but signup redirects the user back immediately while the account is still `pending`/`unverified` (see [Known Limitations](#known-limitations) for that design elsewhere in the flow), and email verification can complete minutes or days later, from a link the resource server never sees. Without a signal, the resource server either provisions too early (before the account is real) or has to poll on a timer. The activation webhook removes the guesswork: SassyAuth calls the resource server's endpoint exactly once, right when the transition to `active` happens — from *any* path that causes it (email verification, invitation acceptance, or an admin re-activating the account) — and the resource server reacts from there (finish provisioning, send the welcome email, unlock the trial).
+
+**Configuring it.** Set a webhook URL and a signing secret on the app, either in the admin console (`/apps` → edit an app → **Webhook URL** / **Webhook secret**) or via the API:
+
+```bash
+curl -X PATCH https://localhost:3010/api/apps/<appPublicId> \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <admin session>" \
+  -d '{
+    "webhookUrl": "https://app.example.com/webhooks/sassy-auth",
+    "webhookSecret": "a-random-secret-at-least-16-chars"
+  }'
+```
+
+Both fields must be set together, or both cleared — a URL with no secret (or vice versa) is rejected with `400`, since an unsigned webhook has no way to be verified. The secret is stored in plaintext (not hashed), because the server needs it back to *sign* outgoing requests, not to verify an incoming credential; treat it as sensitive. `GET`/list responses on `/api/apps` never return the secret itself — only `hasWebhookSecret: true|false` — so the admin console can show whether one is configured without ever displaying it again after it's set.
+
+**Delivery.** When a `SaUser` transitions to `active`, SassyAuth POSTs:
+
+```json
+POST <webhookUrl>
+Content-Type: application/json
+X-Sassy-Signature: sha256=<hex hmac>
+
+{
+  "event": "account.activated",
+  "userId": "<SaUser.publicId>",
+  "appPublicId": "<SaApp.publicId>",
+  "activatedAt": "2026-09-15T12:34:56.000Z"
+}
+```
+
+`X-Sassy-Signature` is an HMAC-SHA256 of the raw JSON body, keyed with `webhookSecret` — the same shape as Stripe's or GitHub's webhook signing, so existing verification libraries and patterns apply. Verify it in Node with a constant-time comparison:
+
+```javascript
+const crypto = require('crypto');
+
+function isValidSassyWebhook(rawBody, signatureHeader, secret) {
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  const provided = (signatureHeader || '').replace(/^sha256=/, '');
+  const a = Buffer.from(expected, 'hex');
+  const b = Buffer.from(provided, 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+```
+
+> Always compute the HMAC over the **raw** request body, before any JSON parsing/re-serialization — re-stringifying a parsed object can reorder keys or change whitespace and silently break the signature check.
+
+**What to expect operationally:**
+
+- **5-second timeout, one retry.** A single retry on a network error or a `5xx` response; a `4xx` is treated as a permanent failure and is not retried. There is no further backoff and no delivery queue — a webhook endpoint that is down when the event fires simply misses it.
+- **Redirects are not followed.** A `webhookUrl` that responds with a redirect fails the delivery rather than being followed, so a signed request can't be silently re-sent somewhere else (e.g. an internal address) by a compromised or misconfigured endpoint.
+- **Fire-and-forget, never blocks activation.** Delivery success or failure has no effect on the activation itself — it always commits — and every outcome (delivered, failed, or no-op because no `webhookUrl` is configured) is written to the `SaAuditEvent` table for later inspection, not held anywhere retriable.
+- **Idempotent trigger, not idempotent delivery.** The status transition itself only fires once (re-activating an already-`active` user is a no-op), but because there's no delivery ledger, treat `userId` + `event` as a natural dedupe key on your side if you care about exactly-once processing across retries.
+- **Scope.** One URL and one secret per app, and `account.activated` is the only event today — no per-app multiple endpoints/subscriptions and no deactivation or other status-change events. See [Known Limitations](#known-limitations).
+
+---
+
 ## API Reference
 
 The endpoints you will use from a resource server:
@@ -1036,7 +1098,7 @@ Routes:
 - `/oauth-error` — OAuth error page (shown when the authorize flow fails; optionally links to `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL`)
 - `/users` — users management (TanStack Table, view/edit/create drawers)
 - `/orgs` — org management
-- `/apps` — app management
+- `/apps` — app management, including per-app 2FA policy, redirect URIs, default org/role, social providers, and the [activation webhook](#activation-webhook) URL/secret
 - `/roles` — role management with inline permission assignment
 - `/permissions` — permission management with role/user detail view
 - `/account/security` — per-user 2FA enrolment
