@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getBetterAuthCookieName } from '@sassy-auth/types'
 import { AUTH_SERVER_URL } from '@/lib/config'
 
 const PUBLIC_PATHS = ['/login', '/accept-invite', '/signup', '/oauth-error', '/forgot-password', '/reset-password']
+
+// Must match the exact production check auth.config.ts uses for
+// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
+const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', process.env.NODE_ENV === 'production')
+const SESSION_COOKIE_PATTERN = new RegExp(
+  `(?:^|;\\s*)${SESSION_COOKIE_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]+)`,
+)
 
 // bug-0165: cache session validation results for a short TTL so we
 // don't round-trip to the auth-server on every authenticated request.
@@ -32,7 +40,7 @@ const SESSION_CACHE_MAX_ENTRIES = 500
 const sessionCache = new Map<string, { at: number; ok: boolean }>()
 
 function readSessionToken(cookieHeader: string): string | null {
-  const match = cookieHeader.match(/(?:^|;\s*)better-auth\.session_token=([^;]+)/)
+  const match = cookieHeader.match(SESSION_COOKIE_PATTERN)
   return match ? match[1] : null
 }
 
