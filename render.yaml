@@ -28,6 +28,17 @@ envVarGroups:
       - key: BETTER_AUTH_SECRET
         sync: false
 
+      # ── Rate limiting (common/config/rate-limit-config.ts) ──────────────
+      # `default` bucket covers the general API surface, including Render's
+      # own healthCheckPath polling (auth-server's own discovery endpoint,
+      # plus every /login health-check hit on sassy-auth-admin, which
+      # server-renders and calls GET /api/social-providers on every request
+      # regardless of real traffic — see bug found 2026-09-17). Raised from
+      # the 120/60s code default after that combined health-check volume
+      # sporadically tripped it.
+      - key: DEFAULT_RATE_LIMIT
+        value: "600"
+
       # ── Public URLs (must match custom domains + TLS) ───────────────────
       - key: BETTER_AUTH_URL
         value: https://auth-api.milissai.com
