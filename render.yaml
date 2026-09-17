@@ -135,7 +135,14 @@ services:
     # See the matching comment on sassy-auth-server's buildCommand — same NODE_ENV/pnpm
     # devDependencies gotcha, needed here for `next build`'s devDependencies (typescript).
     startCommand: cd apps/admin && npx next start -p $PORT
-    healthCheckPath: /login
+    # healthCheckPath: /login
+    # Disabled for now: /login triggers a server-side (SSR) fetch to the
+    # auth-server's GET /api/social-providers on every hit, so Render's
+    # aggressive post-deploy health-check polling was fanning out into that
+    # endpoint's throttle bucket from this service's own IP — same root
+    # cause as the DiscoveryController restart-loop bug (3ee6b15), one hop
+    # removed. Re-enable once this service has a dedicated health endpoint
+    # that doesn't call out to auth-server.
     domains:
       - auth.milissai.com
     envVars:
