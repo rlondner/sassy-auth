@@ -79,4 +79,29 @@ describe('createOtelProxyHandler', () => {
     const response = await handler(makeRequest(), { params: Promise.resolve({ path: ['v1', 'traces'] }) });
     expect(response.status).toBe(500);
   });
+
+  it('allows a request with no origin header at all (non-browser same-site caller)', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(
+      new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const handler = createOtelProxyHandler();
+    const response = await handler(
+      makeRequest({ origin: null }),
+      { params: Promise.resolve({ path: ['v1', 'traces'] }) },
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it('returns 502 when the upstream fetch fails', async () => {
+    const fetchMock = jest.fn().mockRejectedValue(new Error('network down'));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const handler = createOtelProxyHandler();
+    const response = await handler(makeRequest(), { params: Promise.resolve({ path: ['v1', 'traces'] }) });
+
+    expect(response.status).toBe(502);
+  });
 });
