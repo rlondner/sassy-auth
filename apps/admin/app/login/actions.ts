@@ -213,6 +213,8 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
     return { error: 'Email and password are required.' }
   }
 
+  console.log(`[admin] Sign-in attempt for ${email}`)
+
   const origin = await getForwardedOrigin()
 
   // Forward the trust-device cookie, and only that one. BetterAuth decides
