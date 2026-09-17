@@ -5,6 +5,7 @@ exports.detectIdentifierType = detectIdentifierType;
 exports.evaluatePasswordPolicy = evaluatePasswordPolicy;
 exports.isValidAppLogoDataUri = isValidAppLogoDataUri;
 exports.renderTemplate = renderTemplate;
+exports.getBetterAuthCookieName = getBetterAuthCookieName;
 /** Machine-readable codes returned as the `error` field in 4xx JWT responses. */
 var TokenErrorCode;
 (function (TokenErrorCode) {
@@ -97,4 +98,8 @@ function isValidAppLogoDataUri(value) {
  */
 function renderTemplate(template, vars) {
     return template.replace(/\{\{(\w+)\}\}/g, (match, key) => Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : match);
+}
+function getBetterAuthCookieName(cookie, isProduction) {
+    const base = `better-auth.${cookie}`;
+    return isProduction ? `__Secure-${base}` : base;
 }

@@ -3,8 +3,13 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
+import { getBetterAuthCookieName } from '@sassy-auth/types'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { AUTH_SERVER_URL } from '@/lib/config'
+
+// Must match the exact production check auth.config.ts uses for
+// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
+const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', process.env.NODE_ENV === 'production')
 
 // bug-0159: 1-year maxAge so a locale choice survives the browser
 // closing. Previously the cookie was session-only, forcing users to
@@ -47,7 +52,7 @@ export async function signOutAction() {
   } catch (err) {
     Sentry.captureException(err)
   }
-  cookieStore.delete('better-auth.session_token')
+  cookieStore.delete(SESSION_COOKIE_NAME)
   Sentry.addBreadcrumb({
     category: 'auth',
     message: 'Admin signed out',

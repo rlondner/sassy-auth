@@ -1,8 +1,13 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { getBetterAuthCookieName } from '@sassy-auth/types'
 import { validateNextUrl } from '@/lib/safe-next'
 import { fetchSocialProviders } from '@/lib/social-providers'
 import { LoginForm } from './login-form'
+
+// Must match the exact production check auth.config.ts uses for
+// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
+const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', process.env.NODE_ENV === 'production')
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
@@ -23,7 +28,7 @@ export const dynamic = 'force-dynamic'
 async function hasActiveSession(): Promise<boolean> {
   const cookieStore = await cookies()
   const cookieHeader = cookieStore.toString()
-  if (!cookieHeader.includes('better-auth.session_token=')) return false
+  if (!cookieHeader.includes(`${SESSION_COOKIE_NAME}=`)) return false
   try {
     const res = await fetch(`${AUTH_SERVER}/api/auth/get-session`, {
       headers: { Cookie: cookieHeader },
