@@ -3,10 +3,8 @@
  */
 jest.mock('@opentelemetry/api', () => {
   const actual = jest.requireActual('@opentelemetry/api');
-  return {
-    ...actual,
-    trace: { ...actual.trace, getTracer: jest.fn() },
-  };
+  jest.spyOn(actual.trace, 'getTracer');
+  return actual;
 });
 
 import { trace } from '@opentelemetry/api';
@@ -33,6 +31,27 @@ describe('client', () => {
       const fresh = jest.requireActual('./client') as typeof import('./client');
       fresh.captureClientError(new Error('boom'));
       expect(startSpanMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when initOtelClient fails to register the provider', () => {
+    it('permanently no-ops captureClientError for that page load', () => {
+      jest.resetModules();
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { WebTracerProvider } = jest.requireActual('@opentelemetry/sdk-trace-web') as typeof import('@opentelemetry/sdk-trace-web');
+      const registerSpy = jest.spyOn(WebTracerProvider.prototype, 'register').mockImplementation(() => {
+        throw new Error('registration boom');
+      });
+
+      const fresh = jest.requireActual('./client') as typeof import('./client');
+      fresh.initOtelClient('sassy-auth-admin');
+      fresh.captureClientError(new Error('boom'));
+
+      expect(startSpanMock).not.toHaveBeenCalled();
+
+      registerSpy.mockRestore();
+      (console.error as jest.Mock).mockRestore();
     });
   });
 

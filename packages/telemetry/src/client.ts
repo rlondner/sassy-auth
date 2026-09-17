@@ -6,8 +6,11 @@ import { ATTR_SERVICE_NAME, ATTR_DEPLOYMENT_ENVIRONMENT_NAME } from '@openteleme
 
 const OTEL_PROXY_TRACES_PATH = '/api/otel/v1/traces';
 
-let initialized = false;
-let initializedServiceName: string | undefined;
+let attemptedInit = false;
+// Only set once provider.register() has actually succeeded. captureClientError
+// must permanently no-op unless this happened, rather than falling back to
+// whatever tracer provider happens to be globally registered.
+let registeredServiceName: string | undefined;
 
 /**
  * Call once, client-side only, before any captureClientError call site can
@@ -16,9 +19,8 @@ let initializedServiceName: string | undefined;
  * reaches the browser bundle.
  */
 export function initOtelClient(serviceName: string): void {
-  if (typeof window === 'undefined' || initialized) return;
-  initialized = true;
-  initializedServiceName = serviceName;
+  if (typeof window === 'undefined' || attemptedInit) return;
+  attemptedInit = true;
 
   try {
     const resource = resourceFromAttributes({
@@ -31,6 +33,7 @@ export function initOtelClient(serviceName: string): void {
       spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter({ url: OTEL_PROXY_TRACES_PATH }))],
     });
     provider.register();
+    registeredServiceName = serviceName;
   } catch (error) {
     console.error('[otel] Failed to initialize OpenTelemetry Web SDK:', error);
   }
@@ -38,12 +41,13 @@ export function initOtelClient(serviceName: string): void {
 
 /**
  * Records a "client.error" span for an error caught in the browser (an error
- * boundary, a failed fetch, etc.). No-ops if initOtelClient hasn't run yet.
+ * boundary, a failed fetch, etc.). No-ops if initOtelClient hasn't run yet,
+ * or if its OTel provider setup+registration failed.
  */
 export function captureClientError(error: unknown, context?: Record<string, string>): void {
-  if (!initialized || !initializedServiceName) return;
+  if (!registeredServiceName) return;
 
-  const tracer = trace.getTracer(initializedServiceName);
+  const tracer = trace.getTracer(registeredServiceName);
   const err = error instanceof Error ? error : new Error(String(error));
   const span = tracer.startSpan('client.error', {
     attributes: {
