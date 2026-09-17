@@ -69,8 +69,7 @@ services:
     region: ohio
     branch: master
     buildCommand: >-
-      corepack enable &&
-      corepack prepare pnpm@9.0.0 --activate &&
+      npm install -g pnpm@9.0.0 &&
       NODE_ENV=development pnpm install --frozen-lockfile &&
       pnpm --filter @sassy-auth/db --filter @sassy-auth/types build &&
       pnpm --filter @sassy-auth/auth-server build
@@ -128,8 +127,7 @@ services:
     region: ohio
     branch: master
     buildCommand: >-
-      corepack enable &&
-      corepack prepare pnpm@9.0.0 --activate &&
+      npm install -g pnpm@9.0.0 &&
       NODE_ENV=development pnpm install --frozen-lockfile &&
       pnpm --filter @sassy-auth/admin build
     # See the matching comment on sassy-auth-server's buildCommand — same NODE_ENV/pnpm
