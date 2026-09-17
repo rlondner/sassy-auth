@@ -46,6 +46,29 @@ describe('SentryLogRecordExporter', () => {
     expect(logger.info).toHaveBeenCalledWith('social.signin.ok', {});
   });
 
+  it('routes records with an undefined severityNumber to logger.info', () => {
+    const logger = fakeSentryLogger();
+    const exporter = new SentryLogRecordExporter(logger);
+    exporter.export([fakeRecord({ severityNumber: undefined, body: 'social.signin.unspecified' })], jest.fn());
+    expect(logger.info).toHaveBeenCalledWith('social.signin.unspecified', {});
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('stringifies a non-string body via String() coercion', () => {
+    const logger = fakeSentryLogger();
+    const exporter = new SentryLogRecordExporter(logger);
+    exporter.export([fakeRecord({ body: { some: 'object' } })], jest.fn());
+    expect(logger.info).toHaveBeenCalledWith('[object Object]', {});
+  });
+
+  it('falls back to the default message when body is undefined', () => {
+    const logger = fakeSentryLogger();
+    const exporter = new SentryLogRecordExporter(logger);
+    exporter.export([fakeRecord({ body: undefined })], jest.fn());
+    expect(logger.info).toHaveBeenCalledWith('sassy-auth.log.event', {});
+  });
+
   it('resolves shutdown without throwing', async () => {
     await expect(new SentryLogRecordExporter(fakeSentryLogger()).shutdown()).resolves.toBeUndefined();
   });
