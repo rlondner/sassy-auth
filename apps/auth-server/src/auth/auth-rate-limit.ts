@@ -73,8 +73,11 @@ interface Bucket {
 
 /**
  * Resolve the client identity. `req.ips` is populated by Express only when
- * `trust proxy` is configured, in which case its left-most entry is the
- * original client; otherwise fall back to the socket address.
+ * `trust proxy` is configured — `main.ts`'s `bootstrap()` does this
+ * (`expressApp.set('trust proxy', 1)`, added for exactly this reason after a
+ * prod incident where every client shared one bucket) — in which case its
+ * left-most entry is the original client; otherwise fall back to the socket
+ * address.
  */
 function clientKey(req: Request): string {
   const forwarded = Array.isArray(req.ips) && req.ips.length > 0 ? req.ips[0] : undefined;
