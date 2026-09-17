@@ -9,7 +9,7 @@
  * It does NOT prove a trace propagates across the HTTP call, for three
  * reasons: (a) `package.json`'s `test:e2e` script sets
  * `OTEL_SDK_DISABLED=true`, which disables the exporter regardless of
- * `DD_API_KEY`; (b) this test imports `AppModule` directly rather than going
+ * `OTEL_EXPORTER_OTLP_ENDPOINT`; (b) this test imports `AppModule` directly rather than going
  * through `main.ts`, so `src/instrument.ts` (which calls `Sentry.init`,
  * `setupOtel()`, `setupLogging()`) never runs in this test process — no
  * tracer/meter is ever initialized here; (c) the outbound `fetch()` call to
@@ -24,7 +24,7 @@
  * currently automated anywhere in this repo.
  *
  * Run manually with:
- *   DD_API_KEY=... SENTRY_DSN=... RUN_OTEL_E2E=1 RS_E2E_URL=http://localhost:8010 pnpm test:e2e -- otel-thin-slice
+ *   OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.datadoghq.com OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=... SENTRY_DSN=... RUN_OTEL_E2E=1 RS_E2E_URL=http://localhost:8010 pnpm test:e2e -- otel-thin-slice
  */
 import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
@@ -33,7 +33,7 @@ import { AppModule } from '../src/app.module';
 
 const shouldRun =
   process.env.RUN_OTEL_E2E === '1' &&
-  process.env.DD_API_KEY &&
+  process.env.OTEL_EXPORTER_OTLP_ENDPOINT &&
   process.env.SENTRY_DSN &&
   process.env.RS_E2E_URL;
 const describeOrSkip = shouldRun ? describe : describe.skip;
