@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { RegistrationService } from './registration.service';
 import { RegisterDto } from './register.dto';
 import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
@@ -9,6 +10,7 @@ import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
  * The NestJS global prefix is 'api', so the effective route is:
  *   POST /api/register
  */
+@ApiTags('Registration')
 @Controller('register')
 export class RegistrationController {
   constructor(private readonly service: RegistrationService) {}
