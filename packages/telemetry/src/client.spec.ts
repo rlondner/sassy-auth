@@ -27,10 +27,20 @@ describe('client', () => {
   describe('captureClientError before initOtelClient has run', () => {
     it('is a no-op', () => {
       jest.resetModules();
+
+      // Derive a fresh getTracer/startSpan spy from the SAME @opentelemetry/api
+      // module instance that the freshly-required ./client will resolve to
+      // (via its own jest.mock factory's jest.requireActual call within this
+      // resetModules epoch), rather than reusing the outer file's mocks -
+      // otherwise this assertion is vacuous.
+      const freshApi = jest.requireActual('@opentelemetry/api') as typeof import('@opentelemetry/api');
+      const freshStartSpan = jest.fn();
+      jest.spyOn(freshApi.trace, 'getTracer').mockReturnValue({ startSpan: freshStartSpan } as never);
+
       // re-require a fresh, uninitialized module instance
       const fresh = jest.requireActual('./client') as typeof import('./client');
       fresh.captureClientError(new Error('boom'));
-      expect(startSpanMock).not.toHaveBeenCalled();
+      expect(freshStartSpan).not.toHaveBeenCalled();
     });
   });
 
@@ -38,6 +48,10 @@ describe('client', () => {
     it('permanently no-ops captureClientError for that page load', () => {
       jest.resetModules();
       jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const freshApi = jest.requireActual('@opentelemetry/api') as typeof import('@opentelemetry/api');
+      const freshStartSpan = jest.fn();
+      jest.spyOn(freshApi.trace, 'getTracer').mockReturnValue({ startSpan: freshStartSpan } as never);
 
       const { WebTracerProvider } = jest.requireActual('@opentelemetry/sdk-trace-web') as typeof import('@opentelemetry/sdk-trace-web');
       const registerSpy = jest.spyOn(WebTracerProvider.prototype, 'register').mockImplementation(() => {
@@ -48,7 +62,7 @@ describe('client', () => {
       fresh.initOtelClient('sassy-auth-admin');
       fresh.captureClientError(new Error('boom'));
 
-      expect(startSpanMock).not.toHaveBeenCalled();
+      expect(freshStartSpan).not.toHaveBeenCalled();
 
       registerSpy.mockRestore();
       (console.error as jest.Mock).mockRestore();
