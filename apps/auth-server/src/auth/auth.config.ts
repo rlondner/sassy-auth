@@ -229,6 +229,11 @@ export const auth = betterAuth({
   // this same handler, not a second `hooks` block.
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === '/sign-in/email') {
+        const email = (ctx.body as { email?: string } | undefined)?.email;
+        console.log(`[auth-server] Sign-in attempt for ${email ?? 'unknown'}`);
+      }
+
       // task-7: /reset-password has no server-side complexity check by
       // default — BetterAuth only enforces minPasswordLength/
       // maxPasswordLength (the top-level `password` option above). This
