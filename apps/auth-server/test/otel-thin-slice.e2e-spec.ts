@@ -11,7 +11,7 @@
  * `OTEL_SDK_DISABLED=true`, which disables the exporter regardless of
  * `OTEL_EXPORTER_OTLP_ENDPOINT`; (b) this test imports `AppModule` directly rather than going
  * through `main.ts`, so `src/instrument.ts` (which calls `Sentry.init`,
- * `setupOtel()`, `setupLogging()`) never runs in this test process — no
+ * `setupOtelMetrics()`, `setupOtelLogging()`) never runs in this test process — no
  * tracer/meter is ever initialized here; (c) the outbound `fetch()` call to
  * resource-server-fastapi below is a bare Node `fetch` with no
  * instrumentation, so no `traceparent` header is ever sent — even with a
