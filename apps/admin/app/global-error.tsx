@@ -2,6 +2,7 @@
 
 import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
+import { captureClientError, initOtelClient } from '@sassy-auth/telemetry/client'
 
 export default function GlobalError({
   error,
@@ -12,6 +13,8 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     Sentry.captureException(error)
+    initOtelClient('sassy-auth-admin')
+    captureClientError(error, { boundary: 'global-error' })
   }, [error])
 
   return (
