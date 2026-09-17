@@ -69,10 +69,9 @@ services:
     region: ohio
     branch: master
     buildCommand: >-
-      npm install -g pnpm@9.0.0 &&
-      NODE_ENV=development pnpm install --frozen-lockfile &&
-      pnpm --filter @sassy-auth/db --filter @sassy-auth/types build &&
-      pnpm --filter @sassy-auth/auth-server build
+      NODE_ENV=development npx --yes pnpm@9.0.0 install --frozen-lockfile &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/db --filter @sassy-auth/types build &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/auth-server build
     # NODE_ENV=development on the install step only: the production NODE_ENV value from
     # sassy-auth-production (below) is present during the build too, and pnpm skips
     # devDependencies — including @nestjs/cli, needed for `nest build` — whenever it sees
@@ -127,9 +126,8 @@ services:
     region: ohio
     branch: master
     buildCommand: >-
-      npm install -g pnpm@9.0.0 &&
-      NODE_ENV=development pnpm install --frozen-lockfile &&
-      pnpm --filter @sassy-auth/admin build
+      NODE_ENV=development npx --yes pnpm@9.0.0 install --frozen-lockfile &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/admin build
     # See the matching comment on sassy-auth-server's buildCommand — same NODE_ENV/pnpm
     # devDependencies gotcha, needed here for `next build`'s devDependencies (typescript).
     startCommand: cd apps/admin && npx next start -p $PORT
