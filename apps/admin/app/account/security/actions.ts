@@ -1,8 +1,15 @@
 'use server'
 
 import { cookies } from 'next/headers'
+import { getBetterAuthCookieName } from '@sassy-auth/types'
 import { AUTH_SERVER_URL } from '@/lib/config'
 import { getForwardedOrigin } from '@/lib/auth-origin'
+
+// Must match the exact production check auth.config.ts uses for
+// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', IS_PRODUCTION)
+const TRUST_DEVICE_COOKIE_NAME = getBetterAuthCookieName('trust_device', IS_PRODUCTION)
 
 // ---------------------------------------------------------------------------
 // Cookie helpers
@@ -172,7 +179,7 @@ async function revokeOtherSessions(rotatedSessionToken: string, origin: string |
     await fetch(`${AUTH_SERVER_URL}/api/auth/revoke-other-sessions`, {
       method: 'POST',
       headers: {
-        Cookie: `better-auth.session_token=${rotatedSessionToken}`,
+        Cookie: `${SESSION_COOKIE_NAME}=${rotatedSessionToken}`,
         ...(origin && { Origin: origin }),
       },
     })
@@ -279,12 +286,12 @@ export async function confirmEnable(formData: FormData): Promise<ConfirmEnableRe
   // better-auth rotates the session when confirm flips twoFactorEnabled on —
   // it creates a new session and deletes the old one. Forward the new session
   // token so the browser's cookie stays valid after enable completes.
-  await forwardNamedCookie(res, 'better-auth.session_token')
+  await forwardNamedCookie(res, SESSION_COOKIE_NAME)
 
   // bug-0275: also revoke every other active session for this user now that
   // 2FA is on, so a device that never completed the 2FA challenge can't keep
   // minting OAuth codes that falsely claim `amr: ['otp','mfa']`.
-  const rotatedToken = extractSetCookieValue(res, 'better-auth.session_token')
+  const rotatedToken = extractSetCookieValue(res, SESSION_COOKIE_NAME)
   if (rotatedToken) {
     await revokeOtherSessions(rotatedToken, origin)
   }
@@ -339,11 +346,11 @@ export async function disable2fa(formData: FormData): Promise<Disable2faResult> 
   // token that no longer exists, so the user is bounced to /login on the next
   // navigation while this action has already reported success. confirmEnable
   // has handled the enable direction since it was written; this is the mirror.
-  await forwardNamedCookie(res, 'better-auth.session_token')
+  await forwardNamedCookie(res, SESSION_COOKIE_NAME)
   // The same response expires the trust-device cookie when the user had one,
   // its verification record having just been deleted server-side. Forward that
   // too rather than leaving a cookie pointing at nothing.
-  await forwardNamedCookie(res, 'better-auth.trust_device')
+  await forwardNamedCookie(res, TRUST_DEVICE_COOKIE_NAME)
 
   return { ok: true }
 }

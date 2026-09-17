@@ -89,3 +89,22 @@ export interface ActivationEmailBranding {
  * (e.g. a user-supplied name) is responsible for escaping it first.
  */
 export declare function renderTemplate(template: string, vars: Record<string, string>): string;
+/**
+ * BetterAuth prefixes every cookie it issues with `__Secure-` (RFC 6265bis)
+ * whenever `advanced.useSecureCookies` is on. auth-server's auth.config.ts
+ * pins that flag to `NODE_ENV === 'production'`, independent of protocol or
+ * the cookie's own `Secure` attribute. This applies to every BetterAuth
+ * cookie — the session token, the two-factor plugin's temporary challenge
+ * cookie, and its trust-device cookie all go through the same internal
+ * `createAuthCookie` helper.
+ *
+ * apps/admin never imports BetterAuth's cookie machinery — it only sees raw
+ * Set-Cookie/Cookie headers over HTTP — so it has no way to ask BetterAuth
+ * what a cookie is actually named. It must independently compute the same
+ * name, from the same production check, or the two sides drift: one side
+ * renames a cookie while the other keeps looking for the unprefixed name,
+ * and sign-in silently breaks (see auth.config.ts's dev(sec) comment for the
+ * incident this traces to, which turned out to reproduce in production too).
+ */
+export type BetterAuthCookieName = 'session_token' | 'two_factor' | 'trust_device';
+export declare function getBetterAuthCookieName(cookie: BetterAuthCookieName, isProduction: boolean): string;
