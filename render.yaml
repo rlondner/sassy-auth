@@ -152,3 +152,10 @@ services:
       # Browser-facing auth-server URL for social sign-in redirects on /login.
       - key: PUBLIC_AUTH_SERVER_URL
         value: https://auth-api.milissai.com
+      # Same URL, NEXT_PUBLIC_-prefixed so Next.js inlines it into the client
+      # bundle at build time — required by lib/api-public.ts, which is called
+      # from client components (accept-invite-form.tsx, reset-password-form.tsx)
+      # and can't read plain server-only env vars. Without this it silently
+      # falls back to the https://localhost:3010 dev default in every deploy.
+      - key: NEXT_PUBLIC_AUTH_SERVER_URL
+        value: https://auth-api.milissai.com
