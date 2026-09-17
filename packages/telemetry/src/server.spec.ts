@@ -127,4 +127,10 @@ describe('setupOtelLogging', () => {
     const fakeLogger: SentryLoggerLike = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
     expect(() => setupOtelLogging('sassy-auth-auth-server', fakeLogger)).not.toThrow();
   });
+
+  it('does not throw when SENTRY_DSN is set but no logger is provided', async () => {
+    process.env.SENTRY_DSN = 'https://example.invalid/1';
+    const { setupOtelLogging } = await import('./server');
+    expect(() => setupOtelLogging('sassy-auth-auth-server')).not.toThrow();
+  });
 });
