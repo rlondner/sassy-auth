@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { BetterAuthGuard } from '../auth/better-auth.guard';
 import { checkPermission } from '../common/permissions/check-permission';
@@ -38,7 +39,16 @@ export class SocialController {
    * `settings` below): a provider that's off for an app never appears here,
    * and there would be no way to opt back in from a list that never shows
    * it.
+   *
+   * @SkipThrottle here (both named buckets — a bare @SkipThrottle() only
+   * covers `default`, see DiscoveryController): the admin console's /login
+   * page fetches this server-side (Next.js SSR, `cache: 'no-store'`), so
+   * every browser's page load funnels through the admin server's own IP
+   * rather than each end user's IP. That collapses all real traffic onto one
+   * throttle key, tripping the shared `default` bucket under ordinary load
+   * and producing 429s with no actual abuse involved.
    */
+  @SkipThrottle({ default: true, auth: true })
   @Get()
   async list(@Query('client_id') clientId?: string): Promise<{ providers: string[]; logo: string | null }> {
     const [providers, logo] = await Promise.all([

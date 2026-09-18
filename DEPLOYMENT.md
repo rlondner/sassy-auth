@@ -68,7 +68,7 @@ platform seed as a Render Job — no dashboard clicks required after this
 one-time setup:
 
 1. Create a [Render API key](https://api-docs.render.com/reference/authentication) and store it as the `RENDER_API_KEY` secret on this repo's `production` GitHub Environment.
-2. Create a [Neon API key](https://neon.tech/docs/manage/api-keys) and store it as `NEON_API_KEY` on the same Environment.
+2. Create a [Neon API key](https://neon.tech/docs/manage/api-keys) and store it as `NEON_API_KEY` on the same Environment. If it's an **organization** API key (not a personal one), also store your Neon organization ID — found on the Neon dashboard's organization settings page — as `NEON_ORG_ID`; the Neon API rejects project listing/creation from org keys without it.
 3. Create a fine-grained GitHub PAT scoped to this repo with **Environments: write** permission, and store it as `GH_SECRETS_PAT` (the default `GITHUB_TOKEN` can't write Environment secrets).
 4. Connect this repository to Render as a Blueprint once (**Render Dashboard → New → Blueprint**) — Render has no public API for this first-time connection. On this first sync, Render will prompt for the `sync: false` variables; leave them blank and push to `master` — the workflow fills them in on the next run.
 5. Point DNS at the CNAME targets Render shows for each custom domain (see §3.2 below) — a one-time step per domain.
@@ -90,6 +90,62 @@ existing `render.yaml` entry (see §5 below).
 
 See `docs/superpowers/specs/2026-09-16-render-deploy-automation-design.md` for
 the full design.
+
+---
+
+## Staging environment
+
+`sassy-auth-server-staging` and `sassy-auth-admin-staging` mirror the
+production services but deploy from `dev` instead of `master`, via
+`.github/workflows/deploy-render-staging.yml` and the same
+`packages/deploy-render` pipeline (`DEPLOY_TARGET=staging` selects staging's
+service names, env var group, blueprint file, and GitHub Environment — see
+`cli.ts`'s `DEPLOY_TARGETS`).
+
+**Staging runs in its own, separate Render account from production.**
+Production is defined in `render.yaml`; staging is defined in
+`render.staging.yaml`. Each blueprint file is only ever applied in its own
+account — do not connect the same account to both files, or a Blueprint
+sync in one account could try to reconcile services that actually belong to
+the other. The two accounts are otherwise unrelated: separate
+`RENDER_API_KEY`, separate billing, separate service list.
+
+**Promotion:** merging `dev` into `master` (the repo's existing PR flow) is
+what promotes a change from staging to production — there's no separate
+promotion mechanism. Staging simply deploys automatically, and earlier, on
+every push to `dev`.
+
+**Database:** staging uses a Neon **branch** named `staging`, created once
+off the production project's default branch (copy-on-write — starts with a
+real copy of prod's schema/data, including its `sassyauth_owner` role and
+`sassyauth` database, then diverges independently). It is **not**
+auto-reset — to refresh staging's data from current production, delete the
+`staging` branch in the Neon console and push to `dev`; the pipeline
+recreates it fresh from prod on the next run.
+
+One-time setup:
+
+1. Create (or open) the **separate Render account** staging deploys into.
+   Generate a `RENDER_API_KEY` from that account — this is the one value
+   that must *not* match production's.
+2. In that account: **New → Blueprint** → connect this repo → select
+   `render.staging.yaml` (not the default `render.yaml`). Render prompts for
+   every `sync: false` variable on `sassy-auth-server-staging` and
+   `sassy-auth-admin-staging` — leave these blank, same as the production
+   flow in §3.1 above; the deploy workflow populates them on the next push
+   to `dev`. Click **Apply**.
+3. Create a `staging` GitHub Environment (on this repo). Set `RENDER_API_KEY`
+   to the key from step 1. Copy the same `NEON_API_KEY`, `NEON_ORG_ID`, and
+   `GH_SECRETS_PAT` values used for `production` into it — same values, just
+   duplicated, since GitHub scopes secrets per Environment. `RSA_PRIVATE_KEY`,
+   `RSA_PUBLIC_KEY`, `BETTER_AUTH_SECRET`, `SEED_ADMIN_PASSWORD`, and
+   `DATABASE_URL` are independent from production's and get generated
+   automatically by the pipeline — do not copy those.
+4. Point `auth-staging.milissai.com` / `auth-api-staging.milissai.com` CNAMEs
+   at the values Render shows once the services exist.
+5. Push to `dev` (or run the workflow manually) — the pipeline provisions the
+   Neon branch, generates staging's secrets, syncs env vars, deploys, and
+   seeds, exactly like production's first run.
 
 ---
 
@@ -172,9 +228,15 @@ Running migrations in both places executes them twice per deploy — pick one lo
 
 ### 3.4 First-time seed
 
-Seeding is automated as a Render Job triggered by the deploy workflow after every successful deploy of `sassy-auth-server`. `db:seed` is idempotent, so re-running it on every deploy is safe.
+Seeding is automated as two Render Jobs triggered by the deploy workflow after every successful deploy of `sassy-auth-server`: `db:seed`, then `db:seed:vibecast`. Both are idempotent, so re-running them on every deploy is safe.
 
-This creates the platform app, org, permissions, and five platform admin users (`s@sa.io`, `u@sa.io`, …). Sign in at https://auth.milissai.com/login as `s@sa.io` with your `SEED_ADMIN_PASSWORD`.
+`db:seed` creates the platform app, org, permissions, the `Platform Super Admin` role (wired to every `platform.*` permission), and the platform admin users — the dev/test fixtures (`s@sa.io`, `u@sa.io`, …) plus the real production super admin `contact@milissai.com`. Sign in at https://auth.milissai.com/login as `s@sa.io` with your `SEED_ADMIN_PASSWORD`.
+
+`contact@milissai.com` is seeded only when `NODE_ENV=production` and gets its own randomly generated password instead of `SEED_ADMIN_PASSWORD` — that password is never logged or stored anywhere. Use the **forgot password** flow at https://auth.milissai.com/login to claim the account.
+
+`db:seed:vibecast` (`vibecast-migration.ts`) provisions the `vibecast` app, its `vibecast.*` permissions and roles, the "VibeCast Default Org", and the `admin@getvibecast.com` app admin. On the very first run — when the `vibecast` SaApp doesn't exist yet — it reads `VIBECAST_APP_URL`, `VIBECAST_LOGIN_REDIRECT_URI`, and `VIBECAST_LOGOUT_REDIRECT_URI` from the environment (required, or the script throws in production) to seed the app's URL and redirect URIs. On every later run those values already exist on the SaApp record and are left alone — edit them via the admin console's Apps drawer instead, not by setting the env vars again.
+
+`render.yaml` / `render.staging.yaml` set these as static values: `https://app.getvibecast.com` (+ `/api/auth/callback` / `/api/auth/signout`) in production, `https://app-stg.getvibecast.com` (same paths) in staging — each their own root domain, so each environment's `vibecast` SaApp gets its own distinct app URL and redirect URIs. Local dev falls back to `https://localhost:3030` (baked into `vibecast-migration.ts`, no env var needed). Since these are only read on the very first seed run per environment, changing the values in the blueprint files after the SaApp already exists has no effect — edit the live values via the admin console's Apps drawer instead.
 
 **Optional demo data** for the FastAPI sample (creates app `resourceserver01`, org `Citadel`, demo users) — this is not part of the automated pipeline; run it once from a Render shell on `sassy-auth-server` (**Shell** tab in the service dashboard, which inherits the service's environment variables):
 
@@ -217,6 +279,9 @@ Set that value as `SASSY_CLIENT_ID` on `sassy-resource-server` and redeploy.
 | Variable | Notes |
 |----------|-------|
 | `SEED_ADMIN_PASSWORD` | Required for seed in production |
+| `VIBECAST_APP_URL` | `https://app.getvibecast.com` — required by `db:seed:vibecast` in production |
+| `VIBECAST_LOGIN_REDIRECT_URI` | `https://app.getvibecast.com/api/auth/callback` |
+| `VIBECAST_LOGOUT_REDIRECT_URI` | `https://app.getvibecast.com/api/auth/signout` |
 | `RESEND_API_KEY` | Recommended email transport |
 | `REGISTER_RATE_LIMIT` | Default `10` — in-process; see [Known Limitations](README.md#known-limitations) |
 | `GOOGLE_*`, `MICROSOFT_*`, … | Optional social sign-in — redirect URIs use `https://auth-api.milissai.com/api/auth/callback/{provider}` |

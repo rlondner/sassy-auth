@@ -37,9 +37,9 @@ describe('parseRenderYaml + staticGroupValues', () => {
     });
   });
 
-  it('returns an empty object for an unknown group', () => {
+  it('throws for an unknown group', () => {
     const doc = parseRenderYaml(FIXTURE);
-    expect(staticGroupValues(doc, 'missing-group')).toEqual({});
+    expect(() => staticGroupValues(doc, 'missing-group')).toThrow(/no envVarGroup named "missing-group"/);
   });
 });
 
@@ -52,8 +52,8 @@ describe('staticServiceValues', () => {
     });
   });
 
-  it('returns an empty object for an unknown service', () => {
+  it('throws for an unknown service', () => {
     const doc = parseRenderYaml(FIXTURE);
-    expect(staticServiceValues(doc, 'missing-service')).toEqual({});
+    expect(() => staticServiceValues(doc, 'missing-service')).toThrow(/no service named "missing-service"/);
   });
 });

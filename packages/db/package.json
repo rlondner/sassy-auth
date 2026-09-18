@@ -13,7 +13,8 @@
     "db:migrate": "dotenv -e ../../.env.local -- prisma migrate dev",
     "db:migrate:deploy": "dotenv -e ../../.env.local -- prisma migrate deploy",
     "db:push": "dotenv -e ../../.env.local -- prisma db push",
-    "db:seed": "dotenv -e ../../.env.local -- ts-node --transpile-only -r tsconfig-paths/register ../../apps/auth-server/src/seed/seed.ts"
+    "db:seed": "dotenv -e ../../.env.local -- ts-node --transpile-only -r tsconfig-paths/register ../../apps/auth-server/src/seed/seed.ts",
+    "db:seed:vibecast": "dotenv -e ../../.env.local -- ts-node --transpile-only -r tsconfig-paths/register ../../apps/auth-server/src/seed/vibecast-migration.ts"
   },
   "jest": {
     "moduleFileExtensions": ["js", "json", "ts"],
@@ -27,15 +28,15 @@
   "dependencies": {
     "@prisma/client": "^7.0.0",
     "@prisma/adapter-pg": "^7.0.0",
-    "pg": "^8.13.0"
+    "dotenv-cli": "^8.0.0",
+    "pg": "^8.13.0",
+    "prisma": "^7.0.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.11.0",
-    "dotenv-cli": "^8.0.0",
     "jest": "^29.7.0",
-    "prisma": "^7.0.0",
     "ts-jest": "^29.1.4",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.4.0",

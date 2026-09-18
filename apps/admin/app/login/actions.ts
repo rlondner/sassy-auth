@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { trace } from '@opentelemetry/api'
+import { getBetterAuthCookieName } from '@sassy-auth/types'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
@@ -11,6 +12,13 @@ import { forwardNamedCookie, forwardNamedCookieWithMaxAge } from '../account/sec
 import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '@/lib/two-factor-prompt'
 
 const tracer = trace.getTracer('sassy-auth.admin')
+
+// Must match the exact production check auth.config.ts uses for
+// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', IS_PRODUCTION)
+const TWO_FACTOR_COOKIE_NAME = getBetterAuthCookieName('two_factor', IS_PRODUCTION)
+const TRUST_DEVICE_COOKIE_NAME = getBetterAuthCookieName('trust_device', IS_PRODUCTION)
 
 /**
  * The session-create gate (auth.config.ts's databaseHooks.session.create.before)
@@ -62,7 +70,7 @@ function parseSessionCookie(header: string): ParsedSessionCookie | null {
     const eq = namePair.indexOf('=')
     if (eq < 0) continue
     const name = namePair.slice(0, eq)
-    if (name !== 'better-auth.session_token') continue
+    if (name !== SESSION_COOKIE_NAME) continue
     // The upstream Set-Cookie carries the value in its on-the-wire form
     // (e.g. base64 `=` arrives as `%3D`). Next.js's cookieStore.set runs
     // the value through cookie.serialize, which encodeURIComponent's it
@@ -130,9 +138,9 @@ async function forwardSessionCookie(res: Response): Promise<boolean> {
     Sentry.captureMessage('Failed to parse session cookie from auth server response', { level: 'error' })
     return false
   }
-  cookieStore.set('better-auth.session_token', parsed.value, {
+  cookieStore.set(SESSION_COOKIE_NAME, parsed.value, {
     httpOnly: parsed.httpOnly,
-    secure: parsed.secure ?? process.env.NODE_ENV === 'production',
+    secure: parsed.secure ?? IS_PRODUCTION,
     sameSite: parsed.sameSite ?? 'lax',
     path: parsed.path ?? '/',
     ...(parsed.maxAge !== undefined && { maxAge: parsed.maxAge }),
@@ -213,6 +221,8 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
     return { error: 'Email and password are required.' }
   }
 
+  console.log(`[admin] Sign-in attempt for ${email}`)
+
   const origin = await getForwardedOrigin()
 
   // Forward the trust-device cookie, and only that one. BetterAuth decides
@@ -224,7 +234,7 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
   // Deliberately not `cookieStore.toString()`: that would also hand the auth
   // server the caller's existing session token, letting an active session
   // influence the outcome of a password sign-in.
-  const trustCookie = (await cookies()).get('better-auth.trust_device')
+  const trustCookie = (await cookies()).get(TRUST_DEVICE_COOKIE_NAME)
 
   let res: Response
   try {
@@ -234,7 +244,7 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
         'Content-Type': 'application/json',
         ...(origin && { Origin: origin }),
         ...(trustCookie && {
-          Cookie: `better-auth.trust_device=${trustCookie.value}`,
+          Cookie: `${TRUST_DEVICE_COOKIE_NAME}=${trustCookie.value}`,
         }),
       },
       body: JSON.stringify({ email, password }),
@@ -271,7 +281,7 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
   if (responseBody['twoFactorRedirect'] === true) {
     // Forward the temporary 2FA cookie so the browser can present it on the
     // /login/two-factor page. Do NOT set a session cookie.
-    await forwardNamedCookie(res, 'better-auth.two_factor')
+    await forwardNamedCookie(res, TWO_FACTOR_COOKIE_NAME)
     return { twoFactor: true } as { twoFactor: true }
   }
 
@@ -414,7 +424,7 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
   }
 
   if (responseBody['twoFactorRedirect'] === true) {
-    await forwardNamedCookie(res, 'better-auth.two_factor')
+    await forwardNamedCookie(res, TWO_FACTOR_COOKIE_NAME)
     return { twoFactor: true } as { twoFactor: true }
   }
 
@@ -472,7 +482,7 @@ async function applyPerAppTrustCookie(
     } catch { /* use system default */ }
   }
   const resolvedMaxAgeSecs = resolvedDays * 24 * 60 * 60
-  await forwardNamedCookieWithMaxAge(res, 'better-auth.trust_device', resolvedMaxAgeSecs)
+  await forwardNamedCookieWithMaxAge(res, TRUST_DEVICE_COOKIE_NAME, resolvedMaxAgeSecs)
 }
 
 export async function verifyTotp(formData: FormData): Promise<{ error?: string }> {
@@ -516,7 +526,7 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
   if (!ok) return { error: 'serverUnavailable' }
 
   // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
-  await forwardNamedCookie(res, 'better-auth.two_factor')
+  await forwardNamedCookie(res, TWO_FACTOR_COOKIE_NAME)
 
   if (trustDevice) {
     await applyPerAppTrustCookie(res, nextSafe)
@@ -567,7 +577,7 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
   if (!ok) return { error: 'serverUnavailable' }
 
   // Forward the expiring Set-Cookie for the temp 2FA cookie to clear the stale challenge token.
-  await forwardNamedCookie(res, 'better-auth.two_factor')
+  await forwardNamedCookie(res, TWO_FACTOR_COOKIE_NAME)
 
   if (trustDevice) {
     await applyPerAppTrustCookie(res, nextSafe)

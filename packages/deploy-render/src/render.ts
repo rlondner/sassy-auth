@@ -117,7 +117,76 @@ export async function getLatestDeployStatus(
   return body[0].deploy;
 }
 
-const TERMINAL_DEPLOY_FAILURE_STATUSES = new Set(['build_failed', 'update_failed', 'canceled', 'deactivated']);
+const TERMINAL_DEPLOY_FAILURE_STATUSES = new Set([
+  'build_failed',
+  'update_failed',
+  'pre_deploy_failed',
+  'canceled',
+  'deactivated',
+]);
+
+// Env var updates (setEnvVars/syncManagedEnvVars) do NOT themselves trigger a new deploy —
+// use this to kick one off explicitly rather than relying on Render's autoDeploy-on-push,
+// which races the env var sync and typically starts (and fails) before secrets land.
+export async function triggerDeploy(
+  cfg: RenderConfig,
+  serviceId: string,
+  fetchFn: FetchLike = fetch,
+): Promise<RenderDeploy> {
+  const res = await fetchFn(`${RENDER_API_BASE}/services/${serviceId}/deploys`, {
+    method: 'POST',
+    headers: renderHeaders(cfg.apiKey),
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    throw new Error(`Render API error triggering deploy for ${serviceId}: ${res.status} ${await res.text()}`);
+  }
+  const text = await res.text();
+  // Render's create-deploy endpoint responds with an empty body on success — fall back to
+  // the service's now-latest deploy, which is the one this call just created.
+  if (!text) {
+    return getLatestDeployStatus(cfg, serviceId, fetchFn);
+  }
+  return JSON.parse(text) as RenderDeploy;
+}
+
+export async function getDeployStatus(
+  cfg: RenderConfig,
+  serviceId: string,
+  deployId: string,
+  fetchFn: FetchLike = fetch,
+): Promise<RenderDeploy> {
+  const res = await fetchFn(`${RENDER_API_BASE}/services/${serviceId}/deploys/${deployId}`, {
+    headers: renderHeaders(cfg.apiKey),
+  });
+  if (!res.ok) {
+    throw new Error(`Render API error fetching deploy ${deployId} for ${serviceId}: ${res.status} ${await res.text()}`);
+  }
+  return (await res.json()) as RenderDeploy;
+}
+
+// Polls one specific deploy by id, not just "whatever is latest" — a concurrent autoDeploy
+// (or another manually triggered deploy) can otherwise become the "latest" deploy mid-poll
+// and mask the outcome of the one this call actually cares about.
+export async function waitForDeploy(
+  cfg: RenderConfig,
+  serviceId: string,
+  deployId: string,
+  fetchFn: FetchLike = fetch,
+  sleepFn: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+  pollIntervalMs = 15_000,
+  maxAttempts = 40,
+): Promise<void> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const deploy = await getDeployStatus(cfg, serviceId, deployId, fetchFn);
+    if (deploy.status === 'live') return;
+    if (TERMINAL_DEPLOY_FAILURE_STATUSES.has(deploy.status)) {
+      throw new Error(`Render deploy ${deploy.id} for service ${serviceId} ended with status "${deploy.status}"`);
+    }
+    await sleepFn(pollIntervalMs);
+  }
+  throw new Error(`Timed out waiting for deploy ${deployId} on service ${serviceId} to go live`);
+}
 
 export async function waitForLiveDeploy(
   cfg: RenderConfig,

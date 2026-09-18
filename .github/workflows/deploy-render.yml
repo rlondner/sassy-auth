@@ -16,16 +16,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
-    # waitForLiveDeploy (15s x 40 attempts = 10 min) and waitForJobCompletion
-    # (10s x 60 attempts = 10 min) can each run to their full timeout in the
-    # worst case, plus headroom for checkout/install and other CLI steps.
-    timeout-minutes: 25
+    # The two waitForDeploy calls (auth-server, admin) run in parallel, each up to
+    # 15s x 40 attempts = 10 min. The two sequential waitForJobCompletion calls —
+    # db:seed, then db:seed:vibecast (10s x 60 attempts = 10 min each) — follow after.
+    # Worst case: 10 + 10 + 10 = 30 min, plus headroom for checkout/install and other
+    # CLI steps.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 9
 
       - uses: actions/setup-node@v5
         with:
@@ -37,13 +37,15 @@ jobs:
 
       - name: Run deploy automation
         working-directory: packages/deploy-render
-        run: pnpm deploy
+        run: pnpm run deploy
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           # Human-provisioned secrets: created by an operator outside this repo.
           DEPLOY_GITHUB_TOKEN: ${{ secrets.GH_SECRETS_PAT }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # Required only when NEON_API_KEY is a Neon organization API key.
+          NEON_ORG_ID: ${{ secrets.NEON_ORG_ID }}
           # CLI-managed secrets: generated/rotated by the deploy-render CLI itself
           # and written back to GitHub via DEPLOY_GITHUB_TOKEN above.
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}

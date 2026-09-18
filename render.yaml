@@ -1,10 +1,13 @@
-# SassyAuth — Render Blueprint
+# SassyAuth — Render Blueprint (production account)
 #
-# Deploys three web services against an external Neon Postgres database.
+# Deploys two web services against an external Neon Postgres database.
 # See DEPLOYMENT.md for DNS, secrets, first-time seed, and app registration.
 #
 # Apply: Render Dashboard → New → Blueprint → connect this repo.
 # Custom domains and secret values are prompted on first sync (sync: false).
+#
+# Staging lives in a separate Render account — see render.staging.yaml and
+# DEPLOYMENT.md's "Staging environment" section. It is not part of this file.
 
 envVarGroups:
   - name: sassy-auth-production
@@ -25,6 +28,17 @@ envVarGroups:
       - key: BETTER_AUTH_SECRET
         sync: false
 
+      # ── Rate limiting (common/config/rate-limit-config.ts) ──────────────
+      # `default` bucket covers the general API surface, including Render's
+      # own healthCheckPath polling (auth-server's own discovery endpoint,
+      # plus every /login health-check hit on sassy-auth-admin, which
+      # server-renders and calls GET /api/social-providers on every request
+      # regardless of real traffic — see bug found 2026-09-17). Raised from
+      # the 120/60s code default after that combined health-check volume
+      # sporadically tripped it.
+      - key: DEFAULT_RATE_LIMIT
+        value: "600"
+
       # ── Public URLs (must match custom domains + TLS) ───────────────────
       - key: BETTER_AUTH_URL
         value: https://auth-api.milissai.com
@@ -34,9 +48,9 @@ envVarGroups:
         value: https://auth.milissai.com
 
       # BetterAuth CSRF + Nest CORS. Include every browser origin that talks
-      # to the auth-server (admin console + resource-server sample app).
+      # to the auth-server (admin console).
       - key: TRUSTED_ORIGINS
-        value: https://auth.milissai.com,https://testapp.milissai.com
+        value: https://auth.milissai.com
 
       # ── Production defaults ─────────────────────────────────────────────
       - key: NODE_ENV
@@ -52,13 +66,18 @@ services:
     name: sassy-auth-server
     runtime: node
     plan: starter
+    region: ohio
     branch: master
     buildCommand: >-
-      corepack enable &&
-      corepack prepare pnpm@9.0.0 --activate &&
-      pnpm install --frozen-lockfile &&
-      pnpm --filter @sassy-auth/db --filter @sassy-auth/types build &&
-      pnpm --filter @sassy-auth/auth-server build
+      NODE_ENV=development npx --yes pnpm@9.0.0 install --frozen-lockfile &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/db --filter @sassy-auth/types build &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/auth-server build
+    # NODE_ENV=development on the install step only: the production NODE_ENV value from
+    # sassy-auth-production (below) is present during the build too, and pnpm skips
+    # devDependencies — including @nestjs/cli, needed for `nest build` — whenever it sees
+    # NODE_ENV=production. The override doesn't affect the actual running process; that
+    # gets its NODE_ENV from the service env vars, not this build-time shell prefix.
+    #
     # Requires a paid instance type (Starter or above). On Free, move this
     # command to the end of buildCommand — see DEPLOYMENT.md.
     preDeployCommand: cd packages/db && npx prisma migrate deploy
@@ -73,6 +92,17 @@ services:
       # Required in production — seed refuses the dev default otherwise.
       - key: SEED_ADMIN_PASSWORD
         sync: false
+      # VibeCast app provisioning (vibecast-migration.ts) is a second Render Job run by
+      # the deploy workflow after every db:seed. The script only reads these the first
+      # time it creates the vibecast SaApp/redirect URIs — once created, those values are
+      # owned by the SaApp record instead (editable via the admin console), and these vars
+      # are ignored on every later run. See the comment atop vibecast-migration.ts.
+      - key: VIBECAST_APP_URL
+        value: https://app.getvibecast.com
+      - key: VIBECAST_LOGIN_REDIRECT_URI
+        value: https://app.getvibecast.com/api/auth/callback
+      - key: VIBECAST_LOGOUT_REDIRECT_URI
+        value: https://app.getvibecast.com/api/auth/signout
       # Outbound mail — set RESEND_API_KEY (recommended) or SMTP vars.
       - key: RESEND_API_KEY
         sync: false
@@ -93,14 +123,22 @@ services:
     name: sassy-auth-admin
     runtime: node
     plan: starter
+    region: ohio
     branch: master
     buildCommand: >-
-      corepack enable &&
-      corepack prepare pnpm@9.0.0 --activate &&
-      pnpm install --frozen-lockfile &&
-      pnpm --filter @sassy-auth/admin build
+      NODE_ENV=development npx --yes pnpm@9.0.0 install --frozen-lockfile &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/admin build
+    # See the matching comment on sassy-auth-server's buildCommand — same NODE_ENV/pnpm
+    # devDependencies gotcha, needed here for `next build`'s devDependencies (typescript).
     startCommand: cd apps/admin && npx next start -p $PORT
-    healthCheckPath: /login
+    # healthCheckPath: /login
+    # Disabled for now: /login triggers a server-side (SSR) fetch to the
+    # auth-server's GET /api/social-providers on every hit, so Render's
+    # aggressive post-deploy health-check polling was fanning out into that
+    # endpoint's throttle bucket from this service's own IP — same root
+    # cause as the DiscoveryController restart-loop bug (3ee6b15), one hop
+    # removed. Re-enable once this service has a dedicated health endpoint
+    # that doesn't call out to auth-server.
     domains:
       - auth.milissai.com
     envVars:
@@ -110,36 +148,10 @@ services:
       # Browser-facing auth-server URL for social sign-in redirects on /login.
       - key: PUBLIC_AUTH_SERVER_URL
         value: https://auth-api.milissai.com
-      # Allow /login?next= redirects back to the sample resource server.
-      - key: LOGIN_NEXT_ALLOWED_ORIGINS
-        value: https://testapp.milissai.com
-
-  # ── Sample resource server (FastAPI) ──────────────────────────────────────
-  - type: web
-    name: sassy-resource-server
-    runtime: python
-    plan: starter
-    branch: master
-    rootDir: apps/resource-server-fastapi
-    buildCommand: pip install .
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /
-    domains:
-      - testapp.milissai.com
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
-      - key: AUTH_SERVER_URL
+      # Same URL, NEXT_PUBLIC_-prefixed so Next.js inlines it into the client
+      # bundle at build time — required by lib/api-public.ts, which is called
+      # from client components (accept-invite-form.tsx, reset-password-form.tsx)
+      # and can't read plain server-only env vars. Without this it silently
+      # falls back to the https://localhost:3010 dev default in every deploy.
+      - key: NEXT_PUBLIC_AUTH_SERVER_URL
         value: https://auth-api.milissai.com
-      - key: ADMIN_URL
-        value: https://auth.milissai.com
-      - key: RS_BASE_URL
-        value: https://testapp.milissai.com
-      - key: REDIRECT_URI
-        value: https://testapp.milissai.com/auth/callback
-      # sa_app.publicId for the resource-server app — set after seed or
-      # manual app registration in the admin console.
-      - key: SASSY_CLIENT_ID
-        sync: false
-      - key: LOG_LEVEL
-        value: info

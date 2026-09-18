@@ -1,6 +1,6 @@
 {
   "name": "@sassy-auth/admin",
-  "version": "0.0.1",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001 --experimental-https",
@@ -15,7 +15,11 @@
     "@next/env": "^15.5.24",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/resources": "^2.0.0",
     "@opentelemetry/sdk-trace-base": "^2.11.0",
+    "@opentelemetry/sdk-trace-web": "^2.11.0",
+    "@opentelemetry/semantic-conventions": "^1.30.0",
+    "@sassy-auth/telemetry": "workspace:*",
     "@sassy-auth/types": "workspace:*",
     "@sassy-auth/ui": "workspace:*",
     "@sentry/nextjs": "^10.54.0",

@@ -79,6 +79,20 @@ async function bootstrap() {
   const httpsOptions = resolveHttpsOptions(isDev, path.join(__dirname, '..', 'secrets'));
   const expressApp = express();
 
+  // Render terminates TLS/HTTP at its edge and proxies to this app over one
+  // internal hop, so `req.ip` is the proxy's address, not the real client's,
+  // unless Express is told to trust that one hop and read X-Forwarded-For.
+  // Without this, every per-client rate limiter that keys on `req.ip` —
+  // @nestjs/throttler's default `ThrottlerGuard` tracker (app.module.ts) and
+  // `auth-rate-limit.ts`'s `clientKey` — collapses all traffic across every
+  // visitor into a single shared bucket, producing sporadic 429s under
+  // combined load that have nothing to do with any individual client's
+  // request rate (see CR_2026-09-02.md finding 🟡 and auth-rate-limit.ts's
+  // `clientKey` doc comment, which already assumed this would be set).
+  // `1` trusts exactly the first hop in front of the app; if a second proxy
+  // is ever added in front of Render's edge, this needs to become `2`.
+  expressApp.set('trust proxy', 1);
+
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.
   //
   // bug-0232: because that interception happens ahead of NestJS, the
