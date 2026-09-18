@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { prisma } from '@sassy-auth/db';
 import { TokenErrorCode } from '@sassy-auth/types';
+import { safeParseAmr } from './amr';
 
 const SLIDING_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ABSOLUTE_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
@@ -33,15 +34,6 @@ export interface RotatedRefreshToken {
 
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
-}
-
-function safeParseAmr(raw: string): string[] {
-  try {
-    const v = JSON.parse(raw);
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : ['pwd'];
-  } catch {
-    return ['pwd'];
-  }
 }
 
 @Injectable()
