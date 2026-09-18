@@ -94,6 +94,15 @@ describe('ServiceUsersService', () => {
       await expect(service.assignRole(CALLING_APP_ID, 'usr1', 'role1')).rejects.toBeInstanceOf(ForbiddenException);
       expect(mockPrisma.saUserRole.create).not.toHaveBeenCalled();
     });
+
+    it('allows assigning a role with no permissions at all', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeUser(CALLING_APP_ID));
+      mockPrisma.saRole.findUnique.mockResolvedValue({ id: 5, publicId: 'role1', appId: CALLING_APP_ID, permissions: [] });
+      mockPrisma.saUserRole.create.mockResolvedValue(undefined);
+
+      await expect(service.assignRole(CALLING_APP_ID, 'usr1', 'role1')).resolves.toBeUndefined();
+      expect(mockPrisma.saUserRole.create).toHaveBeenCalledWith({ data: { userId: 1, roleId: 5 } });
+    });
   });
 
   describe('removeRole', () => {
