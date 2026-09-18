@@ -121,6 +121,11 @@ model SaApp {
   twoFactorTrustDays Int?
   requireTwoFactor   Boolean        @default(false)
   isPlatform         Boolean        @default(false)
+  // Confidential-app-only gate for the client_credentials grant (RFC 6749
+  // §4.4). A valid client secret is necessary but not sufficient — this
+  // flag is the explicit admin opt-in for whether the app may be granted
+  // `roles:write` at all. See docs/superpowers/specs/2026-09-17-service-client-credentials-design.md §1.
+  canManageOwnRoles  Boolean        @default(false)
   /// Complete PasswordPolicy JSON override (see @sassy-auth/types). null
   /// means "inherit the global env-derived policy" — never partial.
   passwordPolicyOverride Json?
