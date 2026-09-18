@@ -349,4 +349,56 @@ describe('TokenService', () => {
       expect(jwks.keys[0].kid).toBe('test-kid-1');
     });
   });
+
+  // ── Service tokens (client_credentials) ─────────────────────────────────
+
+  describe('issueServiceJwt', () => {
+    it('mints a token with azp, fixed aud, token_use=service, and no sub', async () => {
+      const token = await service.issueServiceJwt({
+        appId: 7,
+        appPublicId: 'app-7',
+        scope: 'roles:write',
+      });
+
+      const decoded = jwt.verify(token, publicPem, { algorithms: ['RS256'] }) as jwt.JwtPayload;
+
+      expect(decoded.azp).toBe('app-7');
+      expect(decoded.aud).toBe('sassy-auth-management-api');
+      expect(decoded.token_use).toBe('service');
+      expect(decoded.scope).toBe('roles:write');
+      expect(decoded.sub).toBeUndefined();
+      expect(decoded.exp! - decoded.iat!).toBe(300);
+    });
+
+    it('emits an empty scope string when nothing was granted', async () => {
+      const token = await service.issueServiceJwt({ appId: 7, appPublicId: 'app-7', scope: '' });
+      const decoded = jwt.decode(token) as Record<string, unknown>;
+      expect(decoded.scope).toBe('');
+    });
+  });
+
+  describe('verifyServiceAccessToken', () => {
+    it('returns the claims for a valid service token', async () => {
+      const token = await service.issueServiceJwt({ appId: 7, appPublicId: 'app-7', scope: 'roles:write' });
+      const claims = service.verifyServiceAccessToken(token);
+      expect(claims.azp).toBe('app-7');
+      expect(claims.scope).toBe('roles:write');
+    });
+
+    it('rejects a user access token (wrong aud, no token_use)', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(saUserWithPermissions);
+      const userToken = await service.issueJwt({
+        saUserId: 1, userPublicId: 'u', orgPublicId: 'o', appPublicId: 'app-7', appId: 5, scope: '',
+      });
+      expect(() => service.verifyServiceAccessToken(userToken)).toThrow();
+    });
+
+    it('rejects a token signed with the wrong key', () => {
+      const forged = jwt.sign(
+        { azp: 'app-7', aud: 'sassy-auth-management-api', token_use: 'service', scope: 'roles:write' },
+        'not-the-real-key',
+      );
+      expect(() => service.verifyServiceAccessToken(forged)).toThrow();
+    });
+  });
 });

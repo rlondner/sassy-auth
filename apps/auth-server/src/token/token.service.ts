@@ -12,6 +12,16 @@ const tracer = trace.getTracer('sassy-auth.auth-server');
 /** JWT lifetime in seconds — must match the `exp - iat` computed in issueJwt(). */
 const TOKEN_TTL_SECONDS = 3600;
 
+/** Service-token lifetime in seconds — short, since it's minted on demand
+ *  right before use rather than held open like a user session. */
+export const SERVICE_TOKEN_TTL_SECONDS = 300;
+
+/** Fixed audience for every service token, regardless of the calling app's
+ *  own publicId. Marks the token as "for calling sassy-auth's own API" and
+ *  ensures a user access token (whose `aud` is always some app's publicId)
+ *  can never satisfy ServiceTokenGuard's audience check. */
+export const SERVICE_TOKEN_AUDIENCE = 'sassy-auth-management-api';
+
 interface IssueJwtParams {
   saUserId: number;
   userPublicId: string;
@@ -23,6 +33,16 @@ interface IssueJwtParams {
   scope: string;
   amr?: string[];
   idp?: string;
+}
+
+interface IssueServiceJwtParams {
+  /** Numeric SaApp.id of the calling app — carried for parity with
+   *  IssueJwtParams and future audit/telemetry use; not embedded in the
+   *  token payload (appPublicId, via `azp`, is what a verifier needs). */
+  appId: number;
+  appPublicId: string;
+  /** Space-delimited granted service scopes. '' if none were granted. */
+  scope: string;
 }
 
 interface IssueIdTokenParams {
@@ -223,6 +243,41 @@ export class TokenService {
       algorithms: ['RS256'],
       issuer: resolveIssuer(),
     }) as { sub?: string; scope?: string; aud?: string };
+  }
+
+  /** Mints a service token for the client_credentials grant. Structurally
+   *  distinct from a user access token: no `sub` (no end user), fixed
+   *  short TTL, and `aud` fixed to SERVICE_TOKEN_AUDIENCE rather than the
+   *  calling app's own publicId. See design spec §4. */
+  async issueServiceJwt(params: IssueServiceJwtParams): Promise<string> {
+    const issuer = resolveIssuer();
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      azp: params.appPublicId,
+      aud: SERVICE_TOKEN_AUDIENCE,
+      iss: issuer,
+      iat: now,
+      exp: now + SERVICE_TOKEN_TTL_SECONDS,
+      scope: params.scope,
+      token_use: 'service',
+    };
+    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
+  }
+
+  /** Verifies a service token this server issued. Throws on any failure,
+   *  including a structurally valid RS256 token that simply isn't a
+   *  service token (wrong `aud` or missing `token_use: 'service'`) — this
+   *  is what makes user and service tokens non-interchangeable. */
+  verifyServiceAccessToken(token: string): { azp?: string; scope?: string; aud?: string } {
+    const claims = jwt.verify(token, this.publicKey, {
+      algorithms: ['RS256'],
+      issuer: resolveIssuer(),
+      audience: SERVICE_TOKEN_AUDIENCE,
+    }) as { azp?: string; scope?: string; aud?: string; token_use?: string };
+    if (claims.token_use !== 'service') {
+      throw new Error('Not a service access token');
+    }
+    return claims;
   }
 
   getJwks(): { keys: Record<string, unknown>[] } {
