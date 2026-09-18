@@ -909,6 +909,19 @@ export class TokenController {
       amr,
     });
 
+    // direct/login has no /authorize step to gate offline_access behind, so
+    // (per design) a refresh token is always issued here.
+    const refreshToken = await this.refreshTokenService.issue({
+      saUserId: saUser.id,
+      userPublicId: saUser.publicId,
+      orgPublicId: saUser.org.publicId,
+      appId: appNumericId,
+      appPublicId: app.publicId,
+      scope: '',
+      amr,
+      authTime: new Date(),
+    });
+
     this.logger.getWinstonLogger().info('Direct login successful, JWT issued', {
       context: 'TokenController',
       identifierType: detectIdentifierType(dto.identifier),
@@ -919,7 +932,12 @@ export class TokenController {
     Sentry.setTag('authFlow', 'direct');
     Sentry.setTag('appId', dto.appId);
 
-    return { access_token: token, token_type: 'Bearer', expires_in: 3600 };
+    return {
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      refresh_token: refreshToken,
+    };
   }
 
   /**

@@ -302,6 +302,32 @@ describe('TokenController', () => {
       });
     });
 
+    it('always issues a refresh token, since direct/login has no /authorize step to gate offline_access', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+      mockTokenService.issueJwt.mockResolvedValue('direct.jwt.token');
+      mockRefreshTokenService.issue.mockResolvedValue('direct-refresh-token');
+
+      const result = await controller.directLogin({
+        identifier: 'user@example.com',
+        password: 'pw',
+        appId: 'sqid-10',
+      });
+
+      expect(result).toEqual(expect.objectContaining({ refresh_token: 'direct-refresh-token' }));
+      expect(mockRefreshTokenService.issue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          saUserId: saUser.id,
+          userPublicId: saUser.publicId,
+          orgPublicId: saUser.org.publicId,
+          appId: app.id,
+          appPublicId: app.publicId,
+          scope: '',
+        }),
+      );
+    });
+
     it('directLogin (phone branch) uses findUnique on phoneNumber, not findFirst', async () => {
       mockPrisma.saApp.findUnique.mockResolvedValue(app);
       mockPrisma.saUser.findUnique.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
