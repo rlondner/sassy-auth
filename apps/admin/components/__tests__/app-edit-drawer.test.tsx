@@ -132,6 +132,7 @@ const app = {
   url: 'https://old.example',
   isPlatform: false,
   requireTwoFactor: false,
+  allowOfflineAccess: false,
   passwordPolicyOverride: null,
   effectivePasswordPolicy: EFFECTIVE_PASSWORD_POLICY,
   activationEmailOverride: null,
