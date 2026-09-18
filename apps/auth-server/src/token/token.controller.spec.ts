@@ -1135,6 +1135,87 @@ describe('TokenController', () => {
     });
   });
 
+  describe('oauthToken — grant_type=refresh_token', () => {
+    const fakeReq = { headers: {} } as unknown as import('express').Request;
+    const fakeRes = { setHeader: jest.fn() } as unknown as import('express').Response;
+
+    it('rotates a valid refresh token and returns a new access+refresh token pair', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      mockRefreshTokenService.rotate.mockResolvedValue({
+        token: 'new-refresh-token',
+        saUserId: 1, userPublicId: 'sqid-1', orgPublicId: 'sqid-5',
+        appId: 10, appPublicId: 'sqid-10', scope: 'openid', amr: ['pwd'],
+        authTime: new Date('2026-09-01T00:00:00Z'),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ publicId: 'sqid-1', status: 'active' });
+      mockTokenService.issueJwt.mockResolvedValue('new.jwt.token');
+      mockTokenService.issueIdToken.mockResolvedValue('new.id.token');
+
+      const result = await controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'old-refresh-token' },
+        fakeReq, fakeRes,
+      );
+
+      expect(mockRefreshTokenService.rotate).toHaveBeenCalledWith('old-refresh-token', 'sqid-10');
+      expect(result).toEqual({
+        access_token: 'new.jwt.token', token_type: 'Bearer', expires_in: 3600,
+        scope: 'openid', refresh_token: 'new-refresh-token', id_token: 'new.id.token',
+      });
+    });
+
+    it('does not include id_token when openid was not in the rotated scope', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      mockRefreshTokenService.rotate.mockResolvedValue({
+        token: 'new-refresh-token', saUserId: 1, userPublicId: 'sqid-1', orgPublicId: 'sqid-5',
+        appId: 10, appPublicId: 'sqid-10', scope: '', amr: ['pwd'], authTime: new Date(),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ publicId: 'sqid-1', status: 'active' });
+      mockTokenService.issueJwt.mockResolvedValue('new.jwt.token');
+
+      const result = await controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'old-refresh-token' },
+        fakeReq, fakeRes,
+      );
+
+      expect(result).not.toHaveProperty('id_token');
+      expect(mockTokenService.issueIdToken).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the rotated token belongs to a user who is no longer active', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      mockRefreshTokenService.rotate.mockResolvedValue({
+        token: 'new-refresh-token', saUserId: 1, userPublicId: 'sqid-1', orgPublicId: 'sqid-5',
+        appId: 10, appPublicId: 'sqid-10', scope: '', amr: ['pwd'], authTime: new Date(),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ publicId: 'sqid-1', status: 'inactive' });
+
+      await expect(controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'old-refresh-token' },
+        fakeReq, fakeRes,
+      )).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('propagates rotate()\'s invalid_grant rejection unchanged (reuse detection, expiry, unknown token)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      mockRefreshTokenService.rotate.mockRejectedValue(new UnauthorizedException(TokenErrorCode.INVALID_GRANT));
+
+      await expect(controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'stolen-token' },
+        fakeReq, fakeRes,
+      )).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects a refresh grant for a confidential app with no client secret presented', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: 'hashed' });
+
+      await expect(controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'some-token' },
+        fakeReq, fakeRes,
+      )).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(mockRefreshTokenService.rotate).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Task 9: confidential clients — §2 invariant ──────────────────────────
   //
   // "A PKCE-challenge-less authorization code may only be exchanged by a

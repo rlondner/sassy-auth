@@ -394,6 +394,10 @@ export class TokenController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (dto.grant_type === 'refresh_token') {
+      return this.refreshTokenGrant(dto, req, res);
+    }
+
     let numericId: number;
     try {
       numericId = this.sqidService.decode(dto.client_id);
@@ -409,13 +413,15 @@ export class TokenController {
     }
     const appClientSecretHash = app.clientSecretHash;
 
+    // dto.grant_type === 'refresh_token' already returned above; @ValidateIf
+    // on the DTO guarantees redirect_uri is present for authorization_code.
     try {
-      assertRedirectUriAllowed(dto.redirect_uri, app);
+      assertRedirectUriAllowed(dto.redirect_uri!, app);
     } catch (err) {
       this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
         context: 'TokenController',
         appId: dto.client_id,
-        attemptedOrigin: (() => { try { return new URL(dto.redirect_uri).origin; } catch { return '<unparseable>'; } })(),
+        attemptedOrigin: (() => { try { return new URL(dto.redirect_uri!).origin; } catch { return '<unparseable>'; } })(),
       });
       throw err;
     }
@@ -448,10 +454,12 @@ export class TokenController {
     let exchanged: Awaited<ReturnType<OauthService['exchangeCode']>>;
     let exchangedIdp: string | undefined;
     try {
+      // dto.grant_type === 'refresh_token' already returned above; @ValidateIf
+      // on the DTO guarantees code is present for authorization_code.
       exchanged = await this.oauthService.exchangeCode(
-        dto.code,
+        dto.code!,
         dto.client_id,
-        dto.redirect_uri,
+        dto.redirect_uri!,
         dto.code_verifier,
       );
       userPublicId = exchanged.userId;
@@ -569,6 +577,92 @@ export class TokenController {
     };
     console.log('[oauth/token response]', oauthTokenResponse);
     return oauthTokenResponse;
+  }
+
+  /**
+   * grant_type=refresh_token branch of /api/token/oauth/token. Rotates the
+   * presented refresh token (RefreshTokenService.rotate handles reuse
+   * detection and expiry) and mints a fresh access token — and id_token, if
+   * the family's scope includes openid — from the rotated claims.
+   */
+  private async refreshTokenGrant(
+    dto: OauthTokenExchangeDto,
+    req: Request,
+    res: Response,
+  ) {
+    let numericId: number;
+    try {
+      numericId = this.sqidService.decode(dto.client_id);
+    } catch {
+      throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
+    }
+    const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+    if (!app) {
+      throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+    }
+
+    const presentedSecret = extractClientSecret(req, dto);
+    const clientAuthenticated = await verifyClientSecret(presentedSecret, app.clientSecretHash ?? null);
+    if (app.clientSecretHash && !clientAuthenticated) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="sassy-auth"');
+      this.logger.getWinstonLogger().warn('oauth.client_auth.failed', {
+        context: 'TokenController',
+        appId: dto.client_id,
+      });
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CLIENT);
+    }
+
+    // @ValidateIf on OauthTokenExchangeDto guarantees refresh_token is
+    // present for this grant type.
+    const rotated = await this.refreshTokenService.rotate(dto.refresh_token!, dto.client_id);
+
+    const saUser = await prisma.saUser.findFirst({ where: { publicId: rotated.userPublicId } });
+    if (!saUser || saUser.status !== 'active') {
+      throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+    }
+
+    const token = await this.tokenService.issueJwt({
+      saUserId: rotated.saUserId,
+      userPublicId: rotated.userPublicId,
+      orgPublicId: rotated.orgPublicId,
+      appPublicId: rotated.appPublicId,
+      appId: rotated.appId,
+      scope: rotated.scope,
+      amr: rotated.amr,
+      idp: rotated.idp,
+    });
+
+    const grantedOpenId = rotated.scope.split(/\s+/).includes('openid');
+    const idToken = grantedOpenId
+      ? await this.tokenService.issueIdToken({
+          saUserId: rotated.saUserId,
+          userPublicId: rotated.userPublicId,
+          orgPublicId: rotated.orgPublicId,
+          appPublicId: rotated.appPublicId,
+          scope: rotated.scope,
+          // A refreshed id_token carries no nonce — nonce only authenticates
+          // the original authorize-time round trip, not later refreshes.
+          nonce: null,
+          authTime: rotated.authTime,
+          amr: rotated.amr,
+          accessToken: token,
+        })
+      : undefined;
+
+    this.logger.getWinstonLogger().info('OAuth refresh token rotated, JWT issued', {
+      context: 'TokenController',
+      appId: rotated.appPublicId,
+      userId: rotated.userPublicId,
+    });
+
+    return {
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: rotated.scope,
+      refresh_token: rotated.token,
+      ...(idToken ? { id_token: idToken } : {}),
+    };
   }
 
   /**
