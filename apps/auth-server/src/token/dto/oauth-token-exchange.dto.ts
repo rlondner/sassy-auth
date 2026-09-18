@@ -1,20 +1,23 @@
-import { IsString, IsNotEmpty, IsUrl, IsOptional, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsUrl, IsOptional, IsIn, ValidateIf } from 'class-validator';
 
 export class OauthTokenExchangeDto {
-  /** RFC 6749 §4.1.3 requires every token request to name its grant type.
-   *  The global ValidationPipe's `forbidNonWhitelisted` rejected this field
-   *  outright until it was declared here — any spec-compliant client sends
-   *  it, so every real client's exchange was a 400 (found by Task 12's e2e
-   *  proof). This server supports exactly one grant, matching
-   *  `grant_types_supported` in both discovery documents. */
-  @IsIn(['authorization_code'])
+  /** RFC 6749 §4.1.3 / §4.4 requires every token request to name its grant
+   *  type. `client_credentials` (RFC 6749 §4.4) mints a service token for a
+   *  confidential app acting as itself — see
+   *  docs/superpowers/specs/2026-09-17-service-client-credentials-design.md §4. */
+  @IsIn(['authorization_code', 'client_credentials'])
   grant_type!: string;
 
+  /** Required for authorization_code; meaningless for client_credentials
+   *  (ValidateIf skips validation entirely for the other grant type, so an
+   *  omitted field there is not an error). */
+  @ValidateIf((o: OauthTokenExchangeDto) => o.grant_type === 'authorization_code')
   @IsString()
   @IsNotEmpty()
-  code!: string;
+  code?: string;
 
-  /** sa_app.publicId — must match the app that requested the code. */
+  /** sa_app.publicId — must match the app that requested the code, or (for
+   *  client_credentials) the app authenticating itself. */
   @IsString()
   @IsNotEmpty()
   client_id!: string;
@@ -22,20 +25,30 @@ export class OauthTokenExchangeDto {
   /** PKCE code verifier — the plaintext that was used to derive the
    *  code_challenge sent on the authorize call. Optional: a confidential
    *  client may omit PKCE entirely and authenticate with a client secret
-   *  instead (Task 9). */
+   *  instead (Task 9). Not used by client_credentials. */
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   code_verifier?: string;
 
+  /** Required for authorization_code; meaningless for client_credentials. */
+  @ValidateIf((o: OauthTokenExchangeDto) => o.grant_type === 'authorization_code')
   @IsUrl({ require_tld: false })
-  redirect_uri!: string;
+  redirect_uri?: string;
 
   /** `client_secret_post` — the plaintext client secret, when the client
    *  authenticates via the request body instead of an Authorization: Basic
-   *  header (`client_secret_basic`). */
+   *  header (`client_secret_basic`). Used by both authorization_code
+   *  (confidential clients) and client_credentials (always confidential). */
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   client_secret?: string;
+
+  /** Space-delimited requested scopes. Only meaningful for
+   *  client_credentials — parsed against the service-scope vocabulary
+   *  (token/service-scopes.ts), not the OIDC SUPPORTED_SCOPES. */
+  @IsOptional()
+  @IsString()
+  scope?: string;
 }
