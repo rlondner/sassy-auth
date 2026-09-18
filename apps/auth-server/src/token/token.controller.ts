@@ -1055,12 +1055,18 @@ export class TokenController {
     }
 
     let audience: string;
+    let subject: string | undefined;
     try {
       const claims = this.tokenService.verifyAccessToken(idTokenHint);
       if (!claims.aud) return { url: loggedOut, statusCode: 302 };
       audience = claims.aud;
+      subject = claims.sub;
     } catch {
       return { url: loggedOut, statusCode: 302 };
+    }
+
+    if (subject) {
+      await this.refreshTokenService.revokeForUserApp(subject, audience);
     }
 
     const app = await prisma.saApp.findUnique({

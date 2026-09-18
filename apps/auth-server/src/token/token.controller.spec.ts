@@ -1708,6 +1708,25 @@ describe('TokenController', () => {
       expect(target.searchParams.get('state')).toBe('xyz');
     });
 
+    it('revokes all refresh tokens for that user+app when id_token_hint resolves to a real app', async () => {
+      const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({ id_token_hint: idToken, post_logout_redirect_uri: 'https://app.example.com/bye' });
+
+      expect(mockRefreshTokenService.revokeForUserApp).toHaveBeenCalledWith('u_1', 'a_7');
+    });
+
+    it('does not attempt refresh-token revocation with no id_token_hint', async () => {
+      await request(app.getHttpServer()).get('/api/token/oauth/logout');
+      expect(mockRefreshTokenService.revokeForUserApp).not.toHaveBeenCalled();
+    });
+
     it('refuses to redirect to an unregistered post_logout URI but still signs out', async () => {
       const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
       mockPrisma.saApp.findUnique.mockResolvedValue({
