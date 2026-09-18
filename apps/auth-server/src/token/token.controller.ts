@@ -301,7 +301,12 @@ export class TokenController {
         signInMethod: (session.session as { signInMethod?: string | null }).signInMethod ?? null,
         twoFactorEnabled: Boolean((session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
       });
-      const granted = parseScopes(scope);
+      // offline_access is only honored for apps explicitly opted in — an app
+      // that never asked for the refresh-token feature shouldn't start
+      // getting one just because a client requests the scope.
+      const granted = parseScopes(scope).filter(
+        (s) => s !== 'offline_access' || app.allowOfflineAccess,
+      );
       const authTime = session.session?.createdAt
         ? new Date(session.session.createdAt)
         : new Date();

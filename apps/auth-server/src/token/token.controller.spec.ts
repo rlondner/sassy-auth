@@ -396,7 +396,14 @@ describe('TokenController', () => {
   // ── GET /api/token/oauth/authorize ───────────────────────────────────────
 
   describe('oauthAuthorize', () => {
-    const app = { id: 10, publicId: 'sqid-10', isPlatform: false, requireTwoFactor: false, url: 'https://app.example.com' };
+    const app = {
+      id: 10,
+      publicId: 'sqid-10',
+      isPlatform: false,
+      requireTwoFactor: false,
+      url: 'https://app.example.com',
+      allowOfflineAccess: false,
+    };
     const fakeSession = { user: { id: 'ba-user-1', email: 'user@example.com', twoFactorEnabled: false } };
     const saUser = {
       id: 1,
@@ -585,6 +592,69 @@ describe('TokenController', () => {
         ['pwd'],
         'n-xyz',
         'openid email',
+        expect.any(Date),
+        undefined,
+      );
+    });
+
+    // Task 5 — offline_access is only honored for apps that opted in via
+    // SaApp.allowOfflineAccess; a client requesting the scope against an
+    // app that never opted in must not receive it in the granted scope.
+    it('drops offline_access from the granted scope when the app has not opted in', async () => {
+      mockApp({ allowOfflineAccess: false });
+      mockSession();
+      mockSaUser();
+      mockOauthService.generateCode.mockReturnValue('code-123');
+
+      await controller.oauthAuthorize(
+        'sqid-10',
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        '',
+        fakeReq,
+        'openid offline_access',
+      );
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['pwd'],
+        null,
+        'openid',
+        expect.any(Date),
+        undefined,
+      );
+    });
+
+    it('keeps offline_access in the granted scope when the app has opted in', async () => {
+      mockApp({ allowOfflineAccess: true });
+      mockSession();
+      mockSaUser();
+      mockOauthService.generateCode.mockReturnValue('code-123');
+
+      await controller.oauthAuthorize(
+        'sqid-10',
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        '',
+        fakeReq,
+        'openid offline_access',
+      );
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['pwd'],
+        null,
+        'openid offline_access',
         expect.any(Date),
         undefined,
       );
