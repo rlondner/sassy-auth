@@ -575,7 +575,6 @@ export class TokenController {
       ...(idToken ? { id_token: idToken } : {}),
       ...(refreshToken ? { refresh_token: refreshToken } : {}),
     };
-    console.log('[oauth/token response]', oauthTokenResponse);
     return oauthTokenResponse;
   }
 
