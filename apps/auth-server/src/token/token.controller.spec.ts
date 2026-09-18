@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import { TokenController } from './token.controller';
 import { TokenService } from './token.service';
 import { OauthService } from './oauth.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -95,6 +96,13 @@ const mockOauthService = {
   exchangeCode: jest.fn(),
 };
 
+const mockRefreshTokenService = {
+  issue: jest.fn(),
+  rotate: jest.fn(),
+  revokeForUserApp: jest.fn(),
+  revokeForUser: jest.fn(),
+};
+
 const mockSqidService = {
   encode: jest.fn((id: number) => `sqid-${id}`),
   decode: jest.fn((s: string) => parseInt(s.replace('sqid-', ''), 10)),
@@ -111,6 +119,7 @@ describe('TokenController', () => {
         { provide: OauthService, useValue: mockOauthService },
         { provide: SqidService, useValue: mockSqidService },
         { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+        { provide: RefreshTokenService, useValue: mockRefreshTokenService },
       ],
     }).compile();
     controller = module.get(TokenController);
@@ -1023,6 +1032,7 @@ describe('TokenController', () => {
           { provide: OauthService, useValue: mockOauthService },
           { provide: SqidService, useValue: mockSqidService },
           { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         ],
       }).compile();
       app = moduleRef.createNestApplication();
@@ -1307,6 +1317,7 @@ describe('TokenController', () => {
           { provide: OauthService, useValue: mockOauthService },
           { provide: SqidService, useValue: mockSqidService },
           { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         ],
       }).compile();
       app = moduleRef.createNestApplication();
@@ -1426,6 +1437,7 @@ describe('TokenController', () => {
           { provide: OauthService, useValue: mockOauthService },
           { provide: SqidService, useValue: mockSqidService },
           { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         ],
       }).compile();
       app = moduleRef.createNestApplication();
@@ -1525,6 +1537,7 @@ describe('TokenController', () => {
           { provide: OauthService, useValue: mockOauthService },
           { provide: SqidService, useValue: mockSqidService },
           { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         ],
       }).compile();
       app = moduleRef.createNestApplication();

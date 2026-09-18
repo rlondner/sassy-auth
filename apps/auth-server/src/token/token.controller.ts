@@ -48,6 +48,7 @@ import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed } from './redirect-uri';
 import { buildClientErrorRedirectUrl, buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { AUTH_THROTTLE } from '../common/config/rate-limit-config';
@@ -78,6 +79,7 @@ export class TokenController {
     private readonly oauthService: OauthService,
     private readonly sqidService: SqidService,
     private readonly logger: LoggerService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {}
 
   /** GET /api/token/jwks */
