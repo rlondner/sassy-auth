@@ -534,6 +534,24 @@ export class TokenController {
         })
       : undefined;
 
+    // offline_access has already been dropped from `exchanged.scope` at
+    // /authorize time for apps that never opted in (Task 5), so this check
+    // alone is enough to decide whether a refresh token should exist.
+    const grantedOffline = exchanged.scope.split(/\s+/).includes('offline_access');
+    const refreshToken = grantedOffline
+      ? await this.refreshTokenService.issue({
+          saUserId: saUser.id,
+          userPublicId: saUser.publicId,
+          orgPublicId: saUser.org.publicId,
+          appId: app.id,
+          appPublicId,
+          scope: exchanged.scope,
+          amr: exchangedAmr,
+          idp: exchangedIdp,
+          authTime: exchanged.authTime,
+        })
+      : undefined;
+
     this.logger.getWinstonLogger().info('OAuth code exchanged, JWT issued', {
       context: 'TokenController',
       appId: appPublicId,
@@ -547,6 +565,7 @@ export class TokenController {
       expires_in: 3600,
       scope: exchanged.scope,
       ...(idToken ? { id_token: idToken } : {}),
+      ...(refreshToken ? { refresh_token: refreshToken } : {}),
     };
     console.log('[oauth/token response]', oauthTokenResponse);
     return oauthTokenResponse;

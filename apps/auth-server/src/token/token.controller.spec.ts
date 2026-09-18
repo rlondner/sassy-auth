@@ -804,6 +804,61 @@ describe('TokenController', () => {
       });
     });
 
+    it('does not include refresh_token when offline_access was not granted', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1', appPublicId: 'sqid-10', scope: 'openid', hadChallenge: true,
+        amr: ['pwd'], authTime: new Date('2026-09-17T00:00:00Z'),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1, publicId: 'sqid-1', status: 'active', orgId: 5, org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+      mockTokenService.issueIdToken.mockResolvedValue('oauth.id.token');
+
+      const result = await controller.oauthToken(
+        {
+          grant_type: 'authorization_code', code: 'valid-code', client_id: 'sqid-10',
+          code_verifier: 'a'.repeat(64), redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq, fakeTokenRes,
+      );
+
+      expect(result).not.toHaveProperty('refresh_token');
+      expect(mockRefreshTokenService.issue).not.toHaveBeenCalled();
+    });
+
+    it('includes refresh_token when offline_access was granted', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1', appPublicId: 'sqid-10', scope: 'openid offline_access', hadChallenge: true,
+        amr: ['pwd'], authTime: new Date('2026-09-17T00:00:00Z'),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1, publicId: 'sqid-1', status: 'active', orgId: 5, org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+      mockTokenService.issueIdToken.mockResolvedValue('oauth.id.token');
+      mockRefreshTokenService.issue.mockResolvedValue('new-refresh-token');
+
+      const result = await controller.oauthToken(
+        {
+          grant_type: 'authorization_code', code: 'valid-code', client_id: 'sqid-10',
+          code_verifier: 'a'.repeat(64), redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq, fakeTokenRes,
+      );
+
+      expect(result).toEqual(expect.objectContaining({ refresh_token: 'new-refresh-token' }));
+      expect(mockRefreshTokenService.issue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          saUserId: 1, userPublicId: 'sqid-1', orgPublicId: 'sqid-5',
+          appId: 10, appPublicId: 'sqid-10', scope: 'openid offline_access', amr: ['pwd'],
+          authTime: new Date('2026-09-17T00:00:00Z'),
+        }),
+      );
+    });
+
     it('returns id_token when the openid scope was granted', async () => {
       mockOauthService.exchangeCode.mockReturnValue({
         userId: 'sqid-1',
