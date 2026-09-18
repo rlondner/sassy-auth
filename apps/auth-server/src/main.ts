@@ -17,7 +17,7 @@ import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { applyRedocExtensions, mergeOpenApiDocs } from './docs/openapi';
+import { applyRedocExtensions, mergeOpenApiDocs, recategorizeBetterAuthTags } from './docs/openapi';
 import { renderRedocPage } from './docs/redoc-page';
 import { renderRedocInitScript } from './docs/redoc-init';
 import { BETTER_AUTH_SESSION_COOKIE } from './common/constants';
@@ -242,9 +242,11 @@ async function bootstrap() {
       );
     }
 
-    // Adds ReDoc's x-logo / x-tagGroups extensions. Swagger UI ignores unknown
-    // x-* keys, so the same enriched document backs every doc surface below.
-    const enrichedDoc = applyRedocExtensions(mergedDoc);
+    // Splits BetterAuth's single ~30-endpoint "Default" tag into readable
+    // categories, then adds ReDoc's x-logo / x-tagGroups extensions. Swagger
+    // UI ignores unknown x-* keys, so the same enriched document backs every
+    // doc surface below.
+    const enrichedDoc = applyRedocExtensions(recategorizeBetterAuthTags(mergedDoc));
 
     SwaggerModule.setup('api/docs', app, enrichedDoc, {
       swaggerOptions: { withCredentials: true, persistAuthorization: true },

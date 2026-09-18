@@ -1,4 +1,4 @@
-import { applyRedocExtensions, mergeOpenApiDocs } from './openapi';
+import { applyRedocExtensions, mergeOpenApiDocs, recategorizeBetterAuthTags } from './openapi';
 
 const baseNest = {
   openapi: '3.0.0',
@@ -195,5 +195,87 @@ describe('applyRedocExtensions', () => {
     } as any);
 
     expect((doc as any)['x-tagGroups']).toEqual([{ name: 'Management API', tags: ['Orgs'] }]);
+  });
+});
+
+describe('recategorizeBetterAuthTags', () => {
+  const docWithDefaultTaggedPaths = (paths: Record<string, unknown>) =>
+    ({
+      ...baseNest,
+      paths,
+      tags: [{ name: 'Default', description: 'stock BetterAuth description' }],
+    }) as any;
+
+  it('splits known BetterAuth paths out of Default into their category', () => {
+    const doc = recategorizeBetterAuthTags(
+      docWithDefaultTaggedPaths({
+        '/api/auth/sign-in/email': { post: { tags: ['Default'], responses: {} } },
+        '/api/auth/get-session': { get: { tags: ['Default'], responses: {} } },
+        '/api/auth/change-password': { post: { tags: ['Default'], responses: {} } },
+        '/api/auth/verify-email': { get: { tags: ['Default'], responses: {} } },
+      }),
+    );
+
+    expect((doc.paths['/api/auth/sign-in/email'] as any).post.tags).toEqual(['Sign In & Sign Up']);
+    expect((doc.paths['/api/auth/get-session'] as any).get.tags).toEqual(['Session']);
+    expect((doc.paths['/api/auth/change-password'] as any).post.tags).toEqual(['Account']);
+    expect((doc.paths['/api/auth/verify-email'] as any).get.tags).toEqual([
+      'Password & Verification',
+    ]);
+  });
+
+  it('leaves paths with no override (e.g. /ok, /error) tagged Default', () => {
+    const doc = recategorizeBetterAuthTags(
+      docWithDefaultTaggedPaths({
+        '/api/auth/ok': { get: { tags: ['Default'], responses: {} } },
+      }),
+    );
+
+    expect((doc.paths['/api/auth/ok'] as any).get.tags).toEqual(['Default']);
+  });
+
+  it('relabels the Default tag as "Better Auth" via x-displayName, and does not duplicate it', () => {
+    const doc = recategorizeBetterAuthTags(
+      docWithDefaultTaggedPaths({
+        '/api/auth/sign-in/email': { post: { tags: ['Default'], responses: {} } },
+      }),
+    );
+
+    const defaultTags = (doc.tags ?? []).filter((t) => t.name === 'Default');
+    expect(defaultTags).toHaveLength(1);
+    expect((defaultTags[0] as any)['x-displayName']).toBe('Better Auth');
+  });
+
+  it('adds a tag descriptor with a description for every new category it introduces', () => {
+    const doc = recategorizeBetterAuthTags(
+      docWithDefaultTaggedPaths({
+        '/api/auth/sign-in/email': { post: { tags: ['Default'], responses: {} } },
+        '/api/auth/get-session': { get: { tags: ['Default'], responses: {} } },
+      }),
+    );
+
+    const byName = new Map((doc.tags ?? []).map((t) => [t.name, t]));
+    expect(byName.get('Sign In & Sign Up')?.description).toBeTruthy();
+    expect(byName.get('Session')?.description).toBeTruthy();
+  });
+
+  it('does not touch operations tagged something other than Default', () => {
+    const doc = recategorizeBetterAuthTags(
+      docWithDefaultTaggedPaths({
+        '/api/auth/email-otp/send-verification-otp': {
+          post: { tags: ['Email-otp'], responses: {} },
+        },
+      }),
+    );
+
+    expect((doc.paths['/api/auth/email-otp/send-verification-otp'] as any).post.tags).toEqual([
+      'Email-otp',
+    ]);
+  });
+
+  it('leaves non-BetterAuth (Nest) paths untouched', () => {
+    const doc = recategorizeBetterAuthTags(baseNest as any);
+
+    expect(doc.paths).toEqual(baseNest.paths);
   });
 });
