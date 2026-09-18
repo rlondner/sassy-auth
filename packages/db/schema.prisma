@@ -359,6 +359,7 @@ model SaRefreshToken {
   @@index([familyId])
   @@index([saUserId])
   @@index([expiresAt])
+  @@index([userPublicId, appPublicId])
 }
 
 // Which social login providers a deployment has, and which apps show them.
