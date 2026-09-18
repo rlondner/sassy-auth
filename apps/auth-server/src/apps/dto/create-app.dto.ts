@@ -30,6 +30,8 @@ export class CreateAppDto {
 
   @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
 
+  @IsOptional() @IsBoolean() allowOfflineAccess?: boolean;
+
   /**
    * Registered login / post_logout redirect URIs for this app. Validated as
    * absolute http(s) URLs in AppsService — see assertValidRedirectUris.

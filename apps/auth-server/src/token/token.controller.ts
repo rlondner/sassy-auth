@@ -48,6 +48,7 @@ import { DirectLoginDto } from './dto/direct-login.dto';
 import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed } from './redirect-uri';
 import { buildClientErrorRedirectUrl, buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { AUTH_THROTTLE } from '../common/config/rate-limit-config';
@@ -78,6 +79,7 @@ export class TokenController {
     private readonly oauthService: OauthService,
     private readonly sqidService: SqidService,
     private readonly logger: LoggerService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {}
 
   /** GET /api/token/jwks */
@@ -299,7 +301,12 @@ export class TokenController {
         signInMethod: (session.session as { signInMethod?: string | null }).signInMethod ?? null,
         twoFactorEnabled: Boolean((session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
       });
-      const granted = parseScopes(scope);
+      // offline_access is only honored for apps explicitly opted in — an app
+      // that never asked for the refresh-token feature shouldn't start
+      // getting one just because a client requests the scope.
+      const granted = parseScopes(scope).filter(
+        (s) => s !== 'offline_access' || app.allowOfflineAccess,
+      );
       const authTime = session.session?.createdAt
         ? new Date(session.session.createdAt)
         : new Date();
@@ -387,6 +394,10 @@ export class TokenController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (dto.grant_type === 'refresh_token') {
+      return this.refreshTokenGrant(dto, req, res);
+    }
+
     let numericId: number;
     try {
       numericId = this.sqidService.decode(dto.client_id);
@@ -402,13 +413,15 @@ export class TokenController {
     }
     const appClientSecretHash = app.clientSecretHash;
 
+    // dto.grant_type === 'refresh_token' already returned above; @ValidateIf
+    // on the DTO guarantees redirect_uri is present for authorization_code.
     try {
-      assertRedirectUriAllowed(dto.redirect_uri, app);
+      assertRedirectUriAllowed(dto.redirect_uri!, app);
     } catch (err) {
       this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
         context: 'TokenController',
         appId: dto.client_id,
-        attemptedOrigin: (() => { try { return new URL(dto.redirect_uri).origin; } catch { return '<unparseable>'; } })(),
+        attemptedOrigin: (() => { try { return new URL(dto.redirect_uri!).origin; } catch { return '<unparseable>'; } })(),
       });
       throw err;
     }
@@ -441,10 +454,12 @@ export class TokenController {
     let exchanged: Awaited<ReturnType<OauthService['exchangeCode']>>;
     let exchangedIdp: string | undefined;
     try {
+      // dto.grant_type === 'refresh_token' already returned above; @ValidateIf
+      // on the DTO guarantees code is present for authorization_code.
       exchanged = await this.oauthService.exchangeCode(
-        dto.code,
+        dto.code!,
         dto.client_id,
-        dto.redirect_uri,
+        dto.redirect_uri!,
         dto.code_verifier,
       );
       userPublicId = exchanged.userId;
@@ -527,6 +542,24 @@ export class TokenController {
         })
       : undefined;
 
+    // offline_access has already been dropped from `exchanged.scope` at
+    // /authorize time for apps that never opted in (Task 5), so this check
+    // alone is enough to decide whether a refresh token should exist.
+    const grantedOffline = exchanged.scope.split(/\s+/).includes('offline_access');
+    const refreshToken = grantedOffline
+      ? await this.refreshTokenService.issue({
+          saUserId: saUser.id,
+          userPublicId: saUser.publicId,
+          orgPublicId: saUser.org.publicId,
+          appId: app.id,
+          appPublicId,
+          scope: exchanged.scope,
+          amr: exchangedAmr,
+          idp: exchangedIdp,
+          authTime: exchanged.authTime,
+        })
+      : undefined;
+
     this.logger.getWinstonLogger().info('OAuth code exchanged, JWT issued', {
       context: 'TokenController',
       appId: appPublicId,
@@ -540,9 +573,95 @@ export class TokenController {
       expires_in: 3600,
       scope: exchanged.scope,
       ...(idToken ? { id_token: idToken } : {}),
+      ...(refreshToken ? { refresh_token: refreshToken } : {}),
     };
-    console.log('[oauth/token response]', oauthTokenResponse);
     return oauthTokenResponse;
+  }
+
+  /**
+   * grant_type=refresh_token branch of /api/token/oauth/token. Rotates the
+   * presented refresh token (RefreshTokenService.rotate handles reuse
+   * detection and expiry) and mints a fresh access token — and id_token, if
+   * the family's scope includes openid — from the rotated claims.
+   */
+  private async refreshTokenGrant(
+    dto: OauthTokenExchangeDto,
+    req: Request,
+    res: Response,
+  ) {
+    let numericId: number;
+    try {
+      numericId = this.sqidService.decode(dto.client_id);
+    } catch {
+      throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
+    }
+    const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+    if (!app) {
+      throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+    }
+
+    const presentedSecret = extractClientSecret(req, dto);
+    const clientAuthenticated = await verifyClientSecret(presentedSecret, app.clientSecretHash ?? null);
+    if (app.clientSecretHash && !clientAuthenticated) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="sassy-auth"');
+      this.logger.getWinstonLogger().warn('oauth.client_auth.failed', {
+        context: 'TokenController',
+        appId: dto.client_id,
+      });
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CLIENT);
+    }
+
+    // @ValidateIf on OauthTokenExchangeDto guarantees refresh_token is
+    // present for this grant type.
+    const rotated = await this.refreshTokenService.rotate(dto.refresh_token!, dto.client_id);
+
+    const saUser = await prisma.saUser.findFirst({ where: { publicId: rotated.userPublicId } });
+    if (!saUser || saUser.status !== 'active') {
+      throw new ForbiddenException(TokenErrorCode.USER_NOT_FOUND);
+    }
+
+    const token = await this.tokenService.issueJwt({
+      saUserId: rotated.saUserId,
+      userPublicId: rotated.userPublicId,
+      orgPublicId: rotated.orgPublicId,
+      appPublicId: rotated.appPublicId,
+      appId: rotated.appId,
+      scope: rotated.scope,
+      amr: rotated.amr,
+      idp: rotated.idp,
+    });
+
+    const grantedOpenId = rotated.scope.split(/\s+/).includes('openid');
+    const idToken = grantedOpenId
+      ? await this.tokenService.issueIdToken({
+          saUserId: rotated.saUserId,
+          userPublicId: rotated.userPublicId,
+          orgPublicId: rotated.orgPublicId,
+          appPublicId: rotated.appPublicId,
+          scope: rotated.scope,
+          // A refreshed id_token carries no nonce — nonce only authenticates
+          // the original authorize-time round trip, not later refreshes.
+          nonce: null,
+          authTime: rotated.authTime,
+          amr: rotated.amr,
+          accessToken: token,
+        })
+      : undefined;
+
+    this.logger.getWinstonLogger().info('OAuth refresh token rotated, JWT issued', {
+      context: 'TokenController',
+      appId: rotated.appPublicId,
+      userId: rotated.userPublicId,
+    });
+
+    return {
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: rotated.scope,
+      refresh_token: rotated.token,
+      ...(idToken ? { id_token: idToken } : {}),
+    };
   }
 
   /**
@@ -789,6 +908,19 @@ export class TokenController {
       amr,
     });
 
+    // direct/login has no /authorize step to gate offline_access behind, so
+    // (per design) a refresh token is always issued here.
+    const refreshToken = await this.refreshTokenService.issue({
+      saUserId: saUser.id,
+      userPublicId: saUser.publicId,
+      orgPublicId: saUser.org.publicId,
+      appId: appNumericId,
+      appPublicId: app.publicId,
+      scope: '',
+      amr,
+      authTime: new Date(),
+    });
+
     this.logger.getWinstonLogger().info('Direct login successful, JWT issued', {
       context: 'TokenController',
       identifierType: detectIdentifierType(dto.identifier),
@@ -799,7 +931,12 @@ export class TokenController {
     Sentry.setTag('authFlow', 'direct');
     Sentry.setTag('appId', dto.appId);
 
-    return { access_token: token, token_type: 'Bearer', expires_in: 3600 };
+    return {
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      refresh_token: refreshToken,
+    };
   }
 
   /**
@@ -917,12 +1054,31 @@ export class TokenController {
     }
 
     let audience: string;
+    let subject: string | undefined;
     try {
       const claims = this.tokenService.verifyAccessToken(idTokenHint);
       if (!claims.aud) return { url: loggedOut, statusCode: 302 };
       audience = claims.aud;
+      subject = claims.sub;
     } catch {
       return { url: loggedOut, statusCode: 302 };
+    }
+
+    if (subject) {
+      try {
+        // Swallowed on purpose: a redirect-based OIDC logout must always
+        // complete its 302, so a revocation failure here is logged and
+        // ignored rather than thrown. Contrast with UsersService.updateUser's
+        // deactivation path, which deliberately lets an equivalent
+        // revocation failure propagate — an admin explicitly deactivating a
+        // user needs to know if that deactivation didn't fully take effect.
+        await this.refreshTokenService.revokeForUserApp(subject, audience);
+      } catch (err) {
+        this.logger.getWinstonLogger().warn('oauth.logout.refresh_token_revocation_failed', {
+          context: 'TokenController', appId: audience,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     const app = await prisma.saApp.findUnique({

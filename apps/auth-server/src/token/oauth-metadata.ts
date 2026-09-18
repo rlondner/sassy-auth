@@ -46,7 +46,7 @@ export function resolveIssuer(): string {
 }
 
 const RESPONSE_TYPES_SUPPORTED = ['code'] as const;
-const GRANT_TYPES_SUPPORTED = ['authorization_code'] as const;
+const GRANT_TYPES_SUPPORTED = ['authorization_code', 'refresh_token'] as const;
 const CODE_CHALLENGE_METHODS_SUPPORTED = ['S256'] as const;
 const TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED = [
   'none', 'client_secret_basic', 'client_secret_post',
@@ -96,7 +96,7 @@ export const OIDC_METADATA_PATH = '.well-known/openid-configuration';
 // silently drift apart again.
 export const WELL_KNOWN_METADATA_PATHS = [OAUTH_AS_METADATA_PATH, OIDC_METADATA_PATH];
 
-const SCOPES_SUPPORTED = ['openid', 'profile', 'email'] as const;
+const SCOPES_SUPPORTED = ['openid', 'profile', 'email', 'offline_access'] as const;
 const SUBJECT_TYPES_SUPPORTED = ['public'] as const;
 const ID_TOKEN_SIGNING_ALGS = ['RS256'] as const;
 const CLAIMS_SUPPORTED = [

@@ -168,6 +168,7 @@ describe('AppsService', () => {
         isPlatform: false,
         twoFactorTrustDays: null,
         requireTwoFactor: false,
+        allowOfflineAccess: false,
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
@@ -580,6 +581,31 @@ describe('AppsService', () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(platformRow);
     await expect(service.updateApp('ba-caller', 'sq_2', { requireTwoFactor: true }))
       .rejects.toThrow('Platform app cannot be modified');
+  });
+
+  it('createApp stores a provided allowOfflineAccess', async () => {
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, allowOfflineAccess: true });
+    const result = await service.createApp('ba-caller', {
+      name: 'Customer Portal', url: 'https://portal.example.com', allowOfflineAccess: true,
+    });
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ allowOfflineAccess: true }),
+    }));
+    expect(result.allowOfflineAccess).toBe(true);
+  });
+
+  it('updateApp sets allowOfflineAccess when provided', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, allowOfflineAccess: true });
+    const result = await service.updateApp('ba-caller', 'sq_1', { allowOfflineAccess: true });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { allowOfflineAccess: true },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+    expect(result.allowOfflineAccess).toBe(true);
   });
 
   describe('createApp re-throw non-P2002 error', () => {
