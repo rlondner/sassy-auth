@@ -1066,7 +1066,14 @@ export class TokenController {
     }
 
     if (subject) {
-      await this.refreshTokenService.revokeForUserApp(subject, audience);
+      try {
+        await this.refreshTokenService.revokeForUserApp(subject, audience);
+      } catch (err) {
+        this.logger.getWinstonLogger().warn('oauth.logout.refresh_token_revocation_failed', {
+          context: 'TokenController', appId: audience,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     const app = await prisma.saApp.findUnique({

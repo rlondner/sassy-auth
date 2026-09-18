@@ -1727,6 +1727,38 @@ describe('TokenController', () => {
       expect(mockRefreshTokenService.revokeForUserApp).not.toHaveBeenCalled();
     });
 
+    it('still redirects to the post-logout URI when refresh-token revocation fails', async () => {
+      const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
+      mockRefreshTokenService.revokeForUserApp.mockRejectedValue(new Error('db down'));
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({ id_token_hint: idToken, post_logout_redirect_uri: 'https://app.example.com/bye' });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('https://app.example.com/bye');
+    });
+
+    it('skips revocation but still redirects when id_token_hint has no sub claim', async () => {
+      const idToken = signTestIdToken({ aud: 'a_7' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({ id_token_hint: idToken, post_logout_redirect_uri: 'https://app.example.com/bye' });
+
+      expect(mockRefreshTokenService.revokeForUserApp).not.toHaveBeenCalled();
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('https://app.example.com/bye');
+    });
+
     it('refuses to redirect to an unregistered post_logout URI but still signs out', async () => {
       const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
       mockPrisma.saApp.findUnique.mockResolvedValue({
