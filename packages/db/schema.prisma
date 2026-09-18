@@ -120,6 +120,7 @@ model SaApp {
   logo        String?
   twoFactorTrustDays Int?
   requireTwoFactor   Boolean        @default(false)
+  allowOfflineAccess Boolean        @default(false)
   isPlatform         Boolean        @default(false)
   /// Complete PasswordPolicy JSON override (see @sassy-auth/types). null
   /// means "inherit the global env-derived policy" — never partial.
@@ -323,6 +324,40 @@ model SaOauthCode {
   expiresAt           DateTime
   createdAt           DateTime @default(now())
 
+  @@index([expiresAt])
+}
+
+// Opaque, single-use refresh tokens (Task: refresh token support). Only the
+// sha256 hash of the token is ever stored — the plaintext exists only in the
+// token response handed to the client. Tokens rotate on every use
+// (tokenHash is replaced by a new row sharing the same familyId); presenting
+// an already-rotated token is treated as theft and burns the whole family.
+model SaRefreshToken {
+  tokenHash           String    @id
+  familyId            String
+  saUserId            Int
+  userPublicId        String
+  orgPublicId         String
+  appId               Int
+  appPublicId         String
+  scope               String
+  amr                 String
+  idp                 String?
+  // Original authentication time, carried unchanged through every rotation
+  // in the family — used to set `auth_time` on an id_token minted from a
+  // refreshed access token, matching how issueIdToken already treats it as
+  // the moment the user actually authenticated, not the moment of refresh.
+  authTime            DateTime
+  createdAt           DateTime  @default(now())
+  // Sliding window: reset to now()+30d on every successful rotation.
+  expiresAt           DateTime
+  // Fixed at family creation to now()+90d; never extended by rotation.
+  absoluteExpiresAt   DateTime
+  revokedAt           DateTime?
+  replacedByTokenHash String?
+
+  @@index([familyId])
+  @@index([saUserId])
   @@index([expiresAt])
 }
 
