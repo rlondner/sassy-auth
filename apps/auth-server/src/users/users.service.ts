@@ -349,6 +349,11 @@ export class UsersService {
     // enforced elsewhere).
     if (dto.status === 'inactive') {
       await prisma.session.deleteMany({ where: { userId: existing.betterAuthUserId } });
+      // Deliberately NOT wrapped in try/catch, unlike the equivalent call in
+      // the OIDC logout path (TokenController.handleOauthLogout): an admin
+      // explicitly deactivating a user needs this request to fail loudly if
+      // revocation didn't actually succeed, rather than silently believing
+      // deactivation fully took effect.
       await this.refreshTokenService.revokeForUser(existing.id);
     }
 

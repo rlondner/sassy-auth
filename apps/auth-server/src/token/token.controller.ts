@@ -1066,6 +1066,12 @@ export class TokenController {
 
     if (subject) {
       try {
+        // Swallowed on purpose: a redirect-based OIDC logout must always
+        // complete its 302, so a revocation failure here is logged and
+        // ignored rather than thrown. Contrast with UsersService.updateUser's
+        // deactivation path, which deliberately lets an equivalent
+        // revocation failure propagate — an admin explicitly deactivating a
+        // user needs to know if that deactivation didn't fully take effect.
         await this.refreshTokenService.revokeForUserApp(subject, audience);
       } catch (err) {
         this.logger.getWinstonLogger().warn('oauth.logout.refresh_token_revocation_failed', {
