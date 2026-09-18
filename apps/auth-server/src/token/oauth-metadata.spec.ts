@@ -34,7 +34,7 @@ describe('buildOAuthAuthorizationServerMetadata', () => {
   it('advertises the OAuth capabilities the auth-server actually implements', () => {
     const doc = buildOAuthAuthorizationServerMetadata('https://localhost:3010');
     expect(doc.response_types_supported).toEqual(['code']);
-    expect(doc.grant_types_supported).toEqual(['authorization_code']);
+    expect(doc.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
     expect(doc.code_challenge_methods_supported).toEqual(['S256']);
     expect(doc.token_endpoint_auth_methods_supported).toEqual([
       'none', 'client_secret_basic', 'client_secret_post',
@@ -79,9 +79,9 @@ describe('buildOpenIdConfiguration', () => {
   });
 
   it('advertises the supported OIDC capabilities', () => {
-    expect(doc.scopes_supported).toEqual(['openid', 'profile', 'email']);
+    expect(doc.scopes_supported).toEqual(['openid', 'profile', 'email', 'offline_access']);
     expect(doc.response_types_supported).toEqual(['code']);
-    expect(doc.grant_types_supported).toEqual(['authorization_code']);
+    expect(doc.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
     expect(doc.subject_types_supported).toEqual(['public']);
     expect(doc.id_token_signing_alg_values_supported).toEqual(['RS256']);
     expect(doc.code_challenge_methods_supported).toEqual(['S256']);
@@ -90,9 +90,9 @@ describe('buildOpenIdConfiguration', () => {
     ]);
   });
 
-  it('does not advertise offline_access — refresh tokens are unsupported', () => {
-    expect(doc.scopes_supported).not.toContain('offline_access');
-    expect(doc.grant_types_supported).not.toContain('refresh_token');
+  it('advertises offline_access and refresh_token now that refresh tokens are supported', () => {
+    expect(doc.scopes_supported).toContain('offline_access');
+    expect(doc.grant_types_supported).toContain('refresh_token');
   });
 
   it('shares endpoint URLs with the RFC 8414 document', () => {
