@@ -1612,13 +1612,18 @@ describe('TokenController', () => {
       await app.close();
       // Restore these to plain jest.fn()s so the stateful mockImplementations
       // set up above can't leak into any other describe block in this file
-      // (none of which touch saRefreshToken/$transaction, but this keeps the
-      // shared mockPrisma object clean regardless of describe execution order).
+      // (none of which touch saRefreshToken, but this keeps the shared
+      // mockPrisma object clean regardless of describe execution order).
       mockPrisma.saRefreshToken.create.mockReset();
       mockPrisma.saRefreshToken.findUnique.mockReset();
       mockPrisma.saRefreshToken.update.mockReset();
       mockPrisma.saRefreshToken.updateMany.mockReset();
-      mockPrisma.$transaction.mockReset();
+      // $transaction is different: the top-level jest.mock('@sassy-auth/db', ...)
+      // factory gives it a module-wide default (Promise.all(ops)) that other
+      // describe blocks in this file rely on. mockReset() would wipe that
+      // default back to a bare stub returning undefined, so restore the same
+      // default explicitly instead of resetting it away.
+      mockPrisma.$transaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     });
 
     beforeEach(() => {
