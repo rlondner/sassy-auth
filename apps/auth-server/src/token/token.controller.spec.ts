@@ -30,6 +30,13 @@ jest.mock('@sassy-auth/db', () => ({
     saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     account: { findFirst: jest.fn() },
     user: { findUnique: jest.fn() },
+    // Only used by the 'refresh token full flow (real HTTP)' block below,
+    // which swaps in stateful mockImplementations for these so a REAL
+    // RefreshTokenService can rotate/reuse-detect against them. Every other
+    // describe block in this file uses the mocked RefreshTokenService and
+    // never touches saRefreshToken/$transaction at all.
+    saRefreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   },
 }));
 
@@ -58,6 +65,8 @@ const mockPrisma = prisma as unknown as {
   saUser: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
   account: { findFirst: jest.Mock };
   user: { findUnique: jest.Mock };
+  saRefreshToken: { create: jest.Mock; findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+  $transaction: jest.Mock;
 };
 
 // ── Key pair for signing test bearer tokens ─────────────────────────────────
@@ -1533,6 +1542,120 @@ describe('TokenController', () => {
 
         delete process.env.ADMIN_URL;
       });
+    });
+  });
+
+  // ── refresh token full flow (real HTTP, real RefreshTokenService) ───────
+
+  describe('refresh token full flow (real HTTP)', () => {
+    let app: INestApplication;
+    const refreshTokenService = new RefreshTokenService();
+
+    // In-memory stand-in for the sa_refresh_token table, scoped to this
+    // describe block only. The real RefreshTokenService is exercised here
+    // (not mocked, unlike every other block in this file), so
+    // prisma.saRefreshToken needs to actually persist/retrieve rows across
+    // the two sequential HTTP calls the test below makes — a plain jest.fn()
+    // that always resolves to undefined can't support that.
+    let rows: Map<string, Record<string, unknown>>;
+
+    beforeAll(async () => {
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        controllers: [TokenController],
+        providers: [
+          { provide: TokenService, useValue: mockTokenService },
+          { provide: OauthService, useValue: mockOauthService },
+          { provide: SqidService, useValue: mockSqidService },
+          { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: refreshTokenService },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api');
+      await app.init();
+
+      rows = new Map();
+
+      mockPrisma.saRefreshToken.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+        const row = { ...data };
+        rows.set(row.tokenHash as string, row);
+        return row;
+      });
+      mockPrisma.saRefreshToken.findUnique.mockImplementation(
+        async ({ where }: { where: { tokenHash: string } }) => rows.get(where.tokenHash) ?? null,
+      );
+      mockPrisma.saRefreshToken.update.mockImplementation(
+        async ({ where, data }: { where: { tokenHash: string }; data: Record<string, unknown> }) => {
+          const existing = rows.get(where.tokenHash);
+          if (!existing) return null;
+          const updated = { ...existing, ...data };
+          rows.set(where.tokenHash, updated);
+          return updated;
+        },
+      );
+      mockPrisma.saRefreshToken.updateMany.mockImplementation(
+        async ({ where, data }: { where: { familyId: string; revokedAt: null }; data: Record<string, unknown> }) => {
+          let count = 0;
+          for (const [hash, row] of rows) {
+            if (row.familyId === where.familyId && row.revokedAt == null) {
+              rows.set(hash, { ...row, ...data });
+              count += 1;
+            }
+          }
+          return { count };
+        },
+      );
+      mockPrisma.$transaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
+    });
+
+    afterAll(async () => {
+      await app.close();
+      // Restore these to plain jest.fn()s so the stateful mockImplementations
+      // set up above can't leak into any other describe block in this file
+      // (none of which touch saRefreshToken/$transaction, but this keeps the
+      // shared mockPrisma object clean regardless of describe execution order).
+      mockPrisma.saRefreshToken.create.mockReset();
+      mockPrisma.saRefreshToken.findUnique.mockReset();
+      mockPrisma.saRefreshToken.update.mockReset();
+      mockPrisma.saRefreshToken.updateMany.mockReset();
+      mockPrisma.$transaction.mockReset();
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('rotates a real refresh token issued by RefreshTokenService and rejects reuse of the old one', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      const firstToken = await refreshTokenService.issue({
+        saUserId: 1, userPublicId: 'usr-1', orgPublicId: 'org-1',
+        appId: 10, appPublicId: 'sqid-10', scope: 'openid', amr: ['pwd'], authTime: new Date(),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ publicId: 'usr-1', status: 'active' });
+      mockTokenService.issueJwt.mockResolvedValue('jwt-1');
+      mockTokenService.issueIdToken.mockResolvedValue('idt-1');
+
+      const firstRotation = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: firstToken });
+
+      expect(firstRotation.status).toBe(200);
+      expect(firstRotation.body.refresh_token).toBeDefined();
+      expect(firstRotation.body.refresh_token).not.toBe(firstToken);
+
+      // Reusing the now-rotated original token must fail.
+      const reuse = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: firstToken });
+      expect(reuse.status).toBe(401);
+      expect(reuse.body.message).toBe('invalid_grant');
+
+      // Reuse detection burns the family — the rotated token from the first
+      // call must ALSO be rejected now, even though it was never used again.
+      const secondRotationAttempt = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: firstRotation.body.refresh_token });
+      expect(secondRotationAttempt.status).toBe(401);
     });
   });
 
