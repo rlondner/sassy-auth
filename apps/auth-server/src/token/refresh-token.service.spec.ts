@@ -2,17 +2,26 @@ import { UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { RefreshTokenService } from './refresh-token.service';
 
-jest.mock('@sassy-auth/db', () => ({
-  prisma: {
-    saRefreshToken: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
+jest.mock('@sassy-auth/db', () => {
+  const saRefreshToken = {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
+  };
+  return {
+    prisma: {
+      saRefreshToken,
+      // Interactive-transaction mock: just invokes the callback with a
+      // `tx` object routed to the same mocked saRefreshToken methods —
+      // this test doesn't need real transactional isolation, only for
+      // the callback to actually run and its calls to hit the jest mocks.
+      $transaction: jest.fn((fn: (tx: { saRefreshToken: typeof saRefreshToken }) => unknown) =>
+        fn({ saRefreshToken }),
+      ),
     },
-    $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
-  },
-}));
+  };
+});
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
@@ -35,7 +44,9 @@ describe('RefreshTokenService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new RefreshTokenService();
-    mockPrisma.$transaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
+    mockPrisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
+      fn({ saRefreshToken: mockPrisma.saRefreshToken }),
+    );
   });
 
   describe('issue', () => {
@@ -127,6 +138,22 @@ describe('RefreshTokenService', () => {
           }),
         }),
       );
+    });
+
+    it('rolls back the whole transaction (not just skips) when create fails after a successful updateMany', async () => {
+      mockPrisma.saRefreshToken.findUnique.mockResolvedValue(existingRow);
+      mockPrisma.saRefreshToken.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.saRefreshToken.create.mockRejectedValue(new Error('db error'));
+
+      await expect(service.rotate('presented-token', 'app-10')).rejects.toThrow('db error');
+
+      // The updateMany was attempted (revocation was proposed)...
+      expect(mockPrisma.saRefreshToken.updateMany).toHaveBeenCalledTimes(1);
+      // ...but create was attempted and failed, so the transaction as a
+      // whole failed — the caller sees an error, not a success with a
+      // missing child token.
+      expect(mockPrisma.saRefreshToken.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
     });
 
     it('concurrent replay: if a race already flipped revokedAt, the losing request fails cleanly without creating a child row', async () => {

@@ -21,24 +21,33 @@ jest.mock('@sentry/nestjs', () => ({
   lastEventId: jest.fn(),
 }));
 
-jest.mock('@sassy-auth/db', () => ({
-  prisma: {
-    saApp: { findUnique: jest.fn() },
-    // `update` covers the bug-0186 fire-and-forget lastLoginAt bump
-    // in directLogin. Default it to resolve so the tests that don't
-    // care about the write don't need to touch it.
-    saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
-    account: { findFirst: jest.fn() },
-    user: { findUnique: jest.fn() },
-    // Only used by the 'refresh token full flow (real HTTP)' block below,
-    // which swaps in stateful mockImplementations for these so a REAL
-    // RefreshTokenService can rotate/reuse-detect against them. Every other
-    // describe block in this file uses the mocked RefreshTokenService and
-    // never touches saRefreshToken/$transaction at all.
-    saRefreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-    $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
-  },
-}));
+jest.mock('@sassy-auth/db', () => {
+  // Only used by the 'refresh token full flow (real HTTP)' block below,
+  // which swaps in stateful mockImplementations for these so a REAL
+  // RefreshTokenService can rotate/reuse-detect against them. Every other
+  // describe block in this file uses the mocked RefreshTokenService and
+  // never touches saRefreshToken/$transaction at all.
+  const saRefreshToken = { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() };
+  return {
+    prisma: {
+      saApp: { findUnique: jest.fn() },
+      // `update` covers the bug-0186 fire-and-forget lastLoginAt bump
+      // in directLogin. Default it to resolve so the tests that don't
+      // care about the write don't need to touch it.
+      saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
+      account: { findFirst: jest.fn() },
+      user: { findUnique: jest.fn() },
+      saRefreshToken,
+      // Interactive-transaction form: invokes the callback with a `tx`
+      // object routed to the same saRefreshToken mock methods on `prisma`
+      // itself — see the 'refresh token full flow (real HTTP)' block
+      // below, the only describe block that actually exercises $transaction.
+      $transaction: jest.fn((fn: (tx: { saRefreshToken: typeof saRefreshToken }) => unknown) =>
+        fn({ saRefreshToken }),
+      ),
+    },
+  };
+});
 
 jest.mock('../auth/verify-user-totp');
 
@@ -1613,7 +1622,9 @@ describe('TokenController', () => {
           return { count };
         },
       );
-      mockPrisma.$transaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
+      mockPrisma.$transaction.mockImplementation((fn: (tx: { saRefreshToken: typeof mockPrisma.saRefreshToken }) => unknown) =>
+        fn({ saRefreshToken: mockPrisma.saRefreshToken }),
+      );
     });
 
     afterAll(async () => {
@@ -1627,11 +1638,14 @@ describe('TokenController', () => {
       mockPrisma.saRefreshToken.update.mockReset();
       mockPrisma.saRefreshToken.updateMany.mockReset();
       // $transaction is different: the top-level jest.mock('@sassy-auth/db', ...)
-      // factory gives it a module-wide default (Promise.all(ops)) that other
-      // describe blocks in this file rely on. mockReset() would wipe that
-      // default back to a bare stub returning undefined, so restore the same
+      // factory gives it a module-wide default (invoke the callback with a
+      // tx routed to the same saRefreshToken mocks) that other describe
+      // blocks in this file rely on. mockReset() would wipe that default
+      // back to a bare stub returning undefined, so restore the same
       // default explicitly instead of resetting it away.
-      mockPrisma.$transaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
+      mockPrisma.$transaction.mockImplementation((fn: (tx: { saRefreshToken: typeof mockPrisma.saRefreshToken }) => unknown) =>
+        fn({ saRefreshToken: mockPrisma.saRefreshToken }),
+      );
     });
 
     beforeEach(() => {
