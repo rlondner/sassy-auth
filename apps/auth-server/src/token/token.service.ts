@@ -237,12 +237,26 @@ export class TokenService {
     return idToken;
   }
 
-  /** Verifies an access token this server issued. Throws on any failure. */
-  verifyAccessToken(token: string): { sub?: string; scope?: string; aud?: string } {
-    return jwt.verify(token, this.publicKey, {
+  /** Verifies an access token this server issued. Throws on any failure —
+   *  including a structurally valid RS256 token that simply isn't a user
+   *  access token (missing `sub`). Without this check, a genuine service
+   *  token (issueServiceJwt — no sub, by design) would verify successfully
+   *  here, and a caller like /userinfo's
+   *  `prisma.saUser.findFirst({ where: { publicId: claims.sub } })` would
+   *  see `publicId: undefined`, which Prisma drops from the WHERE clause
+   *  entirely rather than matching nothing — returning an ARBITRARY user
+   *  row. This is what actually makes service and user tokens mutually
+   *  non-interchangeable through this method, not merely a documentation
+   *  claim. */
+  verifyAccessToken(token: string): { sub: string; scope?: string; aud?: string } {
+    const claims = jwt.verify(token, this.publicKey, {
       algorithms: ['RS256'],
       issuer: resolveIssuer(),
     }) as { sub?: string; scope?: string; aud?: string };
+    if (!claims.sub) {
+      throw new Error('Not a user access token (missing sub)');
+    }
+    return claims as { sub: string; scope?: string; aud?: string };
   }
 
   /** Mints a service token for the client_credentials grant. Structurally

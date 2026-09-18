@@ -401,4 +401,11 @@ describe('TokenService', () => {
       expect(() => service.verifyServiceAccessToken(forged)).toThrow();
     });
   });
+
+  describe('verifyAccessToken', () => {
+    it('rejects a service token (missing sub)', async () => {
+      const serviceToken = await service.issueServiceJwt({ appId: 7, appPublicId: 'app-7', scope: 'roles:write' });
+      expect(() => service.verifyAccessToken(serviceToken)).toThrow();
+    });
+  });
 });

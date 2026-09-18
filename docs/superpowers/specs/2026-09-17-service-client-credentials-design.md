@@ -186,9 +186,13 @@ a machine caller, and idempotent `PUT`/`DELETE` matches REST convention for
    is what makes the two token kinds non-interchangeable: a leaked user
    access token can't be replayed here (wrong `aud`), and a service token
    can't be replayed against a user-scoped endpoint (no `sub`, so
-   `BetterAuthGuard`'s cookie check was never in play, but any other
-   `verifyAccessToken`-based check keying on `sub` fails closed on
-   `undefined`).
+   `BetterAuthGuard`'s cookie check was never in play, and
+   `verifyAccessToken` itself now explicitly rejects any token missing
+   `sub` — without that check, a service token would otherwise verify
+   successfully and hand callers like `/userinfo`'s
+   `prisma.saUser.findFirst({ where: { publicId: claims.sub } })` an
+   `undefined` `publicId`, which Prisma drops from the `WHERE` clause
+   entirely rather than matching nothing, returning an arbitrary user row).
 3. `scope.split(/\s+/).includes('roles:write')` — else `403 Forbidden`.
 4. Attach `{ appId, appPublicId }` (from `azp`, resolved via
    `sqidService.decode`) onto the request for the controller/service to read
