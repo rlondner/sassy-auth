@@ -48,6 +48,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
+  const [allowOfflineAccess, setAllowOfflineAccess] = React.useState<boolean>(app.allowOfflineAccess ?? false)
   const [defaultOrgId, setDefaultOrgId] = React.useState<string | null>(app.defaultOrgId ?? null)
   const [defaultRoleId, setDefaultRoleId] = React.useState<string | null>(app.defaultRoleId ?? null)
   const [passwordPolicyOverrideEnabled, setPasswordPolicyOverrideEnabled] = React.useState(
@@ -104,6 +105,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
+    setAllowOfflineAccess(app.allowOfflineAccess ?? false)
     setDefaultOrgId(app.defaultOrgId ?? null)
     setDefaultRoleId(app.defaultRoleId ?? null)
     setPasswordPolicyOverrideEnabled(app.passwordPolicyOverride !== null)
@@ -219,7 +221,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
     activationSubject.trim() !== (activationOverrideBaseline.subject ?? '') ||
     activationMessage.trim() !== (activationOverrideBaseline.message ?? '')
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -232,13 +234,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
     if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
+    if (allowOfflineAccess !== (app.allowOfflineAccess ?? false)) patch.allowOfflineAccess = allowOfflineAccess
     if (defaultOrgId !== (app.defaultOrgId ?? null)) patch.defaultOrgId = defaultOrgId
     if (defaultRoleId !== (app.defaultRoleId ?? null)) patch.defaultRoleId = defaultRoleId
     if (passwordPolicyDirty) {
@@ -357,6 +360,21 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               </label>
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.requireTwoFactorHint')}
+              </p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="allowOfflineAccess"
+                  checked={allowOfflineAccess}
+                  onChange={(e) => setAllowOfflineAccess(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                />
+                {t('apps.fields.allowOfflineAccess')}
+              </label>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.allowOfflineAccessHint')}
               </p>
             </div>
             <div>

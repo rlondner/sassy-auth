@@ -65,6 +65,8 @@
       "twoFactorTrustDaysHint": "How long to trust this browser after a 2FA challenge. Leave blank to use the system default. Values shorter than the system default shorten the browser cookie; values longer than the system default are capped at the system default on the server.",
       "requireTwoFactor": "Require two-factor authentication",
       "requireTwoFactorHint": "Users signing in to this app must enroll in 2FA before they can continue.",
+      "allowOfflineAccess": "Allow offline access",
+      "allowOfflineAccessHint": "Lets this app request the offline_access scope and receive a refresh token so it can renew access without the user signing in again.",
       "defaultOrg": "Default organization",
       "defaultOrgHint": "New self-serve sign-ups on this app automatically join this org instead of founding a new one. Leave unset to let each sign-up create its own org.",
       "defaultOrgNone": "None — sign-ups create a new org",
