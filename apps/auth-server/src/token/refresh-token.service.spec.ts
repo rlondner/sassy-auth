@@ -102,7 +102,7 @@ describe('RefreshTokenService', () => {
 
     it('rotates a valid token: revokes the old row and issues a new one in the same family', async () => {
       mockPrisma.saRefreshToken.findUnique.mockResolvedValue(existingRow);
-      mockPrisma.saRefreshToken.update.mockResolvedValue({});
+      mockPrisma.saRefreshToken.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.saRefreshToken.create.mockResolvedValue({});
 
       const result = await service.rotate('presented-token', 'app-10');
@@ -113,9 +113,9 @@ describe('RefreshTokenService', () => {
         authTime: existingRow.authTime,
       }));
       expect(typeof result.token).toBe('string');
-      expect(mockPrisma.saRefreshToken.update).toHaveBeenCalledWith(
+      expect(mockPrisma.saRefreshToken.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { tokenHash: hashOf('presented-token') },
+          where: { tokenHash: hashOf('presented-token'), revokedAt: null },
           data: expect.objectContaining({ replacedByTokenHash: hashOf(result.token) }),
         }),
       );
@@ -127,6 +127,21 @@ describe('RefreshTokenService', () => {
           }),
         }),
       );
+    });
+
+    it('concurrent replay: if a race already flipped revokedAt, the losing request fails cleanly without creating a child row', async () => {
+      mockPrisma.saRefreshToken.findUnique.mockResolvedValue(existingRow);
+      // Simulates a concurrent winner already having revoked this row
+      // between our read and our conditional write.
+      mockPrisma.saRefreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.rotate('presented-token', 'app-10')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(mockPrisma.saRefreshToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tokenHash: hashOf('presented-token'), revokedAt: null },
+        }),
+      );
+      expect(mockPrisma.saRefreshToken.create).not.toHaveBeenCalled();
     });
 
     it('rejects an unknown token with invalid_grant', async () => {

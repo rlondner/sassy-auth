@@ -1594,10 +1594,18 @@ describe('TokenController', () => {
         },
       );
       mockPrisma.saRefreshToken.updateMany.mockImplementation(
-        async ({ where, data }: { where: { familyId: string; revokedAt: null }; data: Record<string, unknown> }) => {
+        async ({
+          where,
+          data,
+        }: {
+          where: { familyId?: string; tokenHash?: string; revokedAt: null };
+          data: Record<string, unknown>;
+        }) => {
           let count = 0;
           for (const [hash, row] of rows) {
-            if (row.familyId === where.familyId && row.revokedAt == null) {
+            const matchesTokenHash = where.tokenHash === undefined || hash === where.tokenHash;
+            const matchesFamilyId = where.familyId === undefined || row.familyId === where.familyId;
+            if (matchesTokenHash && matchesFamilyId && row.revokedAt == null) {
               rows.set(hash, { ...row, ...data });
               count += 1;
             }

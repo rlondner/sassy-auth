@@ -95,29 +95,43 @@ export class RefreshTokenService {
 
     const newToken = crypto.randomBytes(32).toString('hex');
     const newTokenHash = hashToken(newToken);
-    await prisma.$transaction([
-      prisma.saRefreshToken.update({
-        where: { tokenHash },
-        data: { revokedAt: now, replacedByTokenHash: newTokenHash },
-      }),
-      prisma.saRefreshToken.create({
-        data: {
-          tokenHash: newTokenHash,
-          familyId: row.familyId,
-          saUserId: row.saUserId,
-          userPublicId: row.userPublicId,
-          orgPublicId: row.orgPublicId,
-          appId: row.appId,
-          appPublicId: row.appPublicId,
-          scope: row.scope,
-          amr: row.amr,
-          idp: row.idp,
-          authTime: row.authTime,
-          expiresAt: new Date(now.getTime() + SLIDING_TTL_MS),
-          absoluteExpiresAt: row.absoluteExpiresAt,
-        },
-      }),
-    ]);
+
+    // Atomic single-use consumption: the update is conditioned on
+    // `revokedAt: null` (a compound where, hence updateMany rather than
+    // update since tokenHash alone is the @id) so that if a concurrent
+    // request already rotated this same still-valid token between our
+    // read above and this write, at most one of the two racing callers
+    // can flip revokedAt here. Mirrors OauthService.exchangeCode's atomic
+    // delete-based single-use consumption of SaOauthCode.
+    const { count } = await prisma.saRefreshToken.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: { revokedAt: now, replacedByTokenHash: newTokenHash },
+    });
+    if (count !== 1) {
+      // Lost the race: someone else already rotated (or revoked) this
+      // token between our read and this write. Fail cleanly — the other
+      // caller's rotation already completed normally, so there's no
+      // family-burn to do here.
+      throw new UnauthorizedException(TokenErrorCode.INVALID_GRANT);
+    }
+
+    await prisma.saRefreshToken.create({
+      data: {
+        tokenHash: newTokenHash,
+        familyId: row.familyId,
+        saUserId: row.saUserId,
+        userPublicId: row.userPublicId,
+        orgPublicId: row.orgPublicId,
+        appId: row.appId,
+        appPublicId: row.appPublicId,
+        scope: row.scope,
+        amr: row.amr,
+        idp: row.idp,
+        authTime: row.authTime,
+        expiresAt: new Date(now.getTime() + SLIDING_TTL_MS),
+        absoluteExpiresAt: row.absoluteExpiresAt,
+      },
+    });
 
     return {
       token: newToken,
