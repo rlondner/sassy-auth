@@ -1,6 +1,6 @@
 // Canonical order so the `scope` claim and the token response are stable
 // regardless of the order the client requested them in.
-export const SUPPORTED_SCOPES = ['openid', 'profile', 'email'] as const;
+export const SUPPORTED_SCOPES = ['openid', 'profile', 'email', 'offline_access'] as const;
 
 export type SupportedScope = (typeof SUPPORTED_SCOPES)[number];
 

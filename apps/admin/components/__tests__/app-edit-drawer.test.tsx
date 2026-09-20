@@ -132,6 +132,7 @@ const app = {
   url: 'https://old.example',
   isPlatform: false,
   requireTwoFactor: false,
+  allowOfflineAccess: false,
   passwordPolicyOverride: null,
   effectivePasswordPolicy: EFFECTIVE_PASSWORD_POLICY,
   activationEmailOverride: null,
@@ -467,6 +468,32 @@ describe('AppEditDrawer', () => {
         'sq_1',
         expect.objectContaining({ defaultOrgId: 'org1', defaultRoleId: 'role1' }),
       ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  // Task 12 (refresh tokens): allowOfflineAccess toggle, mirroring the
+  // requireTwoFactor checkbox pattern.
+
+  it('toggles allowOfflineAccess and includes it in the patch when changed', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, allowOfflineAccess: true },
+    })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    const checkbox = screen.getByLabelText(en.apps.fields.allowOfflineAccess) as HTMLInputElement
+    expect(checkbox.checked).toBe(false)
+
+    fireEvent.click(checkbox)
+    expect(checkbox.checked).toBe(true)
+
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    expect(save).toBeEnabled()
+    fireEvent.click(save)
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', { allowOfflineAccess: true }),
     )
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })

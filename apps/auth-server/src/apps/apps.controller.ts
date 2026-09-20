@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { BetterAuthGuard } from '../auth/better-auth.guard';
+import { BETTER_AUTH_SESSION_COOKIE } from '../common/constants';
 import { AppsService } from './apps.service';
 import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppDto } from './dto/update-app.dto';
@@ -10,6 +12,8 @@ function callerBaId(req: Request): string {
   return (req as unknown as Record<string, { id: string }>)['betterAuthUser'].id;
 }
 
+@ApiTags('Applications')
+@ApiCookieAuth(BETTER_AUTH_SESSION_COOKIE)
 @UseGuards(BetterAuthGuard)
 @Controller('apps')
 export class AppsController {

@@ -549,9 +549,11 @@ Leave blank to disable. See [Observability](#observability) for behavior.
 | `SENTRY_AUTH_TOKEN`         | admin | Build-time auth token for source-map upload                          |
 | `SENTRY_ORG`                | admin | Sentry organization slug (build-time only)                           |
 | `SENTRY_PROJECT`            | admin | Sentry project slug (build-time only)                                |
-| `OTEL_SERVICE_NAME`         | auth  | Per-service override for the OpenTelemetry service name (each app has a sensible default) |
-| `DD_API_KEY`                | auth  | Datadog API key. Unset disables all Datadog export (traces, metrics, logs) |
-| `DD_SITE`                   | auth  | Datadog site — `datadoghq.com`, `datadoghq.eu`, etc. (default: `datadoghq.com`) |
+| `OTEL_SERVICE_NAME`         | auth, admin | Per-service override for the OpenTelemetry service name (each app has a sensible default) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | auth, admin | Base Datadog OTLP URL (e.g. `https://otlp.datadoghq.com`). Unset disables all Datadog export (traces, metrics, logs) |
+| `OTEL_EXPORTER_OTLP_HEADERS` | auth, admin | Datadog auth header, e.g. `dd-api-key=...` |
+| `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` | auth, admin | Log export protocol, e.g. `http/protobuf` |
+| `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | auth | Set to `delta` — Datadog's OTLP intake silently drops cumulative Sums/Histograms |
 | `SENTRY_DSN_RESOURCE_SERVER` | RS sample | Sentry DSN for `apps/resource-server-fastapi` (its own `.env`, not the root one). Leave blank to disable. |
 
 ### Email (optional)

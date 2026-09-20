@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import { TokenController } from './token.controller';
 import { TokenService } from './token.service';
 import { OauthService } from './oauth.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -20,17 +21,33 @@ jest.mock('@sentry/nestjs', () => ({
   lastEventId: jest.fn(),
 }));
 
-jest.mock('@sassy-auth/db', () => ({
-  prisma: {
-    saApp: { findUnique: jest.fn() },
-    // `update` covers the bug-0186 fire-and-forget lastLoginAt bump
-    // in directLogin. Default it to resolve so the tests that don't
-    // care about the write don't need to touch it.
-    saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
-    account: { findFirst: jest.fn() },
-    user: { findUnique: jest.fn() },
-  },
-}));
+jest.mock('@sassy-auth/db', () => {
+  // Only used by the 'refresh token full flow (real HTTP)' block below,
+  // which swaps in stateful mockImplementations for these so a REAL
+  // RefreshTokenService can rotate/reuse-detect against them. Every other
+  // describe block in this file uses the mocked RefreshTokenService and
+  // never touches saRefreshToken/$transaction at all.
+  const saRefreshToken = { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() };
+  return {
+    prisma: {
+      saApp: { findUnique: jest.fn() },
+      // `update` covers the bug-0186 fire-and-forget lastLoginAt bump
+      // in directLogin. Default it to resolve so the tests that don't
+      // care about the write don't need to touch it.
+      saUser: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
+      account: { findFirst: jest.fn() },
+      user: { findUnique: jest.fn() },
+      saRefreshToken,
+      // Interactive-transaction form: invokes the callback with a `tx`
+      // object routed to the same saRefreshToken mock methods on `prisma`
+      // itself — see the 'refresh token full flow (real HTTP)' block
+      // below, the only describe block that actually exercises $transaction.
+      $transaction: jest.fn((fn: (tx: { saRefreshToken: typeof saRefreshToken }) => unknown) =>
+        fn({ saRefreshToken }),
+      ),
+    },
+  };
+});
 
 jest.mock('../auth/verify-user-totp');
 
@@ -57,6 +74,8 @@ const mockPrisma = prisma as unknown as {
   saUser: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
   account: { findFirst: jest.Mock };
   user: { findUnique: jest.Mock };
+  saRefreshToken: { create: jest.Mock; findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+  $transaction: jest.Mock;
 };
 
 // ── Key pair for signing test bearer tokens ─────────────────────────────────
@@ -95,6 +114,13 @@ const mockOauthService = {
   exchangeCode: jest.fn(),
 };
 
+const mockRefreshTokenService = {
+  issue: jest.fn(),
+  rotate: jest.fn(),
+  revokeForUserApp: jest.fn(),
+  revokeForUser: jest.fn(),
+};
+
 const mockSqidService = {
   encode: jest.fn((id: number) => `sqid-${id}`),
   decode: jest.fn((s: string) => parseInt(s.replace('sqid-', ''), 10)),
@@ -111,6 +137,7 @@ describe('TokenController', () => {
         { provide: OauthService, useValue: mockOauthService },
         { provide: SqidService, useValue: mockSqidService },
         { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+        { provide: RefreshTokenService, useValue: mockRefreshTokenService },
       ],
     }).compile();
     controller = module.get(TokenController);
@@ -293,6 +320,32 @@ describe('TokenController', () => {
       });
     });
 
+    it('always issues a refresh token, since direct/login has no /authorize step to gate offline_access', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(app);
+      mockPrisma.saUser.findFirst.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
+      mockPrisma.account.findFirst.mockResolvedValue(account);
+      mockTokenService.issueJwt.mockResolvedValue('direct.jwt.token');
+      mockRefreshTokenService.issue.mockResolvedValue('direct-refresh-token');
+
+      const result = await controller.directLogin({
+        identifier: 'user@example.com',
+        password: 'pw',
+        appId: 'sqid-10',
+      });
+
+      expect(result).toEqual(expect.objectContaining({ refresh_token: 'direct-refresh-token' }));
+      expect(mockRefreshTokenService.issue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          saUserId: saUser.id,
+          userPublicId: saUser.publicId,
+          orgPublicId: saUser.org.publicId,
+          appId: app.id,
+          appPublicId: app.publicId,
+          scope: '',
+        }),
+      );
+    });
+
     it('directLogin (phone branch) uses findUnique on phoneNumber, not findFirst', async () => {
       mockPrisma.saApp.findUnique.mockResolvedValue(app);
       mockPrisma.saUser.findUnique.mockResolvedValue({ ...saUser, betterAuthUser: baUser });
@@ -387,7 +440,14 @@ describe('TokenController', () => {
   // ── GET /api/token/oauth/authorize ───────────────────────────────────────
 
   describe('oauthAuthorize', () => {
-    const app = { id: 10, publicId: 'sqid-10', isPlatform: false, requireTwoFactor: false, url: 'https://app.example.com' };
+    const app = {
+      id: 10,
+      publicId: 'sqid-10',
+      isPlatform: false,
+      requireTwoFactor: false,
+      url: 'https://app.example.com',
+      allowOfflineAccess: false,
+    };
     const fakeSession = { user: { id: 'ba-user-1', email: 'user@example.com', twoFactorEnabled: false } };
     const saUser = {
       id: 1,
@@ -581,6 +641,69 @@ describe('TokenController', () => {
       );
     });
 
+    // Task 5 — offline_access is only honored for apps that opted in via
+    // SaApp.allowOfflineAccess; a client requesting the scope against an
+    // app that never opted in must not receive it in the granted scope.
+    it('drops offline_access from the granted scope when the app has not opted in', async () => {
+      mockApp({ allowOfflineAccess: false });
+      mockSession();
+      mockSaUser();
+      mockOauthService.generateCode.mockReturnValue('code-123');
+
+      await controller.oauthAuthorize(
+        'sqid-10',
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        '',
+        fakeReq,
+        'openid offline_access',
+      );
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['pwd'],
+        null,
+        'openid',
+        expect.any(Date),
+        undefined,
+      );
+    });
+
+    it('keeps offline_access in the granted scope when the app has opted in', async () => {
+      mockApp({ allowOfflineAccess: true });
+      mockSession();
+      mockSaUser();
+      mockOauthService.generateCode.mockReturnValue('code-123');
+
+      await controller.oauthAuthorize(
+        'sqid-10',
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        '',
+        fakeReq,
+        'openid offline_access',
+      );
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        saUser.publicId,
+        app.publicId,
+        'https://app.example.com/callback',
+        'fake-challenge',
+        'S256',
+        ['pwd'],
+        null,
+        'openid offline_access',
+        expect.any(Date),
+        undefined,
+      );
+    });
+
     it('derives auth_time from the BetterAuth session createdAt', async () => {
       mockApp();
       const createdAt = new Date('2026-08-21T10:00:00Z');
@@ -723,6 +846,61 @@ describe('TokenController', () => {
         expires_in: 3600,
         scope: '',
       });
+    });
+
+    it('does not include refresh_token when offline_access was not granted', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1', appPublicId: 'sqid-10', scope: 'openid', hadChallenge: true,
+        amr: ['pwd'], authTime: new Date('2026-09-17T00:00:00Z'),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1, publicId: 'sqid-1', status: 'active', orgId: 5, org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+      mockTokenService.issueIdToken.mockResolvedValue('oauth.id.token');
+
+      const result = await controller.oauthToken(
+        {
+          grant_type: 'authorization_code', code: 'valid-code', client_id: 'sqid-10',
+          code_verifier: 'a'.repeat(64), redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq, fakeTokenRes,
+      );
+
+      expect(result).not.toHaveProperty('refresh_token');
+      expect(mockRefreshTokenService.issue).not.toHaveBeenCalled();
+    });
+
+    it('includes refresh_token when offline_access was granted', async () => {
+      mockOauthService.exchangeCode.mockReturnValue({
+        userId: 'sqid-1', appPublicId: 'sqid-10', scope: 'openid offline_access', hadChallenge: true,
+        amr: ['pwd'], authTime: new Date('2026-09-17T00:00:00Z'),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({
+        id: 1, publicId: 'sqid-1', status: 'active', orgId: 5, org: { publicId: 'sqid-5', appId: 10 },
+      });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', url: 'https://app.example.com' });
+      mockTokenService.issueJwt.mockResolvedValue('oauth.jwt.token');
+      mockTokenService.issueIdToken.mockResolvedValue('oauth.id.token');
+      mockRefreshTokenService.issue.mockResolvedValue('new-refresh-token');
+
+      const result = await controller.oauthToken(
+        {
+          grant_type: 'authorization_code', code: 'valid-code', client_id: 'sqid-10',
+          code_verifier: 'a'.repeat(64), redirect_uri: 'https://app.example.com/callback',
+        },
+        fakeTokenReq, fakeTokenRes,
+      );
+
+      expect(result).toEqual(expect.objectContaining({ refresh_token: 'new-refresh-token' }));
+      expect(mockRefreshTokenService.issue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          saUserId: 1, userPublicId: 'sqid-1', orgPublicId: 'sqid-5',
+          appId: 10, appPublicId: 'sqid-10', scope: 'openid offline_access', amr: ['pwd'],
+          authTime: new Date('2026-09-17T00:00:00Z'),
+        }),
+      );
     });
 
     it('returns id_token when the openid scope was granted', async () => {
@@ -1001,6 +1179,87 @@ describe('TokenController', () => {
     });
   });
 
+  describe('oauthToken — grant_type=refresh_token', () => {
+    const fakeReq = { headers: {} } as unknown as import('express').Request;
+    const fakeRes = { setHeader: jest.fn() } as unknown as import('express').Response;
+
+    it('rotates a valid refresh token and returns a new access+refresh token pair', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      mockRefreshTokenService.rotate.mockResolvedValue({
+        token: 'new-refresh-token',
+        saUserId: 1, userPublicId: 'sqid-1', orgPublicId: 'sqid-5',
+        appId: 10, appPublicId: 'sqid-10', scope: 'openid', amr: ['pwd'],
+        authTime: new Date('2026-09-01T00:00:00Z'),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ publicId: 'sqid-1', status: 'active' });
+      mockTokenService.issueJwt.mockResolvedValue('new.jwt.token');
+      mockTokenService.issueIdToken.mockResolvedValue('new.id.token');
+
+      const result = await controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'old-refresh-token' },
+        fakeReq, fakeRes,
+      );
+
+      expect(mockRefreshTokenService.rotate).toHaveBeenCalledWith('old-refresh-token', 'sqid-10');
+      expect(result).toEqual({
+        access_token: 'new.jwt.token', token_type: 'Bearer', expires_in: 3600,
+        scope: 'openid', refresh_token: 'new-refresh-token', id_token: 'new.id.token',
+      });
+    });
+
+    it('does not include id_token when openid was not in the rotated scope', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      mockRefreshTokenService.rotate.mockResolvedValue({
+        token: 'new-refresh-token', saUserId: 1, userPublicId: 'sqid-1', orgPublicId: 'sqid-5',
+        appId: 10, appPublicId: 'sqid-10', scope: '', amr: ['pwd'], authTime: new Date(),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ publicId: 'sqid-1', status: 'active' });
+      mockTokenService.issueJwt.mockResolvedValue('new.jwt.token');
+
+      const result = await controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'old-refresh-token' },
+        fakeReq, fakeRes,
+      );
+
+      expect(result).not.toHaveProperty('id_token');
+      expect(mockTokenService.issueIdToken).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the rotated token belongs to a user who is no longer active', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      mockRefreshTokenService.rotate.mockResolvedValue({
+        token: 'new-refresh-token', saUserId: 1, userPublicId: 'sqid-1', orgPublicId: 'sqid-5',
+        appId: 10, appPublicId: 'sqid-10', scope: '', amr: ['pwd'], authTime: new Date(),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ publicId: 'sqid-1', status: 'inactive' });
+
+      await expect(controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'old-refresh-token' },
+        fakeReq, fakeRes,
+      )).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('propagates rotate()\'s invalid_grant rejection unchanged (reuse detection, expiry, unknown token)', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      mockRefreshTokenService.rotate.mockRejectedValue(new UnauthorizedException(TokenErrorCode.INVALID_GRANT));
+
+      await expect(controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'stolen-token' },
+        fakeReq, fakeRes,
+      )).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects a refresh grant for a confidential app with no client secret presented', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: 'hashed' });
+
+      await expect(controller.oauthToken(
+        { grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: 'some-token' },
+        fakeReq, fakeRes,
+      )).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(mockRefreshTokenService.rotate).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Task 9: confidential clients — §2 invariant ──────────────────────────
   //
   // "A PKCE-challenge-less authorization code may only be exchanged by a
@@ -1023,6 +1282,7 @@ describe('TokenController', () => {
           { provide: OauthService, useValue: mockOauthService },
           { provide: SqidService, useValue: mockSqidService },
           { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         ],
       }).compile();
       app = moduleRef.createNestApplication();
@@ -1294,6 +1554,138 @@ describe('TokenController', () => {
     });
   });
 
+  // ── refresh token full flow (real HTTP, real RefreshTokenService) ───────
+
+  describe('refresh token full flow (real HTTP)', () => {
+    let app: INestApplication;
+    const refreshTokenService = new RefreshTokenService();
+
+    // In-memory stand-in for the sa_refresh_token table, scoped to this
+    // describe block only. The real RefreshTokenService is exercised here
+    // (not mocked, unlike every other block in this file), so
+    // prisma.saRefreshToken needs to actually persist/retrieve rows across
+    // the two sequential HTTP calls the test below makes — a plain jest.fn()
+    // that always resolves to undefined can't support that.
+    let rows: Map<string, Record<string, unknown>>;
+
+    beforeAll(async () => {
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        controllers: [TokenController],
+        providers: [
+          { provide: TokenService, useValue: mockTokenService },
+          { provide: OauthService, useValue: mockOauthService },
+          { provide: SqidService, useValue: mockSqidService },
+          { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: refreshTokenService },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api');
+      await app.init();
+
+      rows = new Map();
+
+      mockPrisma.saRefreshToken.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+        const row = { ...data };
+        rows.set(row.tokenHash as string, row);
+        return row;
+      });
+      mockPrisma.saRefreshToken.findUnique.mockImplementation(
+        async ({ where }: { where: { tokenHash: string } }) => rows.get(where.tokenHash) ?? null,
+      );
+      mockPrisma.saRefreshToken.update.mockImplementation(
+        async ({ where, data }: { where: { tokenHash: string }; data: Record<string, unknown> }) => {
+          const existing = rows.get(where.tokenHash);
+          if (!existing) return null;
+          const updated = { ...existing, ...data };
+          rows.set(where.tokenHash, updated);
+          return updated;
+        },
+      );
+      mockPrisma.saRefreshToken.updateMany.mockImplementation(
+        async ({
+          where,
+          data,
+        }: {
+          where: { familyId?: string; tokenHash?: string; revokedAt: null };
+          data: Record<string, unknown>;
+        }) => {
+          let count = 0;
+          for (const [hash, row] of rows) {
+            const matchesTokenHash = where.tokenHash === undefined || hash === where.tokenHash;
+            const matchesFamilyId = where.familyId === undefined || row.familyId === where.familyId;
+            if (matchesTokenHash && matchesFamilyId && row.revokedAt == null) {
+              rows.set(hash, { ...row, ...data });
+              count += 1;
+            }
+          }
+          return { count };
+        },
+      );
+      mockPrisma.$transaction.mockImplementation((fn: (tx: { saRefreshToken: typeof mockPrisma.saRefreshToken }) => unknown) =>
+        fn({ saRefreshToken: mockPrisma.saRefreshToken }),
+      );
+    });
+
+    afterAll(async () => {
+      await app.close();
+      // Restore these to plain jest.fn()s so the stateful mockImplementations
+      // set up above can't leak into any other describe block in this file
+      // (none of which touch saRefreshToken, but this keeps the shared
+      // mockPrisma object clean regardless of describe execution order).
+      mockPrisma.saRefreshToken.create.mockReset();
+      mockPrisma.saRefreshToken.findUnique.mockReset();
+      mockPrisma.saRefreshToken.update.mockReset();
+      mockPrisma.saRefreshToken.updateMany.mockReset();
+      // $transaction is different: the top-level jest.mock('@sassy-auth/db', ...)
+      // factory gives it a module-wide default (invoke the callback with a
+      // tx routed to the same saRefreshToken mocks) that other describe
+      // blocks in this file rely on. mockReset() would wipe that default
+      // back to a bare stub returning undefined, so restore the same
+      // default explicitly instead of resetting it away.
+      mockPrisma.$transaction.mockImplementation((fn: (tx: { saRefreshToken: typeof mockPrisma.saRefreshToken }) => unknown) =>
+        fn({ saRefreshToken: mockPrisma.saRefreshToken }),
+      );
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('rotates a real refresh token issued by RefreshTokenService and rejects reuse of the old one', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ id: 10, publicId: 'sqid-10', clientSecretHash: null });
+      const firstToken = await refreshTokenService.issue({
+        saUserId: 1, userPublicId: 'usr-1', orgPublicId: 'org-1',
+        appId: 10, appPublicId: 'sqid-10', scope: 'openid', amr: ['pwd'], authTime: new Date(),
+      });
+      mockPrisma.saUser.findFirst.mockResolvedValue({ publicId: 'usr-1', status: 'active' });
+      mockTokenService.issueJwt.mockResolvedValue('jwt-1');
+      mockTokenService.issueIdToken.mockResolvedValue('idt-1');
+
+      const firstRotation = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: firstToken });
+
+      expect(firstRotation.status).toBe(200);
+      expect(firstRotation.body.refresh_token).toBeDefined();
+      expect(firstRotation.body.refresh_token).not.toBe(firstToken);
+
+      // Reusing the now-rotated original token must fail.
+      const reuse = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: firstToken });
+      expect(reuse.status).toBe(401);
+      expect(reuse.body.message).toBe('invalid_grant');
+
+      // Reuse detection burns the family — the rotated token from the first
+      // call must ALSO be rejected now, even though it was never used again.
+      const secondRotationAttempt = await request(app.getHttpServer())
+        .post('/api/token/oauth/token')
+        .send({ grant_type: 'refresh_token', client_id: 'sqid-10', refresh_token: firstRotation.body.refresh_token });
+      expect(secondRotationAttempt.status).toBe(401);
+    });
+  });
+
   // ── GET /api/token/oauth/userinfo ────────────────────────────────────────
 
   describe('GET /api/token/oauth/userinfo', () => {
@@ -1307,6 +1699,7 @@ describe('TokenController', () => {
           { provide: OauthService, useValue: mockOauthService },
           { provide: SqidService, useValue: mockSqidService },
           { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         ],
       }).compile();
       app = moduleRef.createNestApplication();
@@ -1426,6 +1819,7 @@ describe('TokenController', () => {
           { provide: OauthService, useValue: mockOauthService },
           { provide: SqidService, useValue: mockSqidService },
           { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         ],
       }).compile();
       app = moduleRef.createNestApplication();
@@ -1462,6 +1856,57 @@ describe('TokenController', () => {
       const target = new URL(res.headers.location);
       expect(target.origin + target.pathname).toBe('https://app.example.com/bye');
       expect(target.searchParams.get('state')).toBe('xyz');
+    });
+
+    it('revokes all refresh tokens for that user+app when id_token_hint resolves to a real app', async () => {
+      const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({ id_token_hint: idToken, post_logout_redirect_uri: 'https://app.example.com/bye' });
+
+      expect(mockRefreshTokenService.revokeForUserApp).toHaveBeenCalledWith('u_1', 'a_7');
+    });
+
+    it('does not attempt refresh-token revocation with no id_token_hint', async () => {
+      await request(app.getHttpServer()).get('/api/token/oauth/logout');
+      expect(mockRefreshTokenService.revokeForUserApp).not.toHaveBeenCalled();
+    });
+
+    it('still redirects to the post-logout URI when refresh-token revocation fails', async () => {
+      const idToken = signTestIdToken({ sub: 'u_1', aud: 'a_7' });
+      mockRefreshTokenService.revokeForUserApp.mockRejectedValue(new Error('db down'));
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({ id_token_hint: idToken, post_logout_redirect_uri: 'https://app.example.com/bye' });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('https://app.example.com/bye');
+    });
+
+    it('skips revocation but still redirects when id_token_hint has no sub claim', async () => {
+      const idToken = signTestIdToken({ aud: 'a_7' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        redirectUris: [{ uri: 'https://app.example.com/bye', kind: 'post_logout' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/logout')
+        .query({ id_token_hint: idToken, post_logout_redirect_uri: 'https://app.example.com/bye' });
+
+      expect(mockRefreshTokenService.revokeForUserApp).not.toHaveBeenCalled();
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('https://app.example.com/bye');
     });
 
     it('refuses to redirect to an unregistered post_logout URI but still signs out', async () => {
@@ -1525,6 +1970,7 @@ describe('TokenController', () => {
           { provide: OauthService, useValue: mockOauthService },
           { provide: SqidService, useValue: mockSqidService },
           { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
+          { provide: RefreshTokenService, useValue: mockRefreshTokenService },
         ],
       }).compile();
       app = moduleRef.createNestApplication();
