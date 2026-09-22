@@ -57,7 +57,10 @@ export class SignupPage {
     await this.page.goto('/signup')
   }
 
-  async fillAndSubmit(details: SignupDetails, options: { acceptConsent?: boolean } = {}) {
+  async fillAndSubmit(
+    details: SignupDetails,
+    options: { acceptConsent?: boolean; submit?: boolean } = {},
+  ) {
     await this.firstNameInput.fill(details.firstName)
     await this.lastNameInput.fill(details.lastName)
     await this.companyNameInput.fill(details.companyName)
@@ -78,6 +81,8 @@ export class SignupPage {
     await expect
       .poll(() => this.page.locator('input[name="cf-turnstile-response"]').first().inputValue())
       .not.toBe('')
-    await this.submitButton.click()
+    if (options.submit ?? true) {
+      await this.submitButton.click()
+    }
   }
 }

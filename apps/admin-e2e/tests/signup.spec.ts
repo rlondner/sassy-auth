@@ -109,13 +109,16 @@ test.describe('Signup — Privacy Policy / Terms consent', () => {
     await expect(signup.termsCheckbox).toBeVisible()
 
     // Submit disabled without accepting either checkbox.
-    await signup.fillAndSubmit({
-      firstName: 'Grace',
-      lastName: 'Hopper',
-      companyName: 'Compilers Inc',
-      email: uniqueEmail,
-      password: 'StrongPass123!',
-    })
+    await signup.fillAndSubmit(
+      {
+        firstName: 'Grace',
+        lastName: 'Hopper',
+        companyName: 'Compilers Inc',
+        email: uniqueEmail,
+        password: 'StrongPass123!',
+      },
+      { submit: false },
+    )
     await expect(signup.submitButton).toBeDisabled()
 
     // Accept both, then submit succeeds.
