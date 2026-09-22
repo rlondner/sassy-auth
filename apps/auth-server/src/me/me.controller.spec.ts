@@ -42,7 +42,7 @@ describe('MeController', () => {
       mockMeService.getOutstandingConsent.mockResolvedValue({
         outstanding: [{ documentType: 'terms', url: 'https://a.example.com/terms' }],
       });
-      const result = await controller.getOutstandingConsent(makeReq('ba-1'), 'sq_1');
+      const result = await controller.getOutstandingConsent(makeReq('ba-1'), { appPublicId: 'sq_1' });
       expect(mockMeService.getOutstandingConsent).toHaveBeenCalledWith('ba-1', 'sq_1', 'unknown');
       expect(result).toEqual({ outstanding: [{ documentType: 'terms', url: 'https://a.example.com/terms' }] });
     });

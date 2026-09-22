@@ -1,11 +1,11 @@
 import { Body, Controller, Get, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import type { ConsentDocumentType } from '@sassy-auth/types';
 import { BetterAuthGuard } from '../auth/better-auth.guard';
 import { BETTER_AUTH_SESSION_COOKIE } from '../common/constants';
 import { resolveClientIp } from '../common/net/resolve-client-ip';
 import { MeService } from './me.service';
+import { GetConsentQueryDto, RecordConsentDto } from './dto/record-consent.dto';
 
 function callerBaId(req: Request): string {
   return (req as unknown as Record<string, { id: string }>)['betterAuthUser'].id;
@@ -40,16 +40,13 @@ export class MeController {
   }
 
   @Get('consent')
-  getOutstandingConsent(@Req() req: Request, @Query('appPublicId') appPublicId: string) {
-    return this.me.getOutstandingConsent(callerBaId(req), appPublicId, resolveClientIp(req));
+  getOutstandingConsent(@Req() req: Request, @Query() query: GetConsentQueryDto) {
+    return this.me.getOutstandingConsent(callerBaId(req), query.appPublicId, resolveClientIp(req));
   }
 
   @Post('consent')
   @HttpCode(204)
-  async recordConsent(
-    @Req() req: Request,
-    @Body() body: { appPublicId: string; accepted: ConsentDocumentType[] },
-  ): Promise<void> {
+  async recordConsent(@Req() req: Request, @Body() body: RecordConsentDto): Promise<void> {
     await this.me.recordMyConsent(callerBaId(req), body.appPublicId, resolveClientIp(req), body.accepted ?? []);
   }
 }
