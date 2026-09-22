@@ -27,6 +27,10 @@ describe('fetchAppInfo', () => {
       hasDefaultOrg: true,
       passwordPolicy: POLICY,
       logo: null,
+      privacyPolicyUrl: null,
+      termsUrl: null,
+      gdprUrl: null,
+      gdprRequired: false,
     })
   })
 
@@ -41,6 +45,10 @@ describe('fetchAppInfo', () => {
       hasDefaultOrg: true,
       passwordPolicy: null,
       logo: null,
+      privacyPolicyUrl: null,
+      termsUrl: null,
+      gdprUrl: null,
+      gdprRequired: false,
     })
   })
 
@@ -55,6 +63,10 @@ describe('fetchAppInfo', () => {
       hasDefaultOrg: false,
       passwordPolicy: null,
       logo: null,
+      privacyPolicyUrl: null,
+      termsUrl: null,
+      gdprUrl: null,
+      gdprRequired: false,
     })
   })
 
@@ -66,6 +78,10 @@ describe('fetchAppInfo', () => {
       hasDefaultOrg: false,
       passwordPolicy: null,
       logo: null,
+      privacyPolicyUrl: null,
+      termsUrl: null,
+      gdprUrl: null,
+      gdprRequired: false,
     })
   })
 })
