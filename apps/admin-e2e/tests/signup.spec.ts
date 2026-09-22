@@ -14,7 +14,7 @@
  */
 import { test, expect } from '../lib/fixtures'
 import { SignupPage } from '../pages/signup.page'
-import { createAppWithPasswordPolicyOverride } from '../lib/app-fixtures'
+import { createAppWithPasswordPolicyOverride, createAppWithConsentDocuments } from '../lib/app-fixtures'
 
 const RS_CLIENT_ID = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
 
@@ -90,6 +90,38 @@ test.describe('Signup — per-app password policy override', () => {
     })
 
     await expect(page).toHaveURL(/\/signup\/check-email/)
+    await expect(signup.checkEmailTitle).toBeVisible()
+  })
+})
+
+test.describe('Signup — Privacy Policy / Terms consent', () => {
+  // Like the password-policy-override block above, this provisions its own
+  // SaApp via the admin API (createAppWithConsentDocuments) rather than
+  // borrowing the FastAPI RS client, so it isn't gated on rsIsConfigured().
+
+  test('signup requires accepting Privacy Policy and Terms when the app configures them', async ({ page }) => {
+    const app = await createAppWithConsentDocuments()
+    const signup = new SignupPage(page)
+    const uniqueEmail = `e2e-consent-${Date.now()}@example.com`
+
+    await signup.goto(app.publicId)
+    await expect(signup.privacyPolicyCheckbox).toBeVisible()
+    await expect(signup.termsCheckbox).toBeVisible()
+
+    // Submit disabled without accepting either checkbox.
+    await signup.fillAndSubmit({
+      firstName: 'Grace',
+      lastName: 'Hopper',
+      companyName: 'Compilers Inc',
+      email: uniqueEmail,
+      password: 'StrongPass123!',
+    })
+    await expect(signup.submitButton).toBeDisabled()
+
+    // Accept both, then submit succeeds.
+    await signup.privacyPolicyCheckbox.check()
+    await signup.termsCheckbox.check()
+    await signup.submitButton.click()
     await expect(signup.checkEmailTitle).toBeVisible()
   })
 })

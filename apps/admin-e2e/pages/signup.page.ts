@@ -23,6 +23,8 @@ export class SignupPage {
   readonly resendButton: Locator
   readonly backToLoginLink: Locator
   readonly invalidLinkMessage: Locator
+  readonly privacyPolicyCheckbox: Locator
+  readonly termsCheckbox: Locator
 
   constructor(page: Page) {
     this.page = page
@@ -42,6 +44,8 @@ export class SignupPage {
     this.resendButton = page.getByRole('button', { name: t('signup.checkEmail.resendButton') })
     this.backToLoginLink = page.getByRole('link', { name: t('signup.checkEmail.backToLogin') })
     this.invalidLinkMessage = page.getByText(t('signup.invalidLink'))
+    this.privacyPolicyCheckbox = page.getByRole('checkbox', { name: /Privacy Policy/i })
+    this.termsCheckbox = page.getByRole('checkbox', { name: /Terms and Conditions/i })
   }
 
   async goto(clientId: string, next = '') {
@@ -53,13 +57,17 @@ export class SignupPage {
     await this.page.goto('/signup')
   }
 
-  async fillAndSubmit(details: SignupDetails) {
+  async fillAndSubmit(details: SignupDetails, options: { acceptConsent?: boolean } = {}) {
     await this.firstNameInput.fill(details.firstName)
     await this.lastNameInput.fill(details.lastName)
     await this.companyNameInput.fill(details.companyName)
     await this.emailInput.fill(details.email)
     await this.passwordInput.fill(details.password)
     await this.confirmPasswordInput.fill(details.password)
+    if (options.acceptConsent) {
+      await this.privacyPolicyCheckbox.check()
+      await this.termsCheckbox.check()
+    }
     // The Turnstile widget (signup-form.tsx) loads Cloudflare's script and
     // solves the (always-pass, in CI) challenge asynchronously — the submit
     // button isn't gated on it, so clicking immediately after filling the
