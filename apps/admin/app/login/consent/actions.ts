@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { AUTH_SERVER_URL } from '@/lib/config'
 import { validateNextUrl } from '@/lib/safe-next'
+import { getForwardedClientIpHeader } from '@/lib/forward-client-ip'
 
 export async function acceptConsentAction(
   appPublicId: string,
@@ -12,11 +13,16 @@ export async function acceptConsentAction(
   next: string,
 ): Promise<{ error: true } | never> {
   const cookieStore = await cookies()
+  const forwardedIp = await getForwardedClientIpHeader()
   let res: Response
   try {
     res = await fetch(`${AUTH_SERVER_URL}/api/me/consent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: cookieStore.toString() },
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookieStore.toString(),
+        ...forwardedIp,
+      },
       body: JSON.stringify({ appPublicId, accepted }),
     })
   } catch (err) {

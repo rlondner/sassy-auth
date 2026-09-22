@@ -1,6 +1,8 @@
 import 'server-only'
 import { cookies } from 'next/headers'
+import * as Sentry from '@sentry/nextjs'
 import { AUTH_SERVER_URL } from './config'
+import { getForwardedClientIpHeader } from './forward-client-ip'
 
 /**
  * `next` may be a relative or absolute authorize URL carrying `client_id` —
@@ -31,14 +33,16 @@ export interface OutstandingConsentDocument {
 export async function fetchOutstandingConsent(appPublicId: string): Promise<OutstandingConsentDocument[]> {
   try {
     const cookieStore = await cookies()
+    const forwardedIp = await getForwardedClientIpHeader()
     const res = await fetch(`${AUTH_SERVER_URL}/api/me/consent?appPublicId=${encodeURIComponent(appPublicId)}`, {
-      headers: { Cookie: cookieStore.toString() },
+      headers: { Cookie: cookieStore.toString(), ...forwardedIp },
       cache: 'no-store',
     })
     if (!res.ok) return []
     const data = (await res.json()) as { outstanding?: OutstandingConsentDocument[] }
     return data.outstanding ?? []
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err, { tags: { area: 'auth', action: 'fetch-outstanding-consent' } })
     return []
   }
 }

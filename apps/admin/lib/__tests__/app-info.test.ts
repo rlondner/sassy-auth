@@ -1,7 +1,13 @@
+jest.mock('@/lib/forward-client-ip', () => ({ getForwardedClientIpHeader: jest.fn() }))
+
 import { fetchAppInfo } from '@/lib/app-info'
+import { getForwardedClientIpHeader } from '@/lib/forward-client-ip'
+
+const mockGetForwardedClientIpHeader = getForwardedClientIpHeader as jest.MockedFunction<any>
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockGetForwardedClientIpHeader.mockResolvedValue({})
   global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>
 })
 

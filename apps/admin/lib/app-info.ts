@@ -1,5 +1,6 @@
 import 'server-only'
 import type { PasswordPolicy } from './types'
+import { getForwardedClientIpHeader } from './forward-client-ip'
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
@@ -10,8 +11,10 @@ export async function fetchAppInfo(
   privacyPolicyUrl: string | null; termsUrl: string | null; gdprUrl: string | null; gdprRequired: boolean;
 }> {
   try {
+    const forwardedIp = await getForwardedClientIpHeader()
     const res = await fetch(`${AUTH_SERVER}/api/register/app?appPublicId=${encodeURIComponent(clientId)}`, {
       cache: 'no-store',
+      headers: { ...forwardedIp },
     })
     if (!res.ok) {
       // Fail toward hasDefaultOrg: false, not true: a Company name field shown

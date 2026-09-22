@@ -1,9 +1,12 @@
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }))
 jest.mock('@/lib/auth-origin', () => ({ getForwardedOrigin: jest.fn() }))
+jest.mock('@/lib/forward-client-ip', () => ({ getForwardedClientIpHeader: jest.fn() }))
 
 import { getForwardedOrigin } from '@/lib/auth-origin'
+import { getForwardedClientIpHeader } from '@/lib/forward-client-ip'
 
 const mockGetForwardedOrigin = getForwardedOrigin as jest.MockedFunction<any>
+const mockGetForwardedClientIpHeader = getForwardedClientIpHeader as jest.MockedFunction<any>
 
 function upstream(status: number) {
   return { ok: status >= 200 && status < 300, status } as Response
@@ -25,6 +28,7 @@ beforeEach(async () => {
   jest.clearAllMocks()
   jest.resetModules()
   mockGetForwardedOrigin.mockResolvedValue('https://admin.example.com')
+  mockGetForwardedClientIpHeader.mockResolvedValue({})
   global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>
   const mod = await import('../actions')
   registerAction = mod.registerAction
