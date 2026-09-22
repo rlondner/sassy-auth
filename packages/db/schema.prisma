@@ -141,6 +141,17 @@ model SaApp {
   /// null, or any field omitted within it, means "use the platform default"
   /// for that field.
   activationEmailOverride Json?
+  /// URL to this app's Privacy Policy. When set, self-serve signup and
+  /// login both require the user to accept it (see SaUserConsent).
+  privacyPolicyUrl String?
+  /// URL to this app's Terms and Conditions. Same acceptance rule as
+  /// privacyPolicyUrl.
+  termsUrl         String?
+  /// URL to this app's GDPR disclosure. Acceptance is additionally
+  /// conditional on the signup/login being geo-detected as EU/EEA/UK/CH
+  /// (see common/geoip) — see docs/superpowers/specs/2026-09-22-signup-legal-consent-design.md.
+  gdprUrl          String?
+  consents         SaUserConsent[]
   orgs        SaOrg[]
   permissions SaPermission[]
   roles       SaRole[]
@@ -150,6 +161,27 @@ model SaApp {
   defaultOrg      SaOrg?  @relation("AppDefaultOrg", fields: [defaultOrgId], references: [id], onDelete: Restrict)
   defaultRoleId   Int?
   defaultRole     SaRole? @relation("AppDefaultRole", fields: [defaultRoleId], references: [id], onDelete: Restrict)
+}
+
+model SaUserConsent {
+  id           Int      @id @default(autoincrement())
+  saUserId     Int
+  saUser       SaUser   @relation(fields: [saUserId], references: [id], onDelete: Cascade)
+  appId        Int
+  app          SaApp    @relation(fields: [appId], references: [id], onDelete: Cascade)
+  /// 'privacy_policy' | 'terms' | 'gdpr' — see ConsentDocumentType in
+  /// @sassy-auth/types. Stored as a plain String (not a Prisma enum) to
+  /// match the rest of this schema's convention for small closed string
+  /// sets (see SaAppRedirectUri.kind).
+  documentType String
+  /// Snapshot of the URL as it existed at the moment of acceptance — a
+  /// later change to SaApp's URL must not retroactively change what an
+  /// already-accepted record claims the user agreed to.
+  url          String
+  acceptedAt   DateTime @default(now())
+
+  @@unique([saUserId, appId, documentType])
+  @@index([appId])
 }
 
 model SaAppRedirectUri {
@@ -215,6 +247,7 @@ model SaUser {
   roles            SaUserRole[]
   directPermissions SaUserPermission[]
   invitations       SaInvitation[]
+  consents          SaUserConsent[]
 
   @@index([orgId])
 }
