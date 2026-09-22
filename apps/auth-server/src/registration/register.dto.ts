@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail() email!: string;
@@ -11,4 +11,11 @@ export class RegisterDto {
   @IsString() @IsOptional() @MinLength(1) companyName?: string;
   @IsString() @MinLength(1) appPublicId!: string;
   @IsString() @MinLength(1) turnstileToken!: string;
+  /** Required (must be `true`) iff the target app has privacyPolicyUrl set. */
+  @IsOptional() @IsBoolean() acceptedPrivacyPolicy?: boolean;
+  /** Required (must be `true`) iff the target app has termsUrl set. */
+  @IsOptional() @IsBoolean() acceptedTerms?: boolean;
+  /** Required (must be `true`) iff the target app has gdprUrl set AND the
+   * request is geo-detected as GDPR-applicable. */
+  @IsOptional() @IsBoolean() acceptedGdpr?: boolean;
 }

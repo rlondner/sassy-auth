@@ -14,6 +14,10 @@ import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password
 import { RegisterDto } from './register.dto';
 import { TurnstileService } from './turnstile.service';
 import { OauthService } from '../token/oauth.service';
+import { resolveRequiredConsent } from '../consent/resolve-required-consent';
+import { recordConsent } from '../consent/record-consent';
+import { resolveCountryFromIp } from '../common/geoip/geoip.service';
+import { isGdprCountry } from '../common/geoip/gdpr-countries';
 
 /**
  * BetterAuth (v1.6.x) throws an APIError instance when sign-up fails.
@@ -41,7 +45,10 @@ export class RegistrationService {
     private readonly oauthService: OauthService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<{ ok: true; orgPublicId: string; redirectUrl?: string }> {
+  async register(
+    dto: RegisterDto,
+    ip: string = 'unknown',
+  ): Promise<{ ok: true; orgPublicId: string; redirectUrl?: string }> {
     // 0. Verify the captcha before any app lookup or DB work
     const captchaOk = await this.turnstile.verify(dto.turnstileToken);
     if (!captchaOk) {
@@ -55,6 +62,25 @@ export class RegistrationService {
     // Resolve and enforce the app's effective password policy before ever
     // touching BetterAuth — a rejected password must not create any account.
     validatePasswordOrThrow(dto.password, resolvePasswordPolicy(app));
+
+    // Resolve required consent against THIS request's IP — never trust
+    // whatever the earlier GET /api/register/app call computed.
+    const country = resolveCountryFromIp(ip);
+    const requiredConsent = resolveRequiredConsent(app, country);
+    for (const doc of requiredConsent) {
+      // Field names mirror the DTO's accepted<X> booleans (camelCase), not
+      // the underlying documentType (snake_case) — used in the error
+      // message below so it names what the caller must actually send.
+      const field = doc.documentType === 'privacy_policy' ? 'privacyPolicy'
+        : doc.documentType === 'terms' ? 'terms'
+        : 'gdpr';
+      const accepted = doc.documentType === 'privacy_policy' ? dto.acceptedPrivacyPolicy
+        : doc.documentType === 'terms' ? dto.acceptedTerms
+        : dto.acceptedGdpr;
+      if (accepted !== true) {
+        throw new BadRequestException(`You must accept the ${field} before signing up`);
+      }
+    }
 
     // An app with a defaultOrgId places every self-serve signup into that
     // existing org — companyName is irrelevant and never read in that case.
@@ -137,6 +163,7 @@ export class RegistrationService {
         if (app.defaultRoleId) {
           await tx.saUserRole.create({ data: { userId: createdSaUser.id, roleId: app.defaultRoleId } });
         }
+        await recordConsent(tx, createdSaUser.id, app.id, requiredConsent);
         return { org: targetOrg, saUserPublicId: createdSaUser.publicId };
       });
 
@@ -191,18 +218,43 @@ export class RegistrationService {
 
   async getAppName(
     appPublicId: string,
-  ): Promise<{ name: string; hasDefaultOrg: boolean; passwordPolicy: PasswordPolicy; logo: string | null }> {
+    ip: string = 'unknown',
+  ): Promise<{
+    name: string;
+    hasDefaultOrg: boolean;
+    passwordPolicy: PasswordPolicy;
+    logo: string | null;
+    privacyPolicyUrl: string | null;
+    termsUrl: string | null;
+    gdprUrl: string | null;
+    gdprRequired: boolean;
+  }> {
     if (!appPublicId) throw new NotFoundException('App not found');
     const app = await prisma.saApp.findUnique({
       where: { publicId: appPublicId },
-      select: { name: true, defaultOrgId: true, passwordPolicyOverride: true, logo: true },
+      select: {
+        name: true,
+        defaultOrgId: true,
+        passwordPolicyOverride: true,
+        logo: true,
+        privacyPolicyUrl: true,
+        termsUrl: true,
+        gdprUrl: true,
+      },
     });
     if (!app) throw new NotFoundException('App not found');
+    const country = resolveCountryFromIp(ip);
     return {
       name: app.name,
       hasDefaultOrg: app.defaultOrgId !== null,
       passwordPolicy: resolvePasswordPolicy(app),
       logo: app.logo ?? null,
+      privacyPolicyUrl: app.privacyPolicyUrl ?? null,
+      termsUrl: app.termsUrl ?? null,
+      gdprUrl: app.gdprUrl ?? null,
+      // Advisory only — the POST /api/register call re-resolves this
+      // itself against its own request's IP (see register() above).
+      gdprRequired: Boolean(app.gdprUrl) && (country === null || isGdprCountry(country)),
     };
   }
 }
