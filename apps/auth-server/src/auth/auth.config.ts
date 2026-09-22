@@ -19,6 +19,10 @@ import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
 import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
 import { readIsPrivateEmail } from '../social/apple-private-relay-context';
+import { captureSocialSignInUserId, readSocialConsentContext } from '../social/social-consent-context';
+import { resolveOutstandingConsent } from '../consent/resolve-outstanding-consent';
+import { resolveCountryFromIp } from '../common/geoip/geoip.service';
+import { appendConsentRedirect } from '../social/resolve-social-consent-redirect';
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
 import { notifyActivation } from '../activation/notify-activation';
 import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
@@ -196,6 +200,8 @@ export const auth = betterAuth({
             );
           }
 
+          captureSocialSignInUserId(session.userId);
+
           // bug-0268: `created` from BetterAuth's createWithHooks is the
           // full persisted row, including the signInMethod this same
           // hooks.before override wrote (with-hooks.mjs merges the
@@ -279,7 +285,47 @@ export const auth = betterAuth({
       // to call unconditionally here: it returns false for every
       // non-Apple provider and for any Apple callback that never captured.
       const outcome = classifyCallbackOutcome(ctx.context.returned, readIsPrivateEmail());
-      if (!outcome) return;
+      if (!outcome) {
+        // task-14: successful federated sign-in. Gate on outstanding consent
+        // before letting the browser follow BetterAuth's own success
+        // redirect — same in-place `.set('location', ...)` technique as the
+        // error path below (see the "Verified BetterAuth behavior" note in
+        // task-14-brief.md: `context.redirect(url)` sets this same Headers
+        // object for both the success throw and every error redirect in
+        // better-auth@1.6.11's callback.mjs).
+        const currentLocation = ctx.context.responseHeaders?.get('location');
+        const { ip, userId } = readSocialConsentContext();
+        if (!currentLocation || !userId) return;
+
+        const saUser = await prisma.saUser.findUnique({
+          where: { betterAuthUserId: userId },
+          select: { id: true },
+        });
+        if (!saUser) return;
+
+        let appPublicId: string | null;
+        try {
+          appPublicId = new URL(currentLocation).searchParams.get('client_id');
+        } catch {
+          appPublicId = null;
+        }
+        if (!appPublicId) return;
+
+        const app = await prisma.saApp.findUnique({
+          where: { publicId: appPublicId },
+          select: { id: true, privacyPolicyUrl: true, termsUrl: true, gdprUrl: true },
+        });
+        if (!app) return;
+
+        const country = resolveCountryFromIp(ip ?? 'unknown');
+        const outstanding = await resolveOutstandingConsent(prisma, saUser.id, app.id, app, country);
+        const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+        const redirectTarget = appendConsentRedirect({ currentLocation, appPublicId, outstanding, adminUrl });
+        if (redirectTarget) {
+          ctx.context.responseHeaders?.set('location', redirectTarget);
+        }
+        return;
+      }
 
       // Audit trail first (never throws) — the real reason is recorded
       // regardless of whether the browser can actually be redirected to our
