@@ -80,6 +80,23 @@ export class UpdateAppDto {
   @IsOptional() @IsAppUrl() @MaxLength(2048) webhookUrl?: string | null;
 
   /**
+   * URL to this app's Privacy Policy. When set, self-serve signup and every
+   * login path require the user to accept it before reaching the app (see
+   * consent/resolve-required-consent.ts). null clears it.
+   */
+  @IsOptional() @IsAppUrl() @MaxLength(2048) privacyPolicyUrl?: string | null;
+
+  /** URL to this app's Terms and Conditions. Same acceptance rule as privacyPolicyUrl. */
+  @IsOptional() @IsAppUrl() @MaxLength(2048) termsUrl?: string | null;
+
+  /**
+   * URL to this app's GDPR disclosure. Acceptance is additionally
+   * conditional on geo-detected applicability — see
+   * consent/resolve-required-consent.ts.
+   */
+  @IsOptional() @IsAppUrl() @MaxLength(2048) gdprUrl?: string | null;
+
+  /**
    * Per-app override for the activation email's subject/message/from (see
    * @sassy-auth/types ActivationEmailBranding). Deep-validated in
    * AppsService.assertValidActivationEmailOverride, following the same
