@@ -619,6 +619,9 @@
     "email": "Email Address",
     "password": "Password",
     "confirmPassword": "Confirm Password",
+    "acceptPrivacyPolicy": "I have read and accept the <link>Privacy Policy</link>",
+    "acceptTerms": "I have read and accept the <link>Terms and Conditions</link>",
+    "acceptGdpr": "I have read and accept the <link>GDPR Disclosure</link>",
     "submit": "Create account",
     "backToLogin": "Back to sign in",
     "checkEmail": {

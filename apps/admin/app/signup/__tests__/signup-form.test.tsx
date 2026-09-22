@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SignupForm } from '../signup-form'
 
@@ -6,9 +7,35 @@ import { SignupForm } from '../signup-form'
 // return the dotted key itself, since the component calls the namespace-less
 // t('signup.xxx') form. A real NextIntlClientProvider would render the
 // actual English copy instead of the key, which the assertions below rely on.
-jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
-}))
+//
+// t.rich (used for the consent checkbox labels, which embed a link around
+// part of the copy) can't be expressed by the plain `(key) => key` form, so
+// it gets its own implementation below that renders the real English copy
+// with the <link> placeholder substituted for the caller's chunk renderer —
+// the consent tests assert on the actual label text (e.g. /Privacy Policy/i).
+const RICH_STRINGS: Record<string, string> = {
+  'signup.acceptPrivacyPolicy': 'I have read and accept the <link>Privacy Policy</link>',
+  'signup.acceptTerms': 'I have read and accept the <link>Terms and Conditions</link>',
+  'signup.acceptGdpr': 'I have read and accept the <link>GDPR Disclosure</link>',
+}
+
+jest.mock('next-intl', () => {
+  const t = (key: string) => key
+  t.rich = (key: string, values: { link: (chunks: string) => ReactNode }) => {
+    const template = RICH_STRINGS[key] ?? key
+    const match = template.match(/^(.*)<link>(.*)<\/link>(.*)$/)
+    if (!match) return template
+    const [, before, linkText, after] = match
+    return (
+      <>
+        {before}
+        {values.link(linkText)}
+        {after}
+      </>
+    )
+  }
+  return { useTranslations: () => t }
+})
 
 const mockPush = jest.fn()
 jest.mock('next/navigation', () => ({
@@ -77,7 +104,7 @@ beforeEach(() => {
 
 describe('SignupForm', () => {
   it('renders all fields', () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     expect(screen.getByLabelText('signup.firstName')).toBeInTheDocument()
     expect(screen.getByLabelText('signup.lastName')).toBeInTheDocument()
     expect(screen.getByLabelText('signup.companyName')).toBeInTheDocument()
@@ -87,7 +114,7 @@ describe('SignupForm', () => {
   })
 
   it('shows an error when passwords do not match, without submitting', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'Different1!' } })
     // The mismatch also disables the submit button, so submit the form
@@ -101,7 +128,7 @@ describe('SignupForm', () => {
   })
 
   it('disables the submit button for a password under 12 characters', () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'Short1!' } })
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'Short1!' } })
@@ -111,7 +138,7 @@ describe('SignupForm', () => {
   })
 
   it('shows an error for a password missing complexity when the form is submitted directly', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'lowercaseonly1' } })
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'lowercaseonly1' } })
@@ -125,7 +152,7 @@ describe('SignupForm', () => {
   })
 
   it('disables the submit button for a weak password and enables it for a strong matching one', () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     fireEvent.change(screen.getByLabelText('signup.password'), { target: { value: 'weakpassword' } })
     fireEvent.change(screen.getByLabelText('signup.confirmPassword'), { target: { value: 'weakpassword' } })
@@ -137,7 +164,7 @@ describe('SignupForm', () => {
   })
 
   it('calls registerAction with the mapped fields on valid submit', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
@@ -157,7 +184,7 @@ describe('SignupForm', () => {
 
   it('shows a translated error returned by registerAction', async () => {
     mockRegisterAction.mockResolvedValue({ error: 'emailTaken' })
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
@@ -169,7 +196,7 @@ describe('SignupForm', () => {
 
   it('shows an error and clears the loading state when registerAction rejects', async () => {
     mockRegisterAction.mockRejectedValue(new Error('boom'))
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
@@ -181,7 +208,7 @@ describe('SignupForm', () => {
   })
 
   it('navigates to /signup/check-email with the submitted address after a successful submit', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
@@ -192,7 +219,7 @@ describe('SignupForm', () => {
   })
 
   it('carries next forward into the check-email redirect', async () => {
-    render(<SignupForm clientId="sq_1" next="/orgs" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="/orgs" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     completeCaptcha()
     fireEvent.click(screen.getByText('signup.submit'))
@@ -205,7 +232,7 @@ describe('SignupForm', () => {
   })
 
   it('hides the Company name field when hasDefaultOrg is true, and omits it from the submit payload', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     expect(screen.queryByLabelText('signup.companyName')).not.toBeInTheDocument()
 
     fillValidFormWithoutCompanyName()
@@ -227,12 +254,12 @@ describe('SignupForm', () => {
   })
 
   it('shows the Company name field when hasDefaultOrg is false', () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     expect(screen.getByLabelText('signup.companyName')).toBeInTheDocument()
   })
 
   it('shows a captchaRequired error and does not submit when the captcha has not been completed', async () => {
-    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
     fireEvent.click(screen.getByText('signup.submit'))
 
@@ -240,6 +267,64 @@ describe('SignupForm', () => {
       expect(screen.getByTestId('signup-error')).toHaveTextContent('signup.errors.captchaRequired'),
     )
     expect(mockRegisterAction).not.toHaveBeenCalled()
+  })
+
+  it('renders a checkbox for each configured document and requires it before submit is enabled', () => {
+    render(
+      <SignupForm
+        clientId="sq_1"
+        next=""
+        hasDefaultOrg
+        passwordPolicy={null}
+        privacyPolicyUrl="https://x.example.com/privacy"
+        termsUrl="https://x.example.com/terms"
+        gdprUrl={null}
+      />,
+    )
+    expect(screen.getByRole('checkbox', { name: /Privacy Policy/i })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /Terms and Conditions/i })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /GDPR/i })).not.toBeInTheDocument()
+  })
+
+  it('disables submit until the rendered consent checkbox is checked, and passes only the accepted flag for the checkbox that was actually rendered', async () => {
+    // This codebase does not have @testing-library/user-event installed
+    // (checked package.json and every other test file); every other test in
+    // this file drives the form with fireEvent, so this test follows the same
+    // convention rather than the brief's userEvent snippet.
+    render(
+      <SignupForm
+        clientId="sq_1"
+        next=""
+        hasDefaultOrg
+        passwordPolicy={null}
+        privacyPolicyUrl="https://x.example.com/privacy"
+        termsUrl={null}
+        gdprUrl={null}
+      />,
+    )
+    fillValidFormWithoutCompanyName()
+    completeCaptcha()
+    expect(screen.getByText('signup.submit').closest('button')).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Privacy Policy/i }))
+    expect(screen.getByText('signup.submit').closest('button')).not.toBeDisabled()
+
+    fireEvent.click(screen.getByText('signup.submit'))
+
+    await waitFor(() =>
+      expect(mockRegisterAction).toHaveBeenCalledWith({
+        clientId: 'sq_1',
+        firstName: 'Alice',
+        lastName: 'Wonder',
+        email: 'alice@example.com',
+        password: 'SecurePass1!',
+        turnstileToken: 'test-captcha-token',
+        acceptedPrivacyPolicy: true,
+      }),
+    )
+    const payload = mockRegisterAction.mock.calls[0][0]
+    expect(payload).not.toHaveProperty('acceptedTerms')
+    expect(payload).not.toHaveProperty('acceptedGdpr')
   })
 
   describe('missing NEXT_PUBLIC_TURNSTILE_SITE_KEY diagnostic', () => {
@@ -261,7 +346,7 @@ describe('SignupForm', () => {
 
     it('warns once on mount when the site key is unset', () => {
       delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-      render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+      render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
 
       expect(warnSpy).toHaveBeenCalledTimes(1)
       expect(warnSpy).toHaveBeenCalledWith(
@@ -271,7 +356,7 @@ describe('SignupForm', () => {
 
     it('does not warn when the site key is set', () => {
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = 'test-site-key'
-      render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+      render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
 
       expect(warnSpy).not.toHaveBeenCalled()
     })

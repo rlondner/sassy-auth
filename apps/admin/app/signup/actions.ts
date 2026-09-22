@@ -13,6 +13,9 @@ export interface RegisterInput {
   email: string
   password: string
   turnstileToken: string
+  acceptedPrivacyPolicy?: boolean
+  acceptedTerms?: boolean
+  acceptedGdpr?: boolean
 }
 
 export async function registerAction(
@@ -32,6 +35,9 @@ export async function registerAction(
         ...(input.companyName !== undefined && { companyName: input.companyName }),
         appPublicId: input.clientId,
         turnstileToken: input.turnstileToken,
+        ...(input.acceptedPrivacyPolicy !== undefined && { acceptedPrivacyPolicy: input.acceptedPrivacyPolicy }),
+        ...(input.acceptedTerms !== undefined && { acceptedTerms: input.acceptedTerms }),
+        ...(input.acceptedGdpr !== undefined && { acceptedGdpr: input.acceptedGdpr }),
       }),
     })
   } catch (err) {

@@ -15,6 +15,9 @@ interface SignupFormProps {
   next: string
   hasDefaultOrg: boolean
   passwordPolicy: PasswordPolicy | null
+  privacyPolicyUrl: string | null
+  termsUrl: string | null
+  gdprUrl: string | null
 }
 
 const KNOWN_ERRORS = [
@@ -26,7 +29,7 @@ const KNOWN_ERRORS = [
   'validationError',
 ] as const
 
-export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: SignupFormProps) {
+export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, privacyPolicyUrl, termsUrl, gdprUrl }: SignupFormProps) {
   const t = useTranslations()
   const router = useRouter()
   const [firstName, setFirstName] = React.useState('')
@@ -38,6 +41,9 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
+  const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = React.useState(false)
+  const [acceptedTerms, setAcceptedTerms] = React.useState(false)
+  const [acceptedGdpr, setAcceptedGdpr] = React.useState(false)
 
   React.useEffect(() => {
     if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
@@ -48,6 +54,10 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
   const policy = passwordPolicy ?? FALLBACK_PASSWORD_POLICY
   const policyMet = evaluatePasswordPolicy(password, policy).every((r) => r.met)
   const passwordsMismatch = confirm.length > 0 && password !== confirm
+  const consentSatisfied =
+    (!privacyPolicyUrl || acceptedPrivacyPolicy) &&
+    (!termsUrl || acceptedTerms) &&
+    (!gdprUrl || acceptedGdpr)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -60,6 +70,9 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
       const result = await registerAction({
         clientId, firstName, lastName, email, password, turnstileToken: captchaToken,
         ...(hasDefaultOrg ? {} : { companyName }),
+        ...(privacyPolicyUrl ? { acceptedPrivacyPolicy } : {}),
+        ...(termsUrl ? { acceptedTerms } : {}),
+        ...(gdprUrl ? { acceptedGdpr } : {}),
       })
       if ('error' in result) {
         const key = (KNOWN_ERRORS as readonly string[]).includes(result.error) ? result.error : 'validationError'
@@ -132,6 +145,63 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
         error={passwordsMismatch ? t('signup.errors.passwordMismatch') : undefined}
         required
       />
+      {privacyPolicyUrl && (
+        <label className="flex items-start gap-2 text-body-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={acceptedPrivacyPolicy}
+            onChange={(e) => setAcceptedPrivacyPolicy(e.target.checked)}
+            required
+          />
+          <span>
+            {t.rich('signup.acceptPrivacyPolicy', {
+              link: (chunks) => (
+                <a href={privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                  {chunks}
+                </a>
+              ),
+            })}
+          </span>
+        </label>
+      )}
+      {termsUrl && (
+        <label className="flex items-start gap-2 text-body-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            required
+          />
+          <span>
+            {t.rich('signup.acceptTerms', {
+              link: (chunks) => (
+                <a href={termsUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                  {chunks}
+                </a>
+              ),
+            })}
+          </span>
+        </label>
+      )}
+      {gdprUrl && (
+        <label className="flex items-start gap-2 text-body-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={acceptedGdpr}
+            onChange={(e) => setAcceptedGdpr(e.target.checked)}
+            required
+          />
+          <span>
+            {t.rich('signup.acceptGdpr', {
+              link: (chunks) => (
+                <a href={gdprUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                  {chunks}
+                </a>
+              ),
+            })}
+          </span>
+        </label>
+      )}
       {error && <p data-testid="signup-error" className="text-label-md text-destructive">{error}</p>}
       <Turnstile
         siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''}
@@ -142,7 +212,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
         type="submit"
         className="w-full"
         loading={submitting}
-        disabled={submitting || !policyMet || password !== confirm || password.length === 0}
+        disabled={submitting || !policyMet || password !== confirm || password.length === 0 || !consentSatisfied}
       >
         {t('signup.submit')}
       </Button>
