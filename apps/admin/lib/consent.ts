@@ -1,6 +1,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
+import type { ConsentDocumentType } from '@sassy-auth/types'
 import { AUTH_SERVER_URL } from './config'
 import { getForwardedClientIpHeader } from './forward-client-ip'
 
@@ -20,7 +21,7 @@ export function extractClientId(nextStr: string | null): string | null {
 }
 
 export interface OutstandingConsentDocument {
-  documentType: string
+  documentType: ConsentDocumentType
   url: string
 }
 

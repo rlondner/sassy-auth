@@ -81,9 +81,10 @@ export async function createAppWithPasswordPolicyOverride(
 }
 
 /**
- * Creates a fresh SaApp and PATCHes it with all three consent document
- * URLs set, for signup.spec.ts's full-consent-flow test. Mirrors
- * createAppWithPasswordPolicyOverride's create-then-patch shape.
+ * Creates a fresh SaApp and PATCHes it with Privacy Policy and Terms URLs
+ * set (GDPR deliberately left unset — see below), for signup.spec.ts's
+ * full-consent-flow test. Mirrors createAppWithPasswordPolicyOverride's
+ * create-then-patch shape.
  */
 export async function createAppWithConsentDocuments(): Promise<CreatedApp> {
   const appsAdmin = SEED_ADMINS.find((a) => a.key === 'apps')

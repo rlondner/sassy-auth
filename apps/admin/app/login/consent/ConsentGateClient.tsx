@@ -3,10 +3,11 @@
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
+import type { ConsentDocumentType } from '@sassy-auth/types'
 import type { OutstandingConsentDocument } from '@/lib/consent'
 import { acceptConsentAction } from './actions'
 
-const LABEL_KEY: Record<string, 'acceptPrivacyPolicy' | 'acceptTerms' | 'acceptGdpr'> = {
+const LABEL_KEY: Record<ConsentDocumentType, 'acceptPrivacyPolicy' | 'acceptTerms' | 'acceptGdpr'> = {
   privacy_policy: 'acceptPrivacyPolicy',
   terms: 'acceptTerms',
   gdpr: 'acceptGdpr',

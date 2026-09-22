@@ -17,7 +17,6 @@ import { OauthService } from '../token/oauth.service';
 import { resolveRequiredConsent } from '../consent/resolve-required-consent';
 import { recordConsent } from '../consent/record-consent';
 import { resolveCountryFromIp } from '../common/geoip/geoip.service';
-import { isGdprCountry } from '../common/geoip/gdpr-countries';
 
 /**
  * BetterAuth (v1.6.x) throws an APIError instance when sign-up fails.
@@ -253,8 +252,11 @@ export class RegistrationService {
       termsUrl: app.termsUrl ?? null,
       gdprUrl: app.gdprUrl ?? null,
       // Advisory only — the POST /api/register call re-resolves this
-      // itself against its own request's IP (see register() above).
-      gdprRequired: Boolean(app.gdprUrl) && (country === null || isGdprCountry(country)),
+      // itself against its own request's IP (see register() above). Reuses
+      // resolveRequiredConsent rather than hand-rolling the same rule a
+      // second time, so the two expressions of "is GDPR required" can't
+      // drift out of sync.
+      gdprRequired: resolveRequiredConsent(app, country).some((d) => d.documentType === 'gdpr'),
     };
   }
 }
