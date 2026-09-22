@@ -58,6 +58,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     app.passwordPolicyOverride ?? app.effectivePasswordPolicy,
   )
   const [webhookUrl, setWebhookUrl] = React.useState<string>(app.webhookUrl ?? '')
+  const [privacyPolicyUrl, setPrivacyPolicyUrl] = React.useState<string>(app.privacyPolicyUrl ?? '')
+  const [termsUrl, setTermsUrl] = React.useState<string>(app.termsUrl ?? '')
+  const [gdprUrl, setGdprUrl] = React.useState<string>(app.gdprUrl ?? '')
   const [hasWebhookSecret, setHasWebhookSecret] = React.useState<boolean>(app.hasWebhookSecret ?? false)
   // Webhook secret rotation: same immediate, separate-from-save pattern as
   // client secret rotation below — the plaintext only ever comes back once,
@@ -112,6 +115,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setPasswordPolicy(app.passwordPolicyOverride ?? app.effectivePasswordPolicy)
     setWebhookUrl(app.webhookUrl ?? '')
     setHasWebhookSecret(app.hasWebhookSecret ?? false)
+    setPrivacyPolicyUrl(app.privacyPolicyUrl ?? '')
+    setTermsUrl(app.termsUrl ?? '')
+    setGdprUrl(app.gdprUrl ?? '')
     setActivationFromName(app.activationEmailOverride?.fromName ?? '')
     setActivationFromAddress(app.activationEmailOverride?.fromAddress ?? '')
     setActivationSubject(app.activationEmailOverride?.subject ?? '')
@@ -215,13 +221,16 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
   const webhookUrlDirty = webhookUrl.trim() !== (app.webhookUrl ?? '')
+  const privacyPolicyUrlDirty = privacyPolicyUrl.trim() !== (app.privacyPolicyUrl ?? '')
+  const termsUrlDirty = termsUrl.trim() !== (app.termsUrl ?? '')
+  const gdprUrlDirty = gdprUrl.trim() !== (app.gdprUrl ?? '')
   const activationOverrideBaseline = app.activationEmailOverride ?? { fromName: '', fromAddress: '', subject: '', message: '' }
   const activationDirty =
     activationFromName.trim() !== (activationOverrideBaseline.fromName ?? '') ||
     activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
     activationSubject.trim() !== (activationOverrideBaseline.subject ?? '') ||
     activationMessage.trim() !== (activationOverrideBaseline.message ?? '')
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -234,7 +243,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
@@ -252,6 +261,18 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       // Clearing the URL cascades server-side to clear any stored secret too
       // — a webhook is never left half-configured (see AppsService.updateApp).
       patch.webhookUrl = trimmedWebhookUrl === '' ? null : trimmedWebhookUrl
+    }
+    if (privacyPolicyUrlDirty) {
+      const trimmed = privacyPolicyUrl.trim()
+      patch.privacyPolicyUrl = trimmed === '' ? null : trimmed
+    }
+    if (termsUrlDirty) {
+      const trimmed = termsUrl.trim()
+      patch.termsUrl = trimmed === '' ? null : trimmed
+    }
+    if (gdprUrlDirty) {
+      const trimmed = gdprUrl.trim()
+      patch.gdprUrl = trimmed === '' ? null : trimmed
     }
     if (activationDirty) {
       const trimmed = {
@@ -634,6 +655,45 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.webhookUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="privacyPolicyUrl">{t('apps.fields.privacyPolicyUrl')}</Label>
+              <Input
+                id="privacyPolicyUrl"
+                type="url"
+                value={privacyPolicyUrl}
+                onChange={(e) => setPrivacyPolicyUrl(e.target.value)}
+                placeholder={t('apps.fields.privacyPolicyUrlPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.privacyPolicyUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="termsUrl">{t('apps.fields.termsUrl')}</Label>
+              <Input
+                id="termsUrl"
+                type="url"
+                value={termsUrl}
+                onChange={(e) => setTermsUrl(e.target.value)}
+                placeholder={t('apps.fields.termsUrlPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.termsUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="gdprUrl">{t('apps.fields.gdprUrl')}</Label>
+              <Input
+                id="gdprUrl"
+                type="url"
+                value={gdprUrl}
+                onChange={(e) => setGdprUrl(e.target.value)}
+                placeholder={t('apps.fields.gdprUrlPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.gdprUrlHint')}
               </p>
             </div>
             <div>
