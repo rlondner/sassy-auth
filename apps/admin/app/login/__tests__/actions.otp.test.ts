@@ -24,6 +24,10 @@ jest.mock('../../account/security/actions', () => ({
   forwardNamedCookie: jest.fn(),
   forwardNamedCookieWithMaxAge: jest.fn(),
 }))
+jest.mock('@/lib/consent', () => ({
+  extractClientId: jest.fn(),
+  fetchOutstandingConsent: jest.fn(),
+}))
 
 import { cookies } from 'next/headers'
 
@@ -33,6 +37,8 @@ const mockCookies = cookies as jest.MockedFunction<any>
 // module under test a fresh copy of the mock registry for relative-path mocks,
 // so references captured at file scope point at stale jest.fn()s.
 let mockForwardNamedCookie: jest.MockedFunction<any>
+let mockExtractClientId: jest.MockedFunction<any>
+let mockFetchOutstandingConsent: jest.MockedFunction<any>
 
 const SESSION_COOKIE =
   'better-auth.session_token=abc123; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800'
@@ -83,6 +89,11 @@ beforeEach(async () => {
   )
   const securityActions = await import('../../account/security/actions')
   mockForwardNamedCookie = securityActions.forwardNamedCookie as jest.MockedFunction<any>
+  const consent = await import('@/lib/consent')
+  mockExtractClientId = consent.extractClientId as jest.MockedFunction<any>
+  mockFetchOutstandingConsent = consent.fetchOutstandingConsent as jest.MockedFunction<any>
+  mockExtractClientId.mockReturnValue(null)
+  mockFetchOutstandingConsent.mockResolvedValue([])
   const mod = await import('../actions')
   requestOtp = mod.requestOtp
   verifyOtp = mod.verifyOtp
@@ -282,5 +293,37 @@ describe('verifyOtp success', () => {
     const result = await verifyOtp(formData({ email: 'a@b.io', otp: '123456' }))
 
     expect(result).toEqual({ error: 'serverUnavailable' })
+  })
+})
+
+describe('verifyOtp consent gate', () => {
+  it('redirects to /login/consent when the target app has outstanding consent', async () => {
+    mockExtractClientId.mockReturnValue('sq_1')
+    mockFetchOutstandingConsent.mockResolvedValue([{ documentType: 'terms', url: 'https://a.example.com/terms' }])
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, {}, SESSION_COOKIE),
+    )
+
+    const target = await callExpectingRedirect(
+      verifyOtp,
+      formData({ email: 'a@b.io', otp: '123456', next: '/authorize?client_id=sq_1' }),
+    )
+
+    expect(target).toBe('/login/consent?appPublicId=sq_1&next=%2Fauthorize%3Fclient_id%3Dsq_1')
+  })
+
+  it('does not call the consent check when next has no client_id', async () => {
+    mockExtractClientId.mockReturnValue(null)
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(200, {}, SESSION_COOKIE),
+    )
+
+    const target = await callExpectingRedirect(
+      verifyOtp,
+      formData({ email: 'a@b.io', otp: '123456' }),
+    )
+
+    expect(target).toBe('/users')
+    expect(mockFetchOutstandingConsent).not.toHaveBeenCalled()
   })
 })
