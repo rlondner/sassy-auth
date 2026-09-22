@@ -728,6 +728,12 @@
     "setUp": "Configurer la 2FA",
     "skip": "Ignorer pour l'instant"
   },
+  "loginConsent": {
+    "title": "Avant de continuer",
+    "body": "Cette application exige que vous acceptiez les éléments suivants avant de continuer.",
+    "continue": "Continuer",
+    "error": "Nous n'avons pas pu enregistrer votre acceptation. Veuillez réessayer."
+  },
   "oauthError": {
     "pageTitle": "Erreur d'autorisation — SassyAuth",
     "fallbackHeading": "Demande d'autorisation rejetée",

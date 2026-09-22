@@ -728,6 +728,12 @@
     "setUp": "Set up 2FA",
     "skip": "Skip for now"
   },
+  "loginConsent": {
+    "title": "Before you continue",
+    "body": "This app requires you to accept the following before continuing.",
+    "continue": "Continue",
+    "error": "We couldn't record your acceptance. Please try again."
+  },
   "oauthError": {
     "pageTitle": "Authorization error — SassyAuth",
     "fallbackHeading": "Authorization request rejected",
