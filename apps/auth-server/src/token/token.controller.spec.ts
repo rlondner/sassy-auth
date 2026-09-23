@@ -12,6 +12,7 @@ import { LoggerService } from '../common/logger/logger.service';
 import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { TokenErrorCode } from '@sassy-auth/types';
 import { OAUTH_AUTHORIZE_PATH, resolveIssuer } from './oauth-metadata';
+import { SERVICE_TOKEN_TTL_SECONDS } from './token.service';
 
 jest.mock('@sentry/nestjs', () => ({
   setTag: jest.fn(),
@@ -101,6 +102,7 @@ const signTestIdToken = signTestToken;
 const mockTokenService = {
   issueJwt: jest.fn(),
   issueIdToken: jest.fn(),
+  issueServiceJwt: jest.fn(),
   getJwks: jest.fn(),
   resolvePermissions: jest.fn(),
   buildScopedClaims: jest.fn(),
@@ -956,6 +958,67 @@ describe('TokenController', () => {
           accessToken: 'oauth.jwt.token',
         }),
       );
+    });
+
+    describe('client_credentials', () => {
+      const dto = {
+        grant_type: 'client_credentials',
+        client_id: 'sqid-9',
+        client_secret: 'correct-secret',
+        scope: 'roles:write',
+      } as unknown as import('./dto/oauth-token-exchange.dto').OauthTokenExchangeDto;
+
+      it('rejects a non-confidential app (invalid_client)', async () => {
+        mockPrisma.saApp.findUnique.mockResolvedValue({ id: 9, publicId: 'sqid-9', clientSecretHash: null, canManageOwnRoles: true });
+
+        const promise = controller.oauthToken(dto, fakeTokenReq, fakeTokenRes);
+        await expect(promise).rejects.toBeInstanceOf(UnauthorizedException);
+        await expect(promise).rejects.toThrow(TokenErrorCode.INVALID_CLIENT);
+      });
+
+      it('rejects a bad client secret (invalid_client)', async () => {
+        mockPrisma.saApp.findUnique.mockResolvedValue({ id: 9, publicId: 'sqid-9', clientSecretHash: 'hashed', canManageOwnRoles: true });
+        mockVerifyPassword.mockResolvedValueOnce(false);
+
+        const promise = controller.oauthToken(dto, fakeTokenReq, fakeTokenRes);
+        await expect(promise).rejects.toBeInstanceOf(UnauthorizedException);
+        await expect(promise).rejects.toThrow(TokenErrorCode.INVALID_CLIENT);
+      });
+
+      it('grants an empty scope when canManageOwnRoles is false, even with a valid secret', async () => {
+        mockPrisma.saApp.findUnique.mockResolvedValue({ id: 9, publicId: 'sqid-9', clientSecretHash: 'hashed', canManageOwnRoles: false });
+        mockVerifyPassword.mockResolvedValueOnce(true);
+        mockTokenService.issueServiceJwt.mockResolvedValue('service.jwt.token');
+
+        const res = await controller.oauthToken(dto, fakeTokenReq, fakeTokenRes);
+
+        expect(mockTokenService.issueServiceJwt).toHaveBeenCalledWith({ appId: 9, appPublicId: 'sqid-9', scope: '' });
+        expect(res).toEqual({
+          access_token: 'service.jwt.token',
+          token_type: 'Bearer',
+          expires_in: SERVICE_TOKEN_TTL_SECONDS,
+          scope: '',
+        });
+      });
+
+      it('grants roles:write when canManageOwnRoles is true and the secret is valid', async () => {
+        mockPrisma.saApp.findUnique.mockResolvedValue({ id: 9, publicId: 'sqid-9', clientSecretHash: 'hashed', canManageOwnRoles: true });
+        mockVerifyPassword.mockResolvedValueOnce(true);
+        mockTokenService.issueServiceJwt.mockResolvedValue('service.jwt.token');
+
+        const res = await controller.oauthToken(dto, fakeTokenReq, fakeTokenRes);
+
+        expect(mockTokenService.issueServiceJwt).toHaveBeenCalledWith({ appId: 9, appPublicId: 'sqid-9', scope: 'roles:write' });
+        expect(res.scope).toBe('roles:write');
+      });
+
+      it('returns 404 APP_NOT_FOUND for an unknown client_id', async () => {
+        mockPrisma.saApp.findUnique.mockResolvedValue(null);
+
+        const promise = controller.oauthToken(dto, fakeTokenReq, fakeTokenRes);
+        await expect(promise).rejects.toBeInstanceOf(NotFoundException);
+        await expect(promise).rejects.toThrow(TokenErrorCode.APP_NOT_FOUND);
+      });
     });
 
     // Task 5 — idp must round-trip from the exchanged code into issueJwt so

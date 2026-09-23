@@ -67,6 +67,8 @@ import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days
 import { isTwoFactorRequired } from '../auth/two-factor-required';
 import { verifyUserTotp } from '../auth/verify-user-totp';
 import { parseScopes } from './scopes';
+import { parseServiceScopes } from './service-scopes';
+import { SERVICE_TOKEN_TTL_SECONDS } from './token.service';
 import { record2faChallengeOutcome, recordSignInOutcome } from '../telemetry/auth-metrics';
 
 const tracer = trace.getTracer('sassy-auth.auth-server');
@@ -394,6 +396,9 @@ export class TokenController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (dto.grant_type === 'client_credentials') {
+      return this.handleClientCredentials(dto, req, res);
+    }
     if (dto.grant_type === 'refresh_token') {
       return this.refreshTokenGrant(dto, req, res);
     }
@@ -576,6 +581,76 @@ export class TokenController {
       ...(refreshToken ? { refresh_token: refreshToken } : {}),
     };
     return oauthTokenResponse;
+  }
+
+  /**
+   * client_credentials branch (RFC 6749 §4.4) of oauthToken. Mints a
+   * service token for a confidential app authenticating as itself — no end
+   * user, gated by SaApp.canManageOwnRoles. See design spec §4.
+   */
+  private async handleClientCredentials(
+    dto: OauthTokenExchangeDto,
+    req: Request,
+    res: Response,
+  ) {
+    let numericId: number;
+    try {
+      numericId = this.sqidService.decode(dto.client_id);
+    } catch {
+      throw new BadRequestException(TokenErrorCode.APP_NOT_FOUND);
+    }
+    const app = await prisma.saApp.findUnique({ where: { id: numericId } });
+    if (!app) {
+      throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
+    }
+
+    // client_credentials is for confidential clients only (RFC 6749 §4.4) —
+    // a public app has no secret to prove it's really the app it claims to
+    // be, so it can never hold this grant regardless of canManageOwnRoles.
+    if (!app.clientSecretHash) {
+      this.logger.getWinstonLogger().warn('oauth.client_credentials.not_confidential', {
+        context: 'TokenController',
+        appId: dto.client_id,
+      });
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CLIENT);
+    }
+
+    const presentedSecret = extractClientSecret(req, dto);
+    const clientAuthenticated = await verifyClientSecret(presentedSecret, app.clientSecretHash);
+    if (!clientAuthenticated) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="sassy-auth"');
+      this.logger.getWinstonLogger().warn('oauth.client_credentials.auth_failed', {
+        context: 'TokenController',
+        appId: dto.client_id,
+      });
+      throw new UnauthorizedException(TokenErrorCode.INVALID_CLIENT);
+    }
+
+    // Scope is never self-granted: canManageOwnRoles is the explicit
+    // admin-configured gate. A confidential client with a valid secret but
+    // no opt-in still gets a token — just with nothing granted — so a
+    // reasonable client sees an empty scope rather than an opaque error.
+    const requested = parseServiceScopes(dto.scope);
+    const granted = app.canManageOwnRoles ? requested : [];
+
+    const token = await this.tokenService.issueServiceJwt({
+      appId: app.id,
+      appPublicId: app.publicId,
+      scope: granted.join(' '),
+    });
+
+    this.logger.getWinstonLogger().info('Service token issued', {
+      context: 'TokenController',
+      appId: dto.client_id,
+      scope: granted.join(' '),
+    });
+
+    return {
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: SERVICE_TOKEN_TTL_SECONDS,
+      scope: granted.join(' '),
+    };
   }
 
   /**
