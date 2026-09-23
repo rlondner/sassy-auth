@@ -244,6 +244,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
   - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
   - [Social Sign-In](#social-sign-in)
   - [Activation Webhook](#activation-webhook)
+  - [Activation Email Branding](#activation-email-branding)
   - [API Reference](#api-reference)
   - [Self-serve Registration (`POST /api/register`)](#self-serve-registration-post-apiregister)
     - [Request](#request)
@@ -1005,6 +1006,40 @@ function isValidSassyWebhook(rawBody, signatureHeader, secret) {
 - **Fire-and-forget, never blocks activation.** Delivery success or failure has no effect on the activation itself — it always commits — and every outcome (delivered, failed, or no-op because no `webhookUrl` is configured) is written to the `SaAuditEvent` table for later inspection, not held anywhere retriable.
 - **Idempotent trigger, not idempotent delivery.** The status transition itself only fires once (re-activating an already-`active` user is a no-op), but because there's no delivery ledger, treat `userId` + `event` as a natural dedupe key on your side if you care about exactly-once processing across retries.
 - **Scope.** One URL and one secret per app, and `account.activated` is the only event today — no per-app multiple endpoints/subscriptions and no deactivation or other status-change events. See [Known Limitations](#known-limitations).
+
+---
+
+## Activation Email Branding
+
+A SaApp can override the subject, message, and `From` name/address of the email sent to confirm a new sign-up's email address, instead of using SassyAuth's default copy.
+
+**Configuring it.** Set `activationEmailOverride` on the app, either in the admin console (`/apps` → edit an app → **Activation email**) or via the API:
+
+```bash
+curl -X PATCH https://localhost:3010/api/apps/<appPublicId> \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <admin session>" \
+  -d '{
+    "activationEmailOverride": {
+      "fromName": "Vibecast",
+      "fromAddress": "no-reply@vibecast.io",
+      "subject": "Confirm your {{appName}} account, {{firstName}}!",
+      "message": "Welcome to {{appName}}! Click below to confirm your address."
+    }
+  }'
+```
+
+Every field is optional and independently defaulted — an omitted field falls back to the platform default for that field. Send `null` to clear the override entirely back to defaults. `fromAddress` must be on a domain verified with your email provider (e.g. Resend), or sends will silently fail.
+
+**Placeholders.** `subject` and `message` support literal `{{token}}` substitution — no conditionals or loops:
+
+| Placeholder | Value |
+|---|---|
+| `{{firstName}}` | The recipient's first name |
+| `{{appName}}` | The app's name |
+| `{{activationUrl}}` | The email-verification link |
+
+A token not present in the above list (a typo, or one not yet supported) is left untouched in the rendered output rather than silently stripped, so a mistake is visible instead of hidden. `message` is rendered above a system-generated "Confirm your email address" button that always links to the real verification URL — the button itself is not customizable, so `{{activationUrl}}` in `message` is only useful if you want to also show the raw link as text.
 
 ---
 

@@ -102,7 +102,7 @@
       "webhookSecretConfigured": "A secret is configured.",
       "noWebhookSecret": "No secret configured.",
       "activationEmail": "Activation email",
-      "activationEmailHint": "Customize the email sent when a new sign-up needs to confirm their address. Placeholders '{{firstName}}' and '{{appName}}' are available in the subject and message.",
+      "activationEmailHint": "Customize the email sent when a new sign-up needs to confirm their address. Placeholders '{{firstName}}', '{{appName}}', and '{{activationUrl}}' are available in the subject and message.",
       "activationEmailFromName": "From name",
       "activationEmailFromNamePlaceholder": "e.g. Vibecast",
       "activationEmailFromAddress": "From address",
