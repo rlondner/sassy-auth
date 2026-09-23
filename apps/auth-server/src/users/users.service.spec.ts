@@ -37,6 +37,7 @@ jest.mock('@sassy-auth/db', () => ({
     user: {
       create: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
     account: { create: jest.fn(), findFirst: jest.fn() },
     session: { deleteMany: jest.fn() },
@@ -99,7 +100,7 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saPermission: { findMany: jest.Mock };
   saInvitation: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
   twoFactor: { deleteMany: jest.Mock };
-  user: { create: jest.Mock; update: jest.Mock };
+  user: { create: jest.Mock; update: jest.Mock; delete: jest.Mock };
   account: { create: jest.Mock; findFirst: jest.Mock };
   session: { deleteMany: jest.Mock };
 };
@@ -451,8 +452,20 @@ describe('UsersService', () => {
     it('deletes the user', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
       mockPrisma.saUser.delete.mockResolvedValue(undefined);
+      mockPrisma.user.delete.mockResolvedValue(undefined);
       await expect(service.deleteUser('ba-caller', 'usr1')).resolves.toBeUndefined();
       expect(mockPrisma.saUser.delete).toHaveBeenCalledWith({ where: { publicId: 'usr1' } });
+    });
+
+    // bug: deleting only the SaUser row left the BetterAuth `User` row (and
+    // its unique email) behind, permanently blocking that email from
+    // registering again.
+    it('also deletes the BetterAuth User row so the email can be re-registered', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ betterAuthUserId: 'ba-1' }));
+      mockPrisma.saUser.delete.mockResolvedValue(undefined);
+      mockPrisma.user.delete.mockResolvedValue(undefined);
+      await service.deleteUser('ba-caller', 'usr1');
+      expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: 'ba-1' } });
     });
 
     it('throws NotFoundException when user not found', async () => {
