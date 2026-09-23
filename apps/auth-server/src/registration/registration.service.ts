@@ -48,9 +48,12 @@ interface RecoveredAuthorizeParams {
  * the admin signup page was bounced here with, so a signup-flow code can be
  * bound to the same PKCE challenge (public clients) and carry the same
  * state/nonce (both client types) the relying party is waiting on. Returns
- * null for anything that doesn't look like our own /authorize URL naming
- * this app — every caller must treat that as "no redirect is possible",
- * never as an error worth failing registration over.
+ * null for anything that doesn't name this app's /authorize path with a
+ * matching client_id and a redirect_uri — every caller must treat that as
+ * "no redirect is possible", never as an error worth failing registration
+ * over. Deliberately does not check next's origin/host: the caller still
+ * validates the recovered redirect_uri against the app's registered set via
+ * assertRedirectUriAllowed, which is the actual security boundary here.
  */
 function recoverAuthorizeParams(
   next: string | undefined,

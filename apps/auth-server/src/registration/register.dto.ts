@@ -16,5 +16,5 @@ export class RegisterDto {
   // RegistrationService to bind the signup-flow redirect code to the same
   // PKCE challenge/state/nonce the relying party is waiting on — see
   // docs/superpowers/specs/2026-09-23-signup-pkce-redirect-design.md.
-  @IsString() @IsOptional() @MinLength(1) next?: string;
+  @IsString() @IsOptional() @MinLength(1) @MaxLength(4096) next?: string;
 }
