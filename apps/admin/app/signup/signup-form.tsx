@@ -66,6 +66,10 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
         setError(t(`signup.errors.${key as (typeof KNOWN_ERRORS)[number]}`))
         return
       }
+      if (result.redirectUrl) {
+        window.location.href = result.redirectUrl
+        return
+      }
       router.push(
         `/signup/check-email?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ''}`,
       )

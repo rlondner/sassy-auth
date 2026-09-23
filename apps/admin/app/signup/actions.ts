@@ -17,7 +17,7 @@ export interface RegisterInput {
 
 export async function registerAction(
   input: RegisterInput,
-): Promise<{ ok: true } | { error: string }> {
+): Promise<{ ok: true; redirectUrl?: string } | { error: string }> {
   const origin = await getForwardedOrigin()
   let res: Response
   try {
@@ -39,7 +39,10 @@ export async function registerAction(
     return { error: 'serverUnavailable' }
   }
 
-  if (res.ok) return { ok: true }
+  if (res.ok) {
+    const body: { redirectUrl?: string } = await res.json().catch(() => ({}))
+    return { ok: true, ...(body.redirectUrl && { redirectUrl: body.redirectUrl }) }
+  }
   if (res.status === 404) return { error: 'appNotFound' }
   if (res.status === 409) return { error: 'emailTaken' }
   if (res.status === 422) return { error: 'captchaFailed' }

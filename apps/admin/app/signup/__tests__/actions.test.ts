@@ -5,8 +5,8 @@ import { getForwardedOrigin } from '@/lib/auth-origin'
 
 const mockGetForwardedOrigin = getForwardedOrigin as jest.MockedFunction<any>
 
-function upstream(status: number) {
-  return { ok: status >= 200 && status < 300, status } as Response
+function upstream(status: number, body: unknown = {}) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body } as unknown as Response
 }
 
 let registerAction: typeof import('../actions').registerAction
@@ -76,6 +76,17 @@ describe('registerAction', () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(201))
 
     await expect(registerAction(INPUT)).resolves.toEqual({ ok: true })
+  })
+
+  it('passes through redirectUrl when the upstream response includes one', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+      upstream(201, { ok: true, orgPublicId: 'org_1', redirectUrl: 'https://localhost:3010/api/token/oauth/authorize?code=signup-code-123' }),
+    )
+
+    await expect(registerAction(INPUT)).resolves.toEqual({
+      ok: true,
+      redirectUrl: 'https://localhost:3010/api/token/oauth/authorize?code=signup-code-123',
+    })
   })
 
   it.each([
