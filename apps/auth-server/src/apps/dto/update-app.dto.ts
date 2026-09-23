@@ -34,6 +34,8 @@ export class UpdateAppDto {
 
   @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
 
+  @IsOptional() @IsBoolean() allowOfflineAccess?: boolean;
+
   /**
    * publicId of an existing org under this app to auto-join self-serve
    * sign-ups into. Must belong to the same app — validated in AppsService

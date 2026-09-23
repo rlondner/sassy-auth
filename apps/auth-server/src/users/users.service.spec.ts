@@ -4,6 +4,7 @@ import { UsersService } from './users.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { EmailService } from '../email/email.service';
+import { RefreshTokenService } from '../token/refresh-token.service';
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -51,6 +52,8 @@ jest.mock('../common/permissions/assert-caller-can-grant-system-perms', () => ({
 }));
 
 const mockSend = jest.fn().mockResolvedValue({ sent: true });
+
+const mockRefreshTokenService = { revokeForUser: jest.fn(), revokeForUserApp: jest.fn() };
 
 jest.mock('../auth/auth.config', () => ({
   auth: { api: { requestPasswordReset: jest.fn().mockResolvedValue({ status: true }) } },
@@ -134,6 +137,7 @@ describe('UsersService', () => {
         SqidService,
         { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
         { provide: EmailService, useValue: { send: mockSend } },
+        { provide: RefreshTokenService, useValue: mockRefreshTokenService },
       ],
     }).compile();
     service = module.get(UsersService);
@@ -1067,6 +1071,16 @@ describe('UsersService', () => {
       await expect(service.updateUser('ba-self', 'usr1', { status: 'inactive' })).rejects.toBeInstanceOf(ForbiddenException);
       expect(mockPrisma.session.deleteMany).not.toHaveBeenCalled();
     });
+
+    it('revokes the user refresh tokens when status becomes inactive', async () => {
+      await service.updateUser('ba-caller', 'usr1', { status: 'inactive' });
+      expect(mockRefreshTokenService.revokeForUser).toHaveBeenCalledWith(1);
+    });
+
+    it('does not revoke refresh tokens for a non-inactive update', async () => {
+      await service.updateUser('ba-caller', 'usr1', { firstName: 'New' });
+      expect(mockRefreshTokenService.revokeForUser).not.toHaveBeenCalled();
+    });
   });
 
   describe('reset2fa', () => {
@@ -1114,12 +1128,14 @@ describe('UsersService', () => {
       const { SqidService: SS } = await import('../common/sqid/sqid.service');
       const { LoggerService: LS } = await import('../common/logger/logger.service');
       const { EmailService: ES } = await import('../email/email.service');
+      const { RefreshTokenService: RTS } = await import('../token/refresh-token.service');
       const warnLogger = { info: jest.fn(), warn: warnSpy };
       const mod = await Test.createTestingModule({
         providers: [
           US, SS,
           { provide: LS, useValue: { getWinstonLogger: () => warnLogger } },
           { provide: ES, useValue: { send: jest.fn() } },
+          { provide: RTS, useValue: mockRefreshTokenService },
         ],
       }).compile();
       const svc = mod.get(US);
@@ -1147,6 +1163,7 @@ describe('UsersService', () => {
       const { SqidService: SS } = await import('../common/sqid/sqid.service');
       const { LoggerService: LS } = await import('../common/logger/logger.service');
       const { EmailService: ES } = await import('../email/email.service');
+      const { RefreshTokenService: RTS } = await import('../token/refresh-token.service');
       const allLogArgs: unknown[][] = [];
       const captureLogger = {
         info: (...args: unknown[]) => allLogArgs.push(args),
@@ -1157,6 +1174,7 @@ describe('UsersService', () => {
           US, SS,
           { provide: LS, useValue: { getWinstonLogger: () => captureLogger } },
           { provide: ES, useValue: { send: jest.fn() } },
+          { provide: RTS, useValue: mockRefreshTokenService },
         ],
       }).compile();
       const svc = mod.get(US);

@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { prisma } from '@sassy-auth/db';
 import { TokenErrorCode } from '@sassy-auth/types';
+import { safeParseAmr } from './amr';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
 
@@ -151,14 +152,5 @@ export class OauthService {
       hadChallenge: entry.codeChallenge !== null,
       idp: entry.idp ?? undefined,
     };
-  }
-}
-
-function safeParseAmr(raw: string): string[] {
-  try {
-    const v = JSON.parse(raw);
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : ['pwd'];
-  } catch {
-    return ['pwd'];
   }
 }
