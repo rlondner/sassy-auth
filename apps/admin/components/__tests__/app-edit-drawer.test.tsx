@@ -498,6 +498,42 @@ describe('AppEditDrawer', () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
+  // Task 8: Privacy Policy / Terms / GDPR URL fields (signup/login legal
+  // consent). Plain URL inputs following the same dirty-tracking/patch
+  // pattern as webhookUrl above.
+
+  it('saves privacyPolicyUrl, termsUrl, and gdprUrl when edited', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, privacyPolicyUrl: 'https://x.example.com/privacy' },
+    })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    fireEvent.change(screen.getByLabelText(en.apps.fields.privacyPolicyUrl), {
+      target: { value: 'https://x.example.com/privacy' },
+    })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.termsUrl), {
+      target: { value: 'https://x.example.com/terms' },
+    })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.gdprUrl), {
+      target: { value: 'https://x.example.com/gdpr' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({
+          privacyPolicyUrl: 'https://x.example.com/privacy',
+          termsUrl: 'https://x.example.com/terms',
+          gdprUrl: 'https://x.example.com/gdpr',
+        }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
   // Task 12: collapsible per-app password policy section.
 
   describe('password policy section', () => {

@@ -8,6 +8,7 @@ import { getBetterAuthCookieName } from '@sassy-auth/types'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
+import { extractClientId, fetchOutstandingConsent } from '@/lib/consent'
 import { forwardNamedCookie, forwardNamedCookieWithMaxAge } from '../account/security/actions'
 import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '@/lib/two-factor-prompt'
 
@@ -298,6 +299,8 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
   const nextRaw = formData.get('next')
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
 
+  await maybeRedirectToConsent(nextSafe)
+
   // Optional 2FA interstitial: show once per interval for unenrolled users.
   // Read twoFactorEnabled from the just-established session.
   const cookieStore2 = await cookies()
@@ -436,7 +439,25 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Admin OTP login successful', level: 'info' })
   const nextRaw = formData.get('next')
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
+  await maybeRedirectToConsent(nextSafe)
   redirect(nextSafe ?? '/users')
+}
+
+/**
+ * If `next` targets a specific app (carries client_id) and that app has
+ * outstanding required consent for the current session's user, redirect to
+ * the mandatory /login/consent interstitial instead of continuing. Returns
+ * normally (no-op) when there is nothing outstanding, or when the consent
+ * check itself is unreachable (fail open — see fetchOutstandingConsent).
+ */
+async function maybeRedirectToConsent(nextSafe: string | null): Promise<void> {
+  const clientId = extractClientId(nextSafe)
+  if (!clientId) return
+  const outstanding = await fetchOutstandingConsent(clientId)
+  if (outstanding.length === 0) return
+  const params = new URLSearchParams({ appPublicId: clientId })
+  if (nextSafe) params.set('next', nextSafe)
+  redirect(`/login/consent?${params.toString()}`)
 }
 
 /**
@@ -533,6 +554,7 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
   }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'TOTP verify success', level: 'info' })
+  await maybeRedirectToConsent(nextSafe)
   redirect(nextSafe ?? '/users')
 }
 
@@ -584,5 +606,6 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
   }
 
   Sentry.addBreadcrumb({ category: 'auth', message: 'Backup code verify success', level: 'info' })
+  await maybeRedirectToConsent(nextSafe)
   redirect(nextSafe ?? '/users')
 }

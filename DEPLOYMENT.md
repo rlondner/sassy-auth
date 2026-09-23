@@ -271,8 +271,35 @@ Set that value as `SASSY_CLIENT_ID` on `sassy-resource-server` and redeploy.
 | `ADMIN_URL` | `https://auth.milissai.com` |
 | `TRUSTED_ORIGINS` | `https://auth.milissai.com,https://testapp.milissai.com` |
 | `NODE_ENV` | `production` |
+| `GEOIP_DB_PATH` | *(unset)* |
 
 `BETTER_AUTH_URL` is also the JWT `iss` claim and the OAuth authorization-server metadata issuer. It must exactly match what resource servers expect.
+
+**GDPR geo-detection (`GEOIP_DB_PATH`, optional).** When an app configures
+a GDPR disclosure URL, signup/login must additionally gate on whether the
+request looks like it originates from the EU/EEA, UK, or Switzerland. This
+deployment resolves that locally via a MaxMind GeoLite2-Country database —
+no per-request external API call. Download the free `GeoLite2-Country.mmdb`
+file from a MaxMind account (https://www.maxmind.com/en/geolite2/signup)
+and point `GEOIP_DB_PATH` at its path on disk. If `GEOIP_DB_PATH` is unset,
+or the file can't be read, the feature fails closed: every signup/login is
+treated as GDPR-applicable rather than silently skipping the check.
+
+**Known limitation — leave `GEOIP_DB_PATH` unset for now.** The IP this
+check resolves against is only accurate for social sign-in, which the
+browser hits directly. Every other path (self-serve signup, password,
+OTP, TOTP, backup-code login) goes through the admin console's own
+Next.js server, which makes its own server-to-server call to this
+service — so today the geo-IP lookup sees the admin server's egress
+address, not the end user's. Configuring `GEOIP_DB_PATH` right now would
+make the GDPR check *less* accurate for those paths (it would resolve a
+real but wrong country instead of failing closed to "always require
+GDPR consent"). Fixing this properly means moving `trust proxy` from a
+hop-count to an explicit trusted-address list (Render's edge plus the
+admin server's own address) — a separate piece of infrastructure work,
+not yet done. Until it lands, leave `GEOIP_DB_PATH` unset everywhere:
+the feature stays correct (fail-closed, GDPR consent always required
+when an app configures it) even though it's imprecise.
 
 ### Auth server only
 

@@ -43,6 +43,15 @@ export function detectIdentifierType(identifier: string): IdentifierType {
   return 'username';
 }
 
+/** The three optional legal documents an app can require acceptance of. */
+export type ConsentDocumentType = 'privacy_policy' | 'terms' | 'gdpr';
+
+export const CONSENT_DOCUMENT_TYPES: readonly ConsentDocumentType[] = [
+  'privacy_policy',
+  'terms',
+  'gdpr',
+];
+
 /** The complete set of password-complexity knobs. An app either inherits the
  * global policy or defines a complete override — there is no per-field mix. */
 export interface PasswordPolicy {
