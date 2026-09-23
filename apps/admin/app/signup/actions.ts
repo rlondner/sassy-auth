@@ -13,6 +13,7 @@ export interface RegisterInput {
   email: string
   password: string
   turnstileToken: string
+  next?: string
 }
 
 export async function registerAction(
@@ -32,6 +33,7 @@ export async function registerAction(
         ...(input.companyName !== undefined && { companyName: input.companyName }),
         appPublicId: input.clientId,
         turnstileToken: input.turnstileToken,
+        ...(input.next && { next: input.next }),
       }),
     })
   } catch (err) {

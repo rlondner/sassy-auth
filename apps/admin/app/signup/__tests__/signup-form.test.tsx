@@ -198,6 +198,11 @@ describe('SignupForm', () => {
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() =>
+      expect(mockRegisterAction).toHaveBeenCalledWith(
+        expect.objectContaining({ next: '/orgs' }),
+      ),
+    )
+    await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
         '/signup/check-email?email=alice%40example.com&next=%2Forgs',
       ),

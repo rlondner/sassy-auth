@@ -72,6 +72,26 @@ describe('registerAction', () => {
     expect(body).not.toHaveProperty('companyName')
   })
 
+  it('includes next in the request body when provided', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(201))
+
+    await registerAction({ ...INPUT, next: 'https://localhost:3010/api/token/oauth/authorize?client_id=sq_1' })
+
+    const call = (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0]
+    const body = JSON.parse(call[1]!.body as string)
+    expect(body.next).toBe('https://localhost:3010/api/token/oauth/authorize?client_id=sq_1')
+  })
+
+  it('omits next from the request body when not provided', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(201))
+
+    await registerAction(INPUT)
+
+    const call = (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0]
+    const body = JSON.parse(call[1]!.body as string)
+    expect(body).not.toHaveProperty('next')
+  })
+
   it('returns ok on a 2xx response', async () => {
     ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(201))
 
