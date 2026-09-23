@@ -11,4 +11,10 @@ export class RegisterDto {
   @IsString() @IsOptional() @MinLength(1) companyName?: string;
   @IsString() @MinLength(1) appPublicId!: string;
   @IsString() @MinLength(1) turnstileToken!: string;
+  // The original /authorize URL the admin /signup page was bounced here
+  // from, when there was one. Recovered (never trusted blindly) by
+  // RegistrationService to bind the signup-flow redirect code to the same
+  // PKCE challenge/state/nonce the relying party is waiting on — see
+  // docs/superpowers/specs/2026-09-23-signup-pkce-redirect-design.md.
+  @IsString() @IsOptional() next?: string;
 }
