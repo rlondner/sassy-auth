@@ -285,6 +285,22 @@ and point `GEOIP_DB_PATH` at its path on disk. If `GEOIP_DB_PATH` is unset,
 or the file can't be read, the feature fails closed: every signup/login is
 treated as GDPR-applicable rather than silently skipping the check.
 
+**Known limitation — leave `GEOIP_DB_PATH` unset for now.** The IP this
+check resolves against is only accurate for social sign-in, which the
+browser hits directly. Every other path (self-serve signup, password,
+OTP, TOTP, backup-code login) goes through the admin console's own
+Next.js server, which makes its own server-to-server call to this
+service — so today the geo-IP lookup sees the admin server's egress
+address, not the end user's. Configuring `GEOIP_DB_PATH` right now would
+make the GDPR check *less* accurate for those paths (it would resolve a
+real but wrong country instead of failing closed to "always require
+GDPR consent"). Fixing this properly means moving `trust proxy` from a
+hop-count to an explicit trusted-address list (Render's edge plus the
+admin server's own address) — a separate piece of infrastructure work,
+not yet done. Until it lands, leave `GEOIP_DB_PATH` unset everywhere:
+the feature stays correct (fail-closed, GDPR consent always required
+when an app configures it) even though it's imprecise.
+
 ### Auth server only
 
 | Variable | Notes |
