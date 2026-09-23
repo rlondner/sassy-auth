@@ -42,6 +42,23 @@ authenticated against an app — not just the self-serve signup form.
   gate only fires for a document that has genuinely never been accepted.
 - No admin-configurable GDPR country list in this iteration — the list is
   a fixed constant in code (see below).
+- No gate on an already-active session. The consent gate fires at the
+  moment credentials are verified (sign-in) — it does not re-check on
+  every subsequent app-authorization request. A user who already holds a
+  session from before a document became required is not interrupted
+  until that session ends and they sign in again. Accepted as a known,
+  deliberate boundary rather than closed in this iteration: closing it
+  would mean moving the check into the OAuth `/authorize` endpoint
+  itself, a materially different (and riskier) change to an existing,
+  working redirect flow, out of scope here.
+- No gate on `POST /api/token/direct/login` (the first-party password
+  grant used by resource-server API clients, not the admin console UI).
+  This is a non-browser, programmatic endpoint — the consent mechanism
+  built here is a redirect-to-an-HTML-page flow, which has no browser to
+  redirect and no page to show a checkbox in. Gating a machine-to-machine
+  token endpoint would need a different mechanism entirely (e.g. a
+  structured "consent required" error the calling application handles
+  out-of-band), which is undesigned, separate scope.
 - No change to how social sign-in decides whether an identity is allowed
   to authenticate at all (still invite-only, still never creates a new
   `SaUser` — see `classify-callback-outcome.ts`). This feature only adds
