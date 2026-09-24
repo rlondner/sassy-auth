@@ -1,8 +1,14 @@
 import * as crypto from 'crypto';
 import { SeverityNumber, logs, type LogAttributes } from '@opentelemetry/api-logs';
 import { prisma } from '@sassy-auth/db';
+import { createAppLogger } from '../common/logger/winston.config';
 
 const WEBHOOK_TIMEOUT_MS = 5000;
+
+// Called from better-auth hooks and from services that run outside Nest's
+// request context, so it uses a standalone Winston logger rather than the
+// injected LoggerService (same rationale as auth.config.ts's authLogger).
+const activationLogger = createAppLogger();
 
 interface DeliveryConfig {
   activationWebhookUrl: string;
@@ -41,7 +47,7 @@ function defaultEmit(attributes: Record<string, unknown>): void {
 
 /**
  * Records that a SaApp's activation webhook is about to be called: an OTel
- * log (redacted PII only — never the full name/email) plus a console.log
+ * log (redacted PII only — never the full name/email) plus an app log line
  * (full name/email, for local/dev visibility). Never throws — telemetry must
  * not block webhook delivery.
  */
@@ -62,8 +68,9 @@ function emitWebhookCallLog(
   } catch {
     // Telemetry must never break webhook delivery.
   }
-  console.log(
-    `[activation] Calling webhook for app ${config.appPublicId} (${config.activationWebhookUrl}): ${user.firstName} ${user.lastName} <${user.email}>`,
+  activationLogger.info(
+    `Calling webhook for app ${config.appPublicId} (${config.activationWebhookUrl}): ${user.firstName} ${user.lastName} <${user.email}>`,
+    { context: 'Activation' },
   );
 }
 

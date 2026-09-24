@@ -8,6 +8,14 @@ jest.mock('@sassy-auth/db', () => ({
   },
 }));
 
+jest.mock('../common/logger/winston.config', () => {
+  const sharedLogger = { info: jest.fn() };
+  return { createAppLogger: () => sharedLogger };
+});
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockLoggerInfo = (require('../common/logger/winston.config').createAppLogger() as { info: jest.Mock }).info;
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saOrg: { findUnique: jest.Mock };
@@ -28,17 +36,10 @@ function signedBody(secret: string, body: string): string {
 }
 
 describe('notifyActivation', () => {
-  let consoleLogSpy: jest.SpyInstance;
-
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = jest.fn();
     mockPrisma.saAuditEvent.create.mockResolvedValue(undefined);
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    consoleLogSpy.mockRestore();
   });
 
   it('does nothing when the app has no activationWebhookUrl configured', async () => {
@@ -52,10 +53,10 @@ describe('notifyActivation', () => {
     expect(global.fetch).not.toHaveBeenCalled();
     expect(mockPrisma.saAuditEvent.create).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
-    expect(consoleLogSpy).not.toHaveBeenCalled();
+    expect(mockLoggerInfo).not.toHaveBeenCalled();
   });
 
-  it('emits a redacted OTel log and a full-detail console.log before calling the webhook', async () => {
+  it('emits a redacted OTel log and a full-detail app log before calling the webhook', async () => {
     mockPrisma.saOrg.findUnique.mockResolvedValue({
       app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
     });
@@ -80,10 +81,11 @@ describe('notifyActivation', () => {
     expect(emittedValues).not.toContain('Doe');
     expect(emittedValues).not.toContain('jane.doe@example.com');
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
       expect.stringContaining('Jane Doe <jane.doe@example.com>'),
+      { context: 'Activation' },
     );
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('app_1'));
+    expect(mockLoggerInfo).toHaveBeenCalledWith(expect.stringContaining('app_1'), { context: 'Activation' });
   });
 
   it('emits the call log even when the webhook delivery itself later fails', async () => {
@@ -96,7 +98,7 @@ describe('notifyActivation', () => {
     await notifyActivation(saUser, { emit });
 
     expect(emit).toHaveBeenCalledTimes(1);
-    expect(consoleLogSpy).toHaveBeenCalledTimes(1);
+    expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
   });
 
   it('never throws if the injected emit callback itself throws', async () => {

@@ -11,7 +11,7 @@ const jsonFormat = winston.format.combine(
 );
 
 const prettyFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'HH:mm:ss' }),
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format.printf(({ timestamp, level, message, context, traceId, requestId, stack, ...meta }) => {
     const ctx = context ? ` [${context}]` : '';
