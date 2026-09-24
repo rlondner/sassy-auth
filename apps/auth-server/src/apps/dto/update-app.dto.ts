@@ -77,7 +77,7 @@ export class UpdateAppDto {
    * which stops delivery — the account still activates normally, it just
    * isn't reported to this app anymore.
    */
-  @IsOptional() @IsAppUrl() @MaxLength(2048) webhookUrl?: string | null;
+  @IsOptional() @IsAppUrl() @MaxLength(2048) activationWebhookUrl?: string | null;
 
   /**
    * Per-app override for the activation email's subject/message/from (see

@@ -79,10 +79,10 @@ describe('AppsController', () => {
 
   describe('rotateWebhookSecret', () => {
     it('forwards caller id and publicId to AppsService.rotateWebhookSecret', async () => {
-      mockAppsService.rotateWebhookSecret.mockResolvedValue({ webhookSecret: 'plaintext-secret' });
+      mockAppsService.rotateWebhookSecret.mockResolvedValue({ activationWebhookSecret: 'plaintext-secret' });
       const result = await controller.rotateWebhookSecret(makeReq('ba-6'), 'sq_1');
       expect(mockAppsService.rotateWebhookSecret).toHaveBeenCalledWith('ba-6', 'sq_1');
-      expect(result).toEqual({ webhookSecret: 'plaintext-secret' });
+      expect(result).toEqual({ activationWebhookSecret: 'plaintext-secret' });
     });
   });
 });

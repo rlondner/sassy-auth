@@ -121,7 +121,7 @@ export async function rotateClientSecretAction(
 // one-time-reveal pattern as rotateClientSecretAction above.
 export async function rotateWebhookSecretAction(
   publicId: string,
-): Promise<{ webhookSecret: string } | ErrorResult> {
+): Promise<{ activationWebhookSecret: string } | ErrorResult> {
   try {
     const result = await rotateWebhookSecret(publicId)
     revalidatePath('/apps')

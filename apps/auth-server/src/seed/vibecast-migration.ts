@@ -23,7 +23,7 @@ import { resolveSeedPassword } from './seed-password';
  * Deliberately NOT carried over from dev, and left for the admin console
  * after this runs instead:
  *   - logo: cosmetic, upload it via the Apps edit drawer.
- *   - webhookUrl / webhookSecret: environment-specific delivery target and
+ *   - activationWebhookUrl / activationWebhookSecret: environment-specific delivery target and
  *     a secret that must never live in a checked-in file. Configure via
  *     the "Generate webhook secret" flow (AppsService.rotateWebhookSecret)
  *     once the app's real webhook URL is known.
@@ -67,7 +67,15 @@ function requireEnvOutsideProd(name: string, devFallback: string): string {
 }
 
 const DEFAULT_ORG_NAME = 'VibeCast Default Org';
-const DEFAULT_ROLE_NAME = 'vibecast.org.member';
+// A brand-new self-signup always becomes the sole admin of their own
+// freshly-created personal org (see content-social-automation's
+// apps/api/src/routes/identity.py's provision()), so the default role a
+// fresh signup is granted here must be org.admin, not org.member --
+// otherwise the BFF's role/permission intersection
+// (apps/web/src/app/api/auth/callback/route.ts) caps every new user below
+// vibecast.org.settings.write and the onboarding wizard 403s immediately
+// after signup.
+const DEFAULT_ROLE_NAME = 'vibecast.org.admin';
 
 const ADMIN_PASSWORD = resolveSeedPassword();
 const ADMIN = {

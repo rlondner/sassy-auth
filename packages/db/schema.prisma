@@ -135,12 +135,12 @@ model SaApp {
   clientSecretHash      String?
   clientSecretUpdatedAt DateTime?
   // Signing secret and delivery target for the activation webhook (see
-  // apps/auth-server/src/activation/notify-activation.ts). webhookSecret is
+  // apps/auth-server/src/activation/notify-activation.ts). activationWebhookSecret is
   // stored in plaintext, unlike clientSecretHash, because it is used to SIGN
   // outgoing requests rather than verify incoming credentials — the server
   // must be able to read it back.
-  webhookUrl    String?
-  webhookSecret String?
+  activationWebhookUrl    String?
+  activationWebhookSecret String?
   /// Partial ActivationEmailBranding JSON override (see @sassy-auth/types).
   /// Unlike passwordPolicyOverride, this is field-level, not all-or-nothing:
   /// null, or any field omitted within it, means "use the platform default"

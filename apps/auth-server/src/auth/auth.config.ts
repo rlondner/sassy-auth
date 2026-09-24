@@ -395,9 +395,25 @@ export const auth = betterAuth({
       if (promoted.count > 0) {
         const saUser = await prisma.saUser.findUnique({
           where: { betterAuthUserId: updatedUser.id },
-          select: { id: true, publicId: true, orgId: true },
+          select: {
+            id: true,
+            publicId: true,
+            orgId: true,
+            firstName: true,
+            lastName: true,
+            betterAuthUser: { select: { email: true } },
+          },
         });
-        if (saUser) await notifyActivation(saUser);
+        if (saUser) {
+          await notifyActivation({
+            id: saUser.id,
+            publicId: saUser.publicId,
+            orgId: saUser.orgId,
+            firstName: saUser.firstName,
+            lastName: saUser.lastName,
+            email: saUser.betterAuthUser.email,
+          });
+        }
       }
     },
     autoSignInAfterVerification: false, // consistent with emailAndPassword.autoSignIn: false above

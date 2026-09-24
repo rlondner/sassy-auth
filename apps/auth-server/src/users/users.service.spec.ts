@@ -426,7 +426,14 @@ describe('UsersService', () => {
 
       await service.updateUser('ba-caller', 'usr1', { status: 'active' });
 
-      expect(mockNotifyActivation).toHaveBeenCalledWith({ id: 1, publicId: 'usr1', orgId: 7 });
+      expect(mockNotifyActivation).toHaveBeenCalledWith({
+        id: 1,
+        publicId: 'usr1',
+        orgId: 7,
+        firstName: 'Alice',
+        lastName: 'Smith',
+        email: 'alice@example.com',
+      });
     });
 
     it('does not notify the activation webhook for an unrelated field update', async () => {

@@ -961,17 +961,17 @@ curl -X PATCH https://localhost:3010/api/apps/<appPublicId> \
   -H "Content-Type: application/json" \
   -H "Cookie: <admin session>" \
   -d '{
-    "webhookUrl": "https://app.example.com/webhooks/sassy-auth",
-    "webhookSecret": "a-random-secret-at-least-16-chars"
+    "activationWebhookUrl": "https://app.example.com/webhooks/sassy-auth",
+    "activationWebhookSecret": "a-random-secret-at-least-16-chars"
   }'
 ```
 
-Both fields must be set together, or both cleared — a URL with no secret (or vice versa) is rejected with `400`, since an unsigned webhook has no way to be verified. The secret is stored in plaintext (not hashed), because the server needs it back to *sign* outgoing requests, not to verify an incoming credential; treat it as sensitive. `GET`/list responses on `/api/apps` never return the secret itself — only `hasWebhookSecret: true|false` — so the admin console can show whether one is configured without ever displaying it again after it's set.
+Both fields must be set together, or both cleared — a URL with no secret (or vice versa) is rejected with `400`, since an unsigned webhook has no way to be verified. The secret is stored in plaintext (not hashed), because the server needs it back to *sign* outgoing requests, not to verify an incoming credential; treat it as sensitive. `GET`/list responses on `/api/apps` never return the secret itself — only `hasActivationWebhookSecret: true|false` — so the admin console can show whether one is configured without ever displaying it again after it's set.
 
 **Delivery.** When a `SaUser` transitions to `active`, SassyAuth POSTs:
 
 ```json
-POST <webhookUrl>
+POST <activationWebhookUrl>
 Content-Type: application/json
 X-Sassy-Signature: sha256=<hex hmac>
 
@@ -983,7 +983,7 @@ X-Sassy-Signature: sha256=<hex hmac>
 }
 ```
 
-`X-Sassy-Signature` is an HMAC-SHA256 of the raw JSON body, keyed with `webhookSecret` — the same shape as Stripe's or GitHub's webhook signing, so existing verification libraries and patterns apply. Verify it in Node with a constant-time comparison:
+`X-Sassy-Signature` is an HMAC-SHA256 of the raw JSON body, keyed with `activationWebhookSecret` — the same shape as Stripe's or GitHub's webhook signing, so existing verification libraries and patterns apply. Verify it in Node with a constant-time comparison:
 
 ```javascript
 const crypto = require('crypto');
@@ -1002,8 +1002,8 @@ function isValidSassyWebhook(rawBody, signatureHeader, secret) {
 **What to expect operationally:**
 
 - **5-second timeout, one retry.** A single retry on a network error or a `5xx` response; a `4xx` is treated as a permanent failure and is not retried. There is no further backoff and no delivery queue — a webhook endpoint that is down when the event fires simply misses it.
-- **Redirects are not followed.** A `webhookUrl` that responds with a redirect fails the delivery rather than being followed, so a signed request can't be silently re-sent somewhere else (e.g. an internal address) by a compromised or misconfigured endpoint.
-- **Fire-and-forget, never blocks activation.** Delivery success or failure has no effect on the activation itself — it always commits — and every outcome (delivered, failed, or no-op because no `webhookUrl` is configured) is written to the `SaAuditEvent` table for later inspection, not held anywhere retriable.
+- **Redirects are not followed.** An `activationWebhookUrl` that responds with a redirect fails the delivery rather than being followed, so a signed request can't be silently re-sent somewhere else (e.g. an internal address) by a compromised or misconfigured endpoint.
+- **Fire-and-forget, never blocks activation.** Delivery success or failure has no effect on the activation itself — it always commits — and every outcome (delivered, failed, or no-op because no `activationWebhookUrl` is configured) is written to the `SaAuditEvent` table for later inspection, not held anywhere retriable.
 - **Idempotent trigger, not idempotent delivery.** The status transition itself only fires once (re-activating an already-`active` user is a no-op), but because there's no delivery ledger, treat `userId` + `event` as a natural dedupe key on your side if you care about exactly-once processing across retries.
 - **Scope.** One URL and one secret per app, and `account.activated` is the only event today — no per-app multiple endpoints/subscriptions and no deactivation or other status-change events. See [Known Limitations](#known-limitations).
 
