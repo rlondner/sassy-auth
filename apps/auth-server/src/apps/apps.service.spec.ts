@@ -284,6 +284,19 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).not.toHaveBeenCalled();
   });
 
+  it('updateApp accepts line breaks in activationEmailOverride.message (body copy, not a header)', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    const override = { message: 'Line one.\nLine two.' };
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, activationEmailOverride: override });
+    const result = await service.updateApp('ba-caller', 'sq_1', { activationEmailOverride: override });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { activationEmailOverride: override },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+    expect(result.activationEmailOverride).toEqual(override);
+  });
+
   it('updateApp rejects a malformed fromAddress', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     await expect(

@@ -18,6 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Textarea,
 } from '@sassy-auth/ui'
 import { updateAppAction, getAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction, rotateWebhookSecretAction } from '@/app/(admin)/apps/actions'
 import { listOrgsAction } from '@/app/(admin)/orgs/actions'
@@ -69,6 +70,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [activationFromAddress, setActivationFromAddress] = React.useState<string>(app.activationEmailOverride?.fromAddress ?? '')
   const [activationSubject, setActivationSubject] = React.useState<string>(app.activationEmailOverride?.subject ?? '')
   const [activationMessage, setActivationMessage] = React.useState<string>(app.activationEmailOverride?.message ?? '')
+  // The `app` prop is sourced from the apps list row, whose `select` omits
+  // `activationEmailOverride` (see AppsService.listApps) — so it's always
+  // undefined here at mount. The real value only arrives via the fetch-on-open
+  // effect below, which also updates this baseline so `activationDirty`
+  // compares against the true saved value instead of always seeing a change.
+  const [activationOverrideOriginal, setActivationOverrideOriginal] = React.useState<import('@/lib/types').ActivationEmailBranding | null>(
+    app.activationEmailOverride ?? null,
+  )
   const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
   const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -116,6 +125,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setActivationFromAddress(app.activationEmailOverride?.fromAddress ?? '')
     setActivationSubject(app.activationEmailOverride?.subject ?? '')
     setActivationMessage(app.activationEmailOverride?.message ?? '')
+    setActivationOverrideOriginal(app.activationEmailOverride ?? null)
     setErrorKey(null)
     setNewClientSecret(null)
     setNewWebhookSecret(null)
@@ -131,14 +141,20 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     // Finding 2 (final review): GET /api/apps (the list this drawer's `app`
     // prop is sourced from, via AppsTable's `selected` row) no longer sends
     // `logo` — it's stripped to avoid shipping every row's base64 blob on a
-    // page load. Fetch the single-app record here, which still includes it,
-    // so the logo field is seeded with the real current value rather than
-    // always appearing empty.
+    // page load. It also never sends `activationEmailOverride` (bug-0XXX:
+    // omitted from AppsService.listApps's `select`). Fetch the single-app
+    // record here, which includes both, so those fields are seeded with the
+    // real current value rather than always appearing empty.
     getAppAction(app.publicId).then((result) => {
       if (cancelled) return
       if ('app' in result) {
         setLogo(result.app.logo ?? null)
         setOriginalLogo(result.app.logo ?? null)
+        setActivationFromName(result.app.activationEmailOverride?.fromName ?? '')
+        setActivationFromAddress(result.app.activationEmailOverride?.fromAddress ?? '')
+        setActivationSubject(result.app.activationEmailOverride?.subject ?? '')
+        setActivationMessage(result.app.activationEmailOverride?.message ?? '')
+        setActivationOverrideOriginal(result.app.activationEmailOverride ?? null)
       }
     })
     setSocialLoading(true)
@@ -215,7 +231,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
   const webhookUrlDirty = webhookUrl.trim() !== (app.webhookUrl ?? '')
-  const activationOverrideBaseline = app.activationEmailOverride ?? { fromName: '', fromAddress: '', subject: '', message: '' }
+  const activationOverrideBaseline = activationOverrideOriginal ?? { fromName: '', fromAddress: '', subject: '', message: '' }
   const activationDirty =
     activationFromName.trim() !== (activationOverrideBaseline.fromName ?? '') ||
     activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
@@ -729,8 +745,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
                 <div>
                   <Label htmlFor="activationMessage">{t('apps.fields.activationEmailMessage')}</Label>
-                  <Input
+                  <Textarea
                     id="activationMessage"
+                    rows={4}
                     value={activationMessage}
                     onChange={(e) => setActivationMessage(e.target.value)}
                     placeholder={t('apps.fields.activationEmailMessagePlaceholder')}
