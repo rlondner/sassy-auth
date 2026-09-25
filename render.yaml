@@ -70,7 +70,7 @@ services:
     branch: master
     buildCommand: >-
       NODE_ENV=development npx --yes pnpm@9.0.0 install --frozen-lockfile &&
-      npx --yes pnpm@9.0.0 --filter @sassy-auth/db --filter @sassy-auth/types build &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/db --filter @sassy-auth/types --filter @sassy-auth/telemetry build &&
       npx --yes pnpm@9.0.0 --filter @sassy-auth/auth-server build
     # NODE_ENV=development on the install step only: the production NODE_ENV value from
     # sassy-auth-production (below) is present during the build too, and pnpm skips
@@ -142,6 +142,7 @@ services:
     branch: master
     buildCommand: >-
       NODE_ENV=development npx --yes pnpm@9.0.0 install --frozen-lockfile &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/telemetry build &&
       npx --yes pnpm@9.0.0 --filter @sassy-auth/admin build
     # See the matching comment on sassy-auth-server's buildCommand — same NODE_ENV/pnpm
     # devDependencies gotcha, needed here for `next build`'s devDependencies (typescript).

@@ -56,7 +56,7 @@ services:
       corepack enable &&
       corepack prepare pnpm@9.0.0 --activate &&
       NODE_ENV=development pnpm install --frozen-lockfile &&
-      pnpm --filter @sassy-auth/db --filter @sassy-auth/types build &&
+      pnpm --filter @sassy-auth/db --filter @sassy-auth/types --filter @sassy-auth/telemetry build &&
       pnpm --filter @sassy-auth/auth-server build
     preDeployCommand: cd packages/db && npx prisma migrate deploy
     startCommand: cd apps/auth-server && node dist/main.js
@@ -122,6 +122,7 @@ services:
       corepack enable &&
       corepack prepare pnpm@9.0.0 --activate &&
       NODE_ENV=development pnpm install --frozen-lockfile &&
+      pnpm --filter @sassy-auth/telemetry build &&
       pnpm --filter @sassy-auth/admin build
     startCommand: cd apps/admin && npx next start -p $PORT
     healthCheckPath: /login
