@@ -137,6 +137,16 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             label={t('apps.fields.requireTwoFactor')}
             value={displayApp.requireTwoFactor ? t('common.yes') : t('common.no')}
           />
+          <TextRow
+            label={t('apps.fields.twoFactorPromptEnabled')}
+            value={
+              displayApp.twoFactorPromptEnabled === null || displayApp.twoFactorPromptEnabled === undefined
+                ? t('apps.fields.twoFactorPromptEnabledDefault')
+                : displayApp.twoFactorPromptEnabled
+                  ? t('apps.fields.twoFactorPromptEnabledOn')
+                  : t('apps.fields.twoFactorPromptEnabledOff')
+            }
+          />
           <div>
             <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('apps.fields.passwordPolicy')}</p>
             {displayApp.passwordPolicyOverride === null ? (
