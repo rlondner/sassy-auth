@@ -63,7 +63,7 @@ import {
   resolveIssuer,
   TOKEN_CONTROLLER_PATH,
 } from './oauth-metadata';
-import { resolveTrustDays, getSystemTrustDays } from '../auth/resolve-trust-days';
+import { resolveTrustDays, getSystemTrustDays, resolvePromptEnabled, getSystemPromptEnabled } from '../auth/resolve-trust-days';
 import { isTwoFactorRequired } from '../auth/two-factor-required';
 import { verifyUserTotp } from '../auth/verify-user-totp';
 import { parseScopes } from './scopes';
@@ -94,25 +94,32 @@ export class TokenController {
    * GET /api/token/app-trust-days?client_id=<sqid>
    *
    * Public (unauthenticated) endpoint. Returns the effective 2FA trust interval
-   * for the app identified by client_id (a public sqid). Used by the admin
-   * console's signIn server action to resolve the per-app 2FA re-prompt interval
-   * without duplicating resolveTrustDays logic client-side.
+   * and whether the optional setup interstitial is enabled for the app
+   * identified by client_id (a public sqid). Used by the admin console's
+   * signIn server action to resolve both without duplicating
+   * resolveTrustDays/resolvePromptEnabled logic client-side.
    *
-   * Disclosure is safe: the trust interval is a non-sensitive configuration value
-   * and client_id is already public (displayed in the apps list, embedded in OAuth
-   * authorize URLs). Returns { effectiveTrustDays: number } — always a resolved
-   * positive integer; the system default is returned when client_id is missing,
-   * the app is not found, or the app has no per-app override.
+   * Disclosure is safe: both values are non-sensitive configuration and
+   * client_id is already public (displayed in the apps list, embedded in
+   * OAuth authorize URLs). effectiveTrustDays is always a resolved positive
+   * integer and promptEnabled is always a resolved boolean; the system
+   * defaults are returned when client_id is missing, the app is not found,
+   * or the app has no per-app override.
    */
   @Get('app-trust-days')
   async appTrustDays(@Query('client_id') clientId: string) {
-    if (!clientId) return { effectiveTrustDays: getSystemTrustDays() };
+    const systemTrustDays = getSystemTrustDays();
+    const systemPromptEnabled = getSystemPromptEnabled();
+    if (!clientId) return { effectiveTrustDays: systemTrustDays, promptEnabled: systemPromptEnabled };
     const app = await prisma.saApp.findUnique({
       where: { publicId: clientId },
-      select: { twoFactorTrustDays: true },
+      select: { twoFactorTrustDays: true, twoFactorPromptEnabled: true },
     });
-    if (!app) return { effectiveTrustDays: getSystemTrustDays() };
-    return { effectiveTrustDays: resolveTrustDays(app, getSystemTrustDays()) };
+    if (!app) return { effectiveTrustDays: systemTrustDays, promptEnabled: systemPromptEnabled };
+    return {
+      effectiveTrustDays: resolveTrustDays(app, systemTrustDays),
+      promptEnabled: resolvePromptEnabled(app, systemPromptEnabled),
+    };
   }
 
   /**
