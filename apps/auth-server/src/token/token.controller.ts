@@ -121,13 +121,13 @@ export class TokenController {
    * Validates the client_id (app), checks the requester has an active
    * BetterAuth session, issues an authorization code, and returns redirect info.
    *
-   * Moved into the `auth` throttler bucket rather than the generous `default`
-   * one: a valid session lets a caller mint authorization codes repeatedly,
-   * so this endpoint carries the same brute-force/abuse profile as /token.
+   * Runs on the generous `default` throttler bucket, not `auth`: it's a
+   * redirect endpoint hit on every login page load, so the tight 10/min
+   * budget meant for credential-guessing routes (/direct/login) was tripping
+   * on ordinary traffic (shared IPs, browser retries).
    */
   @Get(OAUTH_AUTHORIZE_ROUTE)
   @Redirect()
-  @Throttle({ auth: AUTH_THROTTLE })
   async oauthAuthorize(
     @Query('client_id') clientId: string,
     @Query('redirect_uri') redirectUri: string,
