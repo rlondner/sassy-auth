@@ -134,18 +134,18 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             value={displayApp.twoFactorTrustDays != null ? String(displayApp.twoFactorTrustDays) : t('apps.fields.twoFactorTrustDaysSystemDefault')}
           />
           <TextRow
-            label={t('apps.fields.requireTwoFactor')}
-            value={displayApp.requireTwoFactor ? t('common.yes') : t('common.no')}
-          />
-          <TextRow
             label={t('apps.fields.twoFactorPromptEnabled')}
             value={
-              displayApp.twoFactorPromptEnabled === null || displayApp.twoFactorPromptEnabled === undefined
+              displayApp.twoFactorPromptEnabled == null
                 ? t('apps.fields.twoFactorPromptEnabledDefault')
                 : displayApp.twoFactorPromptEnabled
                   ? t('apps.fields.twoFactorPromptEnabledOn')
                   : t('apps.fields.twoFactorPromptEnabledOff')
             }
+          />
+          <TextRow
+            label={t('apps.fields.requireTwoFactor')}
+            value={displayApp.requireTwoFactor ? t('common.yes') : t('common.no')}
           />
           <div>
             <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('apps.fields.passwordPolicy')}</p>
