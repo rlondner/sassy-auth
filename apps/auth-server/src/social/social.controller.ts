@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { BetterAuthGuard } from '../auth/better-auth.guard';
@@ -14,6 +15,9 @@ function callerBaId(req: Request): string {
 // configure-nest-app.ts to every controller, so the path here is
 // 'social-providers' (not 'api/social-providers') to land the route at
 // exactly GET /api/social-providers rather than /api/api/social-providers.
+// No class-level @ApiCookieAuth: the GET list endpoint below is public,
+// only the settings/update endpoints require it (documented per-method).
+@ApiTags('Social Providers')
 @Controller('social-providers')
 export class SocialController {
   constructor(private readonly social: SocialService) {}

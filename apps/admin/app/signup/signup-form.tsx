@@ -60,10 +60,15 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy }: Si
       const result = await registerAction({
         clientId, firstName, lastName, email, password, turnstileToken: captchaToken,
         ...(hasDefaultOrg ? {} : { companyName }),
+        ...(next ? { next } : {}),
       })
       if ('error' in result) {
         const key = (KNOWN_ERRORS as readonly string[]).includes(result.error) ? result.error : 'validationError'
         setError(t(`signup.errors.${key as (typeof KNOWN_ERRORS)[number]}`))
+        return
+      }
+      if (result.redirectUrl) {
+        window.location.href = result.redirectUrl
         return
       }
       router.push(

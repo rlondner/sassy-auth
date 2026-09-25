@@ -120,7 +120,13 @@ model SaApp {
   logo        String?
   twoFactorTrustDays Int?
   requireTwoFactor   Boolean        @default(false)
+  allowOfflineAccess Boolean        @default(false)
   isPlatform         Boolean        @default(false)
+  // Confidential-app-only gate for the client_credentials grant (RFC 6749
+  // §4.4). A valid client secret is necessary but not sufficient — this
+  // flag is the explicit admin opt-in for whether the app may be granted
+  // `roles:write` at all. See docs/superpowers/specs/2026-09-17-service-client-credentials-design.md §1.
+  canManageOwnRoles  Boolean        @default(false)
   /// Complete PasswordPolicy JSON override (see @sassy-auth/types). null
   /// means "inherit the global env-derived policy" — never partial.
   passwordPolicyOverride Json?
@@ -129,12 +135,12 @@ model SaApp {
   clientSecretHash      String?
   clientSecretUpdatedAt DateTime?
   // Signing secret and delivery target for the activation webhook (see
-  // apps/auth-server/src/activation/notify-activation.ts). webhookSecret is
+  // apps/auth-server/src/activation/notify-activation.ts). activationWebhookSecret is
   // stored in plaintext, unlike clientSecretHash, because it is used to SIGN
   // outgoing requests rather than verify incoming credentials — the server
   // must be able to read it back.
-  webhookUrl    String?
-  webhookSecret String?
+  activationWebhookUrl    String?
+  activationWebhookSecret String?
   /// Partial ActivationEmailBranding JSON override (see @sassy-auth/types).
   /// Unlike passwordPolicyOverride, this is field-level, not all-or-nothing:
   /// null, or any field omitted within it, means "use the platform default"
@@ -324,6 +330,41 @@ model SaOauthCode {
   createdAt           DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+// Opaque, single-use refresh tokens (Task: refresh token support). Only the
+// sha256 hash of the token is ever stored — the plaintext exists only in the
+// token response handed to the client. Tokens rotate on every use
+// (tokenHash is replaced by a new row sharing the same familyId); presenting
+// an already-rotated token is treated as theft and burns the whole family.
+model SaRefreshToken {
+  tokenHash           String    @id
+  familyId            String
+  saUserId            Int
+  userPublicId        String
+  orgPublicId         String
+  appId               Int
+  appPublicId         String
+  scope               String
+  amr                 String
+  idp                 String?
+  // Original authentication time, carried unchanged through every rotation
+  // in the family — used to set `auth_time` on an id_token minted from a
+  // refreshed access token, matching how issueIdToken already treats it as
+  // the moment the user actually authenticated, not the moment of refresh.
+  authTime            DateTime
+  createdAt           DateTime  @default(now())
+  // Sliding window: reset to now()+30d on every successful rotation.
+  expiresAt           DateTime
+  // Fixed at family creation to now()+90d; never extended by rotation.
+  absoluteExpiresAt   DateTime
+  revokedAt           DateTime?
+  replacedByTokenHash String?
+
+  @@index([familyId])
+  @@index([saUserId])
+  @@index([expiresAt])
+  @@index([userPublicId, appPublicId])
 }
 
 // Which social login providers a deployment has, and which apps show them.

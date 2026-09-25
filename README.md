@@ -244,6 +244,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
   - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
   - [Social Sign-In](#social-sign-in)
   - [Activation Webhook](#activation-webhook)
+  - [Activation Email Branding](#activation-email-branding)
   - [API Reference](#api-reference)
   - [Self-serve Registration (`POST /api/register`)](#self-serve-registration-post-apiregister)
     - [Request](#request)
@@ -549,9 +550,11 @@ Leave blank to disable. See [Observability](#observability) for behavior.
 | `SENTRY_AUTH_TOKEN`         | admin | Build-time auth token for source-map upload                          |
 | `SENTRY_ORG`                | admin | Sentry organization slug (build-time only)                           |
 | `SENTRY_PROJECT`            | admin | Sentry project slug (build-time only)                                |
-| `OTEL_SERVICE_NAME`         | auth  | Per-service override for the OpenTelemetry service name (each app has a sensible default) |
-| `DD_API_KEY`                | auth  | Datadog API key. Unset disables all Datadog export (traces, metrics, logs) |
-| `DD_SITE`                   | auth  | Datadog site — `datadoghq.com`, `datadoghq.eu`, etc. (default: `datadoghq.com`) |
+| `OTEL_SERVICE_NAME`         | auth, admin | Per-service override for the OpenTelemetry service name (each app has a sensible default) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | auth, admin | Base Datadog OTLP URL (e.g. `https://otlp.datadoghq.com`). Unset disables all Datadog export (traces, metrics, logs) |
+| `OTEL_EXPORTER_OTLP_HEADERS` | auth, admin | Datadog auth header, e.g. `dd-api-key=...` |
+| `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` | auth, admin | Log export protocol, e.g. `http/protobuf` |
+| `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | auth | Set to `delta` — Datadog's OTLP intake silently drops cumulative Sums/Histograms |
 | `SENTRY_DSN_RESOURCE_SERVER` | RS sample | Sentry DSN for `apps/resource-server-fastapi` (its own `.env`, not the root one). Leave blank to disable. |
 
 ### Email (optional)
@@ -958,17 +961,17 @@ curl -X PATCH https://localhost:3010/api/apps/<appPublicId> \
   -H "Content-Type: application/json" \
   -H "Cookie: <admin session>" \
   -d '{
-    "webhookUrl": "https://app.example.com/webhooks/sassy-auth",
-    "webhookSecret": "a-random-secret-at-least-16-chars"
+    "activationWebhookUrl": "https://app.example.com/webhooks/sassy-auth",
+    "activationWebhookSecret": "a-random-secret-at-least-16-chars"
   }'
 ```
 
-Both fields must be set together, or both cleared — a URL with no secret (or vice versa) is rejected with `400`, since an unsigned webhook has no way to be verified. The secret is stored in plaintext (not hashed), because the server needs it back to *sign* outgoing requests, not to verify an incoming credential; treat it as sensitive. `GET`/list responses on `/api/apps` never return the secret itself — only `hasWebhookSecret: true|false` — so the admin console can show whether one is configured without ever displaying it again after it's set.
+Both fields must be set together, or both cleared — a URL with no secret (or vice versa) is rejected with `400`, since an unsigned webhook has no way to be verified. The secret is stored in plaintext (not hashed), because the server needs it back to *sign* outgoing requests, not to verify an incoming credential; treat it as sensitive. `GET`/list responses on `/api/apps` never return the secret itself — only `hasActivationWebhookSecret: true|false` — so the admin console can show whether one is configured without ever displaying it again after it's set.
 
 **Delivery.** When a `SaUser` transitions to `active`, SassyAuth POSTs:
 
 ```json
-POST <webhookUrl>
+POST <activationWebhookUrl>
 Content-Type: application/json
 X-Sassy-Signature: sha256=<hex hmac>
 
@@ -980,7 +983,7 @@ X-Sassy-Signature: sha256=<hex hmac>
 }
 ```
 
-`X-Sassy-Signature` is an HMAC-SHA256 of the raw JSON body, keyed with `webhookSecret` — the same shape as Stripe's or GitHub's webhook signing, so existing verification libraries and patterns apply. Verify it in Node with a constant-time comparison:
+`X-Sassy-Signature` is an HMAC-SHA256 of the raw JSON body, keyed with `activationWebhookSecret` — the same shape as Stripe's or GitHub's webhook signing, so existing verification libraries and patterns apply. Verify it in Node with a constant-time comparison:
 
 ```javascript
 const crypto = require('crypto');
@@ -999,10 +1002,44 @@ function isValidSassyWebhook(rawBody, signatureHeader, secret) {
 **What to expect operationally:**
 
 - **5-second timeout, one retry.** A single retry on a network error or a `5xx` response; a `4xx` is treated as a permanent failure and is not retried. There is no further backoff and no delivery queue — a webhook endpoint that is down when the event fires simply misses it.
-- **Redirects are not followed.** A `webhookUrl` that responds with a redirect fails the delivery rather than being followed, so a signed request can't be silently re-sent somewhere else (e.g. an internal address) by a compromised or misconfigured endpoint.
-- **Fire-and-forget, never blocks activation.** Delivery success or failure has no effect on the activation itself — it always commits — and every outcome (delivered, failed, or no-op because no `webhookUrl` is configured) is written to the `SaAuditEvent` table for later inspection, not held anywhere retriable.
+- **Redirects are not followed.** An `activationWebhookUrl` that responds with a redirect fails the delivery rather than being followed, so a signed request can't be silently re-sent somewhere else (e.g. an internal address) by a compromised or misconfigured endpoint.
+- **Fire-and-forget, never blocks activation.** Delivery success or failure has no effect on the activation itself — it always commits — and every outcome (delivered, failed, or no-op because no `activationWebhookUrl` is configured) is written to the `SaAuditEvent` table for later inspection, not held anywhere retriable.
 - **Idempotent trigger, not idempotent delivery.** The status transition itself only fires once (re-activating an already-`active` user is a no-op), but because there's no delivery ledger, treat `userId` + `event` as a natural dedupe key on your side if you care about exactly-once processing across retries.
 - **Scope.** One URL and one secret per app, and `account.activated` is the only event today — no per-app multiple endpoints/subscriptions and no deactivation or other status-change events. See [Known Limitations](#known-limitations).
+
+---
+
+## Activation Email Branding
+
+A SaApp can override the subject, message, and `From` name/address of the email sent to confirm a new sign-up's email address, instead of using SassyAuth's default copy.
+
+**Configuring it.** Set `activationEmailOverride` on the app, either in the admin console (`/apps` → edit an app → **Activation email**) or via the API:
+
+```bash
+curl -X PATCH https://localhost:3010/api/apps/<appPublicId> \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <admin session>" \
+  -d '{
+    "activationEmailOverride": {
+      "fromName": "Vibecast",
+      "fromAddress": "no-reply@vibecast.io",
+      "subject": "Confirm your {{appName}} account, {{firstName}}!",
+      "message": "Welcome to {{appName}}! Click below to confirm your address."
+    }
+  }'
+```
+
+Every field is optional and independently defaulted — an omitted field falls back to the platform default for that field. Send `null` to clear the override entirely back to defaults. `fromAddress` must be on a domain verified with your email provider (e.g. Resend), or sends will silently fail.
+
+**Placeholders.** `subject` and `message` support literal `{{token}}` substitution — no conditionals or loops:
+
+| Placeholder | Value |
+|---|---|
+| `{{firstName}}` | The recipient's first name |
+| `{{appName}}` | The app's name |
+| `{{activationUrl}}` | The email-verification link |
+
+A token not present in the above list (a typo, or one not yet supported) is left untouched in the rendered output rather than silently stripped, so a mistake is visible instead of hidden. `message` is rendered above a system-generated "Confirm your email address" button that always links to the real verification URL — the button itself is not customizable, so `{{activationUrl}}` in `message` is only useful if you want to also show the raw link as text.
 
 ---
 

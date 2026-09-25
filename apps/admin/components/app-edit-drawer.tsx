@@ -18,6 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Textarea,
 } from '@sassy-auth/ui'
 import { updateAppAction, getAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction, rotateWebhookSecretAction } from '@/app/(admin)/apps/actions'
 import { listOrgsAction } from '@/app/(admin)/orgs/actions'
@@ -48,6 +49,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
+  const [allowOfflineAccess, setAllowOfflineAccess] = React.useState<boolean>(app.allowOfflineAccess ?? false)
   const [defaultOrgId, setDefaultOrgId] = React.useState<string | null>(app.defaultOrgId ?? null)
   const [defaultRoleId, setDefaultRoleId] = React.useState<string | null>(app.defaultRoleId ?? null)
   const [passwordPolicyOverrideEnabled, setPasswordPolicyOverrideEnabled] = React.useState(
@@ -56,8 +58,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [passwordPolicy, setPasswordPolicy] = React.useState<PasswordPolicy>(
     app.passwordPolicyOverride ?? app.effectivePasswordPolicy,
   )
-  const [webhookUrl, setWebhookUrl] = React.useState<string>(app.webhookUrl ?? '')
-  const [hasWebhookSecret, setHasWebhookSecret] = React.useState<boolean>(app.hasWebhookSecret ?? false)
+  const [webhookUrl, setWebhookUrl] = React.useState<string>(app.activationWebhookUrl ?? '')
+  const [hasWebhookSecret, setHasWebhookSecret] = React.useState<boolean>(app.hasActivationWebhookSecret ?? false)
   // Webhook secret rotation: same immediate, separate-from-save pattern as
   // client secret rotation below — the plaintext only ever comes back once,
   // at the moment of generation, and the server requires a webhookUrl to
@@ -68,6 +70,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [activationFromAddress, setActivationFromAddress] = React.useState<string>(app.activationEmailOverride?.fromAddress ?? '')
   const [activationSubject, setActivationSubject] = React.useState<string>(app.activationEmailOverride?.subject ?? '')
   const [activationMessage, setActivationMessage] = React.useState<string>(app.activationEmailOverride?.message ?? '')
+  // The `app` prop is sourced from the apps list row, whose `select` omits
+  // `activationEmailOverride` (see AppsService.listApps) — so it's always
+  // undefined here at mount. The real value only arrives via the fetch-on-open
+  // effect below, which also updates this baseline so `activationDirty`
+  // compares against the true saved value instead of always seeing a change.
+  const [activationOverrideOriginal, setActivationOverrideOriginal] = React.useState<import('@/lib/types').ActivationEmailBranding | null>(
+    app.activationEmailOverride ?? null,
+  )
   const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
   const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -104,16 +114,18 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
+    setAllowOfflineAccess(app.allowOfflineAccess ?? false)
     setDefaultOrgId(app.defaultOrgId ?? null)
     setDefaultRoleId(app.defaultRoleId ?? null)
     setPasswordPolicyOverrideEnabled(app.passwordPolicyOverride !== null)
     setPasswordPolicy(app.passwordPolicyOverride ?? app.effectivePasswordPolicy)
-    setWebhookUrl(app.webhookUrl ?? '')
-    setHasWebhookSecret(app.hasWebhookSecret ?? false)
+    setWebhookUrl(app.activationWebhookUrl ?? '')
+    setHasWebhookSecret(app.hasActivationWebhookSecret ?? false)
     setActivationFromName(app.activationEmailOverride?.fromName ?? '')
     setActivationFromAddress(app.activationEmailOverride?.fromAddress ?? '')
     setActivationSubject(app.activationEmailOverride?.subject ?? '')
     setActivationMessage(app.activationEmailOverride?.message ?? '')
+    setActivationOverrideOriginal(app.activationEmailOverride ?? null)
     setErrorKey(null)
     setNewClientSecret(null)
     setNewWebhookSecret(null)
@@ -129,14 +141,20 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     // Finding 2 (final review): GET /api/apps (the list this drawer's `app`
     // prop is sourced from, via AppsTable's `selected` row) no longer sends
     // `logo` — it's stripped to avoid shipping every row's base64 blob on a
-    // page load. Fetch the single-app record here, which still includes it,
-    // so the logo field is seeded with the real current value rather than
-    // always appearing empty.
+    // page load. It also never sends `activationEmailOverride` (bug-0XXX:
+    // omitted from AppsService.listApps's `select`). Fetch the single-app
+    // record here, which includes both, so those fields are seeded with the
+    // real current value rather than always appearing empty.
     getAppAction(app.publicId).then((result) => {
       if (cancelled) return
       if ('app' in result) {
         setLogo(result.app.logo ?? null)
         setOriginalLogo(result.app.logo ?? null)
+        setActivationFromName(result.app.activationEmailOverride?.fromName ?? '')
+        setActivationFromAddress(result.app.activationEmailOverride?.fromAddress ?? '')
+        setActivationSubject(result.app.activationEmailOverride?.subject ?? '')
+        setActivationMessage(result.app.activationEmailOverride?.message ?? '')
+        setActivationOverrideOriginal(result.app.activationEmailOverride ?? null)
       }
     })
     setSocialLoading(true)
@@ -198,7 +216,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       }
       // Shown exactly once — the server never returns the plaintext again
       // after this response.
-      setNewWebhookSecret(result.webhookSecret)
+      setNewWebhookSecret(result.activationWebhookSecret)
       setHasWebhookSecret(true)
       toast.success(t('apps.toast.updated'))
     })
@@ -212,14 +230,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const passwordPolicyDirty =
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
-  const webhookUrlDirty = webhookUrl.trim() !== (app.webhookUrl ?? '')
-  const activationOverrideBaseline = app.activationEmailOverride ?? { fromName: '', fromAddress: '', subject: '', message: '' }
+  const webhookUrlDirty = webhookUrl.trim() !== (app.activationWebhookUrl ?? '')
+  const activationOverrideBaseline = activationOverrideOriginal ?? { fromName: '', fromAddress: '', subject: '', message: '' }
   const activationDirty =
     activationFromName.trim() !== (activationOverrideBaseline.fromName ?? '') ||
     activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
     activationSubject.trim() !== (activationOverrideBaseline.subject ?? '') ||
     activationMessage.trim() !== (activationOverrideBaseline.message ?? '')
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -232,13 +250,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
     if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
+    if (allowOfflineAccess !== (app.allowOfflineAccess ?? false)) patch.allowOfflineAccess = allowOfflineAccess
     if (defaultOrgId !== (app.defaultOrgId ?? null)) patch.defaultOrgId = defaultOrgId
     if (defaultRoleId !== (app.defaultRoleId ?? null)) patch.defaultRoleId = defaultRoleId
     if (passwordPolicyDirty) {
@@ -248,7 +267,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       const trimmedWebhookUrl = webhookUrl.trim()
       // Clearing the URL cascades server-side to clear any stored secret too
       // — a webhook is never left half-configured (see AppsService.updateApp).
-      patch.webhookUrl = trimmedWebhookUrl === '' ? null : trimmedWebhookUrl
+      patch.activationWebhookUrl = trimmedWebhookUrl === '' ? null : trimmedWebhookUrl
     }
     if (activationDirty) {
       const trimmed = {
@@ -357,6 +376,21 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               </label>
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.requireTwoFactorHint')}
+              </p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-label-md cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="allowOfflineAccess"
+                  checked={allowOfflineAccess}
+                  onChange={(e) => setAllowOfflineAccess(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--primary)]"
+                />
+                {t('apps.fields.allowOfflineAccess')}
+              </label>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.allowOfflineAccessHint')}
               </p>
             </div>
             <div>
@@ -657,14 +691,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                     variant="outline"
                     className="mt-2"
                     loading={rotatingWebhookSecret}
-                    disabled={!app.webhookUrl || webhookUrlDirty}
+                    disabled={!app.activationWebhookUrl || webhookUrlDirty}
                     onClick={handleRotateWebhookSecret}
                   >
                     {hasWebhookSecret
                       ? t('apps.fields.regenerateWebhookSecret')
                       : t('apps.fields.generateWebhookSecret')}
                   </Button>
-                  {(!app.webhookUrl || webhookUrlDirty) && (
+                  {(!app.activationWebhookUrl || webhookUrlDirty) && (
                     <p className="mt-1 text-body-sm text-muted-foreground">
                       {t('apps.fields.webhookSecretNeedsUrlHint')}
                     </p>
@@ -711,8 +745,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
                 <div>
                   <Label htmlFor="activationMessage">{t('apps.fields.activationEmailMessage')}</Label>
-                  <Input
+                  <Textarea
                     id="activationMessage"
+                    rows={4}
                     value={activationMessage}
                     onChange={(e) => setActivationMessage(e.target.value)}
                     placeholder={t('apps.fields.activationEmailMessagePlaceholder')}

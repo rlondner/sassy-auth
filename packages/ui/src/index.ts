@@ -5,6 +5,7 @@ export { Button, buttonVariants, type ButtonProps } from './components/ui/button
 export { ButtonGroup, ButtonGroupSeparator, ButtonGroupText } from './components/ui/button-group'
 export { Badge, badgeVariants } from './components/ui/badge'
 export { Input } from './components/ui/input'
+export { Textarea } from './components/ui/textarea'
 export { Label } from './components/ui/label'
 export {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel,

@@ -321,11 +321,25 @@ describe('auth.config — emailVerification', () => {
     prisma.saUser.updateMany.mockClear();
     prisma.saUser.findUnique.mockClear();
     prisma.saUser.updateMany.mockResolvedValue({ count: 1 });
-    prisma.saUser.findUnique.mockResolvedValue({ id: 1, publicId: 'usr_1', orgId: 5 });
+    prisma.saUser.findUnique.mockResolvedValue({
+      id: 1,
+      publicId: 'usr_1',
+      orgId: 5,
+      firstName: 'Jane',
+      lastName: 'Doe',
+      betterAuthUser: { email: 'jane@example.com' },
+    });
     const options = (auth as unknown as { options: Record<string, unknown> }).options;
     const ev = options['emailVerification'] as { afterEmailVerification: (u: { id: string }) => Promise<void> };
     await ev.afterEmailVerification({ id: 'ba-1' });
-    expect(mockNotifyActivation).toHaveBeenCalledWith({ id: 1, publicId: 'usr_1', orgId: 5 });
+    expect(mockNotifyActivation).toHaveBeenCalledWith({
+      id: 1,
+      publicId: 'usr_1',
+      orgId: 5,
+      firstName: 'Jane',
+      lastName: 'Doe',
+      email: 'jane@example.com',
+    });
   });
 
   it('does not notify the activation webhook when the user was already verified (updateMany matches nothing)', async () => {

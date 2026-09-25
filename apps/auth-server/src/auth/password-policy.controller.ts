@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { prisma } from '@sassy-auth/db';
 import { PasswordPolicy } from '@sassy-auth/types';
 import { getGlobalPasswordPolicy, resolvePasswordPolicy } from './password-policy';
@@ -13,6 +14,7 @@ import { resolveAppForResetToken } from './resolve-app-for-reset-token';
  * auth.config.ts is the actual enforcement at submit time regardless of
  * what this endpoint showed beforehand.
  */
+@ApiTags('Password Policy')
 @Controller('password-policy')
 export class PasswordPolicyController {
   @Get()

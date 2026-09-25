@@ -14,6 +14,8 @@ import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password
 import { RegisterDto } from './register.dto';
 import { TurnstileService } from './turnstile.service';
 import { OauthService } from '../token/oauth.service';
+import { assertRedirectUriAllowed } from '../token/redirect-uri';
+import { OAUTH_AUTHORIZE_PATH } from '../token/oauth-metadata';
 
 /**
  * BetterAuth (v1.6.x) throws an APIError instance when sign-up fails.
@@ -31,6 +33,50 @@ function isDuplicateEmailError(e: unknown): boolean {
     'status' in e &&
     (e as { status?: string }).status === 'UNPROCESSABLE_ENTITY'
   );
+}
+
+interface RecoveredAuthorizeParams {
+  redirectUri: string;
+  codeChallenge: string | null;
+  codeChallengeMethod: string | null;
+  state: string | null;
+  nonce: string | null;
+}
+
+/**
+ * Recovers the original /authorize request's parameters from the `next` URL
+ * the admin signup page was bounced here with, so a signup-flow code can be
+ * bound to the same PKCE challenge (public clients) and carry the same
+ * state/nonce (both client types) the relying party is waiting on. Returns
+ * null for anything that doesn't name this app's /authorize path with a
+ * matching client_id and a redirect_uri — every caller must treat that as
+ * "no redirect is possible", never as an error worth failing registration
+ * over. Deliberately does not check next's origin/host: the caller still
+ * validates the recovered redirect_uri against the app's registered set via
+ * assertRedirectUriAllowed, which is the actual security boundary here.
+ */
+function recoverAuthorizeParams(
+  next: string | undefined,
+  appPublicId: string,
+): RecoveredAuthorizeParams | null {
+  if (!next) return null;
+  let url: URL;
+  try {
+    url = new URL(next);
+  } catch {
+    return null;
+  }
+  if (url.pathname !== OAUTH_AUTHORIZE_PATH) return null;
+  if (url.searchParams.get('client_id') !== appPublicId) return null;
+  const redirectUri = url.searchParams.get('redirect_uri');
+  if (!redirectUri) return null;
+  return {
+    redirectUri,
+    codeChallenge: url.searchParams.get('code_challenge'),
+    codeChallengeMethod: url.searchParams.get('code_challenge_method'),
+    state: url.searchParams.get('state'),
+    nonce: url.searchParams.get('nonce'),
+  };
 }
 
 @Injectable()
@@ -147,36 +193,80 @@ export class RegistrationService {
 
       // Authenticate the new (still-pending) user against the target app
       // immediately, so it can redirect back with a working access token
-      // instead of waiting for email verification. Only possible when the
-      // app is confidential (has a client secret) and has a registered
-      // login redirect URI: a code minted here carries no PKCE challenge
-      // (there was no /authorize request to negotiate one), and /api/token
-      // refuses a challenge-less code from a public client.
-      let redirectUrl: string | undefined;
-      if (app.clientSecretHash) {
-        // When an app has multiple registered login redirect URIs, there's no
-        // per-request way to indicate which one signup should target — pick
-        // the oldest-registered one deterministically.
-        const loginRedirect = await prisma.saAppRedirectUri.findFirst({
+      // instead of waiting for email verification. `dto.next` — when
+      // present — is the original /authorize URL the admin signup page was
+      // bounced here from, carrying the redirect_uri/code_challenge/
+      // state/nonce the relying party is waiting on. A public client's code
+      // MUST be bound to that challenge (PKCE is its only defense against
+      // code interception); a confidential client's client secret provides
+      // the same protection, so its challenge is optional and, absent a
+      // usable `next`, falls back to the oldest registered login redirect
+      // URI with no challenge at all. Every validation failure below is
+      // silent — it never fails registration itself, it just narrows what
+      // redirect (if any) comes back.
+      const isConfidential = Boolean(app.clientSecretHash);
+      const recovered = recoverAuthorizeParams(dto.next, app.publicId);
+
+      let loginUris: { uri: string; kind: string }[] | null = null;
+      if (recovered || isConfidential) {
+        loginUris = await prisma.saAppRedirectUri.findMany({
           where: { appId: app.id, kind: 'login' },
           orderBy: { id: 'asc' },
         });
-        if (loginRedirect) {
-          const code = await this.oauthService.generateCode(
-            saUserPublicId,
-            app.publicId,
-            loginRedirect.uri,
-            null,
-            null,
-            ['signup'],
-            null,
-            'openid profile email',
-            new Date(),
-          );
-          const url = new URL(loginRedirect.uri);
-          url.searchParams.set('code', code);
-          redirectUrl = url.toString();
+      }
+
+      let recoveredIsValid = false;
+      if (recovered && loginUris) {
+        try {
+          assertRedirectUriAllowed(recovered.redirectUri, { url: app.url, redirectUris: loginUris });
+          recoveredIsValid = true;
+        } catch {
+          recoveredIsValid = false;
         }
+      }
+
+      let redirectUri: string | null = null;
+      let codeChallenge: string | null = null;
+      let codeChallengeMethod: 'S256' | null = null;
+      let state: string | null = null;
+      let nonce: string | null = null;
+
+      if (recoveredIsValid && recovered) {
+        redirectUri = recovered.redirectUri;
+        state = recovered.state;
+        nonce = recovered.nonce;
+        if (recovered.codeChallenge && recovered.codeChallengeMethod === 'S256') {
+          codeChallenge = recovered.codeChallenge;
+          codeChallengeMethod = 'S256';
+        }
+      } else if (isConfidential && loginUris && loginUris.length > 0) {
+        // When an app has multiple registered login redirect URIs and no
+        // usable `next` named one of them, there's no per-request way to
+        // indicate which one signup should target — pick the
+        // oldest-registered one deterministically.
+        redirectUri = loginUris[0].uri;
+      }
+
+      let redirectUrl: string | undefined;
+      // A public client's code must carry a PKCE challenge to be
+      // redeemable; a confidential client's client secret substitutes for
+      // one.
+      if (redirectUri && (codeChallenge || isConfidential)) {
+        const code = await this.oauthService.generateCode(
+          saUserPublicId,
+          app.publicId,
+          redirectUri,
+          codeChallenge,
+          codeChallengeMethod,
+          ['signup'],
+          nonce,
+          'openid profile email',
+          new Date(),
+        );
+        const url = new URL(redirectUri);
+        url.searchParams.set('code', code);
+        if (state) url.searchParams.set('state', state);
+        redirectUrl = url.toString();
       }
 
       return { ok: true as const, orgPublicId: org.publicId, ...(redirectUrl !== undefined && { redirectUrl }) };

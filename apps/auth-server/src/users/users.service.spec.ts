@@ -4,6 +4,7 @@ import { UsersService } from './users.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { LoggerService } from '../common/logger/logger.service';
 import { EmailService } from '../email/email.service';
+import { RefreshTokenService } from '../token/refresh-token.service';
 
 jest.mock('@sassy-auth/db', () => ({
   prisma: {
@@ -36,6 +37,7 @@ jest.mock('@sassy-auth/db', () => ({
     user: {
       create: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
     account: { create: jest.fn(), findFirst: jest.fn() },
     session: { deleteMany: jest.fn() },
@@ -51,6 +53,8 @@ jest.mock('../common/permissions/assert-caller-can-grant-system-perms', () => ({
 }));
 
 const mockSend = jest.fn().mockResolvedValue({ sent: true });
+
+const mockRefreshTokenService = { revokeForUser: jest.fn(), revokeForUserApp: jest.fn() };
 
 jest.mock('../auth/auth.config', () => ({
   auth: { api: { requestPasswordReset: jest.fn().mockResolvedValue({ status: true }) } },
@@ -96,7 +100,7 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saPermission: { findMany: jest.Mock };
   saInvitation: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
   twoFactor: { deleteMany: jest.Mock };
-  user: { create: jest.Mock; update: jest.Mock };
+  user: { create: jest.Mock; update: jest.Mock; delete: jest.Mock };
   account: { create: jest.Mock; findFirst: jest.Mock };
   session: { deleteMany: jest.Mock };
 };
@@ -134,6 +138,7 @@ describe('UsersService', () => {
         SqidService,
         { provide: LoggerService, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(), getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), child: jest.fn() }) } },
         { provide: EmailService, useValue: { send: mockSend } },
+        { provide: RefreshTokenService, useValue: mockRefreshTokenService },
       ],
     }).compile();
     service = module.get(UsersService);
@@ -421,7 +426,14 @@ describe('UsersService', () => {
 
       await service.updateUser('ba-caller', 'usr1', { status: 'active' });
 
-      expect(mockNotifyActivation).toHaveBeenCalledWith({ id: 1, publicId: 'usr1', orgId: 7 });
+      expect(mockNotifyActivation).toHaveBeenCalledWith({
+        id: 1,
+        publicId: 'usr1',
+        orgId: 7,
+        firstName: 'Alice',
+        lastName: 'Smith',
+        email: 'alice@example.com',
+      });
     });
 
     it('does not notify the activation webhook for an unrelated field update', async () => {
@@ -447,8 +459,20 @@ describe('UsersService', () => {
     it('deletes the user', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser());
       mockPrisma.saUser.delete.mockResolvedValue(undefined);
+      mockPrisma.user.delete.mockResolvedValue(undefined);
       await expect(service.deleteUser('ba-caller', 'usr1')).resolves.toBeUndefined();
       expect(mockPrisma.saUser.delete).toHaveBeenCalledWith({ where: { publicId: 'usr1' } });
+    });
+
+    // bug: deleting only the SaUser row left the BetterAuth `User` row (and
+    // its unique email) behind, permanently blocking that email from
+    // registering again.
+    it('also deletes the BetterAuth User row so the email can be re-registered', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ betterAuthUserId: 'ba-1' }));
+      mockPrisma.saUser.delete.mockResolvedValue(undefined);
+      mockPrisma.user.delete.mockResolvedValue(undefined);
+      await service.deleteUser('ba-caller', 'usr1');
+      expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: 'ba-1' } });
     });
 
     it('throws NotFoundException when user not found', async () => {
@@ -1067,6 +1091,16 @@ describe('UsersService', () => {
       await expect(service.updateUser('ba-self', 'usr1', { status: 'inactive' })).rejects.toBeInstanceOf(ForbiddenException);
       expect(mockPrisma.session.deleteMany).not.toHaveBeenCalled();
     });
+
+    it('revokes the user refresh tokens when status becomes inactive', async () => {
+      await service.updateUser('ba-caller', 'usr1', { status: 'inactive' });
+      expect(mockRefreshTokenService.revokeForUser).toHaveBeenCalledWith(1);
+    });
+
+    it('does not revoke refresh tokens for a non-inactive update', async () => {
+      await service.updateUser('ba-caller', 'usr1', { firstName: 'New' });
+      expect(mockRefreshTokenService.revokeForUser).not.toHaveBeenCalled();
+    });
   });
 
   describe('reset2fa', () => {
@@ -1114,12 +1148,14 @@ describe('UsersService', () => {
       const { SqidService: SS } = await import('../common/sqid/sqid.service');
       const { LoggerService: LS } = await import('../common/logger/logger.service');
       const { EmailService: ES } = await import('../email/email.service');
+      const { RefreshTokenService: RTS } = await import('../token/refresh-token.service');
       const warnLogger = { info: jest.fn(), warn: warnSpy };
       const mod = await Test.createTestingModule({
         providers: [
           US, SS,
           { provide: LS, useValue: { getWinstonLogger: () => warnLogger } },
           { provide: ES, useValue: { send: jest.fn() } },
+          { provide: RTS, useValue: mockRefreshTokenService },
         ],
       }).compile();
       const svc = mod.get(US);
@@ -1147,6 +1183,7 @@ describe('UsersService', () => {
       const { SqidService: SS } = await import('../common/sqid/sqid.service');
       const { LoggerService: LS } = await import('../common/logger/logger.service');
       const { EmailService: ES } = await import('../email/email.service');
+      const { RefreshTokenService: RTS } = await import('../token/refresh-token.service');
       const allLogArgs: unknown[][] = [];
       const captureLogger = {
         info: (...args: unknown[]) => allLogArgs.push(args),
@@ -1157,6 +1194,7 @@ describe('UsersService', () => {
           US, SS,
           { provide: LS, useValue: { getWinstonLogger: () => captureLogger } },
           { provide: ES, useValue: { send: jest.fn() } },
+          { provide: RTS, useValue: mockRefreshTokenService },
         ],
       }).compile();
       const svc = mod.get(US);

@@ -3,9 +3,10 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { CommonModule } from '../common/common.module';
 import { EmailModule } from '../email/email.module';
+import { TokenModule } from '../token/token.module';
 
 @Module({
-  imports: [CommonModule, EmailModule],
+  imports: [CommonModule, EmailModule, TokenModule],
   providers: [UsersService],
   controllers: [UsersController],
 })

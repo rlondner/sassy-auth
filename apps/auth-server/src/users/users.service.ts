@@ -18,6 +18,7 @@ import { LoggerService } from '../common/logger/logger.service';
 import { auth } from '../auth/auth.config';
 import { runWithResetUrlCapture } from '../auth/reset-url-context';
 import { EmailService } from '../email/email.service';
+import { RefreshTokenService } from '../token/refresh-token.service';
 import { invitationEmail } from '../email/templates/invitation.template';
 import { notifyActivation } from '../activation/notify-activation';
 
@@ -62,6 +63,7 @@ export class UsersService {
     private readonly sqids: SqidService,
     private readonly logger: LoggerService,
     private readonly email: EmailService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {}
 
   async listUsers(
@@ -341,16 +343,31 @@ export class UsersService {
       include: USER_INCLUDE,
     });
 
-    // On deactivation, revoke every active session so the user is logged out
-    // everywhere at once (blocking new logins/tokens is enforced elsewhere).
+    // On deactivation, revoke every active session and refresh token so the
+    // user is logged out everywhere at once and cannot silently mint a new
+    // access token via refresh (blocking new logins/direct-token-issuance is
+    // enforced elsewhere).
     if (dto.status === 'inactive') {
       await prisma.session.deleteMany({ where: { userId: existing.betterAuthUserId } });
+      // Deliberately NOT wrapped in try/catch, unlike the equivalent call in
+      // the OIDC logout path (TokenController.handleOauthLogout): an admin
+      // explicitly deactivating a user needs this request to fail loudly if
+      // revocation didn't actually succeed, rather than silently believing
+      // deactivation fully took effect.
+      await this.refreshTokenService.revokeForUser(existing.id);
     }
 
     // Only fire the activation webhook on a genuine transition into 'active'
     // — guard against re-firing on a no-op re-save of an already-active user.
     if (dto.status === 'active' && existing.status !== 'active') {
-      await notifyActivation({ id: existing.id, publicId: existing.publicId, orgId: existing.orgId });
+      await notifyActivation({
+        id: existing.id,
+        publicId: existing.publicId,
+        orgId: existing.orgId,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        email: updated.betterAuthUser.email,
+      });
     }
 
     const changedFields = Object.keys(dto).filter((k) => dto[k as keyof typeof dto] !== undefined);
@@ -374,7 +391,14 @@ export class UsersService {
       targetOrgId: existing.orgId,
     });
 
-    await prisma.saUser.delete({ where: { publicId } });
+    // Deleting only the SaUser row leaves the BetterAuth `User` row (and its
+    // unique email) orphaned in the database, which then blocks the same
+    // email from ever registering again. Delete both in one transaction —
+    // Session/Account/TwoFactor cascade off `User` automatically.
+    await prisma.$transaction([
+      prisma.saUser.delete({ where: { publicId } }),
+      prisma.user.delete({ where: { id: existing.betterAuthUserId } }),
+    ]);
     this.logger.getWinstonLogger().info('User deleted', {
       context: 'UsersService',
       userId: publicId,

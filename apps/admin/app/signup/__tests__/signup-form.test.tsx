@@ -198,10 +198,36 @@ describe('SignupForm', () => {
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() =>
+      expect(mockRegisterAction).toHaveBeenCalledWith(
+        expect.objectContaining({ next: '/orgs' }),
+      ),
+    )
+    await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
         '/signup/check-email?email=alice%40example.com&next=%2Forgs',
       ),
     )
+  })
+
+  it('redirects to redirectUrl instead of check-email when registerAction returns one', async () => {
+    mockRegisterAction.mockResolvedValue({ ok: true, redirectUrl: 'https://localhost:3010/api/token/oauth/authorize?code=signup-code-123' })
+    const originalLocation = window.location
+    // @ts-expect-error -- jsdom's window.location is not directly assignable
+    delete window.location
+    // @ts-expect-error -- minimal stub, only `href` is exercised
+    window.location = { href: '' }
+
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} />)
+    fillValidForm()
+    completeCaptcha()
+    fireEvent.click(screen.getByText('signup.submit'))
+
+    await waitFor(() =>
+      expect(window.location.href).toBe('https://localhost:3010/api/token/oauth/authorize?code=signup-code-123'),
+    )
+    expect(mockPush).not.toHaveBeenCalled()
+
+    window.location = originalLocation
   })
 
   it('hides the Company name field when hasDefaultOrg is true, and omits it from the submit payload', async () => {

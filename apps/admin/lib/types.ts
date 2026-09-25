@@ -97,6 +97,7 @@ export interface App {
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
   requireTwoFactor: boolean;
+  allowOfflineAccess: boolean;
   // Client type is derived from whether a secret hash exists server-side —
   // the hash itself is never sent to the admin console.
   isConfidential?: boolean;
@@ -105,10 +106,10 @@ export interface App {
   defaultRoleId?: string | null;
   passwordPolicyOverride: PasswordPolicy | null;
   effectivePasswordPolicy: PasswordPolicy;
-  webhookUrl?: string | null;
+  activationWebhookUrl?: string | null;
   // The secret itself is never sent to the admin console — only whether one
   // is configured, mirroring isConfidential/clientSecretHash above.
-  hasWebhookSecret?: boolean;
+  hasActivationWebhookSecret?: boolean;
   activationEmailOverride: ActivationEmailBranding | null;
 }
 
@@ -119,6 +120,7 @@ export interface CreateAppPayload {
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
+  allowOfflineAccess?: boolean;
 }
 
 export interface UpdateAppPayload {
@@ -128,10 +130,11 @@ export interface UpdateAppPayload {
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   requireTwoFactor?: boolean;
+  allowOfflineAccess?: boolean;
   defaultOrgId?: string | null;
   defaultRoleId?: string | null;
   passwordPolicyOverride?: PasswordPolicy | null;
-  webhookUrl?: string | null;
+  activationWebhookUrl?: string | null;
   activationEmailOverride?: ActivationEmailBranding | null;
 }
 
