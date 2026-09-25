@@ -14,6 +14,11 @@ import {
   ButtonGroup,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@sassy-auth/ui'
 import { createAppAction } from '@/app/(admin)/apps/actions'
 import type { RedirectUri } from '@/lib/types'
@@ -34,6 +39,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>([])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(false)
+  const [twoFactorPromptEnabled, setTwoFactorPromptEnabled] = React.useState<boolean | null>(null)
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
   const [pending, startTransition] = React.useTransition()
 
@@ -45,6 +51,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       setRedirectUris([])
       setTwoFactorTrustDays(null)
       setRequireTwoFactor(false)
+      setTwoFactorPromptEnabled(null)
       setErrorKey(null)
     }
   }, [open])
@@ -64,6 +71,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
         redirectUris,
         twoFactorTrustDays,
         requireTwoFactor,
+        twoFactorPromptEnabled: twoFactorPromptEnabled === null ? undefined : twoFactorPromptEnabled,
       })
       if ('errorKey' in result) {
         setErrorKey(result.errorKey)
@@ -136,6 +144,27 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.twoFactorTrustDaysHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="twoFactorPromptEnabled">{t('apps.fields.twoFactorPromptEnabled')}</Label>
+              <Select
+                value={twoFactorPromptEnabled === null ? '__default__' : String(twoFactorPromptEnabled)}
+                onValueChange={(v) =>
+                  setTwoFactorPromptEnabled(v === '__default__' ? null : v === 'true')
+                }
+              >
+                <SelectTrigger id="twoFactorPromptEnabled">
+                  <SelectValue placeholder={t('apps.fields.twoFactorPromptEnabled')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__default__">{t('apps.fields.twoFactorPromptEnabledDefault')}</SelectItem>
+                  <SelectItem value="true">{t('apps.fields.twoFactorPromptEnabledOn')}</SelectItem>
+                  <SelectItem value="false">{t('apps.fields.twoFactorPromptEnabledOff')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.twoFactorPromptEnabledHint')}
               </p>
             </div>
             <div>
