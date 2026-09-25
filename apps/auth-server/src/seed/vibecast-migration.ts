@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { prisma } from '@sassy-auth/db';
+import { prisma, Prisma } from '@sassy-auth/db';
+import type { ActivationEmailBranding } from '@sassy-auth/types';
 import Sqids from 'sqids';
 import { auth } from '../auth/auth.config';
 import { generatePendingPublicId } from '../common/pending-public-id';
@@ -23,10 +24,10 @@ import { resolveSeedPassword } from './seed-password';
  * Deliberately NOT carried over from dev, and left for the admin console
  * after this runs instead:
  *   - logo: cosmetic, upload it via the Apps edit drawer.
- *   - activationWebhookUrl / activationWebhookSecret: environment-specific delivery target and
- *     a secret that must never live in a checked-in file. Configure via
- *     the "Generate webhook secret" flow (AppsService.rotateWebhookSecret)
- *     once the app's real webhook URL is known.
+ *   - activationWebhookSecret: must never live in a checked-in file. Generate it via
+ *     the "Generate webhook secret" flow (AppsService.rotateWebhookSecret) once the
+ *     app exists — the webhook won't actually fire until a secret is set, even if
+ *     activationWebhookUrl (below) was seeded.
  *   - The extra dev-only orgs seen alongside vibecast in the source
  *     database ("Smoke Test Co", "Marketing Agency", "Toto inc") are test
  *     fixtures, not part of the vibecast construct itself.
@@ -35,13 +36,15 @@ import { resolveSeedPassword } from './seed-password';
  * production must supply a real SEED_ADMIN_PASSWORD (resolveSeedPassword
  * refuses its dev default outside NODE_ENV=development/test).
  *
- * The app's url and login/logout redirect URIs are seeded from
- * VIBECAST_APP_URL/VIBECAST_LOGIN_REDIRECT_URI/VIBECAST_LOGOUT_REDIRECT_URI
- * only the first time the SaApp is created. Once it exists, those fields
- * are owned by the SaApp record itself (editable via the admin console) —
- * the env vars are not read again on subsequent runs, so they're no longer
- * required (or wired) in render.yaml for environments where vibecast has
- * already been provisioned.
+ * The app's url, login/logout redirect URIs, activation webhook url, and activation
+ * email branding are seeded from VIBECAST_APP_URL/VIBECAST_LOGIN_REDIRECT_URI/
+ * VIBECAST_LOGOUT_REDIRECT_URI/VIBECAST_ACTIVATION_WEBHOOK_URL/
+ * VIBECAST_ACTIVATION_EMAIL_FROM_NAME/VIBECAST_ACTIVATION_EMAIL_FROM_ADDRESS/
+ * VIBECAST_ACTIVATION_EMAIL_SUBJECT/VIBECAST_ACTIVATION_EMAIL_MESSAGE only the first
+ * time the SaApp is created. Once it exists, those fields are owned by the SaApp
+ * record itself (editable via the admin console) — the env vars are not read again on
+ * subsequent runs, so they're no longer required (or wired) in render.yaml for
+ * environments where vibecast has already been provisioned.
  */
 
 const sqids = new Sqids({
@@ -154,6 +157,24 @@ async function createWithPublicId<T extends { id: number }>(
   return update(draft.id, sqids.encode([draft.id]));
 }
 
+/**
+ * Builds the activation email override from whichever VIBECAST_ACTIVATION_EMAIL_*
+ * vars are set, same "genuinely optional, no dev fallback" treatment as the
+ * webhook url above — every field already falls back to the platform default
+ * (see @sassy-auth/types ActivationEmailBranding), and this only runs once.
+ * Returns null (not an empty object) when nothing is set, matching the "null
+ * means use the platform default" contract on SaApp.activationEmailOverride.
+ */
+function buildActivationEmailOverride(): ActivationEmailBranding | null {
+  const branding: ActivationEmailBranding = {
+    fromName: process.env.VIBECAST_ACTIVATION_EMAIL_FROM_NAME || undefined,
+    fromAddress: process.env.VIBECAST_ACTIVATION_EMAIL_FROM_ADDRESS || undefined,
+    subject: process.env.VIBECAST_ACTIVATION_EMAIL_SUBJECT || undefined,
+    message: process.env.VIBECAST_ACTIVATION_EMAIL_MESSAGE || undefined,
+  };
+  return Object.values(branding).some((v) => v !== undefined) ? branding : null;
+}
+
 async function ensureApp() {
   const existing = await prisma.saApp.findUnique({ where: { name: APP_NAME } });
   if (existing) {
@@ -161,6 +182,11 @@ async function ensureApp() {
     return existing;
   }
   const url = requireEnvOutsideProd('VIBECAST_APP_URL', 'https://localhost:3030');
+  // Genuinely optional (unlike url/redirect URIs above): notify-activation.ts already
+  // treats a missing activationWebhookUrl as "don't send", and the webhook won't fire
+  // until an admin also generates a secret via the console, so there's no dev fallback.
+  const activationWebhookUrl = process.env.VIBECAST_ACTIVATION_WEBHOOK_URL || undefined;
+  const activationEmailOverride = buildActivationEmailOverride();
   const app = await prisma.$transaction((tx) =>
     createWithPublicId(
       () =>
@@ -169,6 +195,8 @@ async function ensureApp() {
             publicId: generatePendingPublicId(),
             name: APP_NAME,
             url,
+            activationWebhookUrl,
+            activationEmailOverride: (activationEmailOverride as unknown as Prisma.InputJsonValue) ?? undefined,
             isPlatform: false,
             requireTwoFactor: false,
           },
