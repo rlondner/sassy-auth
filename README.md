@@ -500,6 +500,7 @@ Copy the two output lines directly into your `.env.local` file.
 | `NEXT_PUBLIC_ADMIN_CONTACT_EMAIL` | Optional. Email address shown on the admin `/oauth-error` page's "Contact administrator" mailto. Leave unset to hide the link. The `NEXT_PUBLIC_` prefix is required so Next.js inlines it into the client bundle. |
 | `PLATFORM_REQUIRE_2FA` | Set to exactly `true` to require 2FA for all platform operators. See [Two-Factor Authentication](#two-factor-authentication-2fa). Default: unset |
 | `TWO_FACTOR_TRUST_DAYS` | System-wide default for the "trust this device" cookie lifetime and the 2FA re-prompt threshold, in days. Falls back to 14 if unset, empty, zero, negative, or not an integer. An individual app can override this via its `twoFactorTrustDays` field. |
+| `TWO_FACTOR_PROMPT_ENABLED` | System-wide default for whether the optional "Secure your account" 2FA setup interstitial is shown at all, independent of the re-prompt interval. Falls back to `true` if unset, empty, or not exactly `false`/`0` (case-insensitive). An individual app can override this via its `twoFactorPromptEnabled` field. |
 
 ### Rate limiting (optional)
 
