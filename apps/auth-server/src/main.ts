@@ -12,6 +12,8 @@ import { AppModule } from './app.module';
 import { auth, TRUSTED_ORIGINS } from './auth/auth.config';
 import { createDefaultAuthRateLimiter } from './auth/auth-rate-limit';
 import { runWithPrivateRelayCapture } from './social/apple-private-relay-context';
+import { runWithSocialConsentCapture } from './social/social-consent-context';
+import { resolveClientIp } from './common/net/resolve-client-ip';
 import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
@@ -152,7 +154,9 @@ async function bootstrap() {
     return next();
   };
   expressApp.all('/api/auth/*', authCors, createDefaultAuthRateLimiter(), (req, res) =>
-    runWithPrivateRelayCapture(() => authNodeHandler(req, res)),
+    runWithPrivateRelayCapture(() =>
+      runWithSocialConsentCapture(resolveClientIp(req), () => authNodeHandler(req, res)),
+    ),
   );
 
   // Final review finding 1: mount an explicit JSON body parser on the raw

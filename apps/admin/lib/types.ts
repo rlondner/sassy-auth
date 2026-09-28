@@ -112,6 +112,9 @@ export interface App {
   // is configured, mirroring isConfidential/clientSecretHash above.
   hasActivationWebhookSecret?: boolean;
   activationEmailOverride: ActivationEmailBranding | null;
+  privacyPolicyUrl?: string | null;
+  termsUrl?: string | null;
+  gdprUrl?: string | null;
 }
 
 export interface CreateAppPayload {
@@ -139,6 +142,9 @@ export interface UpdateAppPayload {
   passwordPolicyOverride?: PasswordPolicy | null;
   activationWebhookUrl?: string | null;
   activationEmailOverride?: ActivationEmailBranding | null;
+  privacyPolicyUrl?: string | null;
+  termsUrl?: string | null;
+  gdprUrl?: string | null;
 }
 
 export interface ListAppsParams {

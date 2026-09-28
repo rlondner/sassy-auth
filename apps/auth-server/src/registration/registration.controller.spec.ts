@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
+import type { Request } from 'express';
 import { RegistrationController } from './registration.controller';
 import { RegistrationService } from './registration.service';
 import { AppLookupRateLimitGuard } from './rate-limit.guard';
@@ -21,7 +22,7 @@ describe('RegistrationController', () => {
   });
 
   describe('getAppName', () => {
-    it('delegates to the service with the query param', async () => {
+    it('delegates to the service with the query param and the resolved client IP', async () => {
       const passwordPolicy = {
         minLength: 12,
         requireUppercase: true,
@@ -33,9 +34,10 @@ describe('RegistrationController', () => {
       };
       mockService.getAppName.mockResolvedValue({ name: 'MyApp', hasDefaultOrg: false, passwordPolicy });
 
-      const result = await controller.getAppName('sq_1');
+      const req = { ips: [], ip: '203.0.113.5' } as unknown as Request;
+      const result = await controller.getAppName('sq_1', req);
 
-      expect(mockService.getAppName).toHaveBeenCalledWith('sq_1');
+      expect(mockService.getAppName).toHaveBeenCalledWith('sq_1', '203.0.113.5');
       expect(result).toEqual({ name: 'MyApp', hasDefaultOrg: false, passwordPolicy });
     });
 
