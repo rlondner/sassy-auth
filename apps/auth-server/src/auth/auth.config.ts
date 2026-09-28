@@ -123,6 +123,23 @@ export const auth = betterAuth({
     // production-only condition as `secure` above so dev keeps the
     // unprefixed name regardless of the auth-server's protocol.
     useSecureCookies: process.env.NODE_ENV === 'production',
+    // bug: admin (auth.milissai.com) and this server (auth-api.milissai.com)
+    // are sibling subdomains in production. Without this, BetterAuth issues
+    // a host-only session cookie (no Domain attribute); apps/admin's
+    // forwardSessionCookie() (login/actions.ts) copies that missing Domain
+    // onto the cookie it sets for its own origin, so the browser only ever
+    // holds the cookie for auth.milissai.com. A resource server's
+    // /oauth/authorize hits auth-api.milissai.com directly — no session
+    // cookie arrives, so it bounces to /login, whose OWN session check
+    // (a server-to-server fetch, immune to the missing Domain) says "signed
+    // in" and redirects straight back to /oauth/authorize. Infinite loop
+    // until the client is throttled. COOKIE_DOMAIN is unset in local dev
+    // (admin and auth-server share the literal host "localhost", differing
+    // only by port, so cookies already flow) — only production needs the
+    // shared parent domain.
+    ...(process.env.COOKIE_DOMAIN
+      ? { crossSubDomainCookies: { enabled: true, domain: process.env.COOKIE_DOMAIN } }
+      : {}),
   },
   rateLimit: {
     // Explicit rate-limit for the 2FA verify endpoints. In better-auth 1.6.11

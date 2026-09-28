@@ -410,6 +410,42 @@ describe('auth.config — hooks.before (reset-password policy enforcement)', () 
   });
 });
 
+// bug: without a Domain attribute the session cookie is host-only and
+// scoped to whichever origin sets it (the admin console). A resource
+// server's /oauth/authorize hits this server's own subdomain directly and
+// never receives it, producing the /login <-> /oauth/authorize redirect
+// loop described in the incident. crossSubDomainCookies must be enabled
+// with the shared parent domain whenever COOKIE_DOMAIN is configured, and
+// left off (BetterAuth's default) when it isn't, so local dev — where
+// admin and this server share the literal host "localhost" — is unaffected.
+describe('auth.config — advanced.crossSubDomainCookies (production subdomain redirect loop)', () => {
+  const ORIGINAL_COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
+
+  afterEach(() => {
+    if (ORIGINAL_COOKIE_DOMAIN === undefined) delete process.env.COOKIE_DOMAIN;
+    else process.env.COOKIE_DOMAIN = ORIGINAL_COOKIE_DOMAIN;
+    jest.resetModules();
+  });
+
+  it('enables crossSubDomainCookies with the configured parent domain when COOKIE_DOMAIN is set', async () => {
+    process.env.COOKIE_DOMAIN = '.milissai.com';
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const advanced = options['advanced'] as Record<string, unknown>;
+    expect(advanced['crossSubDomainCookies']).toEqual({ enabled: true, domain: '.milissai.com' });
+  });
+
+  it('leaves crossSubDomainCookies unset when COOKIE_DOMAIN is not configured (local dev)', async () => {
+    delete process.env.COOKIE_DOMAIN;
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const advanced = options['advanced'] as Record<string, unknown>;
+    expect(advanced['crossSubDomainCookies']).toBeUndefined();
+  });
+});
+
 describe('auth.config — session gate FORBIDDEN code (real invocation)', () => {
   async function loadSessionCreateBefore() {
     const { auth } = await import('./auth.config');

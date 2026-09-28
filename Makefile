@@ -1,4 +1,7 @@
-.PHONY: migrate migrate-deploy e2e-tests
+.PHONY: generate migrate migrate-deploy e2e-tests
+
+generate:
+	pnpm --filter @sassy-auth/db run db:generate
 
 migrate:
 	pnpm --filter @sassy-auth/db run db:migrate

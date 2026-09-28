@@ -142,6 +142,11 @@ For production deployment to Render with Neon Postgres — including custom doma
 [`render.yaml`](render.yaml) Blueprint, production Dockerfiles, and a local mock
 layout on custom ports — see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
+If the admin console and auth server live on sibling subdomains (the normal
+case in production), set [`COOKIE_DOMAIN`](#cross-subdomain-cookies-required-for-live-deployments) —
+without it, third-party sign-in loops forever between `/login` and
+`/oauth/authorize`.
+
 ## Quick Start (Flox)
 
 If you have [Flox](https://flox.dev) installed, this is the whole thing — it provisions Node.js, pnpm, PostgreSQL, Python, and uv, writes a `.env.local` with freshly generated RSA keys, migrates the database, and seeds platform data:
@@ -229,6 +234,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
     - [Required](#required)
     - [Admin console](#admin-console)
     - [Rate limiting (optional)](#rate-limiting-optional)
+    - [Cross-subdomain cookies (required for live deployments)](#cross-subdomain-cookies-required-for-live-deployments)
     - [Password policy (optional)](#password-policy-optional)
     - [Signup captcha (optional)](#signup-captcha-optional)
     - [Observability (optional)](#observability-optional)
@@ -514,6 +520,14 @@ Two NestJS throttler buckets (`@nestjs/throttler`), applied globally, keyed per-
 | `AUTH_RATE_WINDOW_MS`    | Window length in milliseconds for `AUTH_RATE_LIMIT`.                     | `60000` (1 min) |
 
 See also [Self-serve Registration rate limiting](#rate-limiting) for the separate, differently-defaulted `REGISTER_RATE_LIMIT`/`REGISTER_RATE_WINDOW_MS` pair that guards `POST /api/register`.
+
+### Cross-subdomain cookies (required for live deployments)
+
+| Variable | Description | Default |
+|----------|--------------|---------|
+| `COOKIE_DOMAIN` | Parent domain shared by the admin console and this auth server when they're deployed on sibling subdomains (e.g. `.example.com` for `auth.example.com` + `auth-api.example.com`). Enables BetterAuth's `crossSubDomainCookies` so the session cookie set at sign-in carries a `Domain` attribute and is sent by the browser to both origins. | *(unset)* |
+
+Without this, BetterAuth issues a host-only session cookie, scoped to whichever origin sets it (the admin console). That's invisible in local dev, where the admin console and auth server both run on the literal host `localhost` (differing only by port — cookies aren't port-scoped). It breaks the moment they're deployed to two different subdomains in production: a resource server's `/oauth/authorize` redirect hits the auth server directly in the browser, finds no session cookie, and bounces to the admin console's `/login`. That page's own session check is a server-to-server fetch — unaffected by the missing cookie domain — so it thinks the user is signed in and redirects straight back to `/oauth/authorize`, producing an infinite redirect loop until the client is throttled. Set `COOKIE_DOMAIN` to the shared parent domain on the auth server for any live deployment where the admin console and auth server are on sibling subdomains — see [DEPLOYMENT.md](DEPLOYMENT.md#4-environment-variable-reference-production).
 
 ### Password policy (optional)
 
