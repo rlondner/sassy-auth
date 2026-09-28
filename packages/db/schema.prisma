@@ -119,6 +119,7 @@ model SaApp {
   /// Full data URI (e.g. "data:image/png;base64,...."). null = no logo set.
   logo        String?
   twoFactorTrustDays Int?
+  twoFactorPromptEnabled Boolean? // null = inherit system default (TWO_FACTOR_PROMPT_ENABLED)
   requireTwoFactor   Boolean        @default(false)
   allowOfflineAccess Boolean        @default(false)
   isPlatform         Boolean        @default(false)

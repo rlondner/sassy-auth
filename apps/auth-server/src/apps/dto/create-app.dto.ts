@@ -28,6 +28,16 @@ export class CreateAppDto {
   @Max(3650)
   twoFactorTrustDays?: number | null;
 
+  /**
+   * Whether the optional post-login "Secure your account" 2FA setup
+   * interstitial is shown for this app.
+   * null → use system default (TWO_FACTOR_PROMPT_ENABLED env var, default true).
+   */
+  @IsOptional()
+  @ValidateIf((o: CreateAppDto) => o.twoFactorPromptEnabled !== null)
+  @IsBoolean()
+  twoFactorPromptEnabled?: boolean | null;
+
   @IsOptional() @IsBoolean() requireTwoFactor?: boolean;
 
   @IsOptional() @IsBoolean() allowOfflineAccess?: boolean;

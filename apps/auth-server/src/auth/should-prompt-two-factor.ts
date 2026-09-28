@@ -3,6 +3,8 @@
  * shown to this user after a successful password login?
  *
  * Returns true only when:
+ * - promptEnabled is true (the interstitial is not disabled globally or for
+ *   this app), AND
  * - The user does NOT yet have 2FA enabled, AND
  * - They have never been prompted (promptedAt is null) OR the last prompt was
  *   strictly more than intervalDays ago. The boundary itself (elapsed === interval)
@@ -15,6 +17,7 @@ export interface ShouldPromptParams {
   promptedAt: Date | null;
   now: Date;
   intervalDays: number;
+  promptEnabled: boolean;
 }
 
 export function shouldPromptTwoFactor({
@@ -22,7 +25,9 @@ export function shouldPromptTwoFactor({
   promptedAt,
   now,
   intervalDays,
+  promptEnabled,
 }: ShouldPromptParams): boolean {
+  if (!promptEnabled) return false;
   if (twoFactorEnabled) return false;
   if (promptedAt === null) return true;
   const intervalMs = intervalDays * 24 * 60 * 60 * 1000;

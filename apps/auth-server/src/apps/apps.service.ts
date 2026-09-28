@@ -17,7 +17,7 @@ import { ListAppsQueryDto } from './dto/list-apps-query.dto';
 type RedirectUriRow = { uri: string; kind: string };
 type AppRow = {
   publicId: string; name: string; url: string; logo?: string | null; isPlatform: boolean;
-  twoFactorTrustDays: number | null; requireTwoFactor: boolean;
+  twoFactorTrustDays: number | null; twoFactorPromptEnabled: boolean | null; requireTwoFactor: boolean;
   allowOfflineAccess: boolean;
   redirectUris?: RedirectUriRow[];
   // Optional in this type because existing tests build rows by hand without
@@ -39,6 +39,7 @@ function formatApp(a: AppRow) {
   return {
     publicId: a.publicId, name: a.name, url: a.url, logo: a.logo ?? null, isPlatform: a.isPlatform,
     twoFactorTrustDays: a.twoFactorTrustDays ?? null,
+    twoFactorPromptEnabled: a.twoFactorPromptEnabled ?? null,
     requireTwoFactor: a.requireTwoFactor,
     allowOfflineAccess: a.allowOfflineAccess,
     redirectUris: (a.redirectUris ?? []).map((r) => ({ uri: r.uri, kind: r.kind })),
@@ -215,6 +216,7 @@ export class AppsService {
           url: true,
           isPlatform: true,
           twoFactorTrustDays: true,
+          twoFactorPromptEnabled: true,
           requireTwoFactor: true,
           allowOfflineAccess: true,
           clientSecretHash: true,
@@ -268,7 +270,7 @@ export class AppsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
-          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, logo: dto.logo ?? null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null, requireTwoFactor: dto.requireTwoFactor ?? false, allowOfflineAccess: dto.allowOfflineAccess ?? false },
+          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, logo: dto.logo ?? null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null, twoFactorPromptEnabled: dto.twoFactorPromptEnabled ?? null, requireTwoFactor: dto.requireTwoFactor ?? false, allowOfflineAccess: dto.allowOfflineAccess ?? false },
         });
         const updated = await tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
         if (dto.redirectUris) {
@@ -293,6 +295,7 @@ export class AppsService {
       dto.url === undefined &&
       dto.logo === undefined &&
       dto.twoFactorTrustDays === undefined &&
+      dto.twoFactorPromptEnabled === undefined &&
       dto.requireTwoFactor === undefined &&
       dto.allowOfflineAccess === undefined &&
       dto.redirectUris === undefined &&
@@ -306,7 +309,7 @@ export class AppsService {
       dto.activationEmailOverride === undefined
     ) {
       throw new BadRequestException(
-        'At least one of name, url, logo, twoFactorTrustDays, requireTwoFactor, allowOfflineAccess, redirectUris, defaultOrgId, defaultRoleId, passwordPolicyOverride, activationWebhookUrl, privacyPolicyUrl, termsUrl, gdprUrl, or activationEmailOverride must be provided',
+        'At least one of name, url, logo, twoFactorTrustDays, twoFactorPromptEnabled, requireTwoFactor, allowOfflineAccess, redirectUris, defaultOrgId, defaultRoleId, passwordPolicyOverride, activationWebhookUrl, privacyPolicyUrl, termsUrl, gdprUrl, or activationEmailOverride must be provided',
       );
     }
     await checkPermission(callerBaId, 'platform.apps.manage');
@@ -334,6 +337,9 @@ export class AppsService {
             ...(dto.logo !== undefined && { logo: dto.logo }),
             ...(dto.twoFactorTrustDays !== undefined && {
               twoFactorTrustDays: dto.twoFactorTrustDays,
+            }),
+            ...(dto.twoFactorPromptEnabled !== undefined && {
+              twoFactorPromptEnabled: dto.twoFactorPromptEnabled,
             }),
             ...(dto.requireTwoFactor !== undefined && {
               requireTwoFactor: dto.requireTwoFactor,

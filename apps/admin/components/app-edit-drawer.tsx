@@ -48,6 +48,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [originalLogo, setOriginalLogo] = React.useState<string | null>(app.logo ?? null)
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
+  const [twoFactorPromptEnabled, setTwoFactorPromptEnabled] = React.useState<boolean | null>(app.twoFactorPromptEnabled ?? null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(app.requireTwoFactor ?? false)
   const [allowOfflineAccess, setAllowOfflineAccess] = React.useState<boolean>(app.allowOfflineAccess ?? false)
   const [defaultOrgId, setDefaultOrgId] = React.useState<string | null>(app.defaultOrgId ?? null)
@@ -116,6 +117,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setOriginalLogo(app.logo ?? null)
     setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
+    setTwoFactorPromptEnabled(app.twoFactorPromptEnabled ?? null)
     setRequireTwoFactor(app.requireTwoFactor ?? false)
     setAllowOfflineAccess(app.allowOfflineAccess ?? false)
     setDefaultOrgId(app.defaultOrgId ?? null)
@@ -246,7 +248,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
     activationSubject.trim() !== (activationOverrideBaseline.subject ?? '') ||
     activationMessage.trim() !== (activationOverrideBaseline.message ?? '')
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -259,12 +261,13 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; twoFactorPromptEnabled?: boolean | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
     if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
+    if (twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null)) patch.twoFactorPromptEnabled = twoFactorPromptEnabled
     if (requireTwoFactor !== (app.requireTwoFactor ?? false)) patch.requireTwoFactor = requireTwoFactor
     if (allowOfflineAccess !== (app.allowOfflineAccess ?? false)) patch.allowOfflineAccess = allowOfflineAccess
     if (defaultOrgId !== (app.defaultOrgId ?? null)) patch.defaultOrgId = defaultOrgId
@@ -382,6 +385,27 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               />
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.twoFactorTrustDaysHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="twoFactorPromptEnabled">{t('apps.fields.twoFactorPromptEnabled')}</Label>
+              <Select
+                value={twoFactorPromptEnabled === null ? '__default__' : String(twoFactorPromptEnabled)}
+                onValueChange={(v) =>
+                  setTwoFactorPromptEnabled(v === '__default__' ? null : v === 'true')
+                }
+              >
+                <SelectTrigger id="twoFactorPromptEnabled">
+                  <SelectValue placeholder={t('apps.fields.twoFactorPromptEnabled')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__default__">{t('apps.fields.twoFactorPromptEnabledDefault')}</SelectItem>
+                  <SelectItem value="true">{t('apps.fields.twoFactorPromptEnabledOn')}</SelectItem>
+                  <SelectItem value="false">{t('apps.fields.twoFactorPromptEnabledOff')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.twoFactorPromptEnabledHint')}
               </p>
             </div>
             <div>

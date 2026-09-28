@@ -10,7 +10,7 @@ import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
 import { extractClientId, fetchOutstandingConsent } from '@/lib/consent'
 import { forwardNamedCookie, forwardNamedCookieWithMaxAge } from '../account/security/actions'
-import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '@/lib/two-factor-prompt'
+import { shouldPromptTwoFactor, getSystemTrustDaysClient, getSystemPromptEnabledClient } from '@/lib/two-factor-prompt'
 
 const tracer = trace.getTracer('sassy-auth.admin')
 
@@ -333,10 +333,12 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
     }
   } catch { /* fail open — no prompt on error */ }
 
-  // Resolve interval: check if next contains a client_id for per-app override.
+  // Resolve interval + prompt-enabled: check if next contains a client_id for
+  // per-app override.
   // validateNextUrl returns relative paths — parse with a base so both relative
   // and absolute values work without throwing.
   let intervalDays = getSystemTrustDaysClient()
+  let promptEnabled = getSystemPromptEnabledClient()
   if (nextSafe) {
     try {
       const nextUrl = new URL(nextSafe, AUTH_SERVER_URL)
@@ -347,17 +349,20 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
           { cache: 'no-store' },
         )
         if (trustRes.ok) {
-          const data = (await trustRes.json()) as { effectiveTrustDays: number }
+          const data = (await trustRes.json()) as { effectiveTrustDays: number; promptEnabled: boolean }
           // FIX 8: guard against deployment-skew payloads
           if (typeof data.effectiveTrustDays === 'number' && data.effectiveTrustDays > 0) {
             intervalDays = data.effectiveTrustDays
+          }
+          if (typeof data.promptEnabled === 'boolean') {
+            promptEnabled = data.promptEnabled
           }
         }
       }
     } catch { /* use system default */ }
   }
 
-  if (twoFactorStateKnown && shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays })) {
+  if (twoFactorStateKnown && shouldPromptTwoFactor({ twoFactorEnabled, promptedAt: twoFactorPromptedAt ? new Date(twoFactorPromptedAt) : null, now: new Date(), intervalDays, promptEnabled })) {
     const encodedNext = nextSafe ? encodeURIComponent(nextSafe) : ''
     redirect(`/login/two-factor-prompt${encodedNext ? `?next=${encodedNext}` : ''}`)
   }

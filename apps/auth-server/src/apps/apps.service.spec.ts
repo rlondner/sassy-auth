@@ -52,8 +52,8 @@ const loggerFake: Partial<LoggerService> = {
   getWinstonLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() } as never),
 };
 
-const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false };
-const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', isPlatform: true, twoFactorTrustDays: null, requireTwoFactor: false };
+const appRow = { id: 1, publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false };
+const platformRow = { id: 2, publicId: 'sq_2', name: 'SassyAuth', url: 'https://auth', isPlatform: true, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false };
 
 describe('AppsService', () => {
   let service: AppsService;
@@ -82,7 +82,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -108,7 +108,7 @@ describe('AppsService', () => {
     });
     expect(result).toEqual({
       publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null,
-      isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [],
+      isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [],
       isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null,
       passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy,
       activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null,
@@ -168,12 +168,13 @@ describe('AppsService', () => {
         logo: null,
         isPlatform: false,
         twoFactorTrustDays: null,
+        twoFactorPromptEnabled: null,
         requireTwoFactor: false,
         allowOfflineAccess: false,
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -364,6 +365,48 @@ describe('AppsService', () => {
       data: { twoFactorTrustDays: null },
       include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
+  });
+
+  it('createApp stores a provided twoFactorPromptEnabled', async () => {
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, twoFactorPromptEnabled: false });
+    const result = await service.createApp('ba-caller', {
+      name: 'Customer Portal', url: 'https://portal.example.com', twoFactorPromptEnabled: false,
+    });
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ twoFactorPromptEnabled: false }),
+    }));
+    expect(result.twoFactorPromptEnabled).toBe(false);
+  });
+
+  it('updateApp sets twoFactorPromptEnabled when provided', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, twoFactorPromptEnabled: true });
+    await service.updateApp('ba-caller', 'sq_1', { twoFactorPromptEnabled: true });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { twoFactorPromptEnabled: true },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp clears twoFactorPromptEnabled when given null', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, twoFactorPromptEnabled: null });
+    await service.updateApp('ba-caller', 'sq_1', { twoFactorPromptEnabled: null });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { twoFactorPromptEnabled: null },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp does NOT throw when only twoFactorPromptEnabled is provided', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, twoFactorPromptEnabled: false });
+    await expect(service.updateApp('ba-caller', 'sq_1', { twoFactorPromptEnabled: false })).resolves.toBeDefined();
+    expect(mockPrisma.saApp.update).toHaveBeenCalled();
   });
 
   it('updateApp omits twoFactorTrustDays from update data when DTO omits it', async () => {

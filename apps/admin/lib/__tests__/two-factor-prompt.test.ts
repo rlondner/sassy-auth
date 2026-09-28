@@ -1,4 +1,4 @@
-import { shouldPromptTwoFactor, getSystemTrustDaysClient } from '../two-factor-prompt'
+import { shouldPromptTwoFactor, getSystemTrustDaysClient, getSystemPromptEnabledClient } from '../two-factor-prompt'
 
 describe('shouldPromptTwoFactor', () => {
   it('returns false when the user already has 2FA enabled', () => {
@@ -7,6 +7,7 @@ describe('shouldPromptTwoFactor', () => {
       promptedAt: null,
       now: new Date('2026-08-23T00:00:00Z'),
       intervalDays: 14,
+      promptEnabled: true,
     })
 
     expect(result).toBe(false)
@@ -18,6 +19,7 @@ describe('shouldPromptTwoFactor', () => {
       promptedAt: null,
       now: new Date('2026-08-23T00:00:00Z'),
       intervalDays: 14,
+      promptEnabled: true,
     })
 
     expect(result).toBe(true)
@@ -29,6 +31,7 @@ describe('shouldPromptTwoFactor', () => {
       promptedAt: new Date('2026-08-20T00:00:00Z'),
       now: new Date('2026-08-23T00:00:00Z'),
       intervalDays: 14,
+      promptEnabled: true,
     })
 
     expect(result).toBe(false)
@@ -40,6 +43,7 @@ describe('shouldPromptTwoFactor', () => {
       promptedAt: new Date('2026-08-01T00:00:00Z'),
       now: new Date('2026-08-23T00:00:00Z'),
       intervalDays: 14,
+      promptEnabled: true,
     })
 
     expect(result).toBe(true)
@@ -54,6 +58,7 @@ describe('shouldPromptTwoFactor', () => {
       promptedAt,
       now,
       intervalDays: 14,
+      promptEnabled: true,
     })
 
     expect(result).toBe(false)
@@ -72,9 +77,34 @@ describe('shouldPromptTwoFactor', () => {
       promptedAt: new Date(0),
       now: new Date(1000),
       intervalDays: 14,
+      promptEnabled: true,
     })
 
     expect(result).toBe(false)
+  })
+
+  it('returns false when promptEnabled is false, even if never prompted', () => {
+    const result = shouldPromptTwoFactor({
+      twoFactorEnabled: false,
+      promptedAt: null,
+      now: new Date('2026-08-23T00:00:00Z'),
+      intervalDays: 14,
+      promptEnabled: false,
+    })
+
+    expect(result).toBe(false)
+  })
+
+  it('returns true when promptEnabled is true and all other conditions are met', () => {
+    const result = shouldPromptTwoFactor({
+      twoFactorEnabled: false,
+      promptedAt: null,
+      now: new Date('2026-08-23T00:00:00Z'),
+      intervalDays: 14,
+      promptEnabled: true,
+    })
+
+    expect(result).toBe(true)
   })
 })
 
@@ -109,5 +139,34 @@ describe('getSystemTrustDaysClient', () => {
   it('uses the env var when it is a valid positive integer', () => {
     process.env['TWO_FACTOR_TRUST_DAYS'] = '30'
     expect(getSystemTrustDaysClient()).toBe(30)
+  })
+})
+
+describe('getSystemPromptEnabledClient', () => {
+  const originalEnv = process.env['TWO_FACTOR_PROMPT_ENABLED']
+
+  afterEach(() => {
+    if (originalEnv === undefined) delete process.env['TWO_FACTOR_PROMPT_ENABLED']
+    else process.env['TWO_FACTOR_PROMPT_ENABLED'] = originalEnv
+  })
+
+  it('defaults to true when unset', () => {
+    delete process.env['TWO_FACTOR_PROMPT_ENABLED']
+    expect(getSystemPromptEnabledClient()).toBe(true)
+  })
+
+  it('returns false when set to "false"', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = 'false'
+    expect(getSystemPromptEnabledClient()).toBe(false)
+  })
+
+  it('returns false when set to "0"', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = '0'
+    expect(getSystemPromptEnabledClient()).toBe(false)
+  })
+
+  it('returns true when set to "true"', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = 'true'
+    expect(getSystemPromptEnabledClient()).toBe(true)
   })
 })

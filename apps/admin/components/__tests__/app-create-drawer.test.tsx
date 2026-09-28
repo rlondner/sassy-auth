@@ -9,6 +9,95 @@ jest.mock('@/app/(admin)/apps/actions', () => ({
   createAppAction: jest.fn(),
 }))
 
+// Radix Select is awkward to drive in JSDOM (it relies on pointer events that
+// JSDOM does not implement). Swap it for a thin native <select> shim so tests
+// can call fireEvent.change to pick a value. Mirrors the shim in
+// app-edit-drawer.test.tsx.
+jest.mock('@sassy-auth/ui', () => {
+  const actual = jest.requireActual('@sassy-auth/ui')
+  type ChildrenProps = { children?: React.ReactNode }
+  type SelectProps = ChildrenProps & {
+    value?: string
+    onValueChange?: (value: string) => void
+  }
+  type SelectItemProps = ChildrenProps & { value: string }
+  type SelectValueProps = { placeholder?: string }
+  const SelectContext = React.createContext<{
+    value: string
+    onValueChange: (value: string) => void
+    placeholder: string
+  }>({ value: '', onValueChange: () => undefined, placeholder: '' })
+
+  function Select({ value = '', onValueChange = () => undefined, children }: SelectProps) {
+    const [placeholder, setPlaceholder] = React.useState('')
+    return (
+      <SelectContext.Provider value={{ value, onValueChange, placeholder }}>
+        <select
+          aria-label={placeholder || 'select'}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        >
+          <option value="" disabled>{placeholder || 'Select'}</option>
+          {React.Children.toArray(children).flatMap((child) => {
+            if (!React.isValidElement(child)) return []
+            const grandchildren = (child.props as ChildrenProps).children
+            return React.Children.toArray(grandchildren)
+          })}
+        </select>
+        <div hidden>{children}</div>
+        <SelectPlaceholderSink onPlaceholder={setPlaceholder}>{children}</SelectPlaceholderSink>
+      </SelectContext.Provider>
+    )
+  }
+
+  function SelectPlaceholderSink({
+    children,
+    onPlaceholder,
+  }: {
+    children?: React.ReactNode
+    onPlaceholder: (value: string) => void
+  }) {
+    React.useEffect(() => {
+      let found = ''
+      const walk = (nodes: React.ReactNode) => {
+        React.Children.forEach(nodes, (node) => {
+          if (!React.isValidElement(node)) return
+          const props = node.props as Record<string, unknown> | undefined
+          if (props && typeof props.placeholder === 'string') {
+            found = props.placeholder
+          }
+          if (props && props.children) walk(props.children as React.ReactNode)
+        })
+      }
+      walk(children)
+      onPlaceholder(found)
+    }, [children, onPlaceholder])
+    return null
+  }
+
+  function SelectTrigger({ children }: ChildrenProps) {
+    return <>{children}</>
+  }
+  function SelectContent({ children }: ChildrenProps) {
+    return <>{children}</>
+  }
+  function SelectValue(_props: SelectValueProps) {
+    return null
+  }
+  function SelectItem({ value, children }: SelectItemProps) {
+    return <option value={value}>{children}</option>
+  }
+
+  return {
+    ...actual,
+    Select,
+    SelectTrigger,
+    SelectContent,
+    SelectValue,
+    SelectItem,
+  }
+})
+
 function withIntl(node: React.ReactNode) {
   return (
     <NextIntlClientProvider locale="en" messages={en}>
@@ -106,6 +195,23 @@ describe('AppCreateDrawer', () => {
     await waitFor(() =>
       expect(actions.createAppAction).toHaveBeenCalledWith(
         expect.objectContaining({ logo: expect.stringMatching(/^data:image\/png;base64,/) }),
+      ),
+    )
+  })
+
+  it('includes twoFactorPromptEnabled in the create payload when set to "Never show"', async () => {
+    ;(actions.createAppAction as jest.Mock).mockResolvedValue({
+      app: { publicId: 'sq_1', name: 'X', url: 'https://x.example', isPlatform: false },
+    })
+    render(withIntl(<AppCreateDrawer open onOpenChange={() => undefined} />))
+    fireEvent.change(screen.getByLabelText(en.apps.fields.name), { target: { value: 'X' } })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.url), { target: { value: 'https://x.example' } })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.twoFactorPromptEnabled), { target: { value: 'false' } })
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.createTitle }))
+    await waitFor(() =>
+      expect(actions.createAppAction).toHaveBeenCalledWith(
+        expect.objectContaining({ twoFactorPromptEnabled: false }),
       ),
     )
   })
