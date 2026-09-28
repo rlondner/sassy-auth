@@ -230,6 +230,7 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
     - [Admin console](#admin-console)
     - [Rate limiting (optional)](#rate-limiting-optional)
     - [Password policy (optional)](#password-policy-optional)
+    - [Legal consent — Privacy Policy / Terms / GDPR (optional)](#legal-consent--privacy-policy--terms--gdpr-optional)
     - [Signup captcha (optional)](#signup-captcha-optional)
     - [Observability (optional)](#observability-optional)
     - [Email (optional)](#email-optional)
@@ -528,6 +529,40 @@ Global password complexity policy applied to every self-serve signup, accept-inv
 | `PASSWORD_REQUIRE_SPECIAL`       | Require at least one special character    | `false` |
 | `PASSWORD_MIN_NUMBERS`           | Minimum count of numeric characters       | `1`     |
 | `PASSWORD_MIN_SPECIAL`           | Minimum count of special characters       | `0`     |
+
+### Legal consent — Privacy Policy / Terms / GDPR (optional)
+
+Per-app, opt-in gate requiring a user to accept a Privacy Policy, Terms and
+Conditions, and/or a GDPR-specific disclosure before signing up or signing
+in. Configure `privacyPolicyUrl` / `termsUrl` / `gdprUrl` on a `SaApp` from
+the admin console's app edit drawer — independently of one another (none,
+one, two, or all three). There is no env var to enable this; it is entirely
+per-app configuration, and an app with all three URLs unset shows no
+consent step at all.
+
+When any document is configured, self-serve signup and **every other way a
+user becomes authenticated against that app** — existing accounts, admin-
+provisioned invites, password/OTP/TOTP/backup-code login, and social
+sign-in — redirect to `/login/consent` until every currently-required
+document has been accepted. Acceptance is recorded per `(user, app,
+document)` with a timestamp and the exact URL accepted, so it survives the
+app later changing a document's URL (no forced re-consent). Deliberately
+out of scope: re-checking an already-active session, and gating the M2M
+`POST /api/token/direct/login` grant.
+
+| Variable | Description | Default |
+|----------|--------------|---------|
+| `GEOIP_DB_PATH` | Optional. Path to a local MaxMind GeoLite2-Country `.mmdb` file, used only to decide whether the GDPR checkbox additionally applies (EU/EEA, UK, Switzerland). Free download from a MaxMind account. If unset, or the file can't be read, GDPR consent is required unconditionally for any app with a `gdprUrl` configured (fails closed, never silently skips the check). | *(unset)* |
+
+**Leave `GEOIP_DB_PATH` unset for now — see bug-0292
+([BUGS_2026-09-28.md](docs/history/bugs/BUGS_2026-09-28.md#bug-0292)).**
+The client IP this check resolves against is only accurate for social
+sign-in, which the browser hits directly; self-serve signup and
+password/OTP/TOTP/backup-code login are proxied server-side through the
+admin console, so today the lookup would see the admin server's egress
+address instead of the end user's. Configuring it right now would make the
+GDPR check *less* accurate, not more — it stays correct (if imprecise)
+only while unset.
 
 ### Signup captcha (optional)
 
@@ -1394,6 +1429,9 @@ Each of Google/Microsoft/Apple has one `clientId`/`clientSecret` pair for the wh
 
 **Apple sign-in is documented but not covered by automated tests.**
 Apple rejects `localhost` return URLs and uses a `form_post` callback, so it cannot be exercised locally or in CI — only Google and Microsoft (plus a stub OIDC provider) are covered by the e2e suite. Apple's integration is implemented and its setup is documented in [`docs/social-auth-setup.md`](docs/social-auth-setup.md), but validating it requires manual testing against a real, publicly reachable HTTPS deployment.
+
+**GDPR geo-detection is only accurate for social sign-in.**
+The optional `GEOIP_DB_PATH` lookup that decides whether a signup/login needs to show the GDPR checkbox resolves the client IP via `trust proxy: 1`, which sees the real browser address only when the browser hits the auth server directly (social sign-in). Self-serve signup and password/OTP/TOTP/backup-code login are proxied server-side through the admin console, so today that lookup would see the admin server's own egress address instead. Mitigated by leaving `GEOIP_DB_PATH` unset (fails closed — GDPR always required when an app configures it); see [Legal consent](#legal-consent--privacy-policy--terms--gdpr-optional) above. Tracked as **bug-0292**.
 
 </details>
 

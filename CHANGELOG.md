@@ -4,6 +4,69 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-28
+
+Landed two features on `dev` (optional legal consent at signup/login, and a
+toggle to disable the optional 2FA setup prompt), then reconciled `dev` and
+`master` — a merge that itself carried a CI build fix.
+
+**Optional Privacy Policy / Terms / GDPR consent (PR #425,
+`feat/signup-legal-consent`).** An app owner can now configure a Privacy
+Policy URL, Terms URL, and/or GDPR disclosure URL independently on their
+`SaApp` (new nullable columns; new `SaUserConsent` table recording
+`(user, app, document, url, acceptedAt)` — additive, no backfill needed).
+Self-serve signup shows a mandatory checkbox per configured document, and
+every other way a user becomes authenticated — existing accounts, admin-
+provisioned invites, password/OTP/TOTP/backup-code login, and social
+sign-in — is gated the same way via `maybeRedirectToConsent` in
+`apps/admin/app/login/actions.ts` and an `AsyncLocalStorage`-bridged hook
+in `auth.config.ts` for the social path. The GDPR checkbox is additionally
+conditional on geo-detecting the EU/EEA, UK, or Switzerland via an optional
+local MaxMind GeoLite2 lookup (`GEOIP_DB_PATH`), failing closed (GDPR
+required) when unset or unreadable. Deliberately out of scope for this
+iteration: re-consent on a document-URL change, gating an already-active
+session, and gating the M2M `POST /api/token/direct/login` grant — all
+documented as accepted boundaries in
+`docs/superpowers/specs/2026-09-22-signup-legal-consent-design.md`.
+
+**2FA optional-prompt toggle (PR #428, `worktree-2fa-prompt-toggle`).** New
+`TWO_FACTOR_PROMPT_ENABLED` env var (system default, `true` unless exactly
+`false`/`0`) plus a per-app `SaApp.twoFactorPromptEnabled` override
+(`null` = inherit system default) let an operator or app owner turn off
+the optional "Secure your account" 2FA setup interstitial shown after
+login. Only threads through `shouldPromptTwoFactor`/`resolvePromptEnabled`
+— it does not touch `isTwoFactorRequired` or the `verifyTotp`/`verifyOtp`/
+`verifyBackupCode` paths, so *required* 2FA enforcement is unaffected.
+
+**`dev` ⇄ `master` reconciliation (PRs #429/#430)**, plus two more commits
+`dev` picked up directly afterward:
+- **`cf68542`** — `typecheck`, `unit-tests`, and `e2e` CI workflows now
+  also build `@sassy-auth/telemetry`, matching the deploy workflow. PR #429
+  had added admin imports of `@sassy-auth/telemetry/{proxy,client,server}`
+  without updating these three, which were failing on `master` with
+  "Cannot find module '@sassy-auth/telemetry/*'".
+- **`e22cf2e`** — added a `generate` target to the root `Makefile`
+  (`pnpm --filter @sassy-auth/db run db:generate`).
+
+Separately, PR #432 (`fix/cross-subdomain-cookie-loop`) merged straight to
+`master` in this same window with a `COOKIE_DOMAIN` fix for a cross-
+subdomain session-cookie redirect loop — not yet back-merged to `dev`. See
+this run's TODO for that divergence.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-09-28.md](./docs/history/todo/TODO_2026-09-28.md) for
+follow-ups and [BUGS_2026-09-28.md](./docs/history/bugs/BUGS_2026-09-28.md)
+for this run's bug catalog. One new item, medium severity:
+
+- **bug-0292** — GDPR geo-detection resolves the admin console's egress IP,
+  not the end user's, for every login/signup path except direct social
+  sign-in, because `trust proxy: 1` sees the admin app's server-to-server
+  call rather than the browser's real address. Already mitigated today by
+  an explicit operational instruction (leave `GEOIP_DB_PATH` unset, which
+  fails closed to "always require GDPR consent") — filed so the fix
+  doesn't get lost if an operator sets it without knowing this history.
+
 ## [Unreleased] — 2026-09-16
 
 Landed the branded-activation-emails feature (PR #394,
