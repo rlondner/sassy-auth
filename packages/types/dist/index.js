@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.APP_LOGO_ALLOWED_MIME_TYPES = exports.APP_LOGO_MAX_BYTES = exports.TokenErrorCode = void 0;
+exports.APP_LOGO_ALLOWED_MIME_TYPES = exports.APP_LOGO_MAX_BYTES = exports.CONSENT_DOCUMENT_TYPES = exports.TokenErrorCode = void 0;
 exports.detectIdentifierType = detectIdentifierType;
 exports.evaluatePasswordPolicy = evaluatePasswordPolicy;
 exports.isValidAppLogoDataUri = isValidAppLogoDataUri;
@@ -28,6 +28,11 @@ function detectIdentifierType(identifier) {
         return 'phone';
     return 'username';
 }
+exports.CONSENT_DOCUMENT_TYPES = [
+    'privacy_policy',
+    'terms',
+    'gdpr',
+];
 const SPECIAL_CHAR_PATTERN = /[!"#$%&'()*+,\-./:;<=>?@[\]^_`{|}~]/g;
 function countMatches(password, pattern) {
     return (password.match(pattern) ?? []).length;

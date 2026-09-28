@@ -35,6 +35,9 @@ export declare enum TokenErrorCode {
 export type IdentifierType = 'email' | 'phone' | 'username';
 /** Detects the type of a login identifier string. */
 export declare function detectIdentifierType(identifier: string): IdentifierType;
+/** The three optional legal documents an app can require acceptance of. */
+export type ConsentDocumentType = 'privacy_policy' | 'terms' | 'gdpr';
+export declare const CONSENT_DOCUMENT_TYPES: readonly ConsentDocumentType[];
 /** The complete set of password-complexity knobs. An app either inherits the
  * global policy or defines a complete override — there is no per-field mix. */
 export interface PasswordPolicy {

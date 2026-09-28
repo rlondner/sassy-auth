@@ -93,6 +93,15 @@
       "webhookUrlHint": "Le serveur d'authentification envoie un événement account.activated à cette URL lorsqu'un utilisateur de cette application devient actif. Laissez vide pour désactiver l'envoi.",
       "webhookUrlPlaceholder": "https://app.example.com/webhooks/sassy-auth",
       "noWebhookUrl": "Aucun webhook configuré",
+      "privacyPolicyUrl": "URL de la politique de confidentialité",
+      "privacyPolicyUrlPlaceholder": "https://example.com/confidentialite",
+      "privacyPolicyUrlHint": "Si renseignée, les utilisateurs doivent l'accepter avant de s'inscrire ou de se connecter.",
+      "termsUrl": "URL des conditions générales",
+      "termsUrlPlaceholder": "https://example.com/conditions",
+      "termsUrlHint": "Si renseignée, les utilisateurs doivent l'accepter avant de s'inscrire ou de se connecter.",
+      "gdprUrl": "URL de la déclaration RGPD",
+      "gdprUrlPlaceholder": "https://example.com/rgpd",
+      "gdprUrlHint": "Si renseignée, les utilisateurs qui s'inscrivent ou se connectent depuis l'UE/EEE, le Royaume-Uni ou la Suisse doivent l'accepter.",
       "webhookSecret": "Secret du webhook",
       "webhookSecretHint": "Utilisé pour signer les charges utiles du webhook (X-Sassy-Signature). Généré par le serveur — enregistrez d'abord une URL de webhook, puis générez un secret.",
       "generateWebhookSecret": "Générer un secret de webhook",
@@ -610,6 +619,9 @@
     "email": "Adresse e-mail",
     "password": "Mot de passe",
     "confirmPassword": "Confirmer le mot de passe",
+    "acceptPrivacyPolicy": "J'ai lu et j'accepte la <link>politique de confidentialité</link>",
+    "acceptTerms": "J'ai lu et j'accepte les <link>conditions générales</link>",
+    "acceptGdpr": "J'ai lu et j'accepte la <link>déclaration RGPD</link>",
     "submit": "Créer le compte",
     "backToLogin": "Retour à la connexion",
     "checkEmail": {
@@ -715,6 +727,12 @@
     "body": "L'authentification à deux facteurs ajoute une couche de protection supplémentaire. Configurez-la en moins d'une minute.",
     "setUp": "Configurer la 2FA",
     "skip": "Ignorer pour l'instant"
+  },
+  "loginConsent": {
+    "title": "Avant de continuer",
+    "body": "Cette application exige que vous acceptiez les éléments suivants avant de continuer.",
+    "continue": "Continuer",
+    "error": "Nous n'avons pas pu enregistrer votre acceptation. Veuillez réessayer."
   },
   "oauthError": {
     "pageTitle": "Erreur d'autorisation — SassyAuth",

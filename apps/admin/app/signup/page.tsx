@@ -25,7 +25,8 @@ export default async function SignupPage({
     )
   }
 
-  const { name: appName, hasDefaultOrg, passwordPolicy, logo } = await fetchAppInfo(clientId)
+  const { name: appName, hasDefaultOrg, passwordPolicy, logo, privacyPolicyUrl, termsUrl, gdprUrl, gdprRequired } =
+    await fetchAppInfo(clientId)
   const nextSafe = next ?? ''
 
   return (
@@ -43,7 +44,15 @@ export default async function SignupPage({
         </Link>
       }
     >
-      <SignupForm clientId={clientId} next={nextSafe} hasDefaultOrg={hasDefaultOrg} passwordPolicy={passwordPolicy} />
+      <SignupForm
+        clientId={clientId}
+        next={nextSafe}
+        hasDefaultOrg={hasDefaultOrg}
+        passwordPolicy={passwordPolicy}
+        privacyPolicyUrl={privacyPolicyUrl}
+        termsUrl={termsUrl}
+        gdprUrl={gdprRequired ? gdprUrl : null}
+      />
     </AuthCard>
   )
 }

@@ -16,6 +16,7 @@ jest.mock('@sassy-auth/db', () => ({
     saOrg: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     saUser: { create: jest.fn() },
     saUserRole: { create: jest.fn() },
+    saUserConsent: { createMany: jest.fn() },
     saAppRedirectUri: { findFirst: jest.fn(), findMany: jest.fn() },
     user: { delete: jest.fn(), findUnique: jest.fn() },
     $transaction: jest.fn(),
@@ -38,6 +39,7 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saOrg: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
   saUser: { create: jest.Mock };
   saUserRole: { create: jest.Mock };
+  saUserConsent: { createMany: jest.Mock };
   saAppRedirectUri: { findFirst: jest.Mock; findMany: jest.Mock };
   user: { delete: jest.Mock; findUnique: jest.Mock };
   $transaction: jest.Mock;
@@ -71,6 +73,9 @@ const appRow = {
   name: 'MyApp',
   isPlatform: false,
   passwordPolicyOverride: null,
+  privacyPolicyUrl: null,
+  termsUrl: null,
+  gdprUrl: null,
   url: 'https://myapp.example.com',
 };
 const draftOrgRow = { id: 10, publicId: 'placeholder', name: 'Acme Inc', appId: 1, isPlatform: false };
@@ -280,6 +285,67 @@ describe('RegistrationService', () => {
       expect(mockPrisma.saAppRedirectUri.findMany).not.toHaveBeenCalled();
       expect(mockOauthService.generateCode).not.toHaveBeenCalled();
       expect(result.redirectUrl).toBeUndefined();
+    });
+
+    it('rejects with 400 when the app requires privacyPolicy acceptance and it was not accepted', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, privacyPolicyUrl: 'https://myapp.example.com/privacy' });
+      await expect(service.register({ ...baseDto })).rejects.toThrow('privacyPolicy');
+    });
+
+    it('rejects with 400 when the app requires terms acceptance and it was not accepted', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, termsUrl: 'https://myapp.example.com/terms' });
+      await expect(service.register({ ...baseDto, acceptedPrivacyPolicy: true })).rejects.toThrow('terms');
+    });
+
+    it('creates the account and records SaUserConsent rows when all required documents are accepted', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        ...appRow,
+        privacyPolicyUrl: 'https://myapp.example.com/privacy',
+        termsUrl: 'https://myapp.example.com/terms',
+      });
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      const createManyMock = jest.fn().mockResolvedValue({ count: 2 });
+      const saUserCreateMock = jest.fn().mockResolvedValue({ id: 100, publicId: baUserId.slice(0, 12) });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb({
+        saOrg: mockPrisma.saOrg,
+        saUser: { create: saUserCreateMock },
+        saUserRole: mockPrisma.saUserRole,
+        saUserConsent: { createMany: createManyMock },
+      }));
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+
+      await service.register({
+        ...baseDto,
+        acceptedPrivacyPolicy: true,
+        acceptedTerms: true,
+      });
+
+      expect(createManyMock).toHaveBeenCalledWith({
+        data: [
+          { saUserId: 100, appId: 1, documentType: 'privacy_policy', url: 'https://myapp.example.com/privacy' },
+          { saUserId: 100, appId: 1, documentType: 'terms', url: 'https://myapp.example.com/terms' },
+        ],
+      });
+    });
+
+    it('creates the account without any SaUserConsent rows when the app requires no documents', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      const createManyMock = jest.fn();
+      const saUserCreateMock = jest.fn().mockResolvedValue({ id: 100, publicId: baUserId.slice(0, 12) });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb({
+        saOrg: mockPrisma.saOrg,
+        saUser: { create: saUserCreateMock },
+        saUserRole: mockPrisma.saUserRole,
+        saUserConsent: { createMany: createManyMock },
+      }));
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+
+      await service.register({ ...baseDto });
+
+      expect(createManyMock).not.toHaveBeenCalled();
     });
 
     it("mints a PKCE-bound signup code and passes state/nonce through when a public app's next names a registered redirect_uri with a valid challenge", async () => {
@@ -645,6 +711,10 @@ describe('RegistrationService', () => {
         hasDefaultOrg: true,
         passwordPolicy: expect.any(Object),
         logo: null,
+        privacyPolicyUrl: null,
+        termsUrl: null,
+        gdprUrl: null,
+        gdprRequired: false,
       });
     });
 
@@ -655,6 +725,10 @@ describe('RegistrationService', () => {
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: null,
+        privacyPolicyUrl: null,
+        termsUrl: null,
+        gdprUrl: null,
+        gdprRequired: false,
       });
     });
   });
@@ -715,10 +789,22 @@ describe('RegistrationService', () => {
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: 'data:image/png;base64,AAA=',
+        privacyPolicyUrl: null,
+        termsUrl: null,
+        gdprUrl: null,
+        gdprRequired: false,
       });
       expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
         where: { publicId: 'sq_1' },
-        select: { name: true, defaultOrgId: true, passwordPolicyOverride: true, logo: true },
+        select: {
+          name: true,
+          defaultOrgId: true,
+          passwordPolicyOverride: true,
+          logo: true,
+          privacyPolicyUrl: true,
+          termsUrl: true,
+          gdprUrl: true,
+        },
       });
     });
 
@@ -730,6 +816,10 @@ describe('RegistrationService', () => {
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: null,
+        privacyPolicyUrl: null,
+        termsUrl: null,
+        gdprUrl: null,
+        gdprRequired: false,
       });
     });
 
@@ -742,6 +832,24 @@ describe('RegistrationService', () => {
     it('throws NotFoundException for an empty appPublicId without querying the database', async () => {
       await expect(service.getAppName('')).rejects.toBeInstanceOf(NotFoundException);
       expect(mockPrisma.saApp.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('includes privacyPolicyUrl, termsUrl, gdprUrl, and gdprRequired in the response', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        name: 'MyApp',
+        defaultOrgId: null,
+        passwordPolicyOverride: null,
+        logo: null,
+        privacyPolicyUrl: 'https://myapp.example.com/privacy',
+        termsUrl: null,
+        gdprUrl: 'https://myapp.example.com/gdpr',
+      });
+      const result = await service.getAppName('sq_1', 'unknown');
+      expect(result.privacyPolicyUrl).toBe('https://myapp.example.com/privacy');
+      expect(result.termsUrl).toBeNull();
+      expect(result.gdprUrl).toBe('https://myapp.example.com/gdpr');
+      // 'unknown' IP resolves to no country → fail-closed → gdprRequired true
+      expect(result.gdprRequired).toBe(true);
     });
   });
 

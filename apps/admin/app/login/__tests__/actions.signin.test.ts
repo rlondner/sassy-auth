@@ -22,6 +22,10 @@ jest.mock('../../account/security/actions', () => ({
   forwardNamedCookie: jest.fn(),
   forwardNamedCookieWithMaxAge: jest.fn(),
 }))
+jest.mock('@/lib/consent', () => ({
+  extractClientId: jest.fn(),
+  fetchOutstandingConsent: jest.fn(),
+}))
 
 import { cookies } from 'next/headers'
 import { getForwardedOrigin } from '@/lib/auth-origin'
@@ -33,6 +37,8 @@ const mockGetForwardedOrigin = getForwardedOrigin as jest.MockedFunction<any>
 // imported module under test a fresh copy of the mock registry, so a
 // reference captured at file scope would point at a stale jest.fn().
 let mockForwardNamedCookie: jest.MockedFunction<any>
+let mockExtractClientId: jest.MockedFunction<any>
+let mockFetchOutstandingConsent: jest.MockedFunction<any>
 
 const SESSION_COOKIE =
   'better-auth.session_token=abc123; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800'
@@ -81,6 +87,11 @@ beforeEach(async () => {
   global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>
   const securityActions = await import('../../account/security/actions')
   mockForwardNamedCookie = securityActions.forwardNamedCookie as jest.MockedFunction<any>
+  const consent = await import('@/lib/consent')
+  mockExtractClientId = consent.extractClientId as jest.MockedFunction<any>
+  mockFetchOutstandingConsent = consent.fetchOutstandingConsent as jest.MockedFunction<any>
+  mockExtractClientId.mockReturnValue(null)
+  mockFetchOutstandingConsent.mockResolvedValue([])
   const mod = await import('../actions')
   signIn = mod.signIn
 })
@@ -403,5 +414,44 @@ describe('signIn optional two-factor interstitial', () => {
     )
 
     expect(target).toBe('/users')
+  })
+})
+
+// Consent must gate BEFORE the optional 2FA-prompt decision: the prompt's
+// skip/set-up buttons navigate client-side and never pass back through
+// signInInner, so a gate placed after that branch would silently miss
+// anyone who goes through it.
+describe('signIn consent gate', () => {
+  it('redirects to /login/consent when the target app has outstanding consent, before the 2FA-prompt check', async () => {
+    mockCookies.mockResolvedValue(cookieJar())
+    mockGetForwardedOrigin.mockResolvedValue(null)
+    mockExtractClientId.mockReturnValue('sq_1')
+    mockFetchOutstandingConsent.mockResolvedValue([{ documentType: 'terms', url: 'https://a.example.com/terms' }])
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock.mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+
+    const target = await callExpectingRedirect(
+      formData({ email: 'a@example.com', password: 'secret', next: '/authorize?client_id=sq_1' }),
+    )
+
+    expect(target).toBe('/login/consent?appPublicId=sq_1&next=%2Fauthorize%3Fclient_id%3Dsq_1')
+  })
+
+  it('does not call the consent check when next has no client_id', async () => {
+    mockCookies.mockResolvedValue(cookieJar())
+    mockGetForwardedOrigin.mockResolvedValue(null)
+    mockExtractClientId.mockReturnValue(null)
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      .mockResolvedValueOnce(upstream(200, { user: { twoFactorEnabled: true } }))
+      .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
+
+    const target = await callExpectingRedirect(
+      formData({ email: 'a@example.com', password: 'secret' }),
+    )
+
+    expect(target).toBe('/users')
+    expect(mockFetchOutstandingConsent).not.toHaveBeenCalled()
   })
 })
