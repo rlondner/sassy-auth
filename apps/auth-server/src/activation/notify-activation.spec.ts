@@ -8,13 +8,28 @@ jest.mock('@sassy-auth/db', () => ({
   },
 }));
 
+jest.mock('../common/logger/winston.config', () => {
+  const sharedLogger = { info: jest.fn() };
+  return { createAppLogger: () => sharedLogger };
+});
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockLoggerInfo = (require('../common/logger/winston.config').createAppLogger() as { info: jest.Mock }).info;
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockPrisma = require('@sassy-auth/db').prisma as {
   saOrg: { findUnique: jest.Mock };
   saAuditEvent: { create: jest.Mock };
 };
 
-const saUser = { id: 1, publicId: 'usr_1', orgId: 5 };
+const saUser = {
+  id: 1,
+  publicId: 'usr_1',
+  orgId: 5,
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: 'jane.doe@example.com',
+};
 
 function signedBody(secret: string, body: string): string {
   return crypto.createHmac('sha256', secret).update(body).digest('hex');
@@ -27,20 +42,81 @@ describe('notifyActivation', () => {
     mockPrisma.saAuditEvent.create.mockResolvedValue(undefined);
   });
 
-  it('does nothing when the app has no webhookUrl configured', async () => {
+  it('does nothing when the app has no activationWebhookUrl configured', async () => {
     mockPrisma.saOrg.findUnique.mockResolvedValue({
-      app: { publicId: 'app_1', webhookUrl: null, webhookSecret: null },
+      app: { publicId: 'app_1', activationWebhookUrl: null, activationWebhookSecret: null },
     });
+    const emit = jest.fn();
 
-    await notifyActivation(saUser);
+    await notifyActivation(saUser, { emit });
 
     expect(global.fetch).not.toHaveBeenCalled();
     expect(mockPrisma.saAuditEvent.create).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
+    expect(mockLoggerInfo).not.toHaveBeenCalled();
+  });
+
+  it('emits a redacted OTel log and a full-detail app log before calling the webhook', async () => {
+    mockPrisma.saOrg.findUnique.mockResolvedValue({
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200 });
+    const emit = jest.fn();
+
+    await notifyActivation(saUser, { emit });
+
+    expect(emit).toHaveBeenCalledWith({
+      'activation.event': 'webhook.called',
+      'app.public_id': 'app_1',
+      'user.public_id': 'usr_1',
+      'user.first_name': 'J***',
+      'user.last_name': 'D***',
+      'user.email': 'j***@example.com',
+    });
+    // The OTel emission is the only PII-adjacent channel checked for
+    // redaction above — assert directly that the real name/email never
+    // appear in any argument passed to it.
+    const emittedValues = Object.values(emit.mock.calls[0][0]);
+    expect(emittedValues).not.toContain('Jane');
+    expect(emittedValues).not.toContain('Doe');
+    expect(emittedValues).not.toContain('jane.doe@example.com');
+
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      expect.stringContaining('Jane Doe <jane.doe@example.com>'),
+      { context: 'Activation' },
+    );
+    expect(mockLoggerInfo).toHaveBeenCalledWith(expect.stringContaining('app_1'), { context: 'Activation' });
+  });
+
+  it('emits the call log even when the webhook delivery itself later fails', async () => {
+    mockPrisma.saOrg.findUnique.mockResolvedValue({
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500 });
+    const emit = jest.fn();
+
+    await notifyActivation(saUser, { emit });
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(mockLoggerInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it('never throws if the injected emit callback itself throws', async () => {
+    mockPrisma.saOrg.findUnique.mockResolvedValue({
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200 });
+    const emit = jest.fn(() => {
+      throw new Error('collector unreachable');
+    });
+
+    await expect(notifyActivation(saUser, { emit })).resolves.toBeUndefined();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('POSTs a signed payload and logs success to SaAuditEvent', async () => {
     mockPrisma.saOrg.findUnique.mockResolvedValue({
-      app: { publicId: 'app_1', webhookUrl: 'https://rp.example.com/hooks', webhookSecret: 'whsec_test' },
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
     });
     (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200 });
 
@@ -75,7 +151,7 @@ describe('notifyActivation', () => {
 
   it('retries once on a network error, then logs failure', async () => {
     mockPrisma.saOrg.findUnique.mockResolvedValue({
-      app: { publicId: 'app_1', webhookUrl: 'https://rp.example.com/hooks', webhookSecret: 'whsec_test' },
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
     });
     (global.fetch as jest.Mock).mockRejectedValue(new Error('ECONNREFUSED'));
 
@@ -94,7 +170,7 @@ describe('notifyActivation', () => {
 
   it('retries once on a 5xx response, then logs failure', async () => {
     mockPrisma.saOrg.findUnique.mockResolvedValue({
-      app: { publicId: 'app_1', webhookUrl: 'https://rp.example.com/hooks', webhookSecret: 'whsec_test' },
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
     });
     (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 503 });
 
@@ -108,7 +184,7 @@ describe('notifyActivation', () => {
 
   it('does not retry a 4xx response', async () => {
     mockPrisma.saOrg.findUnique.mockResolvedValue({
-      app: { publicId: 'app_1', webhookUrl: 'https://rp.example.com/hooks', webhookSecret: 'whsec_test' },
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
     });
     (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 404 });
 
@@ -122,7 +198,7 @@ describe('notifyActivation', () => {
 
   it('never throws even if the audit log write itself fails', async () => {
     mockPrisma.saOrg.findUnique.mockResolvedValue({
-      app: { publicId: 'app_1', webhookUrl: 'https://rp.example.com/hooks', webhookSecret: 'whsec_test' },
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
     });
     (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200 });
     mockPrisma.saAuditEvent.create.mockRejectedValue(new Error('db down'));
@@ -132,7 +208,7 @@ describe('notifyActivation', () => {
 
   it('logs activation_webhook_failed and never throws when fetch rejects on a redirect (redirect: "error")', async () => {
     mockPrisma.saOrg.findUnique.mockResolvedValue({
-      app: { publicId: 'app_1', webhookUrl: 'https://rp.example.com/hooks', webhookSecret: 'whsec_test' },
+      app: { publicId: 'app_1', activationWebhookUrl: 'https://rp.example.com/hooks', activationWebhookSecret: 'whsec_test' },
     });
     // Simulates the fetch spec's behavior for `redirect: 'error'`: rather
     // than returning a response, fetch rejects when the server answers with

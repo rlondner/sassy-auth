@@ -16,6 +16,7 @@ import { MeModule } from './me/me.module';
 import { RegistrationModule } from './registration/registration.module';
 import { TestSupportModule } from './test-support/test-support.module';
 import { SocialModule } from './social/social.module';
+import { ServiceUsersModule } from './service-users/service-users.module';
 import { DEFAULT_THROTTLE, AUTH_THROTTLE } from './common/config/rate-limit-config';
 
 // bug-0080: Two throttler buckets — a generous `default` for the
@@ -56,6 +57,7 @@ const throttlerConfig = [
     RegistrationModule,
     EmailModule,
     SocialModule,
+    ServiceUsersModule,
     ...(isTest ? [TestSupportModule] : []),
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

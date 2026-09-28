@@ -77,7 +77,7 @@ export class UpdateAppDto {
    * which stops delivery — the account still activates normally, it just
    * isn't reported to this app anymore.
    */
-  @IsOptional() @IsAppUrl() @MaxLength(2048) webhookUrl?: string | null;
+  @IsOptional() @IsAppUrl() @MaxLength(2048) activationWebhookUrl?: string | null;
 
   /**
    * URL to this app's Privacy Policy. When set, self-serve signup and every

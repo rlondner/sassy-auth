@@ -70,7 +70,7 @@ services:
     branch: master
     buildCommand: >-
       NODE_ENV=development npx --yes pnpm@9.0.0 install --frozen-lockfile &&
-      npx --yes pnpm@9.0.0 --filter @sassy-auth/db --filter @sassy-auth/types build &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/db --filter @sassy-auth/types --filter @sassy-auth/telemetry build &&
       npx --yes pnpm@9.0.0 --filter @sassy-auth/auth-server build
     # NODE_ENV=development on the install step only: the production NODE_ENV value from
     # sassy-auth-production (below) is present during the build too, and pnpm skips
@@ -103,6 +103,21 @@ services:
         value: https://app.getvibecast.com/api/auth/callback
       - key: VIBECAST_LOGOUT_REDIRECT_URI
         value: https://app.getvibecast.com/api/auth/signout
+      # Optional — only read if set; the activation webhook still won't fire until an
+      # admin also generates a webhook secret via the admin console's rotate flow.
+      - key: VIBECAST_ACTIVATION_WEBHOOK_URL
+        value: https://api.getvibecast.com/webhooks/sassy-auth/activation
+      # Optional activation email branding — each field falls back to the platform
+      # default if unset. fromAddress's domain must be verified with the email
+      # provider (Resend) or sends will fail.
+      - key: VIBECAST_ACTIVATION_EMAIL_FROM_NAME
+        value: Raphael from VibeCast
+      - key: VIBECAST_ACTIVATION_EMAIL_FROM_ADDRESS
+        value: rl@getvibecast.com
+      - key: VIBECAST_ACTIVATION_EMAIL_SUBJECT
+        value: "Please verify your {{appName}} email address"
+      - key: VIBECAST_ACTIVATION_EMAIL_MESSAGE
+        value: "We're so glad to have you join the growing ranks of VibeCasters! Click on the button (or the link) below to activate your VibeCast account:"
       # Outbound mail — set RESEND_API_KEY (recommended) or SMTP vars.
       - key: RESEND_API_KEY
         sync: false
@@ -127,6 +142,7 @@ services:
     branch: master
     buildCommand: >-
       NODE_ENV=development npx --yes pnpm@9.0.0 install --frozen-lockfile &&
+      npx --yes pnpm@9.0.0 --filter @sassy-auth/telemetry build &&
       npx --yes pnpm@9.0.0 --filter @sassy-auth/admin build
     # See the matching comment on sassy-auth-server's buildCommand — same NODE_ENV/pnpm
     # devDependencies gotcha, needed here for `next build`'s devDependencies (typescript).

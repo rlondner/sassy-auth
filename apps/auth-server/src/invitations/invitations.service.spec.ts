@@ -43,6 +43,7 @@ const validInvitation = {
     id: 1,
     publicId: 'usr1',
     firstName: 'Jane',
+    lastName: 'Doe',
     status: 'pending',
     betterAuthUserId: 'ba-jane',
     orgId: 3,
@@ -147,6 +148,9 @@ describe('InvitationsService', () => {
         id: validInvitation.user.id,
         publicId: validInvitation.user.publicId,
         orgId: validInvitation.user.orgId,
+        firstName: validInvitation.user.firstName,
+        lastName: validInvitation.user.lastName,
+        email: validInvitation.user.betterAuthUser.email,
       });
     });
 

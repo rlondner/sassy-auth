@@ -117,7 +117,14 @@ export class InvitationsService {
       });
     });
 
-    await notifyActivation({ id: inv.user.id, publicId: inv.user.publicId, orgId: inv.user.orgId });
+    await notifyActivation({
+      id: inv.user.id,
+      publicId: inv.user.publicId,
+      orgId: inv.user.orgId,
+      firstName: inv.user.firstName,
+      lastName: inv.user.lastName,
+      email: inv.user.betterAuthUser.email,
+    });
 
     this.logger.getWinstonLogger().info('Invitation accepted', {
       context: 'InvitationsService',

@@ -17,11 +17,12 @@ export interface RegisterInput {
   acceptedPrivacyPolicy?: boolean
   acceptedTerms?: boolean
   acceptedGdpr?: boolean
+  next?: string
 }
 
 export async function registerAction(
   input: RegisterInput,
-): Promise<{ ok: true } | { error: string }> {
+): Promise<{ ok: true; redirectUrl?: string } | { error: string }> {
   const origin = await getForwardedOrigin()
   const forwardedIp = await getForwardedClientIpHeader()
   let res: Response
@@ -44,6 +45,7 @@ export async function registerAction(
         ...(input.acceptedPrivacyPolicy !== undefined && { acceptedPrivacyPolicy: input.acceptedPrivacyPolicy }),
         ...(input.acceptedTerms !== undefined && { acceptedTerms: input.acceptedTerms }),
         ...(input.acceptedGdpr !== undefined && { acceptedGdpr: input.acceptedGdpr }),
+        ...(input.next && { next: input.next }),
       }),
     })
   } catch (err) {
@@ -51,7 +53,10 @@ export async function registerAction(
     return { error: 'serverUnavailable' }
   }
 
-  if (res.ok) return { ok: true }
+  if (res.ok) {
+    const body: { redirectUrl?: string } = await res.json().catch(() => ({}))
+    return { ok: true, ...(body.redirectUrl && { redirectUrl: body.redirectUrl }) }
+  }
   if (res.status === 404) return { error: 'appNotFound' }
   if (res.status === 409) return { error: 'emailTaken' }
   if (res.status === 422) return { error: 'captchaFailed' }

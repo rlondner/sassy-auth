@@ -42,6 +42,14 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/** message is admin-editable multiline body copy (see
+ * assertValidActivationEmailOverride, which allows line breaks only for this
+ * field). Escaped first so a literal `<br>` in the source text can't slip
+ * through, then its own newlines are converted to real breaks. */
+function escapeHtmlMultiline(value: string): string {
+  return escapeHtml(value).replace(/\r\n|\r|\n/g, '<br>');
+}
+
 function computeFrom(branding?: ActivationEmailBranding): string | undefined {
   const name = branding?.fromName?.trim();
   const address = branding?.fromAddress?.trim();
@@ -65,7 +73,7 @@ export function verificationEmail(args: {
     subject,
     text: `Hi ${firstName},\n\n${message}\n${verifyUrl}\n\nIf you didn't create this account, you can ignore this email.`,
     html:
-      `<p>Hi ${firstName},</p><p>${escapeHtml(message)}</p>${renderButton(verifyUrl)}` +
+      `<p>Hi ${firstName},</p><p>${escapeHtmlMultiline(message)}</p>${renderButton(verifyUrl)}` +
       `<p style="word-break: break-all;"><a href="${verifyUrl}">${verifyUrl}</a></p>` +
       `<p>If you didn't create this account, you can ignore this email.</p>`,
     ...(from !== undefined && { from }),

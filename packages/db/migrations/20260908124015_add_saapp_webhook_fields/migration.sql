@@ -1,3 +1,3 @@
 -- AlterTable
-ALTER TABLE "SaApp" ADD COLUMN     "webhookUrl" TEXT,
-ADD COLUMN     "webhookSecret" TEXT;
+ALTER TABLE "SaApp" ADD COLUMN     "activationWebhookUrl" TEXT,
+ADD COLUMN     "activationWebhookSecret" TEXT;

@@ -18,6 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Textarea,
 } from '@sassy-auth/ui'
 import { updateAppAction, getAppAction, getSocialProviderSettingsAction, updateSocialProvidersAction, rotateClientSecretAction, rotateWebhookSecretAction } from '@/app/(admin)/apps/actions'
 import { listOrgsAction } from '@/app/(admin)/orgs/actions'
@@ -57,11 +58,11 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [passwordPolicy, setPasswordPolicy] = React.useState<PasswordPolicy>(
     app.passwordPolicyOverride ?? app.effectivePasswordPolicy,
   )
-  const [webhookUrl, setWebhookUrl] = React.useState<string>(app.webhookUrl ?? '')
+  const [webhookUrl, setWebhookUrl] = React.useState<string>(app.activationWebhookUrl ?? '')
   const [privacyPolicyUrl, setPrivacyPolicyUrl] = React.useState<string>(app.privacyPolicyUrl ?? '')
   const [termsUrl, setTermsUrl] = React.useState<string>(app.termsUrl ?? '')
   const [gdprUrl, setGdprUrl] = React.useState<string>(app.gdprUrl ?? '')
-  const [hasWebhookSecret, setHasWebhookSecret] = React.useState<boolean>(app.hasWebhookSecret ?? false)
+  const [hasWebhookSecret, setHasWebhookSecret] = React.useState<boolean>(app.hasActivationWebhookSecret ?? false)
   // Webhook secret rotation: same immediate, separate-from-save pattern as
   // client secret rotation below — the plaintext only ever comes back once,
   // at the moment of generation, and the server requires a webhookUrl to
@@ -72,6 +73,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [activationFromAddress, setActivationFromAddress] = React.useState<string>(app.activationEmailOverride?.fromAddress ?? '')
   const [activationSubject, setActivationSubject] = React.useState<string>(app.activationEmailOverride?.subject ?? '')
   const [activationMessage, setActivationMessage] = React.useState<string>(app.activationEmailOverride?.message ?? '')
+  // The `app` prop is sourced from the apps list row, whose `select` omits
+  // `activationEmailOverride` (see AppsService.listApps) — so it's always
+  // undefined here at mount. The real value only arrives via the fetch-on-open
+  // effect below, which also updates this baseline so `activationDirty`
+  // compares against the true saved value instead of always seeing a change.
+  const [activationOverrideOriginal, setActivationOverrideOriginal] = React.useState<import('@/lib/types').ActivationEmailBranding | null>(
+    app.activationEmailOverride ?? null,
+  )
   const [appOrgs, setAppOrgs] = React.useState<OrgRow[]>([])
   const [appRoles, setAppRoles] = React.useState<RoleRow[]>([])
   const [errorKey, setErrorKey] = React.useState<string | null>(null)
@@ -113,8 +122,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setDefaultRoleId(app.defaultRoleId ?? null)
     setPasswordPolicyOverrideEnabled(app.passwordPolicyOverride !== null)
     setPasswordPolicy(app.passwordPolicyOverride ?? app.effectivePasswordPolicy)
-    setWebhookUrl(app.webhookUrl ?? '')
-    setHasWebhookSecret(app.hasWebhookSecret ?? false)
+    setWebhookUrl(app.activationWebhookUrl ?? '')
+    setHasWebhookSecret(app.hasActivationWebhookSecret ?? false)
     setPrivacyPolicyUrl(app.privacyPolicyUrl ?? '')
     setTermsUrl(app.termsUrl ?? '')
     setGdprUrl(app.gdprUrl ?? '')
@@ -122,6 +131,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setActivationFromAddress(app.activationEmailOverride?.fromAddress ?? '')
     setActivationSubject(app.activationEmailOverride?.subject ?? '')
     setActivationMessage(app.activationEmailOverride?.message ?? '')
+    setActivationOverrideOriginal(app.activationEmailOverride ?? null)
     setErrorKey(null)
     setNewClientSecret(null)
     setNewWebhookSecret(null)
@@ -137,14 +147,20 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     // Finding 2 (final review): GET /api/apps (the list this drawer's `app`
     // prop is sourced from, via AppsTable's `selected` row) no longer sends
     // `logo` — it's stripped to avoid shipping every row's base64 blob on a
-    // page load. Fetch the single-app record here, which still includes it,
-    // so the logo field is seeded with the real current value rather than
-    // always appearing empty.
+    // page load. It also never sends `activationEmailOverride` (bug-0XXX:
+    // omitted from AppsService.listApps's `select`). Fetch the single-app
+    // record here, which includes both, so those fields are seeded with the
+    // real current value rather than always appearing empty.
     getAppAction(app.publicId).then((result) => {
       if (cancelled) return
       if ('app' in result) {
         setLogo(result.app.logo ?? null)
         setOriginalLogo(result.app.logo ?? null)
+        setActivationFromName(result.app.activationEmailOverride?.fromName ?? '')
+        setActivationFromAddress(result.app.activationEmailOverride?.fromAddress ?? '')
+        setActivationSubject(result.app.activationEmailOverride?.subject ?? '')
+        setActivationMessage(result.app.activationEmailOverride?.message ?? '')
+        setActivationOverrideOriginal(result.app.activationEmailOverride ?? null)
       }
     })
     setSocialLoading(true)
@@ -206,7 +222,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       }
       // Shown exactly once — the server never returns the plaintext again
       // after this response.
-      setNewWebhookSecret(result.webhookSecret)
+      setNewWebhookSecret(result.activationWebhookSecret)
       setHasWebhookSecret(true)
       toast.success(t('apps.toast.updated'))
     })
@@ -220,11 +236,11 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const passwordPolicyDirty =
     passwordPolicyOverrideEnabled !== (app.passwordPolicyOverride !== null)
     || (passwordPolicyOverrideEnabled && JSON.stringify(passwordPolicy) !== JSON.stringify(app.passwordPolicyOverride))
-  const webhookUrlDirty = webhookUrl.trim() !== (app.webhookUrl ?? '')
+  const webhookUrlDirty = webhookUrl.trim() !== (app.activationWebhookUrl ?? '')
   const privacyPolicyUrlDirty = privacyPolicyUrl.trim() !== (app.privacyPolicyUrl ?? '')
   const termsUrlDirty = termsUrl.trim() !== (app.termsUrl ?? '')
   const gdprUrlDirty = gdprUrl.trim() !== (app.gdprUrl ?? '')
-  const activationOverrideBaseline = app.activationEmailOverride ?? { fromName: '', fromAddress: '', subject: '', message: '' }
+  const activationOverrideBaseline = activationOverrideOriginal ?? { fromName: '', fromAddress: '', subject: '', message: '' }
   const activationDirty =
     activationFromName.trim() !== (activationOverrideBaseline.fromName ?? '') ||
     activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
@@ -243,7 +259,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; webhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
@@ -260,7 +276,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       const trimmedWebhookUrl = webhookUrl.trim()
       // Clearing the URL cascades server-side to clear any stored secret too
       // — a webhook is never left half-configured (see AppsService.updateApp).
-      patch.webhookUrl = trimmedWebhookUrl === '' ? null : trimmedWebhookUrl
+      patch.activationWebhookUrl = trimmedWebhookUrl === '' ? null : trimmedWebhookUrl
     }
     if (privacyPolicyUrlDirty) {
       const trimmed = privacyPolicyUrl.trim()
@@ -735,14 +751,14 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                     variant="outline"
                     className="mt-2"
                     loading={rotatingWebhookSecret}
-                    disabled={!app.webhookUrl || webhookUrlDirty}
+                    disabled={!app.activationWebhookUrl || webhookUrlDirty}
                     onClick={handleRotateWebhookSecret}
                   >
                     {hasWebhookSecret
                       ? t('apps.fields.regenerateWebhookSecret')
                       : t('apps.fields.generateWebhookSecret')}
                   </Button>
-                  {(!app.webhookUrl || webhookUrlDirty) && (
+                  {(!app.activationWebhookUrl || webhookUrlDirty) && (
                     <p className="mt-1 text-body-sm text-muted-foreground">
                       {t('apps.fields.webhookSecretNeedsUrlHint')}
                     </p>
@@ -789,8 +805,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
                 <div>
                   <Label htmlFor="activationMessage">{t('apps.fields.activationEmailMessage')}</Label>
-                  <Input
+                  <Textarea
                     id="activationMessage"
+                    rows={4}
                     value={activationMessage}
                     onChange={(e) => setActivationMessage(e.target.value)}
                     placeholder={t('apps.fields.activationEmailMessagePlaceholder')}

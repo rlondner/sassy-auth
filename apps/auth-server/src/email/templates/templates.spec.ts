@@ -92,6 +92,17 @@ describe('email templates', () => {
     expect(out.text).toContain('<a href="https://evil.example/phish">Click here</a> & "confirm" now');
   });
 
+  it('verificationEmail converts message line breaks to <br> in html but keeps them literal in text', () => {
+    const out = verificationEmail({
+      firstName: 'Jane',
+      verifyUrl: 'https://x/verify-email?token=abc',
+      appName: 'Vibecast',
+      branding: { message: 'Line one.\nLine two.\r\nLine three.' },
+    });
+    expect(out.html).toContain('Line one.<br>Line two.<br>Line three.');
+    expect(out.text).toContain('Line one.\nLine two.\r\nLine three.');
+  });
+
   it('verificationEmail falls back to the default subject/message when branding fields are whitespace-only', () => {
     const out = verificationEmail({
       firstName: 'Jane', verifyUrl: 'https://x/verify', appName: 'Vibecast',

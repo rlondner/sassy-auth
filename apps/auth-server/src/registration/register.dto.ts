@@ -18,4 +18,10 @@ export class RegisterDto {
   /** Required (must be `true`) iff the target app has gdprUrl set AND the
    * request is geo-detected as GDPR-applicable. */
   @IsOptional() @IsBoolean() acceptedGdpr?: boolean;
+  // The original /authorize URL the admin /signup page was bounced here
+  // from, when there was one. Recovered (never trusted blindly) by
+  // RegistrationService to bind the signup-flow redirect code to the same
+  // PKCE challenge/state/nonce the relying party is waiting on — see
+  // docs/superpowers/specs/2026-09-23-signup-pkce-redirect-design.md.
+  @IsString() @IsOptional() @MinLength(1) @MaxLength(4096) next?: string;
 }

@@ -5,6 +5,7 @@ import { SqidService } from '../common/sqid/sqid.service';
 import { TurnstileService } from './turnstile.service';
 import { OauthService } from '../token/oauth.service';
 import { RegisterDto } from './register.dto';
+import { OAUTH_AUTHORIZE_PATH } from '../token/oauth-metadata';
 
 jest.mock('../token/oauth.service');
 
@@ -16,7 +17,7 @@ jest.mock('@sassy-auth/db', () => ({
     saUser: { create: jest.fn() },
     saUserRole: { create: jest.fn() },
     saUserConsent: { createMany: jest.fn() },
-    saAppRedirectUri: { findFirst: jest.fn() },
+    saAppRedirectUri: { findFirst: jest.fn(), findMany: jest.fn() },
     user: { delete: jest.fn(), findUnique: jest.fn() },
     $transaction: jest.fn(),
   },
@@ -39,7 +40,7 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saUser: { create: jest.Mock };
   saUserRole: { create: jest.Mock };
   saUserConsent: { createMany: jest.Mock };
-  saAppRedirectUri: { findFirst: jest.Mock };
+  saAppRedirectUri: { findFirst: jest.Mock; findMany: jest.Mock };
   user: { delete: jest.Mock; findUnique: jest.Mock };
   $transaction: jest.Mock;
 };
@@ -66,10 +67,25 @@ const baseDto: RegisterDto = {
   turnstileToken: 'valid-captcha-token',
 };
 
-const appRow = { id: 1, publicId: 'sq_1', name: 'MyApp', isPlatform: false, passwordPolicyOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null };
+const appRow = {
+  id: 1,
+  publicId: 'sq_1',
+  name: 'MyApp',
+  isPlatform: false,
+  passwordPolicyOverride: null,
+  privacyPolicyUrl: null,
+  termsUrl: null,
+  gdprUrl: null,
+  url: 'https://myapp.example.com',
+};
 const draftOrgRow = { id: 10, publicId: 'placeholder', name: 'Acme Inc', appId: 1, isPlatform: false };
 const finalOrgRow = { id: 10, publicId: 'sq_10', name: 'Acme Inc', appId: 1, isPlatform: false };
 const baUserId = 'ba-user-id-abc123';
+
+const AUTHORIZE_ORIGIN = 'https://localhost:3010';
+function nextUrl(params: Record<string, string>): string {
+  return `${AUTHORIZE_ORIGIN}${OAUTH_AUTHORIZE_PATH}?${new URLSearchParams(params).toString()}`;
+}
 
 describe('RegistrationService', () => {
   let service: RegistrationService;
@@ -210,7 +226,9 @@ describe('RegistrationService', () => {
           saUserRole: mockPrisma.saUserRole,
         }),
       );
-      mockPrisma.saAppRedirectUri.findFirst.mockResolvedValue({ uri: 'https://relying-party.example.com/callback', kind: 'login' });
+      mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([
+        { uri: 'https://relying-party.example.com/callback', kind: 'login' },
+      ]);
       mockOauthService.generateCode.mockResolvedValue('signup-code-123');
 
       const result = await service.register(baseDto);
@@ -241,7 +259,7 @@ describe('RegistrationService', () => {
           saUserRole: mockPrisma.saUserRole,
         }),
       );
-      mockPrisma.saAppRedirectUri.findFirst.mockResolvedValue(null);
+      mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([]);
 
       const result = await service.register(baseDto);
 
@@ -264,7 +282,7 @@ describe('RegistrationService', () => {
 
       const result = await service.register(baseDto);
 
-      expect(mockPrisma.saAppRedirectUri.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.saAppRedirectUri.findMany).not.toHaveBeenCalled();
       expect(mockOauthService.generateCode).not.toHaveBeenCalled();
       expect(result.redirectUrl).toBeUndefined();
     });
@@ -328,6 +346,241 @@ describe('RegistrationService', () => {
       await service.register({ ...baseDto });
 
       expect(createManyMock).not.toHaveBeenCalled();
+    });
+
+    it("mints a PKCE-bound signup code and passes state/nonce through when a public app's next names a registered redirect_uri with a valid challenge", async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, clientSecretHash: null });
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          saOrg: mockPrisma.saOrg,
+          saUser: { create: jest.fn().mockResolvedValue({ id: 42, publicId: 'ba-user-id-a' }) },
+          saUserRole: mockPrisma.saUserRole,
+        }),
+      );
+      mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([
+        { uri: 'https://relying-party.example.com/callback', kind: 'login' },
+      ]);
+      mockOauthService.generateCode.mockResolvedValue('signup-code-123');
+
+      const dto: RegisterDto = {
+        ...baseDto,
+        next: nextUrl({
+          client_id: 'sq_1',
+          redirect_uri: 'https://relying-party.example.com/callback',
+          response_type: 'code',
+          code_challenge: 'test-challenge',
+          code_challenge_method: 'S256',
+          state: 'test-state',
+          nonce: 'test-nonce',
+        }),
+      };
+
+      const result = await service.register(dto);
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        'ba-user-id-a',
+        'sq_1',
+        'https://relying-party.example.com/callback',
+        'test-challenge',
+        'S256',
+        ['signup'],
+        'test-nonce',
+        'openid profile email',
+        expect.any(Date),
+      );
+      expect(result.redirectUrl).toBe(
+        'https://relying-party.example.com/callback?code=signup-code-123&state=test-state',
+      );
+    });
+
+    it("omits redirectUrl for a public app when next has no code_challenge", async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, clientSecretHash: null });
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          saOrg: mockPrisma.saOrg,
+          saUser: { create: jest.fn().mockResolvedValue({ id: 42, publicId: 'ba-user-id-a' }) },
+          saUserRole: mockPrisma.saUserRole,
+        }),
+      );
+      mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([
+        { uri: 'https://relying-party.example.com/callback', kind: 'login' },
+      ]);
+
+      const dto: RegisterDto = {
+        ...baseDto,
+        next: nextUrl({
+          client_id: 'sq_1',
+          redirect_uri: 'https://relying-party.example.com/callback',
+          response_type: 'code',
+          state: 'test-state',
+        }),
+      };
+
+      const result = await service.register(dto);
+
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+      expect(result.redirectUrl).toBeUndefined();
+    });
+
+    it("omits redirectUrl for a public app when next's redirect_uri is not registered", async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, clientSecretHash: null });
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          saOrg: mockPrisma.saOrg,
+          saUser: { create: jest.fn().mockResolvedValue({ id: 42, publicId: 'ba-user-id-a' }) },
+          saUserRole: mockPrisma.saUserRole,
+        }),
+      );
+      mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([
+        { uri: 'https://relying-party.example.com/callback', kind: 'login' },
+      ]);
+
+      const dto: RegisterDto = {
+        ...baseDto,
+        next: nextUrl({
+          client_id: 'sq_1',
+          redirect_uri: 'https://evil.example.com/callback',
+          response_type: 'code',
+          code_challenge: 'test-challenge',
+          code_challenge_method: 'S256',
+        }),
+      };
+
+      const result = await service.register(dto);
+
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+      expect(result.redirectUrl).toBeUndefined();
+    });
+
+    it("omits redirectUrl for a public app when next's client_id does not match the app, without querying redirect URIs", async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, clientSecretHash: null });
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          saOrg: mockPrisma.saOrg,
+          saUser: { create: jest.fn().mockResolvedValue({ id: 42, publicId: 'ba-user-id-a' }) },
+          saUserRole: mockPrisma.saUserRole,
+        }),
+      );
+
+      const dto: RegisterDto = {
+        ...baseDto,
+        next: nextUrl({
+          client_id: 'sq_OTHER',
+          redirect_uri: 'https://relying-party.example.com/callback',
+          response_type: 'code',
+          code_challenge: 'test-challenge',
+          code_challenge_method: 'S256',
+        }),
+      };
+
+      const result = await service.register(dto);
+
+      expect(mockPrisma.saAppRedirectUri.findMany).not.toHaveBeenCalled();
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+      expect(result.redirectUrl).toBeUndefined();
+    });
+
+    it("honors next's PKCE challenge and passes state/nonce through for a confidential app", async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, clientSecretHash: 'hashed-secret' });
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          saOrg: mockPrisma.saOrg,
+          saUser: { create: jest.fn().mockResolvedValue({ id: 42, publicId: 'ba-user-id-a' }) },
+          saUserRole: mockPrisma.saUserRole,
+        }),
+      );
+      mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([
+        { uri: 'https://relying-party.example.com/callback', kind: 'login' },
+      ]);
+      mockOauthService.generateCode.mockResolvedValue('signup-code-123');
+
+      const dto: RegisterDto = {
+        ...baseDto,
+        next: nextUrl({
+          client_id: 'sq_1',
+          redirect_uri: 'https://relying-party.example.com/callback',
+          response_type: 'code',
+          code_challenge: 'test-challenge',
+          code_challenge_method: 'S256',
+          state: 'test-state',
+          nonce: 'test-nonce',
+        }),
+      };
+
+      const result = await service.register(dto);
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        'ba-user-id-a',
+        'sq_1',
+        'https://relying-party.example.com/callback',
+        'test-challenge',
+        'S256',
+        ['signup'],
+        'test-nonce',
+        'openid profile email',
+        expect.any(Date),
+      );
+      expect(result.redirectUrl).toBe(
+        'https://relying-party.example.com/callback?code=signup-code-123&state=test-state',
+      );
+    });
+
+    it("uses the redirect_uri named by next, not the oldest registered one, when an app has more than one", async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, clientSecretHash: 'hashed-secret' });
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          saOrg: mockPrisma.saOrg,
+          saUser: { create: jest.fn().mockResolvedValue({ id: 42, publicId: 'ba-user-id-a' }) },
+          saUserRole: mockPrisma.saUserRole,
+        }),
+      );
+      mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([
+        { uri: 'https://relying-party.example.com/web-callback', kind: 'login' },
+        { uri: 'https://mobile.example.com/callback', kind: 'login' },
+      ]);
+      mockOauthService.generateCode.mockResolvedValue('signup-code-123');
+
+      const dto: RegisterDto = {
+        ...baseDto,
+        next: nextUrl({
+          client_id: 'sq_1',
+          redirect_uri: 'https://mobile.example.com/callback',
+          response_type: 'code',
+        }),
+      };
+
+      const result = await service.register(dto);
+
+      expect(mockOauthService.generateCode).toHaveBeenCalledWith(
+        'ba-user-id-a',
+        'sq_1',
+        'https://mobile.example.com/callback',
+        null,
+        null,
+        ['signup'],
+        null,
+        'openid profile email',
+        expect.any(Date),
+      );
+      expect(result.redirectUrl).toBe('https://mobile.example.com/callback?code=signup-code-123');
     });
   });
 

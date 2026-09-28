@@ -63,3 +63,4 @@ apps/admin/mkcert/
 apps/auth-server/secrets/localhost-key.pem
 apps/auth-server/secrets/localhost.pem
 packages/types/dist/
+.vscode/settings.json

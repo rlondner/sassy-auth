@@ -360,7 +360,14 @@ export class UsersService {
     // Only fire the activation webhook on a genuine transition into 'active'
     // — guard against re-firing on a no-op re-save of an already-active user.
     if (dto.status === 'active' && existing.status !== 'active') {
-      await notifyActivation({ id: existing.id, publicId: existing.publicId, orgId: existing.orgId });
+      await notifyActivation({
+        id: existing.id,
+        publicId: existing.publicId,
+        orgId: existing.orgId,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        email: updated.betterAuthUser.email,
+      });
     }
 
     const changedFields = Object.keys(dto).filter((k) => dto[k as keyof typeof dto] !== undefined);
@@ -384,7 +391,14 @@ export class UsersService {
       targetOrgId: existing.orgId,
     });
 
-    await prisma.saUser.delete({ where: { publicId } });
+    // Deleting only the SaUser row leaves the BetterAuth `User` row (and its
+    // unique email) orphaned in the database, which then blocks the same
+    // email from ever registering again. Delete both in one transaction —
+    // Session/Account/TwoFactor cascade off `User` automatically.
+    await prisma.$transaction([
+      prisma.saUser.delete({ where: { publicId } }),
+      prisma.user.delete({ where: { id: existing.betterAuthUserId } }),
+    ]);
     this.logger.getWinstonLogger().info('User deleted', {
       context: 'UsersService',
       userId: publicId,
