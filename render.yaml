@@ -52,6 +52,15 @@ envVarGroups:
       - key: TRUSTED_ORIGINS
         value: https://auth.milissai.com
 
+      # Shared parent domain of auth.milissai.com (admin) and auth-api.milissai.com
+      # (this server). Enables BetterAuth's crossSubDomainCookies so the session
+      # cookie set at sign-in is sent by the browser to both — required for any
+      # third-party resource server's /oauth/authorize redirect to see it. Without
+      # this the cookie is host-only and sign-in loops between /login and
+      # /oauth/authorize until throttled. See DEPLOYMENT.md §4 and §9.
+      - key: COOKIE_DOMAIN
+        value: .milissai.com
+
       # ── Production defaults ─────────────────────────────────────────────
       - key: NODE_ENV
         value: production
