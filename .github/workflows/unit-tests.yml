@@ -42,7 +42,7 @@ jobs:
         run: pnpm --filter @sassy-auth/db exec prisma generate
 
       - name: Build shared packages
-        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
+        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types --filter @sassy-auth/telemetry build
 
       # These are unit runs only — no database, no network. The auth-server
       # config sets rootDir=src and module-maps better-auth, otplib and uuid to
