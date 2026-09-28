@@ -45,7 +45,7 @@ jobs:
         run: pnpm --filter @sassy-auth/db exec prisma generate
 
       - name: Build shared packages
-        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
+        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types --filter @sassy-auth/telemetry build
 
       # The e2e workflow already gates auth-server (and, transitively, db and
       # types) via `nest build`. admin and ui had no type coverage in CI at all

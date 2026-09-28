@@ -87,10 +87,10 @@ jobs:
 
       # The auth-server and admin apps import the workspace libraries via
       # their built output (`main: ./dist/index.js`). Compile them so the
-      # dev servers started by Playwright can resolve `@sassy-auth/db` and
-      # `@sassy-auth/types` at runtime.
+      # dev servers started by Playwright can resolve `@sassy-auth/db`,
+      # `@sassy-auth/types` and `@sassy-auth/telemetry` at runtime.
       - name: Build shared packages
-        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types build
+        run: pnpm --filter @sassy-auth/db --filter @sassy-auth/types --filter @sassy-auth/telemetry build
 
       # bug-0092: auth-server compilation was previously excluded from CI
       # because of TS2742 on BetterAuth's inferred type and a shape
