@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { AUTH_THROTTLE } from '../common/config/rate-limit-config';
+import { resolveClientIp } from '../common/net/resolve-client-ip';
 
 // bug-0232: BetterAuth is mounted straight onto the Express app in
 // `main.ts` (`expressApp.all('/api/auth/*', toNodeHandler(auth))`),
@@ -80,8 +81,7 @@ interface Bucket {
  * address.
  */
 function clientKey(req: Request): string {
-  const forwarded = Array.isArray(req.ips) && req.ips.length > 0 ? req.ips[0] : undefined;
-  return forwarded ?? req.ip ?? 'unknown';
+  return resolveClientIp(req);
 }
 
 export function createAuthRateLimiter(options: AuthRateLimitOptions): AuthRateLimiter {

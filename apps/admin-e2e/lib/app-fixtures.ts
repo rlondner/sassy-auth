@@ -79,3 +79,42 @@ export async function createAppWithPasswordPolicyOverride(
     await ctx.dispose()
   }
 }
+
+/**
+ * Creates a fresh SaApp and PATCHes it with Privacy Policy and Terms URLs
+ * set (GDPR deliberately left unset — see below), for signup.spec.ts's
+ * full-consent-flow test. Mirrors createAppWithPasswordPolicyOverride's
+ * create-then-patch shape.
+ */
+export async function createAppWithConsentDocuments(): Promise<CreatedApp> {
+  const appsAdmin = SEED_ADMINS.find((a) => a.key === 'apps')
+  if (!appsAdmin) throw new Error("SEED_ADMINS has no 'apps' admin")
+
+  const ctx = await pwRequest.newContext({
+    baseURL: AUTH_SERVER_URL,
+    storageState: path.join(__dirname, '..', appsAdmin.storageStatePath),
+  })
+  try {
+    const name = `e2e-consent-app-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const createRes = await ctx.post('/api/apps', {
+      data: { name, url: `https://example.com/${name}` },
+    })
+    expect(createRes.ok(), `POST /api/apps failed: ${createRes.status()} ${await createRes.text()}`).toBe(true)
+    const created = (await createRes.json()) as CreatedApp
+
+    const patchRes = await ctx.patch(`/api/apps/${created.publicId}`, {
+      data: {
+        privacyPolicyUrl: 'https://example.com/privacy',
+        termsUrl: 'https://example.com/terms',
+      },
+    })
+    expect(
+      patchRes.ok(),
+      `PATCH /api/apps/${created.publicId} failed: ${patchRes.status()} ${await patchRes.text()}`,
+    ).toBe(true)
+
+    return created
+  } finally {
+    await ctx.dispose()
+  }
+}

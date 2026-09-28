@@ -1,5 +1,9 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
+import type { ConsentDocumentType } from '@sassy-auth/types';
+import { resolveOutstandingConsent } from '../consent/resolve-outstanding-consent';
+import { recordConsent } from '../consent/record-consent';
+import { resolveCountryFromIp } from '../common/geoip/geoip.service';
 
 type RolePermRel = { permission: { name: string } };
 type RoleRel = { role: { permissions: RolePermRel[] } };
@@ -65,5 +69,50 @@ export class MeService {
         isPlatform: user.org.app.isPlatform,
       },
     };
+  }
+
+  async getOutstandingConsent(
+    baId: string,
+    appPublicId: string,
+    ip: string,
+  ): Promise<{ outstanding: Array<{ documentType: ConsentDocumentType; url: string }> }> {
+    const user = await prisma.saUser.findUnique({ where: { betterAuthUserId: baId }, select: { id: true } });
+    if (!user) throw new ForbiddenException();
+    const app = await prisma.saApp.findUnique({
+      where: { publicId: appPublicId },
+      select: { id: true, privacyPolicyUrl: true, termsUrl: true, gdprUrl: true },
+    });
+    if (!app) throw new NotFoundException('App not found');
+    const country = resolveCountryFromIp(ip);
+    const outstanding = await resolveOutstandingConsent(prisma, user.id, app.id, app, country);
+    return { outstanding };
+  }
+
+  async recordMyConsent(
+    baId: string,
+    appPublicId: string,
+    ip: string,
+    accepted: ConsentDocumentType[],
+  ): Promise<void> {
+    const user = await prisma.saUser.findUnique({ where: { betterAuthUserId: baId }, select: { id: true } });
+    if (!user) throw new ForbiddenException();
+    const app = await prisma.saApp.findUnique({
+      where: { publicId: appPublicId },
+      select: { id: true, privacyPolicyUrl: true, termsUrl: true, gdprUrl: true },
+    });
+    if (!app) throw new NotFoundException('App not found');
+    const country = resolveCountryFromIp(ip);
+    const outstanding = await resolveOutstandingConsent(prisma, user.id, app.id, app, country);
+    const acceptedSet = new Set(accepted);
+    const missing = outstanding.filter((doc) => !acceptedSet.has(doc.documentType));
+    if (missing.length > 0) {
+      throw new BadRequestException(`Missing acceptance for: ${missing.map((d) => d.documentType).join(', ')}`);
+    }
+    // Only ever record documents that are genuinely outstanding — an
+    // `accepted` entry naming a document the app doesn't require (or that
+    // was already accepted) is silently ignored rather than written, so a
+    // stale/forged request body can't create a phantom consent row.
+    const toRecord = outstanding.filter((doc) => acceptedSet.has(doc.documentType));
+    await recordConsent(prisma, user.id, app.id, toRecord);
   }
 }

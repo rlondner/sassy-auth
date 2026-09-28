@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { RegistrationService } from './registration.service';
 import { RegisterDto } from './register.dto';
 import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
+import { resolveClientIp } from '../common/net/resolve-client-ip';
 
 /**
  * Public (no BetterAuthGuard) self-serve signup endpoint.
@@ -17,8 +19,8 @@ export class RegistrationController {
 
   @Post()
   @UseGuards(RateLimitGuard)
-  register(@Body() dto: RegisterDto) {
-    return this.service.register(dto);
+  register(@Body() dto: RegisterDto, @Req() req: Request) {
+    return this.service.register(dto, resolveClientIp(req));
   }
 
   /**
@@ -45,7 +47,7 @@ export class RegistrationController {
    */
   @Get('app')
   @UseGuards(AppLookupRateLimitGuard)
-  getAppName(@Query('appPublicId') appPublicId: string) {
-    return this.service.getAppName(appPublicId);
+  getAppName(@Query('appPublicId') appPublicId: string, @Req() req: Request) {
+    return this.service.getAppName(appPublicId, resolveClientIp(req));
   }
 }
