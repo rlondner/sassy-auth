@@ -113,6 +113,23 @@ describe('AppViewDrawer', () => {
     expect(screen.getByText(en.apps.fields.noClientSecret)).toBeInTheDocument()
   })
 
+  it('shows "Use system default" for twoFactorPromptEnabled when unset', () => {
+    render(withIntl(<AppViewDrawer app={app} open onOpenChange={() => undefined} onEdit={() => undefined} onDelete={() => undefined} />))
+    expect(screen.getByText(en.apps.fields.twoFactorPromptEnabledDefault)).toBeInTheDocument()
+  })
+
+  it('shows "Always show" for twoFactorPromptEnabled when true', () => {
+    const appWithPromptOn = { ...app, twoFactorPromptEnabled: true }
+    render(withIntl(<AppViewDrawer app={appWithPromptOn} open onOpenChange={() => undefined} onEdit={() => undefined} onDelete={() => undefined} />))
+    expect(screen.getByText(en.apps.fields.twoFactorPromptEnabledOn)).toBeInTheDocument()
+  })
+
+  it('shows "Never show" for twoFactorPromptEnabled when false', () => {
+    const appWithPromptOff = { ...app, twoFactorPromptEnabled: false }
+    render(withIntl(<AppViewDrawer app={appWithPromptOff} open onOpenChange={() => undefined} onEdit={() => undefined} onDelete={() => undefined} />))
+    expect(screen.getByText(en.apps.fields.twoFactorPromptEnabledOff)).toBeInTheDocument()
+  })
+
   it('resolves the default org/role names and lists enabled social providers', async () => {
     ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({
       items: [{ publicId: 'org_1', name: 'Acme', isPlatform: false, userCount: 0, app: { publicId: 'sq_1', name: 'Customer Portal' } }],

@@ -498,6 +498,38 @@ describe('AppEditDrawer', () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
+  it('changes twoFactorPromptEnabled and includes it in the patch when changed', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, twoFactorPromptEnabled: false },
+    })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    fireEvent.change(screen.getByLabelText(en.apps.fields.twoFactorPromptEnabled), { target: { value: 'false' } })
+
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    expect(save).toBeEnabled()
+    fireEvent.click(save)
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', { twoFactorPromptEnabled: false }),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  it('does not mark the form dirty when twoFactorPromptEnabled is re-selected to its current value', () => {
+    const appWithPrompt = { ...app, twoFactorPromptEnabled: true }
+    render(withIntl(<AppEditDrawer app={appWithPrompt} open onOpenChange={() => undefined} />))
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    expect(save).toBeDisabled()
+
+    // Re-selecting the value the app already has must not flip dirty: the
+    // comparison is against the actual current value, not "was this
+    // control touched at all".
+    fireEvent.change(screen.getByLabelText(en.apps.fields.twoFactorPromptEnabled), { target: { value: 'true' } })
+    expect(save).toBeDisabled()
+  })
+
   // Task 12: collapsible per-app password policy section.
 
   describe('password policy section', () => {

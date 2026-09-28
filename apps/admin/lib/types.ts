@@ -96,6 +96,7 @@ export interface App {
   redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
+  twoFactorPromptEnabled?: boolean | null;
   requireTwoFactor: boolean;
   allowOfflineAccess: boolean;
   // Client type is derived from whether a secret hash exists server-side —
@@ -119,6 +120,7 @@ export interface CreateAppPayload {
   logo?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
+  twoFactorPromptEnabled?: boolean | null;
   requireTwoFactor?: boolean;
   allowOfflineAccess?: boolean;
 }
@@ -129,6 +131,7 @@ export interface UpdateAppPayload {
   logo?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
+  twoFactorPromptEnabled?: boolean | null;
   requireTwoFactor?: boolean;
   allowOfflineAccess?: boolean;
   defaultOrgId?: string | null;

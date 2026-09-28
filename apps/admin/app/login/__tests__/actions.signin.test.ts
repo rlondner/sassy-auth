@@ -357,6 +357,48 @@ describe('signIn optional two-factor interstitial', () => {
     expect(target).toBe('/users')
   })
 
+  it('does not prompt when TWO_FACTOR_PROMPT_ENABLED is false (system default, no client_id)', async () => {
+    const originalEnv = process.env['TWO_FACTOR_PROMPT_ENABLED']
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = 'false'
+    try {
+      const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+      fetchMock
+        .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+        .mockResolvedValueOnce(
+          upstream(200, { user: { twoFactorEnabled: false } }),
+        )
+        .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
+
+      const target = await callExpectingRedirect(
+        formData({ email: 'a@b.io', password: 'pw' }),
+      )
+
+      expect(target).toBe('/users')
+    } finally {
+      if (originalEnv === undefined) delete process.env['TWO_FACTOR_PROMPT_ENABLED']
+      else process.env['TWO_FACTOR_PROMPT_ENABLED'] = originalEnv
+    }
+  })
+
+  it('does not prompt when the per-app app-trust-days lookup returns promptEnabled: false', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      .mockResolvedValueOnce(
+        upstream(200, { user: { twoFactorEnabled: false } }),
+      )
+      .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
+      .mockResolvedValueOnce(
+        upstream(200, { effectiveTrustDays: 14, promptEnabled: false }),
+      )
+
+    const target = await callExpectingRedirect(
+      formData({ email: 'a@b.io', password: 'pw', next: '/orgs?client_id=sq_1' }),
+    )
+
+    expect(target).toBe('/orgs?client_id=sq_1')
+  })
+
   // The interstitial is a nudge, not a gate. If we could not read the user's
   // real 2FA state we must not guess: guessing "unenrolled, never prompted"
   // is what turned a status-lookup outage into a setup prompt for every

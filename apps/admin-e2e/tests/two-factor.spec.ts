@@ -436,6 +436,41 @@ test.describe('2FA — interstitial', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Per-app twoFactorPromptEnabled override (seed dependency).
+//
+// TODO: This test requires:
+//   a) A SaApp seeded with twoFactorPromptEnabled:false (a dedicated non-platform app).
+//   b) A fresh unenrolled user reachable via that app's authorize/next flow.
+//   c) CI seed wiring to provision (a) and (b) and expose the app's publicId
+//      as an env var (e.g. PROMPT_DISABLED_APP_CLIENT_ID).
+//
+// None of (a)-(c) exist in the current CI seed. Rather than ship a fragile
+// test that depends on manual pre-conditions, this test is .skip'd with this
+// explanatory comment — mirrors 2fa-enforcement.spec.ts's forced-enrollment
+// seed-dependency test.
+//
+// When the seed is ready, the test body should:
+//   1. Sign in as the unenrolled user with `next` carrying
+//      client_id=PROMPT_DISABLED_APP_CLIENT_ID.
+//   2. Assert the page lands on /users (or wherever `next` points), NOT
+//      /login/two-factor-prompt.
+// ─────────────────────────────────────────────────────────────────────────────
+test.describe('2FA — interstitial disabled per-app (seed dependency)', () => {
+  test.skip(
+    true,
+    'TODO: requires a seeded twoFactorPromptEnabled:false app + unenrolled user. ' +
+    'Skipped until CI seed provides PROMPT_DISABLED_APP_CLIENT_ID.',
+  )
+
+  test('per-app disabled prompt does not redirect to the interstitial', async ({ page }) => {
+    const PROMPT_DISABLED_APP_CLIENT_ID = process.env.PROMPT_DISABLED_APP_CLIENT_ID ?? ''
+    expect(PROMPT_DISABLED_APP_CLIENT_ID, 'PROMPT_DISABLED_APP_CLIENT_ID must be set').toBeTruthy()
+    // TODO: fill in sign-in flow with client_id once seed exists.
+    await page.goto(`/login?next=${encodeURIComponent(`/some/app/path?client_id=${PROMPT_DISABLED_APP_CLIENT_ID}`)}`)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Admin-reset: uses the pre-captured s@sa.io storageState (super-admin.json) to
 // make authed API calls. MUST run last. Resets tfa@sa.io's 2FA (not s@sa.io —
 // s@sa.io was never enrolled here, so auth-state.setup always stays valid).

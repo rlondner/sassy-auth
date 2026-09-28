@@ -9,7 +9,9 @@ export function shouldPromptTwoFactor(params: {
   promptedAt: Date | null;
   now: Date;
   intervalDays: number;
+  promptEnabled: boolean;
 }): boolean {
+  if (!params.promptEnabled) return false;
   if (params.twoFactorEnabled) return false;
   if (!params.promptedAt) return true;
   const intervalMs = params.intervalDays * 24 * 60 * 60 * 1000;
@@ -25,4 +27,15 @@ export function getSystemTrustDaysClient(): number {
   if (!raw) return 14;
   const n = Number(raw);
   return Number.isInteger(n) && n > 0 ? n : 14;
+}
+
+/**
+ * Reads TWO_FACTOR_PROMPT_ENABLED from process.env (available in Server
+ * Actions). Fails open: anything other than an explicit "false"/"0"
+ * (case-insensitive) is treated as enabled. Default: true.
+ */
+export function getSystemPromptEnabledClient(): boolean {
+  const raw = process.env['TWO_FACTOR_PROMPT_ENABLED'];
+  if (raw === undefined || raw === '') return true;
+  return raw.toLowerCase() !== 'false' && raw !== '0';
 }

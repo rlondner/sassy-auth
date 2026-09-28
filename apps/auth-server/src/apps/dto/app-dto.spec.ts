@@ -65,3 +65,32 @@ describe('CreateAppDto — twoFactorTrustDays validation', () => {
   it('rejects 7.5 (float)', async () => expect(await check(7.5)).not.toHaveLength(0));
   it('rejects "14" (string)', async () => expect(await check('14')).not.toHaveLength(0));
 });
+
+describe('UpdateAppDto — twoFactorPromptEnabled validation', () => {
+  async function check(value: unknown): Promise<string[]> {
+    const dto = Object.assign(new UpdateAppDto(), { twoFactorPromptEnabled: value });
+    const errors = validateSync(dto);
+    return errors.flatMap((e) => Object.values(e.constraints ?? {}));
+  }
+
+  it('accepts null (inherit system default)', async () => expect(await check(null)).toHaveLength(0));
+  it('accepts undefined (omit)', async () => expect(await check(undefined)).toHaveLength(0));
+  it('accepts true', async () => expect(await check(true)).toHaveLength(0));
+  it('accepts false', async () => expect(await check(false)).toHaveLength(0));
+  it('rejects "true" (string)', async () => expect(await check('true')).not.toHaveLength(0));
+  it('rejects 1 (number)', async () => expect(await check(1)).not.toHaveLength(0));
+});
+
+describe('CreateAppDto — twoFactorPromptEnabled validation', () => {
+  async function check(value: unknown): Promise<string[]> {
+    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'https://a.example.com', twoFactorPromptEnabled: value });
+    const errors = validateSync(dto);
+    return errors.flatMap((e) => Object.values(e.constraints ?? {}));
+  }
+
+  it('accepts null (inherit system default)', async () => expect(await check(null)).toHaveLength(0));
+  it('accepts undefined (omit)', async () => expect(await check(undefined)).toHaveLength(0));
+  it('accepts true', async () => expect(await check(true)).toHaveLength(0));
+  it('accepts false', async () => expect(await check(false)).toHaveLength(0));
+  it('rejects "true" (string)', async () => expect(await check('true')).not.toHaveLength(0));
+});

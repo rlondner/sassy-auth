@@ -1,4 +1,4 @@
-import { resolveTrustDays, getSystemTrustDays } from './resolve-trust-days';
+import { resolveTrustDays, getSystemTrustDays, resolvePromptEnabled, getSystemPromptEnabled } from './resolve-trust-days';
 
 describe('getSystemTrustDays', () => {
   const origEnv = process.env;
@@ -66,5 +66,63 @@ describe('resolveTrustDays', () => {
 
   it('returns 1 (minimum positive) when app override is 1', () => {
     expect(resolveTrustDays({ twoFactorTrustDays: 1 }, DEFAULT)).toBe(1);
+  });
+});
+
+describe('getSystemPromptEnabled', () => {
+  const origEnv = process.env;
+
+  afterEach(() => {
+    process.env = { ...origEnv };
+  });
+
+  it('returns true when TWO_FACTOR_PROMPT_ENABLED is not set', () => {
+    delete process.env['TWO_FACTOR_PROMPT_ENABLED'];
+    expect(getSystemPromptEnabled()).toBe(true);
+  });
+
+  it('returns true when TWO_FACTOR_PROMPT_ENABLED is the empty string', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = '';
+    expect(getSystemPromptEnabled()).toBe(true);
+  });
+
+  it('returns false when TWO_FACTOR_PROMPT_ENABLED is "false"', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = 'false';
+    expect(getSystemPromptEnabled()).toBe(false);
+  });
+
+  it('returns false when TWO_FACTOR_PROMPT_ENABLED is "FALSE" (case-insensitive)', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = 'FALSE';
+    expect(getSystemPromptEnabled()).toBe(false);
+  });
+
+  it('returns false when TWO_FACTOR_PROMPT_ENABLED is "0"', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = '0';
+    expect(getSystemPromptEnabled()).toBe(false);
+  });
+
+  it('returns true when TWO_FACTOR_PROMPT_ENABLED is "true"', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = 'true';
+    expect(getSystemPromptEnabled()).toBe(true);
+  });
+
+  it('returns true when TWO_FACTOR_PROMPT_ENABLED is an unrecognized string (fail open)', () => {
+    process.env['TWO_FACTOR_PROMPT_ENABLED'] = 'yes-please';
+    expect(getSystemPromptEnabled()).toBe(true);
+  });
+});
+
+describe('resolvePromptEnabled', () => {
+  it('returns the app override when it is explicitly true', () => {
+    expect(resolvePromptEnabled({ twoFactorPromptEnabled: true }, false)).toBe(true);
+  });
+
+  it('returns the app override when it is explicitly false', () => {
+    expect(resolvePromptEnabled({ twoFactorPromptEnabled: false }, true)).toBe(false);
+  });
+
+  it('returns systemDefault when app override is null', () => {
+    expect(resolvePromptEnabled({ twoFactorPromptEnabled: null }, true)).toBe(true);
+    expect(resolvePromptEnabled({ twoFactorPromptEnabled: null }, false)).toBe(false);
   });
 });
