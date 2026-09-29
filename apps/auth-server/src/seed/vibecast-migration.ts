@@ -52,7 +52,7 @@ const sqids = new Sqids({
   minLength: 4,
 });
 
-const APP_NAME = 'vibecast';
+const APP_NAME = 'VibeCast';
 const isProd = (process.env.NODE_ENV ?? 'development') === 'production';
 
 /**
@@ -91,6 +91,11 @@ const ADMIN = {
 
 // Every vibecast.* SaPermission that exists in the source dev database.
 const PERMISSIONS = [
+  'vibecast.admin.costs.read',
+  'vibecast.admin.costs.write',
+  'vibecast.admin.insights.read',
+  'vibecast.admin.orgs.read',
+  'vibecast.admin.orgs.write',
   'vibecast.app.admin',
   'vibecast.app.settings.read',
   'vibecast.app.settings.write',
