@@ -24,6 +24,7 @@ import { createAppAction } from '@/app/(admin)/apps/actions'
 import type { RedirectUri } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 import { AppLogoField } from './app-logo-field'
+import { AppFaviconField } from './app-favicon-field'
 
 interface Props {
   open: boolean
@@ -36,6 +37,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
   const [name, setName] = React.useState('')
   const [url, setUrl] = React.useState('')
   const [logo, setLogo] = React.useState<string | null>(null)
+  const [favicon, setFavicon] = React.useState<string | null>(null)
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>([])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(false)
@@ -48,6 +50,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       setName('')
       setUrl('')
       setLogo(null)
+      setFavicon(null)
       setRedirectUris([])
       setTwoFactorTrustDays(null)
       setRequireTwoFactor(false)
@@ -68,6 +71,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
         name: name.trim(),
         url: url.trim(),
         logo,
+        favicon,
         redirectUris,
         twoFactorTrustDays,
         requireTwoFactor,
@@ -119,6 +123,9 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
             </div>
             <div>
               <AppLogoField value={logo} onValueChange={setLogo} />
+            </div>
+            <div>
+              <AppFaviconField value={favicon} onValueChange={setFavicon} />
             </div>
             <div>
               <Label>{t('apps.fields.redirectUris')}</Label>
