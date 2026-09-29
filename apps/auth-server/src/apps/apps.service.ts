@@ -16,7 +16,7 @@ import { ListAppsQueryDto } from './dto/list-apps-query.dto';
 
 type RedirectUriRow = { uri: string; kind: string };
 type AppRow = {
-  publicId: string; name: string; url: string; logo?: string | null; isPlatform: boolean;
+  publicId: string; name: string; url: string; logo?: string | null; favicon?: string | null; isPlatform: boolean;
   twoFactorTrustDays: number | null; twoFactorPromptEnabled: boolean | null; requireTwoFactor: boolean;
   allowOfflineAccess: boolean;
   redirectUris?: RedirectUriRow[];
@@ -37,7 +37,7 @@ type AppRow = {
 };
 function formatApp(a: AppRow) {
   return {
-    publicId: a.publicId, name: a.name, url: a.url, logo: a.logo ?? null, isPlatform: a.isPlatform,
+    publicId: a.publicId, name: a.name, url: a.url, logo: a.logo ?? null, favicon: a.favicon ?? null, isPlatform: a.isPlatform,
     twoFactorTrustDays: a.twoFactorTrustDays ?? null,
     twoFactorPromptEnabled: a.twoFactorPromptEnabled ?? null,
     requireTwoFactor: a.requireTwoFactor,
@@ -242,7 +242,7 @@ export class AppsService {
     // `select`, or swapping it for `include`) slips past review. `logo`
     // stays nullable/optional on AppRow and the App type, so this reads as
     // "not sent for this view," not a lie about the data.
-    return { items: rows.map((r) => ({ ...formatApp(r), logo: null })), total, page, pageSize };
+    return { items: rows.map((r) => ({ ...formatApp(r), logo: null, favicon: null })), total, page, pageSize };
   }
 
   async getApp(callerBaId: string, publicId: string) {
@@ -270,7 +270,7 @@ export class AppsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
-          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, logo: dto.logo ?? null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null, twoFactorPromptEnabled: dto.twoFactorPromptEnabled ?? null, requireTwoFactor: dto.requireTwoFactor ?? false, allowOfflineAccess: dto.allowOfflineAccess ?? false },
+          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, logo: dto.logo ?? null, favicon: dto.favicon ?? null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null, twoFactorPromptEnabled: dto.twoFactorPromptEnabled ?? null, requireTwoFactor: dto.requireTwoFactor ?? false, allowOfflineAccess: dto.allowOfflineAccess ?? false },
         });
         const updated = await tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
         if (dto.redirectUris) {
@@ -294,6 +294,7 @@ export class AppsService {
       dto.name === undefined &&
       dto.url === undefined &&
       dto.logo === undefined &&
+      dto.favicon === undefined &&
       dto.twoFactorTrustDays === undefined &&
       dto.twoFactorPromptEnabled === undefined &&
       dto.requireTwoFactor === undefined &&
@@ -309,7 +310,7 @@ export class AppsService {
       dto.activationEmailOverride === undefined
     ) {
       throw new BadRequestException(
-        'At least one of name, url, logo, twoFactorTrustDays, twoFactorPromptEnabled, requireTwoFactor, allowOfflineAccess, redirectUris, defaultOrgId, defaultRoleId, passwordPolicyOverride, activationWebhookUrl, privacyPolicyUrl, termsUrl, gdprUrl, or activationEmailOverride must be provided',
+        'At least one of name, url, logo, favicon, twoFactorTrustDays, twoFactorPromptEnabled, requireTwoFactor, allowOfflineAccess, redirectUris, defaultOrgId, defaultRoleId, passwordPolicyOverride, activationWebhookUrl, privacyPolicyUrl, termsUrl, gdprUrl, or activationEmailOverride must be provided',
       );
     }
     await checkPermission(callerBaId, 'platform.apps.manage');
@@ -335,6 +336,7 @@ export class AppsService {
             ...(dto.name !== undefined && { name: dto.name }),
             ...(dto.url !== undefined && { url: dto.url }),
             ...(dto.logo !== undefined && { logo: dto.logo }),
+            ...(dto.favicon !== undefined && { favicon: dto.favicon }),
             ...(dto.twoFactorTrustDays !== undefined && {
               twoFactorTrustDays: dto.twoFactorTrustDays,
             }),
