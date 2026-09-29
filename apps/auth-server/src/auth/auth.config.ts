@@ -123,6 +123,19 @@ export const auth = betterAuth({
     // production-only condition as `secure` above so dev keeps the
     // unprefixed name regardless of the auth-server's protocol.
     useSecureCookies: process.env.NODE_ENV === 'production',
+    // bug-0293: staging and production are forced to share the same
+    // COOKIE_DOMAIN (`.milissai.com` — see below), because
+    // auth-staging.milissai.com/auth-api-staging.milissai.com don't share a
+    // narrower suffix than that either. Same Domain + same default cookie
+    // name ("better-auth.session_token") + same Path means both
+    // environments write to the identical slot in the browser's cookie jar
+    // — a session cookie from whichever environment was visited last
+    // silently overwrites the other's. Defaulting to BetterAuth's own
+    // default ("better-auth") keeps this a no-op unless COOKIE_PREFIX is
+    // explicitly set (see render.staging.yaml), and apps/admin must be told
+    // the same prefix via the same env var — see getBetterAuthCookieName in
+    // @sassy-auth/types.
+    cookiePrefix: process.env.COOKIE_PREFIX || 'better-auth',
     // bug: admin (auth.milissai.com) and this server (auth-api.milissai.com)
     // are sibling subdomains in production. Without this, BetterAuth issues
     // a host-only session cookie (no Domain attribute); apps/admin's

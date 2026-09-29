@@ -9,7 +9,13 @@ import { AUTH_SERVER_URL } from '@/lib/config'
 
 // Must match the exact production check auth.config.ts uses for
 // `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
-const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', process.env.NODE_ENV === 'production')
+// bug-0293: must match auth.config.ts's `advanced.cookiePrefix` — see
+// getBetterAuthCookieName's doc comment.
+const SESSION_COOKIE_NAME = getBetterAuthCookieName(
+  'session_token',
+  process.env.NODE_ENV === 'production',
+  process.env.COOKIE_PREFIX || 'better-auth',
+)
 
 // bug-0159: 1-year maxAge so a locale choice survives the browser
 // closing. Previously the cookie was session-only, forcing users to

@@ -35,14 +35,24 @@ envVarGroups:
       # ".milissai.com" as production because auth-staging.milissai.com /
       # auth-api-staging.milissai.com don't share a narrower suffix than
       # that (the "staging" segment is baked into the label, not a separate
-      # subdomain level). A browser that has an active session cookie from
-      # BOTH environments will only keep whichever one it set/received most
-      # recently, since they occupy the same cookie-jar slot (same name,
-      # same Domain, same Path). That's a UX quirk (surprise sign-out),
-      # not a security issue — BETTER_AUTH_SECRET differs per environment,
-      # so a stale cross-environment cookie value just fails validation.
+      # subdomain level).
       - key: COOKIE_DOMAIN
         value: .milissai.com
+      # bug-0293: because COOKIE_DOMAIN above is identical to production's,
+      # the two environments would otherwise write the same-named session
+      # cookie to the same Domain/Path — a browser signed into both would
+      # have whichever one it visited most recently silently overwrite the
+      # other's cookie in the shared cookie jar. Not a security issue
+      # (BETTER_AUTH_SECRET differs per environment, so a stale
+      # cross-environment cookie value just fails validation), but a
+      # confusing "surprise sign-out" UX bug. Giving staging a distinct
+      # cookie prefix (see auth.config.ts's `advanced.cookiePrefix` and
+      # @sassy-auth/types' getBetterAuthCookieName) puts the two
+      # environments' cookies in different jar slots. Both services below
+      # pull this from the shared group, so auth-server and admin always
+      # agree on the prefix.
+      - key: COOKIE_PREFIX
+        value: sassy-staging
       - key: TRUSTED_ORIGINS
         value: https://auth-staging.milissai.com
       # NODE_ENV stays "production" here too — it controls app runtime behavior (secure
