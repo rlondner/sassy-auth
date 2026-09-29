@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-29
+
+Two small fixes landed on `dev`/`master` (PR #434 relabels the activation
+webhook fields; PR #435 fixes federated sign-in dropping the session across
+subdomains) — the latter's own `COOKIE_DOMAIN` fix introduced a new,
+same-day bug fixed in this review.
+
+**`fix(admin): rename and reposition activation webhook secret field` (PR
+#434).** "Webhook URL"/"Webhook secret" didn't make clear these apply
+specifically to the account-activation webhook (there is no other webhook
+type). Relabeled to "Activation webhook URL"/"Activation webhook secret"
+(en + fr) and moved the secret field to sit directly under the URL field.
+No behavior change — i18n strings and JSX ordering only.
+
+**`fix(auth): scope session cookie to shared parent domain in production`
+(PR #435).** `auth-server` (`auth-api.milissai.com`) and `admin`
+(`auth.milissai.com`) run on different hosts; federated (Google/Microsoft/
+Apple) sign-in redirects the browser directly through auth-server's OAuth
+callback, where BetterAuth sets the session cookie itself before bouncing
+back to `ADMIN_URL`. With no `Domain` attribute, that cookie was host-only
+and never reached admin's domain, so a successful social sign-in silently
+dropped the user back at `/login`. Fixed via a new optional `COOKIE_DOMAIN`
+env var wired to BetterAuth's `crossSubDomainCookies`, set to
+`.milissai.com` on both `render.yaml` and `render.staging.yaml`.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-09-29.md](./docs/history/todo/TODO_2026-09-29.md) for
+follow-ups and [BUGS_2026-09-29.md](./docs/history/bugs/BUGS_2026-09-29.md)
+for this run's bug catalog. One new item, medium severity, fixed in this
+review:
+
+- **bug-0293** — Setting `COOKIE_DOMAIN=.milissai.com` on staging (PR
+  #435, above) forced staging onto the *exact same* cookie `Domain` as
+  production, since `auth-staging.milissai.com`/`auth-api-staging.milissai.com`
+  don't share a narrower suffix either. Combined with an identical default
+  cookie name and `Path`, staging and production wrote to the same slot in
+  a browser's cookie jar — whichever environment was visited most recently
+  silently overwrote the other's session cookie. Fixed by adding an
+  optional `COOKIE_PREFIX` env var (`sassy-staging` on staging, unset on
+  production) so the two environments' cookies no longer collide. See PR
+  [#436](https://github.com/rlondner/sassy-auth/pull/436).
+
 ## [Unreleased] — 2026-09-28
 
 Landed two features on `dev` (optional legal consent at signup/login, and a
