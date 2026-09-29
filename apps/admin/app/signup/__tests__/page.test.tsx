@@ -29,6 +29,7 @@ const BASE_APP_INFO = {
   hasDefaultOrg: false,
   passwordPolicy: null,
   logo: null,
+  favicon: null,
   privacyPolicyUrl: null,
   termsUrl: null,
   gdprUrl: null,
