@@ -13,6 +13,8 @@
     "switchToDark": "Passer en mode sombre"
   },
   "common": {
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
     "save": "Enregistrer",
     "edit": "Modifier",
     "delete": "Supprimer",
@@ -645,6 +647,7 @@
       "continueToLogin": "Continuer vers la connexion"
     },
     "errors": {
+      "invalidEmail": "Veuillez saisir une adresse e-mail valide.",
       "passwordMismatch": "Les mots de passe ne correspondent pas.",
       "passwordTooShort": "Le mot de passe doit comporter au moins 12 caractères.",
       "passwordComplexity": "Le mot de passe doit contenir une majuscule, une minuscule et un chiffre.",
