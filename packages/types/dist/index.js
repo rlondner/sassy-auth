@@ -104,7 +104,7 @@ function isValidAppLogoDataUri(value) {
 function renderTemplate(template, vars) {
     return template.replace(/\{\{(\w+)\}\}/g, (match, key) => Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : match);
 }
-function getBetterAuthCookieName(cookie, isProduction) {
-    const base = `better-auth.${cookie}`;
+function getBetterAuthCookieName(cookie, isProduction, prefix = 'better-auth') {
+    const base = `${prefix}.${cookie}`;
     return isProduction ? `__Secure-${base}` : base;
 }

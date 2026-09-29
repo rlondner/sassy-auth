@@ -6,7 +6,13 @@ const PUBLIC_PATHS = ['/login', '/accept-invite', '/signup', '/oauth-error', '/f
 
 // Must match the exact production check auth.config.ts uses for
 // `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
-const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', process.env.NODE_ENV === 'production')
+// bug-0293: must match auth.config.ts's `advanced.cookiePrefix` — see
+// getBetterAuthCookieName's doc comment.
+const SESSION_COOKIE_NAME = getBetterAuthCookieName(
+  'session_token',
+  process.env.NODE_ENV === 'production',
+  process.env.COOKIE_PREFIX || 'better-auth',
+)
 const SESSION_COOKIE_PATTERN = new RegExp(
   `(?:^|;\\s*)${SESSION_COOKIE_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]+)`,
 )

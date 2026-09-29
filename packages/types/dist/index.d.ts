@@ -108,6 +108,17 @@ export declare function renderTemplate(template: string, vars: Record<string, st
  * renames a cookie while the other keeps looking for the unprefixed name,
  * and sign-in silently breaks (see auth.config.ts's dev(sec) comment for the
  * incident this traces to, which turned out to reproduce in production too).
+ *
+ * bug-0293: `prefix` defaults to BetterAuth's own default ("better-auth") but
+ * can be overridden with the COOKIE_PREFIX env var (wired through
+ * auth.config.ts's `advanced.cookiePrefix`). This exists because staging and
+ * production share the same cookie `Domain` (`.milissai.com` — see
+ * COOKIE_DOMAIN's doc comment): auth.milissai.com and auth-staging.milissai.com
+ * only diverge at the first subdomain label, so there is no narrower shared
+ * suffix to scope staging's cookie to. Without a distinct prefix, both
+ * environments write the identically-named cookie to the same Domain/Path,
+ * so whichever environment a browser visited most recently silently
+ * overwrites the other's session cookie in the shared cookie jar.
  */
 export type BetterAuthCookieName = 'session_token' | 'two_factor' | 'trust_device';
-export declare function getBetterAuthCookieName(cookie: BetterAuthCookieName, isProduction: boolean): string;
+export declare function getBetterAuthCookieName(cookie: BetterAuthCookieName, isProduction: boolean, prefix?: string): string;
