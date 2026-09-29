@@ -31,14 +31,23 @@ This design adds:
 
 - An admin-triggered resend action, mirroring the existing `resendInvitation`
   pattern.
-- A thin wrapper around BetterAuth's verify-email endpoint that we own, so the
-  error redirect can carry the user's email (decoded from the JWT payload,
-  which is unencrypted) alongside the error code.
+- Threading the user's email through `callbackURL` itself at every
+  `sendVerificationEmail` call site, so BetterAuth's own error redirect
+  — which appends `&error=CODE` to an existing `callbackURL` query string —
+  naturally carries the email to the error page. No wrapper endpoint, no
+  token decoding.
 - Error-aware rendering on `/signup/verified`, with a one-click "Resend link"
   action for the expired case (no retyping the email) and a generic
-  invalid-link message for the other error codes.
-- A public, unauthenticated, rate-limited resend endpoint that the expired-link
-  page's button calls.
+  invalid-link message for the other error codes. The resend button calls
+  BetterAuth's existing public `POST /api/auth/send-verification-email`
+  endpoint directly from the browser — the same endpoint
+  `apps/admin/app/signup/check-email/check-email-card.tsx` already uses for
+  its own resend button — via a small shared hook, not a new backend
+  endpoint.
+- Closing a pre-existing rate-limit gap: `/send-verification-email` is missing
+  from `auth-rate-limit.ts`'s `SENSITIVE_PREFIXES`, so both the existing
+  check-email resend and the new expired-link resend are currently
+  unthrottled at the Express layer. Adding it protects both.
 - A new env var to make the activation link's lifetime configurable, replacing
   today's implicit reliance on BetterAuth's library default (1 hour).
 
@@ -64,45 +73,58 @@ Mirrors `resendInvitation` (`users.service.ts:641-681`,
   - `checkPermission(..., ['platform.users.manage', 'org.users.manage'], { targetOrgId })`
     — same gate as `resendInvitation`.
   - Guard: throws `BadRequestException` unless `user.status === 'unverified'`.
-  - Calls `auth.api.sendVerificationEmail({ body: { email: user.betterAuthUser.email, callbackURL: \`${adminUrl}/signup/verified\` } })`
+  - Calls `auth.api.sendVerificationEmail({ body: { email, callbackURL: \`${adminUrl}/signup/verified?email=${encodeURIComponent(email)}\` } })`
+    where `email = user.betterAuthUser.email`
     — the same BetterAuth API already used at signup
-    (`registration.service.ts:216-218`). No new token-generation logic;
-    BetterAuth issues a fresh JWT with its own expiry.
+    (`registration.service.ts:216-218`), with `email` now threaded into
+    `callbackURL` (see §4). No new token-generation logic; BetterAuth issues
+    a fresh JWT with its own expiry.
 - **`apps/admin/app/(admin)/users/actions.ts`**: new `resendActivationAction`,
   same `mapActionError`/`errorKey` shape as `resendInvitationAction`.
 - **`apps/admin/components/users-table.tsx`**: new `DropdownMenuItem`, gated on
   `u.status === 'unverified'`, alongside the existing pending-gated
   resend-invitation item.
 
-## 4. Verify-email wrapper endpoint
+## 4. Threading the email through `callbackURL`
 
-Today's activation link points directly at BetterAuth's built-in
-`GET /api/auth/verify-email`, which lives in library code
-(`node_modules/better-auth/.../email-verification.mjs`) and, on failure, only
-forwards `?error=CODE` to `callbackURL` — never the email. We insert a thin
-wrapper we own so the error redirect can also carry the decoded email:
+BetterAuth's built-in `GET /api/auth/verify-email` handler
+(`node_modules/better-auth/.../email-verification.mjs:150-164`) redirects on
+failure with:
 
-- **New endpoint**, `GET /verify-email`, in
-  `apps/auth-server/src/registration/` (co-located with the other
-  registration/activation code that already calls `auth.api.*` directly):
-  1. Base64url-decode the JWT payload portion of `token` to extract `email`.
-     This is best-effort UX only — no signature verification, and a decode
-     failure simply means no email is available downstream.
-  2. Call `auth.api.verifyEmail({ query: { token } })` directly — the same
-     "call the BetterAuth API programmatically" pattern already used for
-     `sendVerificationEmail`.
-  3. On success: redirect to `callbackURL` unchanged (today's success
-     behavior — no `error` param).
-  4. On failure: map the thrown error to a code using the same rules
-     BetterAuth's own handler uses (`JWTExpired` → `TOKEN_EXPIRED`; missing
-     user → `USER_NOT_FOUND`; otherwise `INVALID_TOKEN`/`INVALID_USER` as
-     appropriate), then redirect to
-     `callbackURL?error=CODE&email=<decoded-email-if-any>`.
-- **Email template change**: in `auth.config.ts`'s `sendVerificationEmail`
-  callback (`auth.config.ts:482-495`, already customized to build the
-  branded email), rewrite the `url` BetterAuth hands us so its path points at
-  `/verify-email` (our wrapper) instead of `/api/auth/verify-email`, keeping
-  the `token` and `callbackURL` query params unchanged.
+```js
+function redirectOnError(error) {
+  if (ctx.query.callbackURL) {
+    if (ctx.query.callbackURL.includes("?")) throw ctx.redirect(`${ctx.query.callbackURL}&error=${error.code}`);
+    throw ctx.redirect(`${ctx.query.callbackURL}?error=${error.code}`);
+  }
+  throw APIError.from("UNAUTHORIZED", error);
+}
+```
+
+— it appends `&error=CODE` to whatever `callbackURL` already contains. Today
+every call site builds `callbackURL` as a bare `${adminUrl}/signup/verified`,
+so the email is lost. Instead, every place that calls
+`auth.api.sendVerificationEmail` (or the browser calls
+`POST /api/auth/send-verification-email` directly) builds `callbackURL` as
+`${base}/signup/verified?email=${encodeURIComponent(email)}` — a same-origin
+relative concern, no new backend code:
+
+- `apps/auth-server/src/registration/registration.service.ts:217` (initial
+  signup send) — add `?email=...`.
+- The new admin resend action (§3) — add `?email=...`.
+- `apps/admin/app/signup/check-email/check-email-card.tsx`'s existing
+  `resend()` (the "check your email" page's own resend button) — add
+  `?email=...` too, so if *that* resent link also expires, the user still
+  lands on an error page that knows their email. Requires updating that
+  component's existing test assertion on the `callbackURL` body value.
+
+On success, BetterAuth redirects to `callbackURL` unchanged (`email=...`
+harmlessly present); on failure, it becomes
+`.../signup/verified?email=...&error=CODE` with zero app-owned endpoint
+sitting in front of BetterAuth's own verify-email handler. GET requests skip
+BetterAuth's origin-check middleware entirely
+(`origin-check.mjs:39`: `if (ctx.request?.method === "GET" ...) return;`), so
+the extra query param on `callbackURL` needs no `trustedOrigins` changes.
 
 ## 5. `/signup/verified` page
 
@@ -112,29 +134,39 @@ reads `searchParams` (`error`, `email`):
 - No `error` → today's success card, unchanged.
 - `error === 'TOKEN_EXPIRED'` and `email` is present → "Link expired for
   `{email}`" card with a single **Resend link** button (client component).
-  Clicking it calls the self-service resend endpoint (§6) with that email —
-  no typing required.
+  Clicking it calls BetterAuth's public `send-verification-email` endpoint
+  (§6) with that email — no typing required.
 - `error === 'TOKEN_EXPIRED'` without a decodable `email`, or
   `error` ∈ `{INVALID_TOKEN, USER_NOT_FOUND, INVALID_USER}`, or any other/
   unrecognized error code → generic "This link isn't valid" card with a link
   back to login/signup, no resend button.
 
-## 6. Self-service resend endpoint
+## 6. Self-service resend: reuse BetterAuth's existing public endpoint
 
-- New route `POST /users/resend-verification-email` (colocated with the
-  wrapper endpoint in `apps/auth-server/src/registration/`), body
-  `{ email: string }`, decorated `@Throttle({ auth: AUTH_THROTTLE })`. No
-  authentication.
-- Behavior: look up the user by email. If found and `status === 'unverified'`,
-  call `auth.api.sendVerificationEmail(...)` the same way the admin path
-  does. Always return the same generic success-shaped response regardless of
-  whether the email matched a real unverified account, so the endpoint cannot
-  be used to enumerate accounts.
-- The email reaching this endpoint is decoded from a legitimately-issued (if
-  expired) token rather than arbitrary user input, so the abuse surface is
-  already narrow; the shared `AUTH_THROTTLE` bucket (`auth` bucket, same one
-  used by invitations/token/social endpoints,
-  `rate-limit-config.ts:40-42`) is sufficient — no new dedicated cooldown.
+No new backend endpoint. The expired-link page's "Resend link" button calls
+`POST /api/auth/send-verification-email` directly from the browser — the
+exact endpoint `check-email-card.tsx:32` already calls for its own resend
+button, with the same body shape: `{ email, callbackURL }`. Since the email
+on the expired-link page came from a legitimately-issued (if expired) token's
+`callbackURL` round-trip rather than arbitrary user input, there's no new
+enumeration surface — this is the same public, no-op-if-unknown-email
+behavior `send-verification-email` already has today (`email-verification.mjs:93-102`:
+unknown/already-verified email still returns `{status:true}`).
+
+Extract the shared "POST send-verification-email, track cooldown/status"
+logic out of `check-email-card.tsx`'s inline `resend()` into a small reusable
+hook, e.g. `apps/admin/lib/use-resend-verification-email.ts`, parameterized by
+`email` and `callbackURL`. Both `CheckEmailCard` and the new expired-link
+component use it — DRY, since the logic is now needed in two places with
+identical shape.
+
+**Rate limiting**: `send-verification-email` is currently *not* in
+`apps/auth-server/src/auth/auth-rate-limit.ts`'s `SENSITIVE_PREFIXES` list,
+so calls to it bypass the Express-level limiter entirely (BetterAuth's own
+optional rate limiting is off outside production and not configured here).
+Add `/send-verification-email` to `SENSITIVE_PREFIXES` — this protects both
+the pre-existing check-email resend button and the new expired-link resend
+button with the same `AUTH_THROTTLE` budget (`auth-rate-limit.ts:26-36`).
 
 ## 7. Configurable activation link duration
 
@@ -166,18 +198,24 @@ reads `searchParams` (`error`, `email`):
 
 - `users.service.spec.ts`: `resendActivationEmail` — permission gate, status
   gate (`BadRequestException` for non-`unverified` users), calls
-  `sendVerificationEmail` with the right email/callbackURL on success.
-- New `verify-email` wrapper endpoint test: JWT-expired → redirects with
-  `error=TOKEN_EXPIRED&email=...`; malformed/invalid token → redirects with
-  `error=INVALID_TOKEN` and no `email`; unknown user → `USER_NOT_FOUND`;
-  success → redirects to `callbackURL` with no `error` param.
-- New `resend-verification-email` endpoint test: existing unverified user →
-  triggers `sendVerificationEmail`, generic success response; unknown email →
-  same generic success response, no email sent; non-`unverified` user → same
-  generic success response, no email sent.
+  `sendVerificationEmail` with `callbackURL` containing `?email=<encoded>`
+  on success.
+- `registration.service.spec.ts`: existing assertion
+  (`expect.stringContaining('/signup/verified')`) still passes; add a
+  narrower assertion that `callbackURL` also contains
+  `email=${encodeURIComponent(baseDto.email)}`.
+- `apps/admin/lib/__tests__/use-resend-verification-email.test.ts` (new): the
+  extracted hook — posts to `${authServerUrl}/api/auth/send-verification-email`
+  with `{ email, callbackURL }`, sets a cooldown on success, surfaces an
+  error on failure.
+- `check-email-card.test.tsx`: update the existing `callbackURL` body
+  assertion to include `?email=...`.
 - `apps/admin/app/signup/verified/__tests__/page.test.tsx`: extend to cover
   the three new branches (success / expired-with-email+resend-button /
-  generic-invalid).
+  generic-invalid-no-resend), asserting the resend button posts to the right
+  endpoint with the email from `searchParams`.
 - `apps/admin/components/users-table.tsx` test: resend-activation menu item
   visible only for `status === 'unverified'` rows, wired to the new server
   action.
+- `auth-rate-limit.spec.ts`: add `/api/auth/send-verification-email` to the
+  `isSensitiveAuthPath` "treats %s as sensitive" table.
