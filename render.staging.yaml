@@ -30,6 +30,19 @@ envVarGroups:
         value: https://auth-api-staging.milissai.com
       - key: ADMIN_URL
         value: https://auth-staging.milissai.com
+      # Shared parent domain for the session cookie — see the matching
+      # comment in render.yaml. NOTE: this resolves to the same
+      # ".milissai.com" as production because auth-staging.milissai.com /
+      # auth-api-staging.milissai.com don't share a narrower suffix than
+      # that (the "staging" segment is baked into the label, not a separate
+      # subdomain level). A browser that has an active session cookie from
+      # BOTH environments will only keep whichever one it set/received most
+      # recently, since they occupy the same cookie-jar slot (same name,
+      # same Domain, same Path). That's a UX quirk (surprise sign-out),
+      # not a security issue — BETTER_AUTH_SECRET differs per environment,
+      # so a stale cross-environment cookie value just fails validation.
+      - key: COOKIE_DOMAIN
+        value: .milissai.com
       - key: TRUSTED_ORIGINS
         value: https://auth-staging.milissai.com
       # NODE_ENV stays "production" here too — it controls app runtime behavior (secure

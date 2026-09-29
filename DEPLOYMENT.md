@@ -269,6 +269,7 @@ Set that value as `SASSY_CLIENT_ID` on `sassy-resource-server` and redeploy.
 | `BETTER_AUTH_URL` | `https://auth-api.milissai.com` |
 | `AUTH_SERVER_URL` | `https://auth-api.milissai.com` |
 | `ADMIN_URL` | `https://auth.milissai.com` |
+| `COOKIE_DOMAIN` | `.milissai.com` — shared parent domain so the session cookie survives federated (Google/Microsoft/Apple) sign-in, which redirects the browser through auth-api.milissai.com before landing back on auth.milissai.com. See auth.config.ts's `advanced` block. |
 | `TRUSTED_ORIGINS` | `https://auth.milissai.com,https://testapp.milissai.com` |
 | `NODE_ENV` | `production` |
 | `GEOIP_DB_PATH` | *(unset)* |
