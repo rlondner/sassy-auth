@@ -123,6 +123,13 @@ services:
         sync: false
       - key: MICROSOFT_TENANT_ID
         sync: false
+      # Cloudflare Turnstile secret key, verified server-side against the token
+      # submitted by apps/admin's /signup widget (see turnstile.service.ts).
+      # Paired with NEXT_PUBLIC_TURNSTILE_SITE_KEY on sassy-auth-admin-staging
+      # below. Staging can use its own Turnstile widget/keys, or the same test
+      # keys as local dev — see .env.example.
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
 
   # ── Staging (admin console) ────────────────────────────────────────────
   - type: web
@@ -147,3 +154,8 @@ services:
         value: "24"
       - key: PUBLIC_AUTH_SERVER_URL
         value: https://auth-api-staging.milissai.com
+      # NEXT_PUBLIC_ so Next.js inlines it at build time — see the matching
+      # comment in render.yaml. Paired with TURNSTILE_SECRET_KEY on
+      # sassy-auth-server-staging.
+      - key: NEXT_PUBLIC_TURNSTILE_SITE_KEY
+        sync: false
