@@ -1,15 +1,20 @@
-# Per-app favicon + dynamic signup tab title — design
+# Per-app favicon + dynamic signup/login tab title — design
 
 **Date:** 2026-09-29
 **Status:** approved design, no implementation plan yet
 **Scope:** (1) the `/signup` page's browser tab title shows `"{appName} Sign
 Up"` instead of the static `"SassyAuth Admin"` console title when signing up
-for a specific app; (2) a new `favicon` image property on `SaApp`, uploaded
-from the app create/edit drawer next to the existing `Logo` field, shown as
-the browser tab icon on that app's `/signup` page.
+for a specific app; (2) the `/login` page's browser tab title shows
+`"{appName} Sign In"` when the login is for a specific app — including a
+resource server registered as an `SaApp`, reached via
+`/login?next=<authorize URL carrying client_id>`; (3) a new `favicon` image
+property on `SaApp`, uploaded from the app create/edit drawer next to the
+existing `Logo` field, shown as the browser tab icon on both pages above for
+that app.
 
-Out of scope: `/login` and other auth pages keep their current title/favicon
-behavior. This spec only touches `/signup`.
+Out of scope: any other auth page (`/login/two-factor`, `/login/code`,
+`/forgot-password`, `/reset-password`, `/accept-invite`) keeps its current
+static title/favicon behavior. This spec only touches `/signup` and `/login`.
 
 ---
 
@@ -18,9 +23,15 @@ behavior. This spec only touches `/signup`.
 Today `apps/admin/app/layout.tsx` sets a single static
 `metadata.title = 'SassyAuth Admin'` for the whole admin console, and no
 favicon file exists anywhere in the app (no `favicon.ico`, no `app/icon.tsx`
-— the browser shows its own default). `/signup` is end-user-facing per app
-(reached via `?client_id=<app>`), so showing internal console branding in the
-tab, and no per-app favicon, is a rough edge for apps embedding this flow.
+— the browser shows its own default). Both `/signup` (reached via
+`?client_id=<app>`) and `/login` (reached directly, or via
+`?next=<authorize URL carrying client_id>` when a resource server registered
+as an `SaApp` bounces a user here to sign in) are end-user-facing per app, so
+showing internal console branding in the tab, and no per-app favicon, is a
+rough edge for apps embedding either flow. `login-form.tsx` already
+recognizes this for the on-page title — it hides the `"Admin Console"`
+`AuthCard` title whenever a `client_id` is resolved out of `next`, with the
+same rationale this spec extends to the browser tab.
 
 `SaApp` already has an identical precedent for an uploaded image: `logo`
 (`packages/db/schema.prisma`), stored as a full base64 data URI, validated by
@@ -115,7 +126,46 @@ future change to the shared rule can't silently drift between the two.
 result straight through — no controller change needed beyond whatever
 response-shape typing it has, which should widen automatically.
 
-## 6. Admin UI: shared image-upload field
+## 6. Server: public social-providers endpoint (for `/login`)
+
+`/login` cannot use `getAppName()` — per the confirmed decision above, doing
+so would apply that endpoint's rate-limited/404-on-unknown enumeration
+trade-off to a much higher-traffic page. Instead, extend the already-public,
+never-404s `GET /api/social-providers` (`social.controller.ts` /
+`social.service.ts`) to also return `name` and `favicon`, following the
+exact null-if-absent-or-unknown pattern it already uses for `logo` — this
+does not change that endpoint's enumeration-safety posture (it already
+returns 200 with `logo: null` for an unknown `client_id`; `name`/`favicon`
+behave identically).
+
+`social.service.ts`:
+- Replace `getLogoForApp(clientId)` with a single
+  `getBrandingForApp(clientId): Promise<{ name: string | null; logo: string | null; favicon: string | null }>`
+  that does one `findUnique` selecting `name`, `logo`, `favicon` instead of
+  three separate lookups. (Today there's only the one lookup for `logo`;
+  this consolidates what would otherwise become three near-identical
+  `findUnique` calls into one.)
+- Same enumeration-safety rule as today: unknown/absent `clientId` → every
+  field `null`, never a throw.
+
+`social.controller.ts`'s `list()`:
+```ts
+async list(@Query('client_id') clientId?: string): Promise<{
+  providers: string[]; logo: string | null; name: string | null; favicon: string | null
+}> {
+  const [providers, branding] = await Promise.all([
+    this.social.listForApp(clientId),
+    this.social.getBrandingForApp(clientId),
+  ]);
+  return { providers, ...branding };
+}
+```
+
+`apps/admin/lib/social-providers.ts`'s `fetchSocialProviders()`: widen its
+return type and JSON-body mapping to include `name: string | null` and
+`favicon: string | null`, following the exact same `typeof body.x === 'string' ? ... : null` pattern already used for `logo`.
+
+## 7. Admin UI: shared image-upload field
 
 Generalize `apps/admin/components/app-logo-field.tsx` into
 `apps/admin/components/app-image-field.tsx` exporting one parameterized
@@ -156,7 +206,7 @@ New translation keys (`en.json` + `fr.json`), mirroring the existing
 - `apps.fields.favicon`, `apps.fields.faviconHint`, `apps.fields.removeFavicon`, `apps.fields.noFavicon`
 - `apps.errors.faviconInvalidType`, `apps.errors.faviconTooLarge`
 
-## 7. Admin UI: drawer wiring
+## 8. Admin UI: drawer wiring
 
 `apps/admin/components/app-edit-drawer.tsx` and `app-create-drawer.tsx`, for
 every place `logo`/`originalLogo` appears, add the `favicon` equivalent:
@@ -174,7 +224,7 @@ empty state). Add the same block for `favicon` right after it: an
 `apps.fields.favicon` label, an `<img>` preview when set, and a new
 `apps.fields.noFavicon` translation key for the empty state.
 
-## 8. Signup page: dynamic title + favicon
+## 9. Signup page: dynamic title + favicon
 
 `apps/admin/lib/app-info.ts` `fetchAppInfo()`: add `favicon: string | null`
 to its return type and the mapping from the endpoint's JSON body, following
@@ -211,7 +261,50 @@ export async function generateMetadata({
   than threading a cache/dedupe mechanism through for a single cheap
   same-request fetch.
 
-## 9. Testing
+## 10. Login page: dynamic title + favicon
+
+`apps/admin/lib/social-providers.ts`'s `fetchSocialProviders()` already
+resolves `client_id` out of `next` the same way `login-form.tsx`'s
+client-side `clientIdFromNext()` does; per section 6 its return type now
+also carries `name`/`favicon`.
+
+`apps/admin/app/login/page.tsx`: add
+
+```ts
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>
+}): Promise<Metadata> {
+  const { next } = await searchParams
+  const nextSafe = validateNextUrl(next)
+  if (!nextSafe) return {}
+  const { name: appName, favicon } = await fetchSocialProviders(nextSafe)
+  return {
+    ...(appName && { title: `${appName} Sign In` }),
+    ...(favicon && { icons: { icon: favicon } }),
+  }
+}
+```
+
+- No valid `next` (plain console login, or an untrusted/malformed `next`
+  that `validateNextUrl` rejects) → `{}` → default `"SassyAuth Admin"` title,
+  no icon override. Mirrors the signup page's no-`client_id` fallback.
+- `next` present but its `client_id` doesn't resolve to a known app (or the
+  app has no name somehow) → same fallback, since `fetchSocialProviders`
+  yields `name: null` in that case, exactly like it does for `logo` today.
+- This is a second call to `fetchSocialProviders` beyond the one
+  `LoginPage`'s body already makes (for `providers`/`logo`) — same accepted
+  trade-off as `/signup`'s double `fetchAppInfo` call (section 9).
+- `login-form.tsx`'s existing client-side `clientIdFromNext()` /
+  `AuthCard title={clientId ? undefined : t('title')}` logic is unrelated
+  and unchanged — that controls the on-page `<CardTitle>`, this controls the
+  browser tab; both now agree on hiding console branding for an app-scoped
+  login, via two independent mechanisms that already existed for the logo
+  case (server-fetched `fetchSocialProviders` vs. client-side
+  `clientIdFromNext`).
+
+## 11. Testing
 
 - `packages/types`: unit tests for `isValidAppFaviconDataUri` — valid PNG,
   wrong mime type, over-size — mirroring the existing logo test cases.
@@ -236,12 +329,28 @@ export async function generateMetadata({
     this session): add cases for `generateMetadata` — title set when
     `appName` present, unset when absent; icon set when `favicon` present,
     unset when absent.
+  - `lib/__tests__/social-providers.test.ts`: extend for the new
+    `name`/`favicon` fields, including the unknown-`client_id` → all-null
+    case.
+  - New `app/login/__tests__/page.test.tsx` (no such file exists today —
+    `LoginPage` currently has no dedicated page-level test, only
+    `login-forms.test.tsx` for the client component): add `generateMetadata`
+    cases mirroring signup's — title set when the resolved app has a name,
+    unset when `next` is absent/invalid/unresolvable; icon set when
+    `favicon` present.
+- `apps/auth-server` social module: extend `social.service.spec.ts` /
+  `social.controller.spec.ts` for `getBrandingForApp` and the widened
+  `list()` response, including the unknown-`client_id` all-null case.
 
-## 10. Non-goals / explicitly out of scope
+## 12. Non-goals / explicitly out of scope
 
-- No favicon (or per-app title) support on `/login` or any other page —
-  only `/signup`.
+- No favicon (or per-app title) support on `/login/two-factor`,
+  `/login/code`, `/forgot-password`, `/reset-password`, `/accept-invite`, or
+  any other page — only `/signup` and `/login`.
 - No change to the site-wide default favicon (still none — untouched by
   this spec).
 - No stricter/smaller favicon-specific validation rule — deliberately
   reuses the logo's rule byte-for-byte, per the confirmed decision above.
+- No change to `/api/register/app`'s existing enumeration/rate-limit
+  trade-off, and no reuse of it from `/login` — per the confirmed decision
+  above, `/login` uses the already-public `/api/social-providers` instead.
