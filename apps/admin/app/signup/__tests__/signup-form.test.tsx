@@ -127,6 +127,38 @@ describe('SignupForm', () => {
     expect(mockRegisterAction).not.toHaveBeenCalled()
   })
 
+  it('shows an invalid email error on blur, without submitting', () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
+    fillValidForm()
+    fireEvent.change(screen.getByLabelText('signup.email'), { target: { value: 'not-an-email' } })
+    fireEvent.blur(screen.getByLabelText('signup.email'))
+
+    expect(screen.getByText('signup.errors.invalidEmail')).toBeInTheDocument()
+    expect(mockRegisterAction).not.toHaveBeenCalled()
+  })
+
+  it('clears the invalid email error once the user edits the field again', () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
+    fillValidForm()
+    fireEvent.change(screen.getByLabelText('signup.email'), { target: { value: 'not-an-email' } })
+    fireEvent.blur(screen.getByLabelText('signup.email'))
+    expect(screen.getByText('signup.errors.invalidEmail')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('signup.email'), { target: { value: 'alice@example.com' } })
+    expect(screen.queryByText('signup.errors.invalidEmail')).not.toBeInTheDocument()
+  })
+
+  it('blocks submit and shows an invalid email error when the form is submitted with a malformed email', async () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
+    fillValidForm()
+    completeCaptcha()
+    fireEvent.change(screen.getByLabelText('signup.email'), { target: { value: 'not-an-email' } })
+    submitForm()
+
+    await waitFor(() => expect(screen.getByText('signup.errors.invalidEmail')).toBeInTheDocument())
+    expect(mockRegisterAction).not.toHaveBeenCalled()
+  })
+
   it('disables the submit button for a password under 12 characters', () => {
     render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
@@ -293,6 +325,23 @@ describe('SignupForm', () => {
       expect(screen.getByTestId('signup-error')).toHaveTextContent('signup.errors.captchaRequired'),
     )
     expect(mockRegisterAction).not.toHaveBeenCalled()
+  })
+
+  it('renders the captcha control before the privacy policy checkbox', () => {
+    render(
+      <SignupForm
+        clientId="sq_1"
+        next=""
+        hasDefaultOrg
+        passwordPolicy={null}
+        privacyPolicyUrl="https://x.example.com/privacy"
+        termsUrl={null}
+        gdprUrl={null}
+      />,
+    )
+    const captcha = screen.getByTestId('mock-turnstile-success')
+    const privacyCheckbox = screen.getByRole('checkbox', { name: /Privacy Policy/i })
+    expect(captcha.compareDocumentPosition(privacyCheckbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('renders a checkbox for each configured document and requires it before submit is enabled', () => {

@@ -36,6 +36,8 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
   const [lastName, setLastName] = React.useState('')
   const [companyName, setCompanyName] = React.useState('')
   const [email, setEmail] = React.useState('')
+  const [emailError, setEmailError] = React.useState<string | null>(null)
+  const emailRef = React.useRef<HTMLInputElement>(null)
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
@@ -59,8 +61,15 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
     (!termsUrl || acceptedTerms) &&
     (!gdprUrl || acceptedGdpr)
 
+  function validateEmail() {
+    const valid = emailRef.current?.validity.valid ?? true
+    setEmailError(valid ? null : t('signup.errors.invalidEmail'))
+    return valid
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!validateEmail()) return
     if (passwordsMismatch) { setError(t('signup.errors.passwordMismatch')); return }
     if (!policyMet) { setError(t('signup.errors.passwordComplexity')); return }
     if (!captchaToken) { setError(t('signup.errors.captchaRequired')); return }
@@ -122,12 +131,18 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         />
       )}
       <FormField
+        ref={emailRef}
         id="email"
         type="email"
         autoComplete="email"
         label={t('signup.email')}
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) => {
+          setEmail(e.target.value)
+          if (emailError) setEmailError(null)
+        }}
+        onBlur={validateEmail}
+        error={emailError ?? undefined}
         required
       />
       <div className="flex flex-col gap-1.5">
@@ -137,6 +152,8 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
           label={t('signup.password')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          showPasswordLabel={t('common.showPassword')}
+          hidePasswordLabel={t('common.hidePassword')}
           required
         />
         <PasswordRequirementsChecklist password={password} policy={policy} />
@@ -148,7 +165,14 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
         error={passwordsMismatch ? t('signup.errors.passwordMismatch') : undefined}
+        showPasswordLabel={t('common.showPassword')}
+        hidePasswordLabel={t('common.hidePassword')}
         required
+      />
+      <Turnstile
+        siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''}
+        onSuccess={setCaptchaToken}
+        onExpire={() => setCaptchaToken(null)}
       />
       {privacyPolicyUrl && (
         <label className="flex items-start gap-2 text-body-sm text-foreground">
@@ -208,16 +232,11 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         </label>
       )}
       {error && <p data-testid="signup-error" className="text-label-md text-destructive">{error}</p>}
-      <Turnstile
-        siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''}
-        onSuccess={setCaptchaToken}
-        onExpire={() => setCaptchaToken(null)}
-      />
       <Button
         type="submit"
         className="w-full"
         loading={submitting}
-        disabled={submitting || !policyMet || password !== confirm || password.length === 0 || !consentSatisfied}
+        disabled={submitting || !!emailError || !policyMet || password !== confirm || password.length === 0 || !consentSatisfied}
       >
         {t('signup.submit')}
       </Button>
