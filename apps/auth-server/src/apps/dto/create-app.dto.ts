@@ -2,6 +2,7 @@ import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLe
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 import { IsAppLogo } from '../../common/config/is-app-logo.decorator';
+import { IsAppFavicon } from '../../common/config/is-app-favicon.decorator';
 
 export class CreateAppDto {
   @IsString() @MinLength(1) @MaxLength(120) name!: string;
@@ -15,6 +16,14 @@ export class CreateAppDto {
   @IsOptional()
   @IsAppLogo()
   logo?: string | null;
+
+  /**
+   * Full data URI, validated by IsAppFavicon against the same shared
+   * size/type rule as logo. Omitted or null means no favicon.
+   */
+  @IsOptional()
+  @IsAppFavicon()
+  favicon?: string | null;
 
   /**
    * Per-app 2FA trust / re-prompt interval in days.
