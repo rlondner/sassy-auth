@@ -27,6 +27,7 @@
         "DATABASE_URL",
         "JWT_KEY_ID",
         "LOGIN_NEXT_ALLOWED_ORIGINS",
+        "NODE_EXTRA_CA_CERTS",
         "LOG_LEVEL",
         "PLATFORM_REQUIRE_2FA",
         "PORT",

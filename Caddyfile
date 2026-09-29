@@ -1,0 +1,16 @@
+# Local reverse proxy for replicating the prod hostnames on this machine.
+# Terminates TLS on :443 for both hostnames and forwards plain HTTP to each
+# app's normal dev port. Requires the hosts file entries:
+#   127.0.0.1 auth-dev.milissai.com
+#   127.0.0.1 auth-api-dev.milissai.com
+# Run with: caddy run --config .\Caddyfile
+
+auth-dev.milissai.com {
+    tls internal
+    reverse_proxy 127.0.0.1:3001
+}
+
+auth-api-dev.milissai.com {
+    tls internal
+    reverse_proxy 127.0.0.1:3010
+}

@@ -257,6 +257,7 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
     // Transport-level failure (auth server down, DNS, TLS). Surface a
     // dedicated error so the form can prompt the operator to retry
     // instead of crashing the action with a 500.
+    console.error(`[admin] sign-in fetch to ${AUTH_SERVER_URL} failed:`, err)
     Sentry.captureException(err, { tags: { area: 'auth', action: 'admin-login' } })
     return { error: 'serverUnavailable' }
   }
