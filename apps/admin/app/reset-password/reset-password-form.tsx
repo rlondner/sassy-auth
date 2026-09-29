@@ -12,6 +12,7 @@ import { resetPasswordSubmitAction } from './actions'
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const t = useTranslations('resetPassword')
+  const tCommon = useTranslations('common')
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
@@ -87,6 +88,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
             label={t('password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            showPasswordLabel={tCommon('showPassword')}
+            hidePasswordLabel={tCommon('hidePassword')}
             required
           />
           <PasswordRequirementsChecklist password={password} policy={policy} />
@@ -97,6 +100,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
           label={t('confirmPassword')}
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
+          showPasswordLabel={tCommon('showPassword')}
+          hidePasswordLabel={tCommon('hidePassword')}
           required
         />
         {error && <p data-testid="reset-error" className="text-label-md text-destructive">{error}</p>}

@@ -27,6 +27,33 @@ interface Props {
   next?: string | null
 }
 
+function PasswordInput({ name, placeholder }: { name: string; placeholder: string }) {
+  const t = useTranslations('common')
+  const [visible, setVisible] = useState(false)
+
+  return (
+    <div className="relative mt-1">
+      <input
+        type={visible ? 'text' : 'password'}
+        name={name}
+        placeholder={placeholder}
+        required
+        className="block w-full rounded-md border px-3 py-2 pr-10 text-sm"
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? t('hidePassword') : t('showPassword')}
+        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+      >
+        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+          {visible ? 'visibility_off' : 'visibility'}
+        </span>
+      </button>
+    </div>
+  )
+}
+
 function BackupCodesDisplay({
   codes,
   t,
@@ -200,13 +227,7 @@ export function SecurityClient({ twoFactorEnabled: initialEnabled, forced, next 
           <h2 className="font-medium">{t('enable.heading')}</h2>
           <label className="block text-sm">
             {t('enable.passwordLabel')}
-            <input
-              type="password"
-              name="password"
-              placeholder={t('enable.passwordPlaceholder')}
-              required
-              className="mt-1 block w-full rounded-md border px-3 py-2 text-sm"
-            />
+            <PasswordInput name="password" placeholder={t('enable.passwordPlaceholder')} />
           </label>
           <button
             type="submit"
@@ -296,13 +317,7 @@ export function SecurityClient({ twoFactorEnabled: initialEnabled, forced, next 
               <p className="text-sm text-muted-foreground">{t('disable.body')}</p>
               <label className="block text-sm">
                 {t('disable.passwordLabel')}
-                <input
-                  type="password"
-                  name="password"
-                  placeholder={t('disable.passwordPlaceholder')}
-                  required
-                  className="mt-1 block w-full rounded-md border px-3 py-2 text-sm"
-                />
+                <PasswordInput name="password" placeholder={t('disable.passwordPlaceholder')} />
               </label>
               <div className="flex gap-2">
                 <button
@@ -342,13 +357,7 @@ export function SecurityClient({ twoFactorEnabled: initialEnabled, forced, next 
               <p className="text-sm text-muted-foreground">{t('regenerate.body')}</p>
               <label className="block text-sm">
                 {t('regenerate.passwordLabel')}
-                <input
-                  type="password"
-                  name="password"
-                  placeholder={t('regenerate.passwordPlaceholder')}
-                  required
-                  className="mt-1 block w-full rounded-md border px-3 py-2 text-sm"
-                />
+                <PasswordInput name="password" placeholder={t('regenerate.passwordPlaceholder')} />
               </label>
               <div className="flex gap-2">
                 <button
