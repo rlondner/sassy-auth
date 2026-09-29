@@ -705,12 +705,13 @@ describe('RegistrationService', () => {
 
   describe('getAppName — hasDefaultOrg', () => {
     it('reports hasDefaultOrg: true when the app has a defaultOrgId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99, passwordPolicyOverride: null, logo: null });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99, passwordPolicyOverride: null, logo: null, favicon: null });
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: true,
         passwordPolicy: expect.any(Object),
         logo: null,
+        favicon: null,
         privacyPolicyUrl: null,
         termsUrl: null,
         gdprUrl: null,
@@ -719,12 +720,13 @@ describe('RegistrationService', () => {
     });
 
     it('reports hasDefaultOrg: false when the app has no defaultOrgId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null, favicon: null });
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: null,
+        favicon: null,
         privacyPolicyUrl: null,
         termsUrl: null,
         gdprUrl: null,
@@ -781,14 +783,15 @@ describe('RegistrationService', () => {
   });
 
   describe('getAppName', () => {
-    it('returns the app name and logo for a known appPublicId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: 'data:image/png;base64,AAA=' });
+    it('returns the app name, logo, and favicon for a known appPublicId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: 'data:image/png;base64,AAA=', favicon: 'data:image/png;base64,FFF=' });
 
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: 'data:image/png;base64,AAA=',
+        favicon: 'data:image/png;base64,FFF=',
         privacyPolicyUrl: null,
         termsUrl: null,
         gdprUrl: null,
@@ -801,6 +804,7 @@ describe('RegistrationService', () => {
           defaultOrgId: true,
           passwordPolicyOverride: true,
           logo: true,
+          favicon: true,
           privacyPolicyUrl: true,
           termsUrl: true,
           gdprUrl: true,
@@ -808,14 +812,15 @@ describe('RegistrationService', () => {
       });
     });
 
-    it('returns logo: null when the app has no logo set', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null });
+    it('returns logo: null and favicon: null when the app has neither set', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null, favicon: null });
 
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: null,
+        favicon: null,
         privacyPolicyUrl: null,
         termsUrl: null,
         gdprUrl: null,
@@ -840,6 +845,7 @@ describe('RegistrationService', () => {
         defaultOrgId: null,
         passwordPolicyOverride: null,
         logo: null,
+        favicon: null,
         privacyPolicyUrl: 'https://myapp.example.com/privacy',
         termsUrl: null,
         gdprUrl: 'https://myapp.example.com/gdpr',
