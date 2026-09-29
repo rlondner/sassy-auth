@@ -698,45 +698,6 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
               </p>
             </div>
             <div>
-              <Label htmlFor="privacyPolicyUrl">{t('apps.fields.privacyPolicyUrl')}</Label>
-              <Input
-                id="privacyPolicyUrl"
-                type="url"
-                value={privacyPolicyUrl}
-                onChange={(e) => setPrivacyPolicyUrl(e.target.value)}
-                placeholder={t('apps.fields.privacyPolicyUrlPlaceholder')}
-              />
-              <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.privacyPolicyUrlHint')}
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="termsUrl">{t('apps.fields.termsUrl')}</Label>
-              <Input
-                id="termsUrl"
-                type="url"
-                value={termsUrl}
-                onChange={(e) => setTermsUrl(e.target.value)}
-                placeholder={t('apps.fields.termsUrlPlaceholder')}
-              />
-              <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.termsUrlHint')}
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="gdprUrl">{t('apps.fields.gdprUrl')}</Label>
-              <Input
-                id="gdprUrl"
-                type="url"
-                value={gdprUrl}
-                onChange={(e) => setGdprUrl(e.target.value)}
-                placeholder={t('apps.fields.gdprUrlPlaceholder')}
-              />
-              <p className="mt-1 text-body-sm text-muted-foreground">
-                {t('apps.fields.gdprUrlHint')}
-              </p>
-            </div>
-            <div>
               <Label>{t('apps.fields.webhookSecret')}</Label>
               <p className="mt-1 text-body-sm text-muted-foreground">
                 {t('apps.fields.webhookSecretHint')}
@@ -789,6 +750,45 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                   )}
                 </div>
               )}
+            </div>
+            <div>
+              <Label htmlFor="privacyPolicyUrl">{t('apps.fields.privacyPolicyUrl')}</Label>
+              <Input
+                id="privacyPolicyUrl"
+                type="url"
+                value={privacyPolicyUrl}
+                onChange={(e) => setPrivacyPolicyUrl(e.target.value)}
+                placeholder={t('apps.fields.privacyPolicyUrlPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.privacyPolicyUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="termsUrl">{t('apps.fields.termsUrl')}</Label>
+              <Input
+                id="termsUrl"
+                type="url"
+                value={termsUrl}
+                onChange={(e) => setTermsUrl(e.target.value)}
+                placeholder={t('apps.fields.termsUrlPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.termsUrlHint')}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="gdprUrl">{t('apps.fields.gdprUrl')}</Label>
+              <Input
+                id="gdprUrl"
+                type="url"
+                value={gdprUrl}
+                onChange={(e) => setGdprUrl(e.target.value)}
+                placeholder={t('apps.fields.gdprUrlPlaceholder')}
+              />
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.gdprUrlHint')}
+              </p>
             </div>
             <div>
               <Label>{t('apps.fields.activationEmail')}</Label>
