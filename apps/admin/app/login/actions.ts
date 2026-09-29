@@ -134,11 +134,21 @@ async function forwardSessionCookie(res: Response): Promise<boolean> {
   const cookieStore = await cookies()
   const setCookieHeader = res.headers.get('set-cookie')
   if (!setCookieHeader) {
+    console.error(
+      `[admin] forwardSessionCookie: auth server returned ${res.status} with no Set-Cookie header (expected "${SESSION_COOKIE_NAME}")`,
+    )
     Sentry.captureMessage('Auth server returned 200 but no Set-Cookie header', { level: 'error' })
     return false
   }
   const parsed = parseSessionCookie(setCookieHeader)
   if (!parsed) {
+    // Log cookie names only (not values — the header carries the session token itself).
+    const cookieNames = setCookieHeader
+      .split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/)
+      .map((c) => c.split('=')[0]?.trim())
+    console.error(
+      `[admin] forwardSessionCookie: could not find "${SESSION_COOKIE_NAME}" among Set-Cookie names [${cookieNames.join(', ')}]`,
+    )
     Sentry.captureMessage('Failed to parse session cookie from auth server response', { level: 'error' })
     return false
   }
