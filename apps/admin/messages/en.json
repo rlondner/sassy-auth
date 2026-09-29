@@ -13,6 +13,8 @@
     "switchToDark": "Switch to dark mode"
   },
   "common": {
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "save": "Save",
     "edit": "Edit",
     "delete": "Delete",
@@ -645,6 +647,7 @@
       "continueToLogin": "Continue to sign in"
     },
     "errors": {
+      "invalidEmail": "Please enter a valid email address.",
       "passwordMismatch": "Passwords do not match.",
       "passwordTooShort": "Password must be at least 12 characters.",
       "passwordComplexity": "Password must contain an uppercase letter, a lowercase letter, and a digit.",

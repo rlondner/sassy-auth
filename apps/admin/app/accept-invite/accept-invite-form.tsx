@@ -21,6 +21,8 @@ export function AcceptInviteForm({ token, firstName, email, passwordPolicy }: Ac
   const router = useRouter()
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')
+  const [passwordVisible, setPasswordVisible] = React.useState(false)
+  const [confirmVisible, setConfirmVisible] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [success, setSuccess] = React.useState(false)
@@ -70,26 +72,50 @@ export function AcceptInviteForm({ token, firstName, email, passwordPolicy }: Ac
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="password" className="text-label-md font-semibold">{t('acceptInvite.password')}</label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        />
+        <div className="relative">
+          <input
+            id="password"
+            type={passwordVisible ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="flex h-9 rounded border border-[var(--border)] px-3 pr-10 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          />
+          <button
+            type="button"
+            onClick={() => setPasswordVisible((visible) => !visible)}
+            aria-label={passwordVisible ? t('common.hidePassword') : t('common.showPassword')}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+              {passwordVisible ? 'visibility_off' : 'visibility'}
+            </span>
+          </button>
+        </div>
         <PasswordRequirementsChecklist password={password} policy={passwordPolicy} />
       </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="confirm-password" className="text-label-md font-semibold">{t('acceptInvite.confirmPassword')}</label>
-        <input
-          id="confirm-password"
-          type="password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          required
-          className="flex h-9 rounded border border-[var(--border)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        />
+        <div className="relative">
+          <input
+            id="confirm-password"
+            type={confirmVisible ? 'text' : 'password'}
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+            className="flex h-9 rounded border border-[var(--border)] px-3 pr-10 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          />
+          <button
+            type="button"
+            onClick={() => setConfirmVisible((visible) => !visible)}
+            aria-label={confirmVisible ? t('common.hidePassword') : t('common.showPassword')}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+              {confirmVisible ? 'visibility_off' : 'visibility'}
+            </span>
+          </button>
+        </div>
       </div>
       {error && <p className="text-label-md text-[var(--destructive)]">{error}</p>}
       <Button

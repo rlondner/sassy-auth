@@ -8,9 +8,33 @@ interface FormFieldProps extends React.ComponentProps<typeof Input> {
   error?: string
   hint?: string
   required?: boolean
+  /**
+   * `packages/ui` has no i18n of its own (see `AuthCard.logoAlt`), so
+   * callers on localized pages must pass translated copy for the
+   * password-visibility toggle's aria-label. English defaults keep
+   * untranslated callers (and tests) working.
+   */
+  showPasswordLabel?: string
+  hidePasswordLabel?: string
 }
 
-export function FormField({ label, error, hint, required, className, id, ...props }: FormFieldProps) {
+export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(function FormField(
+  {
+    label,
+    error,
+    hint,
+    required,
+    className,
+    id,
+    type,
+    showPasswordLabel = 'Show password',
+    hidePasswordLabel = 'Hide password',
+    ...props
+  },
+  ref,
+) {
+  const [passwordVisible, setPasswordVisible] = React.useState(false)
+  const isPassword = type === 'password'
   // bug-0170: previously the auto-generated id was
   // `label.toLowerCase().replace(/\s+/g, '-')`. Two fields with the
   // same label (e.g. "Name" for both create-app and create-org
@@ -37,7 +61,30 @@ export function FormField({ label, error, hint, required, className, id, ...prop
           </span>
         )}
       </div>
-      <Input id={fieldId} required={required} aria-invalid={!!error} aria-describedby={describedBy} {...props} />
+      <div className="relative">
+        <Input
+          ref={ref}
+          id={fieldId}
+          type={isPassword && passwordVisible ? 'text' : type}
+          required={required}
+          aria-invalid={!!error}
+          aria-describedby={describedBy}
+          className={isPassword ? 'pr-10' : undefined}
+          {...props}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setPasswordVisible((visible) => !visible)}
+            aria-label={passwordVisible ? hidePasswordLabel : showPasswordLabel}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+              {passwordVisible ? 'visibility_off' : 'visibility'}
+            </span>
+          </button>
+        )}
+      </div>
       {hint && !error && (
         <p id={hintId} className="text-label-md text-muted-foreground">
           {hint}
@@ -50,4 +97,4 @@ export function FormField({ label, error, hint, required, className, id, ...prop
       )}
     </div>
   )
-}
+})

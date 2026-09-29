@@ -35,6 +35,7 @@ export function LoginForm({
   authServerUrl: string
 }) {
   const t = useTranslations('login')
+  const tCommon = useTranslations('common')
   const router = useRouter()
   const clientId = clientIdFromNext(next)
 
@@ -90,6 +91,8 @@ export function LoginForm({
           autoComplete="current-password"
           required
           label={t('password')}
+          showPasswordLabel={tCommon('showPassword')}
+          hidePasswordLabel={tCommon('hidePassword')}
         />
 
         {'error' in state && state.error && (

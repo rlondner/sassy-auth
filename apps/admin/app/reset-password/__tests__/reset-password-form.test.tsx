@@ -53,7 +53,7 @@ function fillAndSubmit(password: string, confirm = password) {
   // is disabled whenever the live policy check fails or passwords mismatch,
   // and going through a button click would let jsdom's constraint validation
   // pre-empt the component's own checks, which are what these cases exercise.
-  fireEvent.submit(screen.getByRole('button').closest('form')!)
+  fireEvent.submit(screen.getByRole('button', { name: messages.resetPassword.submit }).closest('form')!)
 }
 
 const VALID = 'Str0ngPassw0rd'
@@ -100,7 +100,7 @@ describe('ResetPasswordForm client-side validation', () => {
     fireEvent.change(screen.getByLabelText(messages.resetPassword.confirmPassword), {
       target: { value: 'weakpassword' },
     })
-    expect(screen.getByRole('button')).toBeDisabled()
+    expect(screen.getByRole('button', { name: messages.resetPassword.submit })).toBeDisabled()
 
     fireEvent.change(screen.getByLabelText(messages.resetPassword.password), {
       target: { value: VALID },
@@ -108,7 +108,7 @@ describe('ResetPasswordForm client-side validation', () => {
     fireEvent.change(screen.getByLabelText(messages.resetPassword.confirmPassword), {
       target: { value: VALID },
     })
-    expect(screen.getByRole('button')).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: messages.resetPassword.submit })).not.toBeDisabled()
   })
 
   it('falls back to the default policy when the client-side policy fetch fails', async () => {
