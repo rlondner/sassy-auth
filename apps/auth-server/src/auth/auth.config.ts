@@ -123,29 +123,25 @@ export const auth = betterAuth({
     // production-only condition as `secure` above so dev keeps the
     // unprefixed name regardless of the auth-server's protocol.
     useSecureCookies: process.env.NODE_ENV === 'production',
-    // bug: cross-domain cookie failures in production. auth-server and
-    // admin are deployed on DIFFERENT hosts (auth-api.<domain> vs
-    // auth.<domain>) — see DEPLOYMENT.md. Most sign-in flows never hit this:
-    // admin's server actions call auth-server server-to-server and
-    // re-issue the session cookie themselves on admin's own origin
-    // (forwardSessionCookie in apps/admin/app/login/actions.ts), so the
-    // browser only ever sees a cookie scoped to admin's host.
-    //
-    // Federated sign-in (Google/Microsoft/Apple) is different: the browser
-    // is redirected directly to auth-server for the OAuth callback
-    // (social-buttons.tsx does a real `window.location.href` navigation,
-    // not a proxied fetch), and BetterAuth sets the session cookie itself
-    // on that response before redirecting the browser back to ADMIN_URL.
-    // Without an explicit Domain attribute, that cookie defaults to
-    // host-only for auth-api.<domain> — the browser never sends it back to
-    // admin's different host, so the user lands back on admin with no
-    // valid session and bounces to /login.
-    //
-    // Setting a shared parent-domain Cookie here (e.g. ".milissai.com")
-    // makes the cookie visible to both hosts, since they're both
-    // subdomains of it. Disabled (undefined) unless COOKIE_DOMAIN is set,
-    // so local dev (different hosts entirely, e.g. localhost:3010 vs
-    // :3001) is unaffected.
+    // bug: admin (auth.milissai.com) and this server (auth-api.milissai.com)
+    // are sibling subdomains in production. Without this, BetterAuth issues
+    // a host-only session cookie (no Domain attribute); apps/admin's
+    // forwardSessionCookie() (login/actions.ts) copies that missing Domain
+    // onto the cookie it sets for its own origin, so the browser only ever
+    // holds the cookie for auth.milissai.com. A resource server's
+    // /oauth/authorize hits auth-api.milissai.com directly — no session
+    // cookie arrives, so it bounces to /login, whose OWN session check
+    // (a server-to-server fetch, immune to the missing Domain) says "signed
+    // in" and redirects straight back to /oauth/authorize. Infinite loop
+    // until the client is throttled. The same missing-Domain gap also
+    // breaks federated sign-in (Google/Microsoft/Apple): BetterAuth sets
+    // the session cookie directly on auth-api.milissai.com mid-callback
+    // (social-buttons.tsx navigates the browser there for real, not via a
+    // proxied fetch), then redirects back to ADMIN_URL — a host that never
+    // received the cookie either. COOKIE_DOMAIN is unset in local dev
+    // (admin and auth-server share the literal host "localhost", differing
+    // only by port, so cookies already flow) — only production needs the
+    // shared parent domain.
     ...(process.env.COOKIE_DOMAIN
       ? { crossSubDomainCookies: { enabled: true, domain: process.env.COOKIE_DOMAIN } }
       : {}),

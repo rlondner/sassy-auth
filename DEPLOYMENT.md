@@ -46,6 +46,8 @@ flowchart LR
 - Operators sign in at **auth.milissai.com**. The admin app calls **auth-api.milissai.com** server-side with the BetterAuth session cookie.
 - End users of the sample app hit **testapp.milissai.com**, which redirects to **auth-api.milissai.com** for OAuth2 + PKCE, then verifies RS256 JWTs against the JWKS endpoint at `https://auth-api.milissai.com/api/token/jwks`.
 
+**`auth.milissai.com` and `auth-api.milissai.com` are sibling subdomains, and the session cookie must be shared between them.** A resource server's `/oauth/authorize` redirect (e.g. `app.getvibecast.com` → `auth-api.milissai.com`) hits the auth server directly, in the browser — not via the admin app's server-to-server calls. Without `COOKIE_DOMAIN` set (see [§4](#4-environment-variable-reference-production)), BetterAuth issues a host-only session cookie scoped to whichever origin sets it (the admin console), the browser never sends it to `auth-api.milissai.com`, and every third-party sign-in loops forever between `/login` and `/oauth/authorize` until the client is throttled. `COOKIE_DOMAIN=.milissai.com` is required on the auth server for any third-party resource server — not just `testapp.milissai.com` — to sign users in.
+
 ---
 
 ## Prerequisites
@@ -269,10 +271,12 @@ Set that value as `SASSY_CLIENT_ID` on `sassy-resource-server` and redeploy.
 | `BETTER_AUTH_URL` | `https://auth-api.milissai.com` |
 | `AUTH_SERVER_URL` | `https://auth-api.milissai.com` |
 | `ADMIN_URL` | `https://auth.milissai.com` |
-| `COOKIE_DOMAIN` | `.milissai.com` — shared parent domain so the session cookie survives federated (Google/Microsoft/Apple) sign-in, which redirects the browser through auth-api.milissai.com before landing back on auth.milissai.com. See auth.config.ts's `advanced` block. |
 | `TRUSTED_ORIGINS` | `https://auth.milissai.com,https://testapp.milissai.com` |
 | `NODE_ENV` | `production` |
 | `GEOIP_DB_PATH` | *(unset)* |
+| `COOKIE_DOMAIN` | `.milissai.com` |
+
+**`COOKIE_DOMAIN` (required in production).** Enables BetterAuth's `advanced.crossSubDomainCookies` (see `apps/auth-server/src/auth/auth.config.ts`) so the session cookie set at sign-in carries `Domain=.milissai.com` and is sent by the browser to both `auth.milissai.com` and `auth-api.milissai.com`. Without it the cookie is host-only, scoped to whichever origin set it — see the [Architecture](#architecture) note above and [Troubleshooting](#9-troubleshooting) for the resulting symptom. Only needed when the admin console and auth server are on sibling subdomains; leave unset for the [local mock deployment](#8-local-mock-deployment-custom-ports), where both share the literal host `localhost`.
 
 `BETTER_AUTH_URL` is also the JWT `iss` claim and the OAuth authorization-server metadata issuer. It must exactly match what resource servers expect.
 
@@ -582,6 +586,7 @@ When promoting from mock to Render, update every URL-shaped variable consistentl
 | Seed throws on production deploy | Missing `SEED_ADMIN_PASSWORD` | Set a strong password in Render env |
 | Migrations fail on deploy | Neon unreachable or wrong `DATABASE_URL` | Verify pooled URL, `sslmode=require` |
 | Invitation emails not sent | No mail transport configured | Set `RESEND_API_KEY` or SMTP vars |
+| Third-party app's sign-in loops between `/login` and `/oauth/authorize` until throttled | Missing `COOKIE_DOMAIN` — session cookie is host-only, never reaches `auth-api.milissai.com` from the browser | Set `COOKIE_DOMAIN=.milissai.com` on the auth server (see [§4](#4-environment-variable-reference-production)) |
 
 ---
 

@@ -47,20 +47,20 @@ envVarGroups:
       - key: ADMIN_URL
         value: https://auth.milissai.com
 
-      # Shared parent domain for the session cookie. auth-server
-      # (auth-api.milissai.com) and admin (auth.milissai.com) are different
-      # hosts; without this, a session cookie BetterAuth sets directly (e.g.
-      # during the federated/social OAuth callback, which redirects the
-      # browser straight through auth-api.milissai.com) is host-only and
-      # never reaches admin's domain. Setting the shared parent domain here
-      # makes it visible to both. See auth.config.ts's `advanced` block.
-      - key: COOKIE_DOMAIN
-        value: .milissai.com
-
       # BetterAuth CSRF + Nest CORS. Include every browser origin that talks
       # to the auth-server (admin console).
       - key: TRUSTED_ORIGINS
         value: https://auth.milissai.com
+
+      # Shared parent domain of auth.milissai.com (admin) and auth-api.milissai.com
+      # (this server). Enables BetterAuth's crossSubDomainCookies so the session
+      # cookie set at sign-in is sent by the browser to both — required for any
+      # third-party resource server's /oauth/authorize redirect to see it. Without
+      # this the cookie is host-only and sign-in loops between /login and
+      # /oauth/authorize until throttled. The same gap also bounces federated
+      # (Google/Microsoft/Apple) sign-in back to /login. See DEPLOYMENT.md §4 and §9.
+      - key: COOKIE_DOMAIN
+        value: .milissai.com
 
       # ── Production defaults ─────────────────────────────────────────────
       - key: NODE_ENV
