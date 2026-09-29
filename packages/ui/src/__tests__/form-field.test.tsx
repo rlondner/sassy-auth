@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { FormField } from '../components/form-field'
 
 describe('FormField', () => {
@@ -52,5 +52,37 @@ describe('FormField', () => {
     expect(screen.queryByText('Your full legal name')).not.toBeInTheDocument()
     const describedBy = input.getAttribute('aria-describedby')
     expect(document.getElementById(describedBy as string)).toHaveTextContent('Name is required')
+  })
+
+  describe('password visibility toggle', () => {
+    it('does not render a toggle for a non-password field', () => {
+      render(<FormField label="Name" type="text" />)
+      expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    })
+
+    it('renders a hidden password by default with a "Show password" toggle', () => {
+      render(<FormField label="Password" type="password" showPasswordLabel="Show password" hidePasswordLabel="Hide password" />)
+      expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
+      expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    })
+
+    it('reveals the password as plain text when the toggle is clicked, and hides it again on a second click', () => {
+      render(<FormField label="Password" type="password" showPasswordLabel="Show password" hidePasswordLabel="Hide password" />)
+      const input = screen.getByLabelText('Password')
+      const toggle = screen.getByRole('button', { name: 'Show password' })
+
+      fireEvent.click(toggle)
+      expect(input).toHaveAttribute('type', 'text')
+      expect(screen.getByRole('button', { name: 'Hide password' })).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hide password' }))
+      expect(input).toHaveAttribute('type', 'password')
+      expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    })
+
+    it('defaults to English toggle labels when none are supplied', () => {
+      render(<FormField label="Password" type="password" />)
+      expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    })
   })
 })
