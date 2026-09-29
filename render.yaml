@@ -57,7 +57,8 @@ envVarGroups:
       # cookie set at sign-in is sent by the browser to both — required for any
       # third-party resource server's /oauth/authorize redirect to see it. Without
       # this the cookie is host-only and sign-in loops between /login and
-      # /oauth/authorize until throttled. See DEPLOYMENT.md §4 and §9.
+      # /oauth/authorize until throttled. The same gap also bounces federated
+      # (Google/Microsoft/Apple) sign-in back to /login. See DEPLOYMENT.md §4 and §9.
       - key: COOKIE_DOMAIN
         value: .milissai.com
 

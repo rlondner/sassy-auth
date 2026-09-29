@@ -133,7 +133,12 @@ export const auth = betterAuth({
     // cookie arrives, so it bounces to /login, whose OWN session check
     // (a server-to-server fetch, immune to the missing Domain) says "signed
     // in" and redirects straight back to /oauth/authorize. Infinite loop
-    // until the client is throttled. COOKIE_DOMAIN is unset in local dev
+    // until the client is throttled. The same missing-Domain gap also
+    // breaks federated sign-in (Google/Microsoft/Apple): BetterAuth sets
+    // the session cookie directly on auth-api.milissai.com mid-callback
+    // (social-buttons.tsx navigates the browser there for real, not via a
+    // proxied fetch), then redirects back to ADMIN_URL — a host that never
+    // received the cookie either. COOKIE_DOMAIN is unset in local dev
     // (admin and auth-server share the literal host "localhost", differing
     // only by port, so cookies already flow) — only production needs the
     // shared parent domain.
