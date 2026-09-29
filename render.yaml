@@ -62,6 +62,13 @@ envVarGroups:
       - key: COOKIE_DOMAIN
         value: .milissai.com
 
+      # bug-0293: left unset here deliberately — production keeps BetterAuth's
+      # default cookie prefix ("better-auth") so this change doesn't silently
+      # sign out every existing production session. Staging sets its own
+      # COOKIE_PREFIX (see render.staging.yaml) to a distinct value, since it
+      # shares the same COOKIE_DOMAIN as production above and would otherwise
+      # collide with it in a browser's cookie jar.
+
       # ── Production defaults ─────────────────────────────────────────────
       - key: NODE_ENV
         value: production
@@ -131,6 +138,11 @@ services:
       # Outbound mail — set RESEND_API_KEY (recommended) or SMTP vars.
       - key: RESEND_API_KEY
         sync: false
+      # Cloudflare Turnstile secret key, verified server-side against the token
+      # submitted by apps/admin's /signup widget (see turnstile.service.ts).
+      # Paired with NEXT_PUBLIC_TURNSTILE_SITE_KEY on sassy-auth-admin below.
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
       # Optional social providers — see docs/social-auth-setup.md
       - key: GOOGLE_CLIENT_ID
         sync: false
@@ -181,3 +193,10 @@ services:
       # falls back to the https://localhost:3010 dev default in every deploy.
       - key: NEXT_PUBLIC_AUTH_SERVER_URL
         value: https://auth-api.milissai.com
+      # Cloudflare Turnstile site key for the /signup widget — public, but
+      # account-specific, so still prompted on sync rather than hardcoded.
+      # NEXT_PUBLIC_-prefixed so Next.js inlines it at build time (same
+      # reasoning as NEXT_PUBLIC_AUTH_SERVER_URL above). Paired with
+      # TURNSTILE_SECRET_KEY on sassy-auth-server.
+      - key: NEXT_PUBLIC_TURNSTILE_SITE_KEY
+        sync: false

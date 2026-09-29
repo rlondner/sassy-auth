@@ -446,6 +446,41 @@ describe('auth.config — advanced.crossSubDomainCookies (production subdomain r
   });
 });
 
+// bug-0293: staging and production are forced onto the same COOKIE_DOMAIN
+// (neither pair of subdomains shares a narrower suffix), so without a
+// distinct cookie name they'd write the identically-named session cookie to
+// the same Domain/Path — whichever environment a browser visited most
+// recently silently overwrites the other's cookie. cookiePrefix must default
+// to BetterAuth's own "better-auth" (so production, which leaves
+// COOKIE_PREFIX unset, isn't affected) but be overridable per-deployment.
+describe('auth.config — advanced.cookiePrefix (bug-0293 staging/production cookie collision)', () => {
+  const ORIGINAL_COOKIE_PREFIX = process.env.COOKIE_PREFIX;
+
+  afterEach(() => {
+    if (ORIGINAL_COOKIE_PREFIX === undefined) delete process.env.COOKIE_PREFIX;
+    else process.env.COOKIE_PREFIX = ORIGINAL_COOKIE_PREFIX;
+    jest.resetModules();
+  });
+
+  it('defaults to "better-auth" when COOKIE_PREFIX is not configured (production)', async () => {
+    delete process.env.COOKIE_PREFIX;
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const advanced = options['advanced'] as Record<string, unknown>;
+    expect(advanced['cookiePrefix']).toBe('better-auth');
+  });
+
+  it('uses the configured prefix when COOKIE_PREFIX is set (e.g. staging)', async () => {
+    process.env.COOKIE_PREFIX = 'sassy-staging';
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const advanced = options['advanced'] as Record<string, unknown>;
+    expect(advanced['cookiePrefix']).toBe('sassy-staging');
+  });
+});
+
 describe('auth.config — session gate FORBIDDEN code (real invocation)', () => {
   async function loadSessionCreateBefore() {
     const { auth } = await import('./auth.config');

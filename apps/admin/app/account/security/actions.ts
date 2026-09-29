@@ -8,8 +8,11 @@ import { getForwardedOrigin } from '@/lib/auth-origin'
 // Must match the exact production check auth.config.ts uses for
 // `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
-const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', IS_PRODUCTION)
-const TRUST_DEVICE_COOKIE_NAME = getBetterAuthCookieName('trust_device', IS_PRODUCTION)
+// bug-0293: must match auth.config.ts's `advanced.cookiePrefix` — see
+// getBetterAuthCookieName's doc comment.
+const COOKIE_PREFIX = process.env.COOKIE_PREFIX || 'better-auth'
+const SESSION_COOKIE_NAME = getBetterAuthCookieName('session_token', IS_PRODUCTION, COOKIE_PREFIX)
+const TRUST_DEVICE_COOKIE_NAME = getBetterAuthCookieName('trust_device', IS_PRODUCTION, COOKIE_PREFIX)
 
 // ---------------------------------------------------------------------------
 // Cookie helpers

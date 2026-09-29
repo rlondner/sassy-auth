@@ -275,8 +275,11 @@ Set that value as `SASSY_CLIENT_ID` on `sassy-resource-server` and redeploy.
 | `NODE_ENV` | `production` |
 | `GEOIP_DB_PATH` | *(unset)* |
 | `COOKIE_DOMAIN` | `.milissai.com` |
+| `COOKIE_PREFIX` | *(unset — production keeps BetterAuth's default `better-auth` prefix)* |
 
 **`COOKIE_DOMAIN` (required in production).** Enables BetterAuth's `advanced.crossSubDomainCookies` (see `apps/auth-server/src/auth/auth.config.ts`) so the session cookie set at sign-in carries `Domain=.milissai.com` and is sent by the browser to both `auth.milissai.com` and `auth-api.milissai.com`. Without it the cookie is host-only, scoped to whichever origin set it — see the [Architecture](#architecture) note above and [Troubleshooting](#9-troubleshooting) for the resulting symptom. Only needed when the admin console and auth server are on sibling subdomains; leave unset for the [local mock deployment](#8-local-mock-deployment-custom-ports), where both share the literal host `localhost`.
+
+**`COOKIE_PREFIX` (bug-0293 — required on staging, unset on production).** Staging (`auth-staging.milissai.com` / `auth-api-staging.milissai.com`) has no narrower shared suffix than `.milissai.com` either, so it uses the *same* `COOKIE_DOMAIN` as production. Without a distinct cookie name, staging and production would write an identically-named session cookie to the same Domain/Path — whichever environment a browser visited most recently would silently overwrite the other's cookie. `render.staging.yaml` sets `COOKIE_PREFIX=sassy-staging`; production leaves it unset (defaulting to BetterAuth's own `better-auth` prefix) so this change doesn't invalidate existing production sessions. Both the auth server (`advanced.cookiePrefix`) and the admin console (`getBetterAuthCookieName` in `@sassy-auth/types`) read the same env var and must agree — `render.staging.yaml` sets it once in the shared `sassy-auth-staging` env group so both services stay in sync.
 
 `BETTER_AUTH_URL` is also the JWT `iss` claim and the OAuth authorization-server metadata issuer. It must exactly match what resource servers expect.
 

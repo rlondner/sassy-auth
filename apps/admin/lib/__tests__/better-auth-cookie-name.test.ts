@@ -19,4 +19,17 @@ describe('getBetterAuthCookieName', () => {
     expect(getBetterAuthCookieName('two_factor', false)).toBe('better-auth.two_factor')
     expect(getBetterAuthCookieName('trust_device', false)).toBe('better-auth.trust_device')
   })
+
+  // bug-0293: staging and production share the same COOKIE_DOMAIN, so an
+  // explicit prefix (COOKIE_PREFIX, wired through auth.config.ts's
+  // `advanced.cookiePrefix`) is the only way to keep their session cookies
+  // from colliding in the same browser's cookie jar.
+  it('honors a custom prefix, still applying the production __Secure- rule', () => {
+    expect(getBetterAuthCookieName('session_token', true, 'sassy-staging')).toBe(
+      '__Secure-sassy-staging.session_token',
+    )
+    expect(getBetterAuthCookieName('session_token', false, 'sassy-staging')).toBe(
+      'sassy-staging.session_token',
+    )
+  })
 })
