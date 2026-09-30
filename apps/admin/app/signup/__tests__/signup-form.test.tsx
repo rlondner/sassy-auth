@@ -137,6 +137,13 @@ describe('SignupForm', () => {
     expect(mockRegisterAction).not.toHaveBeenCalled()
   })
 
+  it('does not show an invalid email error when blurring an untouched, empty email field (bug-0295)', () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
+    fireEvent.blur(screen.getByLabelText('signup.email'))
+
+    expect(screen.queryByText('signup.errors.invalidEmail')).not.toBeInTheDocument()
+  })
+
   it('clears the invalid email error once the user edits the field again', () => {
     render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
