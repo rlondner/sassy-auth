@@ -440,8 +440,34 @@ instead of failing to start, but sign-in from the admin console expects
 `https://localhost:3010`, so generate the certs before your first `pnpm
 dev`.
 
-`apps/admin` uses a different, self-generating mechanism
-(`next dev --experimental-https`) and needs no manual step.
+`apps/admin`'s dev server is plain HTTP on `:3001` — it no longer
+self-generates its own certificate (the `next dev --experimental-https`
+flag was dropped once the Caddy proxy below took over that role).
+
+### 6b. Optional — Caddy proxy for prod-like hostnames (Windows only)
+
+To exercise the app under the same hostnames used in production
+(`auth.milissai.com` / `auth-api.milissai.com`) instead of `localhost`
+ports, a root `Caddyfile` fronts both dev servers on `:443` under
+`auth-dev.milissai.com` / `auth-api-dev.milissai.com`:
+
+1. Install [Caddy](https://caddyserver.com/docs/install) and add these
+   entries to your hosts file (`C:\Windows\System32\drivers\etc\hosts`):
+   ```
+   127.0.0.1 auth-dev.milissai.com
+   127.0.0.1 auth-api-dev.milissai.com
+   ```
+2. `pnpm dev`'s `predev` hook (`scripts/start-caddy.ps1`) starts Caddy
+   automatically, elevated (one UAC prompt per machine reboot — binding
+   `:443` requires it), and is a no-op if Caddy is already running.
+
+This step is **optional** — the mkcert-based `https://localhost:3010` /
+`http://localhost:3001` setup above works on its own and is what CI and
+this README's other examples assume. `pnpm dev`'s `predev` hook
+(`scripts/predev.mjs`) only attempts to start Caddy on Windows, and does
+nothing (rather than failing) on macOS/Linux or when the `caddy` binary
+isn't on `PATH` — safe to leave alone if you don't want the prod-like
+hostnames.
 
 ### 7. Start the development servers
 
