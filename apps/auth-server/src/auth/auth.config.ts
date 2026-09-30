@@ -479,6 +479,7 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
+    expiresIn: Number(process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS ?? 3600),
     sendVerificationEmail: async ({ user, url }: { user: { id: string; email: string; name?: string }; url: string }) => {
       const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
       const saUser = await prisma.saUser.findUnique({
