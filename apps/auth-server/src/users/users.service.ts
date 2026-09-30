@@ -686,6 +686,32 @@ export class UsersService {
     return { inviteUrl };
   }
 
+  async resendActivationEmail(callerBaId: string, userPublicId: string): Promise<void> {
+    const user = await prisma.saUser.findUnique({
+      where: { publicId: userPublicId },
+      include: { betterAuthUser: { select: { email: true } } },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.betterAuthUser) throw new NotFoundException('User account not found');
+    await checkPermission(
+      callerBaId,
+      ['platform.users.manage', 'org.users.manage'],
+      { targetOrgId: user.orgId },
+    );
+    if (user.status !== 'unverified') throw new BadRequestException('User is not unverified — activation email cannot be resent');
+
+    const email = user.betterAuthUser.email;
+    const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    await auth.api.sendVerificationEmail({
+      body: { email, callbackURL: `${adminUrl}/signup/verified?email=${encodeURIComponent(email)}` },
+    });
+
+    this.logger.getWinstonLogger().info('Activation email resent', {
+      context: 'UsersService',
+      userId: userPublicId,
+    });
+  }
+
   async reset2fa(callerBaId: string, userPublicId: string): Promise<void> {
     const user = await prisma.saUser.findUnique({ where: { publicId: userPublicId } });
     if (!user) throw new NotFoundException('User not found');
