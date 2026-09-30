@@ -4,6 +4,69 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-09-30
+
+A password-visibility toggle rolled out across every auth form, a signup
+UX pass (captcha reorder, conditional subtitle, client-side email
+validation), a small production fix, and new local dev tooling (Caddy
+reverse proxy) — the last of which shipped with two bugs, both fixed in
+this review.
+
+**Password visibility toggle (`2fa6278`, `2f999ca`).** `packages/ui`'s
+`FormField` now shows a show/hide eye-icon toggle automatically whenever
+`type="password"` (translatable via new `showPasswordLabel`/
+`hidePasswordLabel` props), and the same toggle was added by hand to the
+three password inputs that don't go through `FormField`
+(`accept-invite-form.tsx`, `SecurityClient.tsx`). `FormField` is now a
+`React.forwardRef` component, which also unblocked the email-validation
+feature below.
+
+**Signup form UX pass (`65aa0d5`, `22a79f9`).** Cloudflare Turnstile now
+renders before the privacy/terms/GDPR checkboxes instead of after; the
+"Create your account to get started." subtitle is hidden when signing up
+for a specific app that already has a default org (the title already
+names the app in that case); and the email field gets client-side format
+validation (native browser validity, checked on blur and submit) with a
+translated error message.
+
+**`fix(api): added missing permissions to vibecast seed` (`346ad0e`) and
+`fix(ci): included Cloudflare Captcha to render.yaml` (`31e14f7`).** Small,
+additive fixes — 5 missing `vibecast.admin.*` permissions added to the
+idempotent seed script, and `TURNSTILE_SECRET_KEY`/
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` placeholders added to `render.yaml` /
+`render.staging.yaml`.
+
+**New local dev tooling: Caddy reverse proxy (`8d487f2`).** A root
+`Caddyfile` now fronts both dev servers on `:443` under
+`auth-dev.milissai.com` / `auth-api-dev.milissai.com`, to mimic the
+production hostnames locally; `apps/admin`'s dev server dropped its own
+`--experimental-https` flag in favor of it. Shipped with two bugs, both
+found and fixed in this same review (see below): the proxy spoke
+plaintext HTTP to `auth-server`'s TLS-only listener, and the new `predev`
+hook could hard-fail `pnpm dev` on a machine without Caddy or PowerShell.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-09-30.md](./docs/history/todo/TODO_2026-09-30.md) for
+follow-ups and [BUGS_2026-09-30.md](./docs/history/bugs/BUGS_2026-09-30.md)
+for this run's bug catalog. Two new items, both fixed in this review:
+
+- **bug-0294** (medium) — The Caddy proxy added by `8d487f2` reverse-proxied
+  `auth-api-dev.milissai.com` to `auth-server` as plaintext HTTP, but
+  `auth-server` still terminates its own TLS on `:3010` — a protocol
+  mismatch that would break that hostname for anyone who used it. The same
+  commit's new `predev` hook (`powershell -File ...`, no platform guard,
+  `$ErrorActionPreference = 'Stop'`) could also hard-fail `pnpm dev`
+  entirely on a machine without PowerShell or Caddy installed. Fixed via a
+  proper TLS backend transport and a cross-platform, fail-soft `predev`
+  script. See PR [#444](https://github.com/rlondner/sassy-auth/pull/444).
+- **bug-0295** (low) — The new signup email-format validation
+  (`65aa0d5`) also fires on an empty, untouched field (native
+  `ValidityState.valid` is `false` for a missing required value, not only
+  a malformed one), showing "Please enter a valid email address." before
+  the user has typed anything. Fixed by skipping the format check when the
+  field is empty. See PR [#445](https://github.com/rlondner/sassy-auth/pull/445).
+
 ## [Unreleased] — 2026-09-29
 
 Two small fixes landed on `dev`/`master` (PR #434 relabels the activation
