@@ -26,6 +26,7 @@ import { appendConsentRedirect } from '../social/resolve-social-consent-redirect
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
 import { notifyActivation } from '../activation/notify-activation';
 import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
+import { envInt } from '../common/config/rate-limit-config';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -479,7 +480,10 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    expiresIn: Number(process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS ?? 3600),
+    // Unset, blank, zero, or non-numeric all fall back to 3600 (envInt only
+    // accepts a finite, positive number) — matches the .env.example comment
+    // for EMAIL_VERIFICATION_EXPIRES_IN_SECONDS exactly.
+    expiresIn: envInt('EMAIL_VERIFICATION_EXPIRES_IN_SECONDS', 3600),
     sendVerificationEmail: async ({ user, url }: { user: { id: string; email: string; name?: string }; url: string }) => {
       const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
       const saUser = await prisma.saUser.findUnique({
