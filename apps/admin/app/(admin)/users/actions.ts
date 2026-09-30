@@ -14,6 +14,7 @@ import {
   deleteUser,
   resetPassword,
   resendInvitation,
+  resendActivation,
 } from '@/lib/api'
 import { isRedirectSentinel } from '@/lib/redirect-sentinel'
 import type { CreateUserPayload, Permission, Role, User } from '@/lib/types'
@@ -199,6 +200,17 @@ export async function resendInvitationAction(
     return await resendInvitation(userId)
   } catch (err) {
     return { errorKey: mapActionError(err, { on400: 'users.errors.notPending', on403: 'users.errors.forbidden' }) }
+  }
+}
+
+export async function resendActivationAction(
+  userId: string,
+): Promise<{ ok: true } | { errorKey: string }> {
+  try {
+    await resendActivation(userId)
+    return { ok: true }
+  } catch (err) {
+    return { errorKey: mapActionError(err, { on400: 'users.errors.notUnverified', on403: 'users.errors.forbidden' }) }
   }
 }
 
