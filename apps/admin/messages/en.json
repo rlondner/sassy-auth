@@ -503,7 +503,8 @@
       "activate": "Activate",
       "delete": "Delete",
       "resendInvitation": "Resend Invitation",
-      "resend": "Resend Invitation"
+      "resend": "Resend Invitation",
+      "resendActivation": "Resend Activation Email"
     },
     "toast": {
       "created": "User created",
@@ -512,7 +513,8 @@
       "resent": "Invitation resent",
       "resetLinkGenerated": "Password reset link generated",
       "activated": "User activated",
-      "deactivated": "User deactivated"
+      "deactivated": "User deactivated",
+      "activationResent": "Activation email resent"
     },
     "confirmDelete": {
       "title": "Delete user",
@@ -532,6 +534,7 @@
       "generic": "Something went wrong. Please try again.",
       "noPassword": "This user has no password to reset.",
       "notPending": "This user is no longer pending an invitation.",
+      "notUnverified": "This user's email is already verified.",
       "rolesSetFailed": "Failed to update roles.",
       "directPermissionsSetFailed": "Failed to update direct permissions.",
       "selfDeactivate": "You cannot deactivate your own account.",
