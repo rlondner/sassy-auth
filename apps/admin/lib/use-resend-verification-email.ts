@@ -30,6 +30,7 @@ export function useResendVerificationEmail({
   }, [cooldown])
 
   async function resend() {
+    if (cooldown > 0 || status === 'sending') return
     setStatus('sending')
     try {
       const callbackURL = `${window.location.origin}/signup/verified?email=${encodeURIComponent(email)}`
