@@ -647,7 +647,21 @@
     "verified": {
       "title": "Adresse e-mail vérifiée",
       "subtitle": "Votre compte est prêt. Vous pouvez maintenant vous connecter.",
-      "continueToLogin": "Continuer vers la connexion"
+      "continueToLogin": "Continuer vers la connexion",
+      "expired": {
+        "title": "Lien expiré",
+        "subtitle": "Votre lien d’activation pour {email} a expiré.",
+        "resendButton": "Renvoyer le lien",
+        "resendCooldown": "Renvoyer dans {seconds}s",
+        "resendSent": "Un nouveau lien d’activation est en route.",
+        "resendError": "Impossible de renvoyer l’e-mail. Veuillez réessayer dans un instant.",
+        "backToLogin": "Retour à la connexion"
+      },
+      "invalid": {
+        "title": "Ce lien n’est pas valide",
+        "subtitle": "Ce lien d’activation est invalide ou a déjà été utilisé.",
+        "backToLogin": "Retour à la connexion"
+      }
     },
     "errors": {
       "invalidEmail": "Veuillez saisir une adresse e-mail valide.",

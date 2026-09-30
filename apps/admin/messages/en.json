@@ -647,7 +647,21 @@
     "verified": {
       "title": "Email verified",
       "subtitle": "Your account is ready. You can now sign in.",
-      "continueToLogin": "Continue to sign in"
+      "continueToLogin": "Continue to sign in",
+      "expired": {
+        "title": "Link expired",
+        "subtitle": "Your activation link for {email} has expired.",
+        "resendButton": "Resend link",
+        "resendCooldown": "Resend in {seconds}s",
+        "resendSent": "A new activation link is on its way.",
+        "resendError": "We couldn't resend the email. Please try again in a moment.",
+        "backToLogin": "Back to sign in"
+      },
+      "invalid": {
+        "title": "This link isn't valid",
+        "subtitle": "This activation link is invalid or has already been used.",
+        "backToLogin": "Back to sign in"
+      }
     },
     "errors": {
       "invalidEmail": "Please enter a valid email address.",
