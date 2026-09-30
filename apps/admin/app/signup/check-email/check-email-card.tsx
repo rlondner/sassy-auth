@@ -4,8 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { AuthCard, Button } from '@sassy-auth/ui'
-
-const COOLDOWN_SECONDS = 30
+import { useResendVerificationEmail } from '@/lib/use-resend-verification-email'
 
 export function CheckEmailCard({
   email,
@@ -17,36 +16,7 @@ export function CheckEmailCard({
   authServerUrl: string
 }) {
   const t = useTranslations('signup.checkEmail')
-  const [cooldown, setCooldown] = React.useState(0)
-  const [status, setStatus] = React.useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
-
-  React.useEffect(() => {
-    if (cooldown === 0) return
-    const id = setInterval(() => setCooldown((s) => Math.max(0, s - 1)), 1000)
-    return () => clearInterval(id)
-  }, [cooldown])
-
-  async function resend() {
-    setStatus('sending')
-    try {
-      const res = await fetch(`${authServerUrl}/api/auth/send-verification-email`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          callbackURL: `${window.location.origin}/signup/verified`,
-        }),
-      })
-      if (!res.ok) {
-        setStatus('error')
-        return
-      }
-      setStatus('sent')
-      setCooldown(COOLDOWN_SECONDS)
-    } catch {
-      setStatus('error')
-    }
-  }
+  const { resend, status, cooldown } = useResendVerificationEmail({ email, authServerUrl })
 
   const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : '/login'
 

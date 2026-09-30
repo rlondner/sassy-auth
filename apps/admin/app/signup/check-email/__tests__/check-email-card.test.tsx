@@ -34,7 +34,7 @@ describe('CheckEmailCard', () => {
         method: 'POST',
         body: JSON.stringify({
           email: 'alice@example.com',
-          callbackURL: `${window.location.origin}/signup/verified`,
+          callbackURL: `${window.location.origin}/signup/verified?email=${encodeURIComponent('alice@example.com')}`,
         }),
       }),
     )
