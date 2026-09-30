@@ -574,12 +574,24 @@ describe('UsersService', () => {
     it('throws NotFoundException when the user does not exist', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(null);
       await expect(service.resendActivationEmail('ba-caller', 'usr1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockSendVerificationEmail).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when the user is not unverified', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'active' }));
       const { BadRequestException } = await import('@nestjs/common');
       await expect(service.resendActivationEmail('ba-caller', 'usr1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockSendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('propagates a permission error and performs no writes when checkPermission rejects', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'unverified', orgId: 10 }));
+      const permError = new Error('Forbidden');
+      mockCheckPermission.mockRejectedValueOnce(permError);
+
+      await expect(service.resendActivationEmail('ba-caller', 'usr1')).rejects.toThrow(permError);
+
+      expect(mockSendVerificationEmail).not.toHaveBeenCalled();
     });
 
     it('checks platform/org permission before resending', async () => {
