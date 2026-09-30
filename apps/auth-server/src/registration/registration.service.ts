@@ -214,7 +214,7 @@ export class RegistrationService {
 
       const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
       await auth.api.sendVerificationEmail({
-        body: { email: dto.email, callbackURL: `${adminUrl}/signup/verified` },
+        body: { email: dto.email, callbackURL: `${adminUrl}/signup/verified?email=${encodeURIComponent(dto.email)}` },
       });
 
       // Authenticate the new (still-pending) user against the target app
