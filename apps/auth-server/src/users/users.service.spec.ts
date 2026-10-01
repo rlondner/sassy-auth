@@ -57,7 +57,12 @@ const mockSend = jest.fn().mockResolvedValue({ sent: true });
 const mockRefreshTokenService = { revokeForUser: jest.fn(), revokeForUserApp: jest.fn() };
 
 jest.mock('../auth/auth.config', () => ({
-  auth: { api: { requestPasswordReset: jest.fn().mockResolvedValue({ status: true }) } },
+  auth: {
+    api: {
+      requestPasswordReset: jest.fn().mockResolvedValue({ status: true }),
+      sendVerificationEmail: jest.fn().mockResolvedValue({ status: true }),
+    },
+  },
 }));
 
 jest.mock('../activation/notify-activation', () => ({
@@ -69,6 +74,9 @@ const mockNotifyActivation = require('../activation/notify-activation').notifyAc
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockCheckPermission = require('../common/permissions/check-permission')
   .checkPermission as jest.Mock;
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockSendVerificationEmail = require('../auth/auth.config').auth.api.sendVerificationEmail as jest.Mock;
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockAssertGrant = require('../common/permissions/assert-caller-can-grant-system-perms')
@@ -559,6 +567,54 @@ describe('UsersService', () => {
     it('throws NotFoundException when user not found', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(null);
       await expect(service.resendInvitation('ba-caller', 'missing-usr')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('resendActivationEmail', () => {
+    it('throws NotFoundException when the user does not exist', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(null);
+      await expect(service.resendActivationEmail('ba-caller', 'usr1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(mockSendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when the user is not unverified', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'active' }));
+      const { BadRequestException } = await import('@nestjs/common');
+      await expect(service.resendActivationEmail('ba-caller', 'usr1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockSendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('propagates a permission error and performs no writes when checkPermission rejects', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'unverified', orgId: 10 }));
+      const permError = new Error('Forbidden');
+      mockCheckPermission.mockRejectedValueOnce(permError);
+
+      await expect(service.resendActivationEmail('ba-caller', 'usr1')).rejects.toThrow(permError);
+
+      expect(mockSendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('checks platform/org permission before resending', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'unverified', orgId: 10 }));
+      await service.resendActivationEmail('ba-caller', 'usr1');
+      expect(mockCheckPermission).toHaveBeenCalledWith(
+        'ba-caller',
+        ['platform.users.manage', 'org.users.manage'],
+        { targetOrgId: 10 },
+      );
+    });
+
+    it('calls sendVerificationEmail with the user email and a callbackURL carrying that email', async () => {
+      mockPrisma.saUser.findUnique.mockResolvedValue(
+        makeSaUser({ status: 'unverified', betterAuthUser: { email: 'jane@example.com' } }),
+      );
+      await service.resendActivationEmail('ba-caller', 'usr1');
+      expect(mockSendVerificationEmail).toHaveBeenCalledWith({
+        body: {
+          email: 'jane@example.com',
+          callbackURL: expect.stringContaining(`/signup/verified?email=${encodeURIComponent('jane@example.com')}`),
+        },
+      });
     });
   });
 

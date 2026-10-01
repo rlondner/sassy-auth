@@ -1,31 +1,26 @@
 'use client'
 
-import * as React from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { AuthCard, Button } from '@sassy-auth/ui'
 import { useResendVerificationEmail } from '@/lib/use-resend-verification-email'
 
-export function CheckEmailCard({
+export function LinkExpiredCard({
   email,
-  next,
   authServerUrl,
 }: {
   email: string
-  next: string
   authServerUrl: string
 }) {
-  const t = useTranslations('signup.checkEmail')
+  const t = useTranslations('signup.verified.expired')
   const { resend, status, cooldown } = useResendVerificationEmail({ email, authServerUrl })
-
-  const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : '/login'
 
   return (
     <AuthCard
       title={t('title')}
       subtitle={t('subtitle', { email })}
       footer={
-        <Link href={loginHref} className="text-label-md text-primary hover:underline">
+        <Link href="/login" className="text-label-md text-primary hover:underline">
           {t('backToLogin')}
         </Link>
       }
@@ -35,12 +30,12 @@ export function CheckEmailCard({
           {cooldown > 0 ? t('resendCooldown', { seconds: cooldown }) : t('resendButton')}
         </Button>
         {status === 'sent' && (
-          <p data-testid="check-email-resent" className="text-body-sm text-muted-foreground">
+          <p data-testid="link-expired-resent" className="text-body-sm text-muted-foreground">
             {t('resendSent')}
           </p>
         )}
         {status === 'error' && (
-          <p data-testid="check-email-error" className="text-label-md text-destructive">
+          <p data-testid="link-expired-error" className="text-label-md text-destructive">
             {t('resendError')}
           </p>
         )}

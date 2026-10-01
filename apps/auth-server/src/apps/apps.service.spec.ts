@@ -82,7 +82,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, favicon: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -107,7 +107,7 @@ describe('AppsService', () => {
       include: { redirectUris: true, defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
     expect(result).toEqual({
-      publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null,
+      publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, favicon: null,
       isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [],
       isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null,
       passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy,
@@ -155,6 +155,18 @@ describe('AppsService', () => {
     expect(call.include).toBeUndefined();
   });
 
+  it('listApps never selects favicon and always returns favicon: null in every row, even if the DB row has one', async () => {
+    mockPrisma.saApp.findMany.mockResolvedValue([{ ...appRow, favicon: 'data:image/png;base64,LEAKED=' }]);
+    mockPrisma.saApp.count.mockResolvedValue(1);
+    const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].favicon).toBeNull();
+    const call = mockPrisma.saApp.findMany.mock.calls[0][0];
+    expect(call.select).toBeDefined();
+    expect(call.select.favicon).toBeUndefined();
+    expect(call.include).toBeUndefined();
+  });
+
   it('createApp generates publicId via two-step transaction', async () => {
     mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
     mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
@@ -166,6 +178,7 @@ describe('AppsService', () => {
         name: 'Customer Portal',
         url: 'https://portal.example.com',
         logo: null,
+        favicon: null,
         isPlatform: false,
         twoFactorTrustDays: null,
         twoFactorPromptEnabled: null,
@@ -174,7 +187,7 @@ describe('AppsService', () => {
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, favicon: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -213,6 +226,29 @@ describe('AppsService', () => {
     }));
   });
 
+  it('createApp stores a provided favicon', async () => {
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, favicon: 'data:image/png;base64,AAA=' });
+    const result = await service.createApp('ba-caller', {
+      name: 'Customer Portal', url: 'https://portal.example.com', favicon: 'data:image/png;base64,AAA=',
+    });
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ favicon: 'data:image/png;base64,AAA=' }),
+    }));
+    expect(result.favicon).toBe('data:image/png;base64,AAA=');
+  });
+
+  it('createApp defaults favicon to null when omitted', async () => {
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
+    mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
+    mockPrisma.saApp.update.mockResolvedValue(appRow);
+    await service.createApp('ba-caller', { name: 'Customer Portal', url: 'https://portal.example.com' });
+    expect(mockPrisma.saApp.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ favicon: null }),
+    }));
+  });
+
   it('updateApp sets logo when provided', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
     mockPrisma.saApp.update.mockResolvedValue({ ...appRow, logo: 'data:image/png;base64,BBB=' });
@@ -242,6 +278,28 @@ describe('AppsService', () => {
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
       where: { publicId: 'sq_1' },
       data: { name: 'Renamed' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp sets favicon when provided', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, favicon: 'data:image/png;base64,BBB=' });
+    await service.updateApp('ba-caller', 'sq_1', { favicon: 'data:image/png;base64,BBB=' });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { favicon: 'data:image/png;base64,BBB=' },
+      include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
+    });
+  });
+
+  it('updateApp clears favicon when given null', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, favicon: null });
+    await service.updateApp('ba-caller', 'sq_1', { favicon: null });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith({
+      where: { publicId: 'sq_1' },
+      data: { favicon: null },
       include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
   });

@@ -29,11 +29,11 @@ const authedSession = { user: { id: 'ba-caller' }, session: {} };
 describe('SocialController (public reachability)', () => {
   let app: INestApplication;
 
-  async function buildApp(listForApp: jest.Mock, logo: string | null = null): Promise<INestApplication> {
-    const getLogoForApp = jest.fn().mockResolvedValue(logo);
+  async function buildApp(listForApp: jest.Mock, branding: { name: string | null; logo: string | null; favicon: string | null } = { name: null, logo: null, favicon: null }): Promise<INestApplication> {
+    const getBrandingForApp = jest.fn().mockResolvedValue(branding);
     const moduleRef = await Test.createTestingModule({
       controllers: [SocialController],
-      providers: [{ provide: SocialService, useValue: { listForApp, getLogoForApp } }],
+      providers: [{ provide: SocialService, useValue: { listForApp, getBrandingForApp } }],
     }).compile();
     const instance = moduleRef.createNestApplication();
     instance.setGlobalPrefix('api');
@@ -51,7 +51,7 @@ describe('SocialController (public reachability)', () => {
       .get('/api/social-providers')
       .query({ client_id: 'qp31' });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ providers: ['google'], logo: null });
+    expect(res.body).toEqual({ providers: ['google'], logo: null, name: null, favicon: null });
   });
 
   it('answers 200 with an empty list for an unknown client_id — never 404', async () => {
@@ -60,7 +60,7 @@ describe('SocialController (public reachability)', () => {
       .get('/api/social-providers')
       .query({ client_id: 'doesnotexist' });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ providers: [], logo: null });
+    expect(res.body).toEqual({ providers: [], logo: null, name: null, favicon: null });
   });
 
   it('sends no cookie/authorization header, proving the route needs none', async () => {

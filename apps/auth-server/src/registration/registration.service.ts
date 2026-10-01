@@ -214,7 +214,7 @@ export class RegistrationService {
 
       const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
       await auth.api.sendVerificationEmail({
-        body: { email: dto.email, callbackURL: `${adminUrl}/signup/verified` },
+        body: { email: dto.email, callbackURL: `${adminUrl}/signup/verified?email=${encodeURIComponent(dto.email)}` },
       });
 
       // Authenticate the new (still-pending) user against the target app
@@ -313,6 +313,7 @@ export class RegistrationService {
     hasDefaultOrg: boolean;
     passwordPolicy: PasswordPolicy;
     logo: string | null;
+    favicon: string | null;
     privacyPolicyUrl: string | null;
     termsUrl: string | null;
     gdprUrl: string | null;
@@ -326,6 +327,7 @@ export class RegistrationService {
         defaultOrgId: true,
         passwordPolicyOverride: true,
         logo: true,
+        favicon: true,
         privacyPolicyUrl: true,
         termsUrl: true,
         gdprUrl: true,
@@ -338,6 +340,7 @@ export class RegistrationService {
       hasDefaultOrg: app.defaultOrgId !== null,
       passwordPolicy: resolvePasswordPolicy(app),
       logo: app.logo ?? null,
+      favicon: app.favicon ?? null,
       privacyPolicyUrl: app.privacyPolicyUrl ?? null,
       termsUrl: app.termsUrl ?? null,
       gdprUrl: app.gdprUrl ?? null,

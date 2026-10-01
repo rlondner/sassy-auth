@@ -33,6 +33,7 @@ describe('fetchAppInfo', () => {
       hasDefaultOrg: true,
       passwordPolicy: POLICY,
       logo: null,
+      favicon: null,
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,
@@ -51,6 +52,7 @@ describe('fetchAppInfo', () => {
       hasDefaultOrg: true,
       passwordPolicy: null,
       logo: null,
+      favicon: null,
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,
@@ -69,6 +71,7 @@ describe('fetchAppInfo', () => {
       hasDefaultOrg: false,
       passwordPolicy: null,
       logo: null,
+      favicon: null,
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,
@@ -84,6 +87,26 @@ describe('fetchAppInfo', () => {
       hasDefaultOrg: false,
       passwordPolicy: null,
       logo: null,
+      favicon: null,
+      privacyPolicyUrl: null,
+      termsUrl: null,
+      gdprUrl: null,
+      gdprRequired: false,
+    })
+  })
+
+  it('returns the favicon from a successful response', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ name: 'Acme', hasDefaultOrg: true, passwordPolicy: POLICY, favicon: 'data:image/png;base64,FFF=' }),
+    } as Response)
+
+    await expect(fetchAppInfo('sq_1')).resolves.toEqual({
+      name: 'Acme',
+      hasDefaultOrg: true,
+      passwordPolicy: POLICY,
+      logo: null,
+      favicon: 'data:image/png;base64,FFF=',
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,

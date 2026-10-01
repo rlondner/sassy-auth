@@ -15,7 +15,7 @@ import { UserViewDrawer } from './user-view-drawer'
 import { UserCreateDrawer } from './user-create-drawer'
 import { DeleteAlertDialog } from './delete-alert-dialog'
 import { PageHeader } from './page-header'
-import { deleteUserAction, resetPasswordAction, resendInvitationAction, setUserStatusAction } from '@/app/(admin)/users/actions'
+import { deleteUserAction, resetPasswordAction, resendInvitationAction, resendActivationAction, setUserStatusAction } from '@/app/(admin)/users/actions'
 import { ShareLinkDialog } from './share-link-dialog'
 
 interface UsersTableProps {
@@ -152,6 +152,18 @@ export function UsersTable({ users, orgs, initialOrgId, canPickOrg = true, curre
                   }}
                 >
                   {t('users.actions.resendInvitation')}
+                </DropdownMenuItem>
+              )}
+              {u.status === 'unverified' && (
+                <DropdownMenuItem
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    const res = await resendActivationAction(u.id)
+                    if ('errorKey' in res) { toast.error(t(res.errorKey)); return }
+                    toast.success(t('users.toast.activationResent'))
+                  }}
+                >
+                  {t('users.actions.resendActivation')}
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />

@@ -61,6 +61,10 @@
       "logoHint": "Shown on this app's sign in and sign up pages. PNG, JPEG, WebP, or SVG, up to 250KB.",
       "removeLogo": "Remove logo",
       "noLogo": "No logo configured",
+      "favicon": "App favicon",
+      "faviconHint": "Shown as the browser tab icon on this app's sign in and sign up pages. PNG, JPEG, WebP, or SVG, up to 250KB.",
+      "removeFavicon": "Remove favicon",
+      "noFavicon": "No favicon configured",
       "twoFactorTrustDays": "2FA trust interval (days)",
       "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
       "twoFactorTrustDaysSystemDefault": "System default",
@@ -172,6 +176,8 @@
       "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
       "logoInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
       "logoTooLarge": "That image is too large. Please choose one under 250KB.",
+      "faviconInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
+      "faviconTooLarge": "That image is too large. Please choose one under 250KB.",
       "nameRequired": "App name is required.",
       "activationEmailInvalid": "Please check the activation email settings — the from address must be a valid email, and no field may contain a line break."
     },
@@ -503,7 +509,8 @@
       "activate": "Activate",
       "delete": "Delete",
       "resendInvitation": "Resend Invitation",
-      "resend": "Resend Invitation"
+      "resend": "Resend Invitation",
+      "resendActivation": "Resend Activation Email"
     },
     "toast": {
       "created": "User created",
@@ -512,7 +519,8 @@
       "resent": "Invitation resent",
       "resetLinkGenerated": "Password reset link generated",
       "activated": "User activated",
-      "deactivated": "User deactivated"
+      "deactivated": "User deactivated",
+      "activationResent": "Activation email resent"
     },
     "confirmDelete": {
       "title": "Delete user",
@@ -532,6 +540,7 @@
       "generic": "Something went wrong. Please try again.",
       "noPassword": "This user has no password to reset.",
       "notPending": "This user is no longer pending an invitation.",
+      "notUnverified": "This user's email is already verified.",
       "rolesSetFailed": "Failed to update roles.",
       "directPermissionsSetFailed": "Failed to update direct permissions.",
       "selfDeactivate": "You cannot deactivate your own account.",
@@ -644,7 +653,21 @@
     "verified": {
       "title": "Email verified",
       "subtitle": "Your account is ready. You can now sign in.",
-      "continueToLogin": "Continue to sign in"
+      "continueToLogin": "Continue to sign in",
+      "expired": {
+        "title": "Link expired",
+        "subtitle": "Your activation link for {email} has expired.",
+        "resendButton": "Resend link",
+        "resendCooldown": "Resend in {seconds}s",
+        "resendSent": "A new activation link is on its way.",
+        "resendError": "We couldn't resend the email. Please try again in a moment.",
+        "backToLogin": "Back to sign in"
+      },
+      "invalid": {
+        "title": "This link isn't valid",
+        "subtitle": "This activation link is invalid or has already been used.",
+        "backToLogin": "Back to sign in"
+      }
     },
     "errors": {
       "invalidEmail": "Please enter a valid email address.",

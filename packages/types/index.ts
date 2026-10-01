@@ -130,9 +130,32 @@ export const APP_LOGO_ALLOWED_MIME_TYPES = [
   'image/svg+xml',
 ] as const;
 
-const APP_LOGO_DATA_URI_PATTERN = new RegExp(
-  `^data:(${APP_LOGO_ALLOWED_MIME_TYPES.map((t) => t.replace('/', '\\/').replace('+', '\\+')).join('|')});base64,([A-Za-z0-9+/]+=?=?)$`,
-);
+export const APP_FAVICON_MAX_BYTES = APP_LOGO_MAX_BYTES;
+
+export const APP_FAVICON_ALLOWED_MIME_TYPES = APP_LOGO_ALLOWED_MIME_TYPES;
+
+function buildImageDataUriPattern(allowedTypes: readonly string[]): RegExp {
+  return new RegExp(
+    `^data:(${allowedTypes.map((t) => t.replace('/', '\\/').replace('+', '\\+')).join('|')});base64,([A-Za-z0-9+/]+=?=?)$`,
+  );
+}
+
+/**
+ * True when `value` is a data URI whose mime type is in `allowedTypes` and
+ * whose decoded byte size is within `maxBytes`. Shared by
+ * isValidAppLogoDataUri and isValidAppFaviconDataUri so the two rules
+ * (currently identical) can't silently drift apart from independently
+ * duplicated regex/byte-math.
+ */
+function isValidImageDataUri(value: unknown, allowedTypes: readonly string[], maxBytes: number): boolean {
+  if (typeof value !== 'string') return false;
+  const match = buildImageDataUriPattern(allowedTypes).exec(value);
+  if (!match) return false;
+  const base64Payload = match[2];
+  const padding = base64Payload.endsWith('==') ? 2 : base64Payload.endsWith('=') ? 1 : 0;
+  const decodedBytes = (base64Payload.length * 3) / 4 - padding;
+  return decodedBytes <= maxBytes;
+}
 
 /**
  * True when `value` is a data URI of an allowed image type whose decoded
@@ -142,13 +165,17 @@ const APP_LOGO_DATA_URI_PATTERN = new RegExp(
  * write hits the database) — one definition, two enforcement points.
  */
 export function isValidAppLogoDataUri(value: unknown): boolean {
-  if (typeof value !== 'string') return false;
-  const match = APP_LOGO_DATA_URI_PATTERN.exec(value);
-  if (!match) return false;
-  const base64Payload = match[2];
-  const padding = base64Payload.endsWith('==') ? 2 : base64Payload.endsWith('=') ? 1 : 0;
-  const decodedBytes = (base64Payload.length * 3) / 4 - padding;
-  return decodedBytes <= APP_LOGO_MAX_BYTES;
+  return isValidImageDataUri(value, APP_LOGO_ALLOWED_MIME_TYPES, APP_LOGO_MAX_BYTES);
+}
+
+/**
+ * Same rule as isValidAppLogoDataUri, exposed under its own name for the
+ * favicon field (see IsAppFavicon / AppFaviconField). Deliberately reuses
+ * APP_LOGO_ALLOWED_MIME_TYPES/APP_LOGO_MAX_BYTES as its source of truth
+ * (via the APP_FAVICON_* aliases above) rather than an independent rule.
+ */
+export function isValidAppFaviconDataUri(value: unknown): boolean {
+  return isValidImageDataUri(value, APP_FAVICON_ALLOWED_MIME_TYPES, APP_FAVICON_MAX_BYTES);
 }
 
 /**

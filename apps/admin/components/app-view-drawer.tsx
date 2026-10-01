@@ -113,6 +113,17 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
               )}
             </div>
           </div>
+          <div>
+            <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('apps.fields.favicon')}</p>
+            <div className="mt-1 flex items-center rounded border border-border bg-card px-3 py-2">
+              {displayApp.favicon ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={displayApp.favicon} alt={t('apps.fields.favicon')} className="h-10 w-10 rounded border border-border object-contain" />
+              ) : (
+                <span className="text-body-sm text-muted-foreground">{t('apps.fields.noFavicon')}</span>
+              )}
+            </div>
+          </div>
           <RedirectUriGroup
             label={t('apps.fields.loginRedirectUris')}
             uris={(displayApp.redirectUris ?? []).filter((r) => r.kind === 'login')}

@@ -3,7 +3,7 @@ import { SocialService } from './social.service';
 
 function makeService(
   rows: { appId: number | null; provider: string; enabled: boolean }[],
-  app: { id: number; logo?: string | null } | null,
+  app: { id: number; name?: string | null; logo?: string | null; favicon?: string | null } | null,
 ) {
   const db = {
     saApp: { findUnique: async () => app },
@@ -40,25 +40,29 @@ describe('SocialService.listForApp', () => {
   });
 });
 
-describe('SocialService.getLogoForApp', () => {
-  it('returns the logo for a known app', async () => {
-    const svc = makeService([], { id: 7, logo: 'data:image/png;base64,AAA=' });
-    await expect(svc.getLogoForApp('qp31')).resolves.toBe('data:image/png;base64,AAA=');
+describe('SocialService.getBrandingForApp', () => {
+  it('returns name, logo, and favicon for a known app', async () => {
+    const svc = makeService([], { id: 7, name: 'Acme', logo: 'data:image/png;base64,AAA=', favicon: 'data:image/png;base64,FFF=' });
+    await expect(svc.getBrandingForApp('qp31')).resolves.toEqual({
+      name: 'Acme',
+      logo: 'data:image/png;base64,AAA=',
+      favicon: 'data:image/png;base64,FFF=',
+    });
   });
 
-  it('returns null for a known app with no logo set', async () => {
-    const svc = makeService([], { id: 7, logo: null });
-    await expect(svc.getLogoForApp('qp31')).resolves.toBeNull();
+  it('returns all-null fields for a known app with none set', async () => {
+    const svc = makeService([], { id: 7, name: null, logo: null, favicon: null });
+    await expect(svc.getBrandingForApp('qp31')).resolves.toEqual({ name: null, logo: null, favicon: null });
   });
 
-  it('returns null for an unknown client_id rather than throwing', async () => {
+  it('returns all-null fields for an unknown client_id rather than throwing', async () => {
     const svc = makeService([], null);
-    await expect(svc.getLogoForApp('nope')).resolves.toBeNull();
+    await expect(svc.getBrandingForApp('nope')).resolves.toEqual({ name: null, logo: null, favicon: null });
   });
 
-  it('returns null when no client_id is given', async () => {
+  it('returns all-null fields when no client_id is given', async () => {
     const svc = makeService([], null);
-    await expect(svc.getLogoForApp(undefined)).resolves.toBeNull();
+    await expect(svc.getBrandingForApp(undefined)).resolves.toEqual({ name: null, logo: null, favicon: null });
   });
 });
 

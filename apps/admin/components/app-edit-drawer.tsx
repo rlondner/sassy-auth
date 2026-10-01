@@ -27,6 +27,7 @@ import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { App, RedirectUri, OrgRow, RoleRow, PasswordPolicy } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 import { AppLogoField } from './app-logo-field'
+import { AppFaviconField } from './app-favicon-field'
 
 interface Props {
   app: App
@@ -46,6 +47,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   // this tracks that real value instead, same pattern as `initialProviders`
   // for the social-provider checkboxes.
   const [originalLogo, setOriginalLogo] = React.useState<string | null>(app.logo ?? null)
+  const [favicon, setFavicon] = React.useState<string | null>(app.favicon ?? null)
+  const [originalFavicon, setOriginalFavicon] = React.useState<string | null>(app.favicon ?? null)
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [twoFactorPromptEnabled, setTwoFactorPromptEnabled] = React.useState<boolean | null>(app.twoFactorPromptEnabled ?? null)
@@ -115,6 +118,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setUrl(app.url)
     setLogo(app.logo ?? null)
     setOriginalLogo(app.logo ?? null)
+    setFavicon(app.favicon ?? null)
+    setOriginalFavicon(app.favicon ?? null)
     setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setTwoFactorPromptEnabled(app.twoFactorPromptEnabled ?? null)
@@ -158,6 +163,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       if ('app' in result) {
         setLogo(result.app.logo ?? null)
         setOriginalLogo(result.app.logo ?? null)
+        setFavicon(result.app.favicon ?? null)
+        setOriginalFavicon(result.app.favicon ?? null)
         setActivationFromName(result.app.activationEmailOverride?.fromName ?? '')
         setActivationFromAddress(result.app.activationEmailOverride?.fromAddress ?? '')
         setActivationSubject(result.app.activationEmailOverride?.subject ?? '')
@@ -248,7 +255,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
     activationSubject.trim() !== (activationOverrideBaseline.subject ?? '') ||
     activationMessage.trim() !== (activationOverrideBaseline.message ?? '')
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || favicon !== originalFavicon || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -261,10 +268,11 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; twoFactorPromptEnabled?: boolean | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; favicon?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; twoFactorPromptEnabled?: boolean | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
+    if (favicon !== originalFavicon) patch.favicon = favicon
     if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null)) patch.twoFactorPromptEnabled = twoFactorPromptEnabled
@@ -360,6 +368,9 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
             </div>
             <div>
               <AppLogoField value={logo} onValueChange={setLogo} />
+            </div>
+            <div>
+              <AppFaviconField value={favicon} onValueChange={setFavicon} />
             </div>
             <div>
               <Label>{t('apps.fields.redirectUris')}</Label>

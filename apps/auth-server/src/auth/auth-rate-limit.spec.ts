@@ -44,6 +44,7 @@ describe('isSensitiveAuthPath', () => {
     '/api/auth/sign-in/magic-link',
     '/api/auth/email-otp/send-verification-otp',
     '/api/auth/two-factor/verify-totp',
+    '/api/auth/send-verification-email',
   ])('treats %s as sensitive', (path) => {
     expect(isSensitiveAuthPath(path)).toBe(true);
   });
