@@ -457,7 +457,7 @@ ports, a root `Caddyfile` fronts both dev servers on `:443` under
    127.0.0.1 auth-dev.milissai.com
    127.0.0.1 auth-api-dev.milissai.com
    ```
-2. `pnpm dev`'s `predev` hook (`scripts/predev.mjs`) starts Caddy
+2. `pnpm dev`'s `predev` hook (`scripts/start-caddy.ps1`) starts Caddy
    automatically, elevated (one UAC prompt per machine reboot — binding
    `:443` requires it), and is a no-op if Caddy is already running.
 
