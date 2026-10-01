@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
@@ -5,6 +6,20 @@ import { fetchAppInfo } from '@/lib/app-info'
 import { SignupForm } from './signup-form'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ client_id?: string; next?: string }>
+}): Promise<Metadata> {
+  const { client_id: clientId } = await searchParams
+  if (!clientId) return {}
+  const { name: appName, favicon } = await fetchAppInfo(clientId)
+  return {
+    ...(appName && { title: `${appName} Sign Up` }),
+    ...(favicon && { icons: { icon: favicon } }),
+  }
+}
 
 export default async function SignupPage({
   searchParams,

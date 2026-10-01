@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.APP_LOGO_ALLOWED_MIME_TYPES = exports.APP_LOGO_MAX_BYTES = exports.CONSENT_DOCUMENT_TYPES = exports.TokenErrorCode = void 0;
+exports.APP_FAVICON_ALLOWED_MIME_TYPES = exports.APP_FAVICON_MAX_BYTES = exports.APP_LOGO_ALLOWED_MIME_TYPES = exports.APP_LOGO_MAX_BYTES = exports.CONSENT_DOCUMENT_TYPES = exports.TokenErrorCode = void 0;
 exports.detectIdentifierType = detectIdentifierType;
 exports.evaluatePasswordPolicy = evaluatePasswordPolicy;
 exports.isValidAppLogoDataUri = isValidAppLogoDataUri;
+exports.isValidAppFaviconDataUri = isValidAppFaviconDataUri;
 exports.renderTemplate = renderTemplate;
 exports.getBetterAuthCookieName = getBetterAuthCookieName;
 /** Machine-readable codes returned as the `error` field in 4xx JWT responses. */
@@ -74,7 +75,29 @@ exports.APP_LOGO_ALLOWED_MIME_TYPES = [
     'image/webp',
     'image/svg+xml',
 ];
-const APP_LOGO_DATA_URI_PATTERN = new RegExp(`^data:(${exports.APP_LOGO_ALLOWED_MIME_TYPES.map((t) => t.replace('/', '\\/').replace('+', '\\+')).join('|')});base64,([A-Za-z0-9+/]+=?=?)$`);
+exports.APP_FAVICON_MAX_BYTES = exports.APP_LOGO_MAX_BYTES;
+exports.APP_FAVICON_ALLOWED_MIME_TYPES = exports.APP_LOGO_ALLOWED_MIME_TYPES;
+function buildImageDataUriPattern(allowedTypes) {
+    return new RegExp(`^data:(${allowedTypes.map((t) => t.replace('/', '\\/').replace('+', '\\+')).join('|')});base64,([A-Za-z0-9+/]+=?=?)$`);
+}
+/**
+ * True when `value` is a data URI whose mime type is in `allowedTypes` and
+ * whose decoded byte size is within `maxBytes`. Shared by
+ * isValidAppLogoDataUri and isValidAppFaviconDataUri so the two rules
+ * (currently identical) can't silently drift apart from independently
+ * duplicated regex/byte-math.
+ */
+function isValidImageDataUri(value, allowedTypes, maxBytes) {
+    if (typeof value !== 'string')
+        return false;
+    const match = buildImageDataUriPattern(allowedTypes).exec(value);
+    if (!match)
+        return false;
+    const base64Payload = match[2];
+    const padding = base64Payload.endsWith('==') ? 2 : base64Payload.endsWith('=') ? 1 : 0;
+    const decodedBytes = (base64Payload.length * 3) / 4 - padding;
+    return decodedBytes <= maxBytes;
+}
 /**
  * True when `value` is a data URI of an allowed image type whose decoded
  * byte size is within APP_LOGO_MAX_BYTES. Used both by the admin console's
@@ -83,15 +106,16 @@ const APP_LOGO_DATA_URI_PATTERN = new RegExp(`^data:(${exports.APP_LOGO_ALLOWED_
  * write hits the database) — one definition, two enforcement points.
  */
 function isValidAppLogoDataUri(value) {
-    if (typeof value !== 'string')
-        return false;
-    const match = APP_LOGO_DATA_URI_PATTERN.exec(value);
-    if (!match)
-        return false;
-    const base64Payload = match[2];
-    const padding = base64Payload.endsWith('==') ? 2 : base64Payload.endsWith('=') ? 1 : 0;
-    const decodedBytes = (base64Payload.length * 3) / 4 - padding;
-    return decodedBytes <= exports.APP_LOGO_MAX_BYTES;
+    return isValidImageDataUri(value, exports.APP_LOGO_ALLOWED_MIME_TYPES, exports.APP_LOGO_MAX_BYTES);
+}
+/**
+ * Same rule as isValidAppLogoDataUri, exposed under its own name for the
+ * favicon field (see IsAppFavicon / AppFaviconField). Deliberately reuses
+ * APP_LOGO_ALLOWED_MIME_TYPES/APP_LOGO_MAX_BYTES as its source of truth
+ * (via the APP_FAVICON_* aliases above) rather than an independent rule.
+ */
+function isValidAppFaviconDataUri(value) {
+    return isValidImageDataUri(value, exports.APP_FAVICON_ALLOWED_MIME_TYPES, exports.APP_FAVICON_MAX_BYTES);
 }
 /**
  * Literal `{{token}}` substitution — no conditionals, no loops. A token not

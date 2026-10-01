@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getBetterAuthCookieName } from '@sassy-auth/types'
@@ -30,6 +31,21 @@ const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 const PUBLIC_AUTH_SERVER = process.env.PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>
+}): Promise<Metadata> {
+  const { next } = await searchParams
+  const nextSafe = validateNextUrl(next)
+  if (!nextSafe) return {}
+  const { name: appName, favicon } = await fetchSocialProviders(nextSafe)
+  return {
+    ...(appName && { title: `${appName} Sign In` }),
+    ...(favicon && { icons: { icon: favicon } }),
+  }
+}
 
 async function hasActiveSession(): Promise<boolean> {
   const cookieStore = await cookies()

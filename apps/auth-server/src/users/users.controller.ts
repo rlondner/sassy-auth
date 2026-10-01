@@ -2,9 +2,11 @@ import {
   Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, HttpCode, UseGuards, Req,
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { BetterAuthGuard } from '../auth/better-auth.guard';
 import { BETTER_AUTH_SESSION_COOKIE } from '../common/constants';
+import { AUTH_THROTTLE } from '../common/config/rate-limit-config';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -74,6 +76,12 @@ export class UsersController {
   @Post(':id/resend-invitation')
   resendInvitation(@Req() req: Request, @Param('id') id: string) {
     return this.users.resendInvitation(callerBaId(req), id);
+  }
+
+  @Post(':id/resend-activation')
+  @Throttle({ auth: AUTH_THROTTLE })
+  resendActivation(@Req() req: Request, @Param('id') id: string) {
+    return this.users.resendActivationEmail(callerBaId(req), id);
   }
 
   @Post(':id/reset-password')

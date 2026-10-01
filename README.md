@@ -469,6 +469,14 @@ nothing (rather than failing) on macOS/Linux or when the `caddy` binary
 isn't on `PATH` — safe to leave alone if you don't want the prod-like
 hostnames.
 
+The `Caddyfile`'s `tls internal` uses Caddy's own local CA, separate from
+the mkcert one above — Node doesn't trust it automatically. If you switch
+any app's own env vars to the new hostnames, you'll also need to point
+that process at Caddy's local root certificate via `NODE_EXTRA_CA_CERTS`
+(passed through in `turbo.json`; run `caddy trust` to install it into
+your system/browser trust store, or locate the root cert Caddy already
+generated under its config directory).
+
 ### 7. Start the development servers
 
 **All apps in parallel (recommended):**

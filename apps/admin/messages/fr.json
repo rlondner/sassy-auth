@@ -61,6 +61,10 @@
       "logoHint": "Affiché sur les pages de connexion et d'inscription de cette application. PNG, JPEG, WebP ou SVG, 250 Ko maximum.",
       "removeLogo": "Supprimer le logo",
       "noLogo": "Aucun logo configuré",
+      "favicon": "Favicon de l'application",
+      "faviconHint": "Affiché comme icône d'onglet sur les pages de connexion et d'inscription de cette application. PNG, JPEG, WebP ou SVG, 250 Ko maximum.",
+      "removeFavicon": "Supprimer le favicon",
+      "noFavicon": "Aucun favicon configuré",
       "twoFactorTrustDays": "Intervalle de confiance 2FA (jours)",
       "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
       "twoFactorTrustDaysSystemDefault": "Valeur par défaut système",
@@ -172,6 +176,8 @@
       "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
       "logoInvalidType": "Veuillez choisir une image PNG, JPEG, WebP ou SVG.",
       "logoTooLarge": "Cette image est trop volumineuse. Veuillez en choisir une de moins de 250 Ko.",
+      "faviconInvalidType": "Veuillez choisir une image PNG, JPEG, WebP ou SVG.",
+      "faviconTooLarge": "Cette image est trop volumineuse. Veuillez en choisir une de moins de 250 Ko.",
       "nameRequired": "Le nom de l’application est requis.",
       "activationEmailInvalid": "Veuillez vérifier les paramètres de l'e-mail d'activation — l'adresse d'expéditeur doit être une adresse e-mail valide et aucun champ ne doit contenir de saut de ligne."
     },
@@ -503,7 +509,8 @@
       "activate": "Activer",
       "delete": "Supprimer",
       "resendInvitation": "Renvoyer l’invitation",
-      "resend": "Resend Invitation"
+      "resend": "Resend Invitation",
+      "resendActivation": "Renvoyer l’e-mail d’activation"
     },
     "toast": {
       "created": "User created",
@@ -512,7 +519,8 @@
       "resent": "Invitation resent",
       "resetLinkGenerated": "Lien de réinitialisation généré",
       "activated": "Utilisateur activé",
-      "deactivated": "Utilisateur désactivé"
+      "deactivated": "Utilisateur désactivé",
+      "activationResent": "E-mail d’activation renvoyé"
     },
     "confirmDelete": {
       "title": "Supprimer l’utilisateur",
@@ -532,6 +540,7 @@
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "noPassword": "Cet utilisateur n’a pas de mot de passe à réinitialiser.",
       "notPending": "Cet utilisateur n’est plus en attente d’invitation.",
+      "notUnverified": "L’adresse e-mail de cet utilisateur est déjà vérifiée.",
       "rolesSetFailed": "Échec de la mise à jour des rôles.",
       "directPermissionsSetFailed": "Échec de la mise à jour des permissions directes.",
       "selfDeactivate": "Vous ne pouvez pas désactiver votre propre compte.",
@@ -644,7 +653,21 @@
     "verified": {
       "title": "Adresse e-mail vérifiée",
       "subtitle": "Votre compte est prêt. Vous pouvez maintenant vous connecter.",
-      "continueToLogin": "Continuer vers la connexion"
+      "continueToLogin": "Continuer vers la connexion",
+      "expired": {
+        "title": "Lien expiré",
+        "subtitle": "Votre lien d’activation pour {email} a expiré.",
+        "resendButton": "Renvoyer le lien",
+        "resendCooldown": "Renvoyer dans {seconds}s",
+        "resendSent": "Un nouveau lien d’activation est en route.",
+        "resendError": "Impossible de renvoyer l’e-mail. Veuillez réessayer dans un instant.",
+        "backToLogin": "Retour à la connexion"
+      },
+      "invalid": {
+        "title": "Ce lien n’est pas valide",
+        "subtitle": "Ce lien d’activation est invalide ou a déjà été utilisé.",
+        "backToLogin": "Retour à la connexion"
+      }
     },
     "errors": {
       "invalidEmail": "Veuillez saisir une adresse e-mail valide.",

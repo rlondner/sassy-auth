@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import SignupPage from '../page'
+import SignupPage, { generateMetadata } from '../page'
 import { fetchAppInfo } from '@/lib/app-info'
 
 jest.mock('next-intl/server', () => ({
@@ -20,11 +20,16 @@ jest.mock('../signup-form', () => ({
 
 const mockFetchAppInfo = fetchAppInfo as jest.MockedFunction<typeof fetchAppInfo>
 
+beforeEach(() => {
+  jest.clearAllMocks()
+})
+
 const BASE_APP_INFO = {
   name: null,
   hasDefaultOrg: false,
   passwordPolicy: null,
   logo: null,
+  favicon: null,
   privacyPolicyUrl: null,
   termsUrl: null,
   gdprUrl: null,
@@ -54,5 +59,37 @@ describe('SignupPage subtitle', () => {
     render(ui)
 
     expect(screen.getByText('signup.subtitle')).toBeInTheDocument()
+  })
+})
+
+describe('SignupPage generateMetadata', () => {
+  it('sets the title to "{appName} Sign Up" when the app has a name', async () => {
+    mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, name: 'Acme' })
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
+    expect(metadata.title).toBe('Acme Sign Up')
+  })
+
+  it('leaves the title unset when there is no client_id', async () => {
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({}) })
+    expect(metadata.title).toBeUndefined()
+    expect(mockFetchAppInfo).not.toHaveBeenCalled()
+  })
+
+  it('leaves the title unset when the app has no name', async () => {
+    mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, name: null })
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
+    expect(metadata.title).toBeUndefined()
+  })
+
+  it('sets the tab icon when the app has a favicon', async () => {
+    mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, name: 'Acme', favicon: 'data:image/png;base64,FFF=' })
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
+    expect(metadata.icons).toEqual({ icon: 'data:image/png;base64,FFF=' })
+  })
+
+  it('leaves the icon unset when the app has no favicon', async () => {
+    mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, name: 'Acme', favicon: null })
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
+    expect(metadata.icons).toBeUndefined()
   })
 })

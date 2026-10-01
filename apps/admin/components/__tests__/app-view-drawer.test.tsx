@@ -108,6 +108,7 @@ describe('AppViewDrawer', () => {
     expect(screen.getByText(en.apps.fields.twoFactorTrustDaysSystemDefault)).toBeInTheDocument()
     expect(screen.getByText(en.common.no)).toBeInTheDocument()
     expect(screen.getByText(en.apps.fields.noLogo)).toBeInTheDocument()
+    expect(screen.getByText(en.apps.fields.noFavicon)).toBeInTheDocument()
     expect(screen.getByText(en.apps.fields.defaultOrgNone)).toBeInTheDocument()
     expect(screen.getByText(en.apps.fields.defaultRoleNone)).toBeInTheDocument()
     expect(screen.getByText(en.apps.fields.noClientSecret)).toBeInTheDocument()

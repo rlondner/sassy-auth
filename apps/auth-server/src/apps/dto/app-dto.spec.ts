@@ -94,3 +94,40 @@ describe('CreateAppDto — twoFactorPromptEnabled validation', () => {
   it('accepts false', async () => expect(await check(false)).toHaveLength(0));
   it('rejects "true" (string)', async () => expect(await check('true')).not.toHaveLength(0));
 });
+
+describe('CreateAppDto — favicon validation', () => {
+  const TINY_PNG =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+  it('accepts a valid favicon data URI', () => {
+    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'https://a.example.com', favicon: TINY_PNG });
+    expect(validateSync(dto)).toHaveLength(0);
+  });
+
+  it('accepts omitting favicon', () => {
+    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'https://a.example.com' });
+    expect(validateSync(dto)).toHaveLength(0);
+  });
+
+  it('rejects a non-data-URI favicon', () => {
+    const dto = plainToInstance(CreateAppDto, { name: 'A', url: 'https://a.example.com', favicon: 'not-a-data-uri' });
+    expect(validateSync(dto).length).toBeGreaterThan(0);
+  });
+});
+
+describe('UpdateAppDto — favicon validation', () => {
+  it('accepts null (clear favicon)', () => {
+    const dto = Object.assign(new UpdateAppDto(), { favicon: null });
+    expect(validateSync(dto)).toHaveLength(0);
+  });
+
+  it('accepts undefined (omit)', () => {
+    const dto = Object.assign(new UpdateAppDto(), { favicon: undefined });
+    expect(validateSync(dto)).toHaveLength(0);
+  });
+
+  it('rejects a non-data-URI favicon', () => {
+    const dto = Object.assign(new UpdateAppDto(), { favicon: 'not-a-data-uri' });
+    expect(validateSync(dto).length).toBeGreaterThan(0);
+  });
+});

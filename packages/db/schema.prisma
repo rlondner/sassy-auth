@@ -118,6 +118,9 @@ model SaApp {
   url         String
   /// Full data URI (e.g. "data:image/png;base64,...."). null = no logo set.
   logo        String?
+  /// Full data URI. null = no favicon set; the signup/login pages fall back
+  /// to the browser's default icon (no site-wide favicon exists either way).
+  favicon     String?
   twoFactorTrustDays Int?
   twoFactorPromptEnabled Boolean? // null = inherit system default (TWO_FACTOR_PROMPT_ENABLED)
   requireTwoFactor   Boolean        @default(false)
