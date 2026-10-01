@@ -4,7 +4,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import en from '@/messages/en.json'
 import { UsersTable } from '../users-table'
 import type { User, Org } from '@/lib/types'
-import { setUserStatusAction } from '@/app/(admin)/users/actions'
+import { setUserStatusAction, resendActivationAction } from '@/app/(admin)/users/actions'
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
@@ -13,6 +13,7 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/app/(admin)/users/actions', () => ({
   deleteUserAction: jest.fn().mockResolvedValue({ ok: true }),
   setUserStatusAction: jest.fn().mockResolvedValue({ ok: true }),
+  resendActivationAction: jest.fn().mockResolvedValue({ ok: true }),
 }))
 
 // Render just enough of the drawer to observe which snapshot of the user it
@@ -150,6 +151,25 @@ describe('UsersTable', () => {
     fireEvent.click(activateItems[0])
 
     expect(setUserStatusAction).toHaveBeenCalledWith('3', 'active')
+  })
+
+  it('shows a Resend Activation Email item for an unverified user and calls resendActivationAction on click', async () => {
+    const unverifiedUsers: User[] = [
+      { id: '3', firstName: 'Cara', lastName: 'Diaz', email: 'cara@example.com', status: 'unverified', orgId: 'org1', phoneNumber: null, username: null, createdAt: '2026-01-01T00:00:00.000Z', lastLoginAt: null },
+    ]
+    render(withIntl(<UsersTable users={unverifiedUsers} orgs={mockOrgs} />))
+
+    const resendItems = await screen.findAllByRole('menuitem', { name: en.users.actions.resendActivation })
+    expect(resendItems).toHaveLength(1)
+
+    fireEvent.click(resendItems[0])
+
+    expect(resendActivationAction).toHaveBeenCalledWith('3')
+  })
+
+  it('does not show a Resend Activation Email item for an active user', async () => {
+    render(withIntl(<UsersTable users={mockUsers} orgs={mockOrgs} />))
+    expect(screen.queryByRole('menuitem', { name: en.users.actions.resendActivation })).not.toBeInTheDocument()
   })
 
 })

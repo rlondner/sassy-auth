@@ -481,6 +481,61 @@ describe('auth.config — advanced.cookiePrefix (bug-0293 staging/production coo
   });
 });
 
+describe('auth.config — emailVerification.expiresIn (configurable activation link duration)', () => {
+  const ORIGINAL = process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS;
+
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS;
+    else process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS = ORIGINAL;
+    jest.resetModules();
+  });
+
+  it('defaults to 3600 seconds when EMAIL_VERIFICATION_EXPIRES_IN_SECONDS is not configured', async () => {
+    delete process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS;
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as Record<string, unknown>;
+    expect(ev['expiresIn']).toBe(3600);
+  });
+
+  it('uses the configured value when EMAIL_VERIFICATION_EXPIRES_IN_SECONDS is set', async () => {
+    process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS = '7200';
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as Record<string, unknown>;
+    expect(ev['expiresIn']).toBe(7200);
+  });
+
+  it('falls back to 3600 when EMAIL_VERIFICATION_EXPIRES_IN_SECONDS is blank', async () => {
+    process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS = '';
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as Record<string, unknown>;
+    expect(ev['expiresIn']).toBe(3600);
+  });
+
+  it('falls back to 3600 when EMAIL_VERIFICATION_EXPIRES_IN_SECONDS is non-numeric', async () => {
+    process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS = 'abc';
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as Record<string, unknown>;
+    expect(ev['expiresIn']).toBe(3600);
+  });
+
+  it('falls back to 3600 when EMAIL_VERIFICATION_EXPIRES_IN_SECONDS is "0"', async () => {
+    process.env.EMAIL_VERIFICATION_EXPIRES_IN_SECONDS = '0';
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as Record<string, unknown>;
+    expect(ev['expiresIn']).toBe(3600);
+  });
+});
+
 describe('auth.config — session gate FORBIDDEN code (real invocation)', () => {
   async function loadSessionCreateBefore() {
     const { auth } = await import('./auth.config');

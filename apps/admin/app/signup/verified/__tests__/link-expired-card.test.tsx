@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { CheckEmailCard } from '../check-email-card'
+import { LinkExpiredCard } from '../link-expired-card'
 
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string, values?: Record<string, unknown>) =>
@@ -11,13 +11,13 @@ afterEach(() => {
 })
 
 function renderCard() {
-  return render(<CheckEmailCard email="alice@example.com" next="" authServerUrl="https://auth.example.com" />)
+  return render(<LinkExpiredCard email="jane@example.com" authServerUrl="https://auth.example.com" />)
 }
 
-describe('CheckEmailCard', () => {
+describe('LinkExpiredCard', () => {
   it('shows the email address in the subtitle', () => {
     renderCard()
-    expect(screen.getByText('subtitle:{"email":"alice@example.com"}')).toBeInTheDocument()
+    expect(screen.getByText('subtitle:{"email":"jane@example.com"}')).toBeInTheDocument()
   })
 
   it('resends the verification email, shows a confirmation, and disables the button during cooldown', async () => {
@@ -27,14 +27,14 @@ describe('CheckEmailCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'resendButton' }))
 
-    await waitFor(() => expect(screen.getByTestId('check-email-resent')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('link-expired-resent')).toBeInTheDocument())
     expect(fetchMock).toHaveBeenCalledWith(
       'https://auth.example.com/api/auth/send-verification-email',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          email: 'alice@example.com',
-          callbackURL: `${window.location.origin}/signup/verified?email=${encodeURIComponent('alice@example.com')}`,
+          email: 'jane@example.com',
+          callbackURL: `${window.location.origin}/signup/verified?email=${encodeURIComponent('jane@example.com')}`,
         }),
       }),
     )
@@ -47,14 +47,11 @@ describe('CheckEmailCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'resendButton' }))
 
-    await waitFor(() => expect(screen.getByTestId('check-email-error')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('link-expired-error')).toBeInTheDocument())
   })
 
-  it('shows a link back to sign-in, preserving next', () => {
-    render(<CheckEmailCard email="alice@example.com" next="/orgs" authServerUrl="https://auth.example.com" />)
-    expect(screen.getByRole('link', { name: 'backToLogin' })).toHaveAttribute(
-      'href',
-      '/login?next=%2Forgs',
-    )
+  it('shows a link back to sign-in', () => {
+    renderCard()
+    expect(screen.getByRole('link', { name: 'backToLogin' })).toHaveAttribute('href', '/login')
   })
 })

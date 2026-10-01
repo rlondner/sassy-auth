@@ -172,6 +172,11 @@ export async function resendInvitation(userId: string): Promise<{ inviteUrl: str
   return result
 }
 
+export async function resendActivation(userId: string): Promise<void> {
+  await apiFetch(`/api/users/${userId}/resend-activation`, { method: 'POST' })
+  Sentry.addBreadcrumb({ category: 'admin.action', message: `Activation email resent for user ${userId}`, level: 'info' })
+}
+
 export async function resetPassword(userId: string): Promise<{ resetUrl: string | null }> {
   const res = await apiFetch(`/api/users/${userId}/reset-password`, { method: 'POST' })
   const result = await res.json()

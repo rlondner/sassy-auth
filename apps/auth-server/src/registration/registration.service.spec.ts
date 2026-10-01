@@ -173,7 +173,10 @@ describe('RegistrationService', () => {
         },
       });
       expect(mockSendVerificationEmail).toHaveBeenCalledWith({
-        body: { email: baseDto.email, callbackURL: expect.stringContaining('/signup/verified') },
+        body: {
+          email: baseDto.email,
+          callbackURL: expect.stringContaining(`/signup/verified?email=${encodeURIComponent(baseDto.email)}`),
+        },
       });
 
       expect(result).toEqual({ ok: true, orgPublicId: finalOrgRow.publicId });

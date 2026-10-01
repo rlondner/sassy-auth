@@ -33,6 +33,7 @@ const SENSITIVE_PREFIXES = [
   '/magic-link',
   '/email-otp',
   '/two-factor',
+  '/send-verification-email',
 ];
 
 const MOUNT_PREFIX = '/api/auth';

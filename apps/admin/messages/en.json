@@ -509,7 +509,8 @@
       "activate": "Activate",
       "delete": "Delete",
       "resendInvitation": "Resend Invitation",
-      "resend": "Resend Invitation"
+      "resend": "Resend Invitation",
+      "resendActivation": "Resend Activation Email"
     },
     "toast": {
       "created": "User created",
@@ -518,7 +519,8 @@
       "resent": "Invitation resent",
       "resetLinkGenerated": "Password reset link generated",
       "activated": "User activated",
-      "deactivated": "User deactivated"
+      "deactivated": "User deactivated",
+      "activationResent": "Activation email resent"
     },
     "confirmDelete": {
       "title": "Delete user",
@@ -538,6 +540,7 @@
       "generic": "Something went wrong. Please try again.",
       "noPassword": "This user has no password to reset.",
       "notPending": "This user is no longer pending an invitation.",
+      "notUnverified": "This user's email is already verified.",
       "rolesSetFailed": "Failed to update roles.",
       "directPermissionsSetFailed": "Failed to update direct permissions.",
       "selfDeactivate": "You cannot deactivate your own account.",
@@ -650,7 +653,21 @@
     "verified": {
       "title": "Email verified",
       "subtitle": "Your account is ready. You can now sign in.",
-      "continueToLogin": "Continue to sign in"
+      "continueToLogin": "Continue to sign in",
+      "expired": {
+        "title": "Link expired",
+        "subtitle": "Your activation link for {email} has expired.",
+        "resendButton": "Resend link",
+        "resendCooldown": "Resend in {seconds}s",
+        "resendSent": "A new activation link is on its way.",
+        "resendError": "We couldn't resend the email. Please try again in a moment.",
+        "backToLogin": "Back to sign in"
+      },
+      "invalid": {
+        "title": "This link isn't valid",
+        "subtitle": "This activation link is invalid or has already been used.",
+        "backToLogin": "Back to sign in"
+      }
     },
     "errors": {
       "invalidEmail": "Please enter a valid email address.",
