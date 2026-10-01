@@ -3,6 +3,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PasswordPolicy, ActivationEmailBranding } from '@sassy-auth/types';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 import { IsAppLogo } from '../../common/config/is-app-logo.decorator';
+import { IsAppFavicon } from '../../common/config/is-app-favicon.decorator';
 
 // "At least one of name / url" is enforced server-side in
 // AppsService.updateApp rather than in a DTO-level ValidateIf trick (which is
@@ -19,6 +20,14 @@ export class UpdateAppDto {
   @IsOptional()
   @IsAppLogo()
   logo?: string | null;
+
+  /**
+   * Full data URI, validated by IsAppFavicon against the same shared
+   * size/type rule as logo. `null` clears the favicon.
+   */
+  @IsOptional()
+  @IsAppFavicon()
+  favicon?: string | null;
 
   /**
    * Per-app 2FA trust / re-prompt interval in days.

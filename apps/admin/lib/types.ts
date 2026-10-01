@@ -93,6 +93,7 @@ export interface App {
   name: string;
   url: string;
   logo?: string | null;
+  favicon?: string | null;
   redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
@@ -121,6 +122,7 @@ export interface CreateAppPayload {
   name: string;
   url: string;
   logo?: string | null;
+  favicon?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   twoFactorPromptEnabled?: boolean | null;
@@ -132,6 +134,7 @@ export interface UpdateAppPayload {
   name?: string;
   url?: string;
   logo?: string | null;
+  favicon?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   twoFactorPromptEnabled?: boolean | null;

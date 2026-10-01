@@ -63,6 +63,8 @@ export interface PasswordRuleResult {
 export declare function evaluatePasswordPolicy(password: string, policy: PasswordPolicy): PasswordRuleResult[];
 export declare const APP_LOGO_MAX_BYTES: number;
 export declare const APP_LOGO_ALLOWED_MIME_TYPES: readonly ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+export declare const APP_FAVICON_MAX_BYTES: number;
+export declare const APP_FAVICON_ALLOWED_MIME_TYPES: readonly ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 /**
  * True when `value` is a data URI of an allowed image type whose decoded
  * byte size is within APP_LOGO_MAX_BYTES. Used both by the admin console's
@@ -71,6 +73,13 @@ export declare const APP_LOGO_ALLOWED_MIME_TYPES: readonly ["image/png", "image/
  * write hits the database) — one definition, two enforcement points.
  */
 export declare function isValidAppLogoDataUri(value: unknown): boolean;
+/**
+ * Same rule as isValidAppLogoDataUri, exposed under its own name for the
+ * favicon field (see IsAppFavicon / AppFaviconField). Deliberately reuses
+ * APP_LOGO_ALLOWED_MIME_TYPES/APP_LOGO_MAX_BYTES as its source of truth
+ * (via the APP_FAVICON_* aliases above) rather than an independent rule.
+ */
+export declare function isValidAppFaviconDataUri(value: unknown): boolean;
 /**
  * Per-app override for the activation (email-verification) email. Every
  * field is optional and independently defaulted by the caller — omitted or
