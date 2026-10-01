@@ -1,15 +1,25 @@
-# Ensures the local Caddy reverse proxy (Caddyfile at repo root) is running
-# before dev servers start, so https://auth-dev.milissai.com and
-# https://auth-api-dev.milissai.com work without a manual step every session.
+# Ensures the local Caddy reverse proxy is running before dev servers start,
+# so https://auth-dev.milissai.com and https://auth-api-dev.milissai.com
+# work without a manual step every session.
+#
+# This machine runs ONE shared Caddy instance on :443/:2019 across multiple
+# repos (this one plus content-social-automation today), config combined at
+# ~/.caddy/Caddyfile, which imports each repo's own Caddyfile (including
+# this repo's -- see ./Caddyfile at repo root for the actual routes). We
+# point at the shared file here instead of the repo-root one so starting
+# Caddy from this repo doesn't clobber other repos' routes.
 #
 # Binding to :443 requires elevation on Windows, so when Caddy isn't already
 # up this launches it in a new elevated, detached window (one UAC prompt).
 # If Caddy is already running, this is a no-op — no prompt, no relaunch.
+# (If it's running an older config that predates this repo's routes being
+# added to the shared Caddyfile, reload it: `caddy reload --config
+# "$env:USERPROFILE\.caddy\Caddyfile"`.)
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$caddyfile = Join-Path $repoRoot 'Caddyfile'
+$caddyfile = Join-Path $env:USERPROFILE '.caddy\Caddyfile'
+$caddyDir = Split-Path -Parent $caddyfile
 
 function Test-CaddyRunning {
     try {
@@ -29,7 +39,7 @@ Write-Host '[start-caddy] Caddy not running — starting elevated (Caddyfile: '"
 
 Start-Process -FilePath 'caddy' `
     -ArgumentList @('run', '--config', "`"$caddyfile`"") `
-    -WorkingDirectory $repoRoot `
+    -WorkingDirectory $caddyDir `
     -Verb RunAs `
     -WindowStyle Normal
 

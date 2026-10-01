@@ -3,7 +3,11 @@
 # app's normal dev port. Requires the hosts file entries:
 #   127.0.0.1 auth-dev.milissai.com
 #   127.0.0.1 auth-api-dev.milissai.com
-# Run with: caddy run --config .\Caddyfile
+#
+# Normally loaded indirectly via ~/.caddy/Caddyfile (imported alongside
+# other repos' Caddyfiles -- see scripts/start-caddy.ps1), so this repo's
+# routes can share one Caddy instance on :443 with other projects. Can
+# still be run standalone: caddy run --config .\Caddyfile
 
 auth-dev.milissai.com {
     tls internal
