@@ -7,11 +7,21 @@ import {
 } from '@nestjs/common';
 import { prisma } from '@sassy-auth/db';
 import { PasswordPolicy } from '@sassy-auth/types';
+import type { ActivationEmailBranding } from '@sassy-auth/types';
+import { randomBytes, randomUUID } from 'crypto';
 import { auth } from '../auth/auth.config';
 import { SqidService } from '../common/sqid/sqid.service';
 import { generatePendingPublicId } from '../common/pending-public-id';
 import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password-policy';
-import { RegisterDto } from './register.dto';
+import { getEmailer } from '../email/email.singleton';
+import { sendVerificationCode } from '../auth/verification-code-sender';
+import { notifyActivation } from '../activation/notify-activation';
+import {
+  CompleteRegistrationDto,
+  RegisterDto,
+  StartRegistrationDto,
+  VerifyRegistrationCodeDto,
+} from './register.dto';
 import { TurnstileService } from './turnstile.service';
 import { OauthService } from '../token/oauth.service';
 import { resolveRequiredConsent } from '../consent/resolve-required-consent';
@@ -303,6 +313,63 @@ export class RegistrationService {
       });
       throw e;
     }
+  }
+
+  async startRegistration(dto: StartRegistrationDto): Promise<{ ok: true }> {
+    const captchaOk = await this.turnstile.verify(dto.turnstileToken);
+    if (!captchaOk) {
+      throw new UnprocessableEntityException('captcha verification failed');
+    }
+
+    const app = await prisma.saApp.findUnique({ where: { publicId: dto.appPublicId } });
+    if (!app) throw new NotFoundException('App not found');
+
+    // Reuse an abandoned step-1 signup (placeholder account, never
+    // verified, no SaUser yet) instead of erroring, so retrying a dropped
+    // signup just works. Anything else with this email — a verified
+    // account, or an unverified one that already has a SaUser (shouldn't
+    // happen, but fail closed) — is a real duplicate.
+    const existing = await prisma.user.findUnique({
+      where: { email: dto.email },
+      include: { saUser: true },
+    });
+    let baUserId: string;
+    if (existing) {
+      if (existing.emailVerified || existing.saUser) {
+        throw new ConflictException('email already registered');
+      }
+      baUserId = existing.id;
+    } else {
+      // Never shown or emailed — overwritten with the real password in
+      // completeRegistration via BetterAuth's resetPassword token flow.
+      const placeholderPassword = randomBytes(24).toString('base64url');
+      let signUp: { user: { id: string } };
+      try {
+        signUp = await auth.api.signUpEmail({
+          body: { email: dto.email, password: placeholderPassword, name: '' },
+        });
+      } catch (e: unknown) {
+        if (isDuplicateEmailError(e)) {
+          throw new ConflictException('email already registered');
+        }
+        throw e;
+      }
+      // Same synthetic-user guard as register() — see its comment on
+      // emailAndPassword.autoSignIn above.
+      const persisted = await prisma.user.findUnique({ where: { id: signUp.user.id }, select: { id: true } });
+      if (!persisted) {
+        throw new ConflictException('email already registered');
+      }
+      baUserId = persisted.id;
+    }
+
+    const branding = (app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
+    await sendVerificationCode(
+      { createOtp: (d) => auth.api.createVerificationOTP({ body: d }), emailer: getEmailer() },
+      { email: dto.email, firstName: 'there', appName: app.name, branding },
+    );
+
+    return { ok: true };
   }
 
   async getAppName(

@@ -18,7 +18,8 @@ jest.mock('@sassy-auth/db', () => ({
     saUserRole: { create: jest.fn() },
     saUserConsent: { createMany: jest.fn() },
     saAppRedirectUri: { findFirst: jest.fn(), findMany: jest.fn() },
-    user: { delete: jest.fn(), findUnique: jest.fn() },
+    user: { delete: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    verification: { create: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -29,8 +30,20 @@ jest.mock('../auth/auth.config', () => ({
     api: {
       signUpEmail: jest.fn(),
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+      createVerificationOTP: jest.fn(),
+      checkVerificationOTP: jest.fn(),
+      verifyEmailOTP: jest.fn(),
+      resetPassword: jest.fn(),
     },
   },
+}));
+
+jest.mock('../email/email.singleton', () => ({
+  getEmailer: () => ({ send: jest.fn().mockResolvedValue({ sent: true }) }),
+}));
+
+jest.mock('../activation/notify-activation', () => ({
+  notifyActivation: jest.fn().mockResolvedValue(undefined),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -41,14 +54,22 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saUserRole: { create: jest.Mock };
   saUserConsent: { createMany: jest.Mock };
   saAppRedirectUri: { findFirst: jest.Mock; findMany: jest.Mock };
-  user: { delete: jest.Mock; findUnique: jest.Mock };
+  user: { delete: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+  verification: { create: jest.Mock };
   $transaction: jest.Mock;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const mockSignUpEmail = require('../auth/auth.config').auth.api.signUpEmail as jest.Mock;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const mockSendVerificationEmail = require('../auth/auth.config').auth.api.sendVerificationEmail as jest.Mock;
+const authApi = require('../auth/auth.config').auth.api as {
+  signUpEmail: jest.Mock;
+  sendVerificationEmail: jest.Mock;
+  createVerificationOTP: jest.Mock;
+  checkVerificationOTP: jest.Mock;
+  verifyEmailOTP: jest.Mock;
+  resetPassword: jest.Mock;
+};
+const mockSignUpEmail = authApi.signUpEmail;
+const mockSendVerificationEmail = authApi.sendVerificationEmail;
 
 const sqidFake: Pick<SqidService, 'encode' | 'decode'> = {
   encode: (n: number) => `sq_${n}`,
@@ -876,4 +897,99 @@ describe('RegistrationService', () => {
     });
   });
 
+});
+
+describe('RegistrationService.startRegistration', () => {
+  let service: RegistrationService;
+  let mockVerify: jest.Mock;
+
+  beforeEach(async () => {
+    mockVerify = jest.fn().mockResolvedValue(true);
+    const module = await Test.createTestingModule({
+      providers: [
+        RegistrationService,
+        { provide: SqidService, useValue: sqidFake },
+        { provide: TurnstileService, useValue: { verify: mockVerify } },
+        { provide: OauthService, useValue: { generateCode: jest.fn() } },
+      ],
+    }).compile();
+    service = module.get(RegistrationService);
+    jest.clearAllMocks();
+    mockVerify.mockResolvedValue(true);
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+    authApi.createVerificationOTP.mockResolvedValue('123456');
+  });
+
+  it('rejects when the captcha fails', async () => {
+    mockVerify.mockResolvedValue(false);
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'bad' }),
+    ).rejects.toThrow(UnprocessableEntityException);
+  });
+
+  it('404s for an unknown app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(null);
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_missing', turnstileToken: 'tok' }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('creates a placeholder BetterAuth account and sends a verification code', async () => {
+    // First call is the "existing account?" lookup (none); second call is
+    // the post-signUp persisted-synthetic-user guard (really persisted).
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: baUserId });
+
+    await service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' });
+
+    expect(mockSignUpEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.objectContaining({ email: 'alice@example.com', name: '' }) }),
+    );
+    // The placeholder password must be a real, unguessable value — never
+    // something fixed like '' or 'placeholder'.
+    const placeholderPassword = mockSignUpEmail.mock.calls[0][0].body.password;
+    expect(typeof placeholderPassword).toBe('string');
+    expect(placeholderPassword.length).toBeGreaterThanOrEqual(16);
+
+    expect(authApi.createVerificationOTP).toHaveBeenCalledWith({
+      body: { email: 'alice@example.com', type: 'email-verification' },
+    });
+  });
+
+  it('rejects when the email already belongs to a verified account', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: baUserId, emailVerified: true, saUser: null });
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
+    ).rejects.toThrow(ConflictException);
+    expect(mockSignUpEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the email already has a fully-registered SaUser', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: baUserId, emailVerified: false, saUser: { id: 5 } });
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
+    ).rejects.toThrow(ConflictException);
+    expect(mockSignUpEmail).not.toHaveBeenCalled();
+  });
+
+  it('reuses an abandoned, unverified, SaUser-less account and resends a code instead of erroring', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: baUserId, emailVerified: false, saUser: null });
+
+    await service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' });
+
+    expect(mockSignUpEmail).not.toHaveBeenCalled();
+    expect(authApi.createVerificationOTP).toHaveBeenCalledWith({
+      body: { email: 'alice@example.com', type: 'email-verification' },
+    });
+  });
+
+  it('throws ConflictException when signUpEmail reports a duplicate email', async () => {
+    mockSignUpEmail.mockRejectedValue({ status: 'UNPROCESSABLE_ENTITY' });
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
+    ).rejects.toThrow(ConflictException);
+  });
 });
