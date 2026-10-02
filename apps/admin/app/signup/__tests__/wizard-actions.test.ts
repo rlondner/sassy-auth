@@ -12,32 +12,39 @@ beforeEach(() => {
 })
 
 describe('startRegistrationAction', () => {
-  it('posts to /api/register/start and returns ok on success', async () => {
+  const input = { clientId: 'sq_1', email: 'a@x.com', turnstileToken: 'real-turnstile-token' }
+
+  it('posts to /api/register/start and forwards the real turnstileToken as-is', async () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
-    const result = await startRegistrationAction({ clientId: 'sq_1', email: 'a@x.com' })
+    const result = await startRegistrationAction(input)
     expect(result).toEqual({ ok: true })
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/register/start'),
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ email: 'a@x.com', appPublicId: 'sq_1', turnstileToken: 'sq_1' }),
+        body: JSON.stringify({ email: 'a@x.com', appPublicId: 'sq_1', turnstileToken: 'real-turnstile-token' }),
       }),
     )
   })
 
   it('maps 409 to emailTaken', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 409 })
-    expect(await startRegistrationAction({ clientId: 'sq_1', email: 'a@x.com' })).toEqual({ error: 'emailTaken' })
+    expect(await startRegistrationAction(input)).toEqual({ error: 'emailTaken' })
+  })
+
+  it('maps 422 to captchaFailed', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 422 })
+    expect(await startRegistrationAction(input)).toEqual({ error: 'captchaFailed' })
   })
 
   it('maps 429 to tooManyRequests', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 429 })
-    expect(await startRegistrationAction({ clientId: 'sq_1', email: 'a@x.com' })).toEqual({ error: 'tooManyRequests' })
+    expect(await startRegistrationAction(input)).toEqual({ error: 'tooManyRequests' })
   })
 
   it('maps a network failure to serverUnavailable', async () => {
     mockFetch.mockRejectedValue(new Error('network down'))
-    expect(await startRegistrationAction({ clientId: 'sq_1', email: 'a@x.com' })).toEqual({ error: 'serverUnavailable' })
+    expect(await startRegistrationAction(input)).toEqual({ error: 'serverUnavailable' })
   })
 })
 
@@ -54,6 +61,16 @@ describe('verifyRegistrationCodeAction', () => {
 
   it('falls back to a generic error code when the response has none', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+    expect(await verifyRegistrationCodeAction({ email: 'a@x.com', otp: '000000' })).toEqual({ error: 'GENERIC' })
+  })
+
+  it('maps 429 to tooManyRequests before inspecting the body', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 429, json: async () => ({}) })
+    expect(await verifyRegistrationCodeAction({ email: 'a@x.com', otp: '000000' })).toEqual({ error: 'tooManyRequests' })
+  })
+
+  it('falls back to GENERIC for an unrecognized code value', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({ code: 'SOME_UNKNOWN_CODE' }) })
     expect(await verifyRegistrationCodeAction({ email: 'a@x.com', otp: '000000' })).toEqual({ error: 'GENERIC' })
   })
 })
