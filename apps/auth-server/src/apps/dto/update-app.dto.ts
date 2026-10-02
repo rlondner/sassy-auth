@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PasswordPolicy, ActivationEmailBranding } from '@sassy-auth/types';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
@@ -125,4 +125,13 @@ export class UpdateAppDto {
   @ApiPropertyOptional({ type: Object })
   @IsOptional()
   activationEmailOverride?: ActivationEmailBranding | null;
+
+  /**
+   * Which mechanism self-serve signup uses to verify a new user's email for
+   * this app. 'link' (default) sends a clickable verification link; 'code'
+   * sends a 6-digit code instead, reusing the same activationEmailOverride
+   * branding. See AppsService.assertValidEmailVerificationMethod for the
+   * service-layer defense-in-depth check.
+   */
+  @IsOptional() @IsEnum(['link', 'code']) emailVerificationMethod?: 'link' | 'code';
 }

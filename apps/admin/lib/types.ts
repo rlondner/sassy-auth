@@ -116,6 +116,7 @@ export interface App {
   privacyPolicyUrl?: string | null;
   termsUrl?: string | null;
   gdprUrl?: string | null;
+  emailVerificationMethod?: 'link' | 'code';
 }
 
 export interface CreateAppPayload {
@@ -148,6 +149,7 @@ export interface UpdateAppPayload {
   privacyPolicyUrl?: string | null;
   termsUrl?: string | null;
   gdprUrl?: string | null;
+  emailVerificationMethod?: 'link' | 'code';
 }
 
 export interface ListAppsParams {

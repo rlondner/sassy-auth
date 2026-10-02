@@ -34,6 +34,7 @@ type AppRow = {
   privacyPolicyUrl?: string | null;
   termsUrl?: string | null;
   gdprUrl?: string | null;
+  emailVerificationMethod?: string;
 };
 function formatApp(a: AppRow) {
   return {
@@ -58,6 +59,7 @@ function formatApp(a: AppRow) {
     privacyPolicyUrl: a.privacyPolicyUrl ?? null,
     termsUrl: a.termsUrl ?? null,
     gdprUrl: a.gdprUrl ?? null,
+    emailVerificationMethod: (a.emailVerificationMethod ?? 'link') as 'link' | 'code',
   };
 }
 
@@ -139,6 +141,14 @@ function assertValidActivationEmailOverride(override: ActivationEmailBranding): 
   }
   if (override.fromAddress !== undefined && !BASIC_EMAIL_PATTERN.test(override.fromAddress)) {
     throw new BadRequestException('activationEmailOverride.fromAddress must be a valid email address');
+  }
+}
+
+/** Defense-in-depth alongside the DTO's @IsEnum — the DTO pipe only runs for
+ * HTTP requests, not for AppsService called directly (see apps.service.spec.ts). */
+function assertValidEmailVerificationMethod(value: string): void {
+  if (value !== 'link' && value !== 'code') {
+    throw new BadRequestException('emailVerificationMethod must be "link" or "code"');
   }
 }
 
@@ -307,10 +317,11 @@ export class AppsService {
       dto.privacyPolicyUrl === undefined &&
       dto.termsUrl === undefined &&
       dto.gdprUrl === undefined &&
-      dto.activationEmailOverride === undefined
+      dto.activationEmailOverride === undefined &&
+      dto.emailVerificationMethod === undefined
     ) {
       throw new BadRequestException(
-        'At least one of name, url, logo, favicon, twoFactorTrustDays, twoFactorPromptEnabled, requireTwoFactor, allowOfflineAccess, redirectUris, defaultOrgId, defaultRoleId, passwordPolicyOverride, activationWebhookUrl, privacyPolicyUrl, termsUrl, gdprUrl, or activationEmailOverride must be provided',
+        'At least one of name, url, logo, favicon, twoFactorTrustDays, twoFactorPromptEnabled, requireTwoFactor, allowOfflineAccess, redirectUris, defaultOrgId, defaultRoleId, passwordPolicyOverride, activationWebhookUrl, privacyPolicyUrl, termsUrl, gdprUrl, activationEmailOverride, or emailVerificationMethod must be provided',
       );
     }
     await checkPermission(callerBaId, 'platform.apps.manage');
@@ -323,6 +334,7 @@ export class AppsService {
     if (dto.redirectUris) assertValidRedirectUris(dto.redirectUris);
     if (dto.passwordPolicyOverride) assertValidPasswordPolicyOverride(dto.passwordPolicyOverride);
     if (dto.activationEmailOverride) assertValidActivationEmailOverride(dto.activationEmailOverride);
+    if (dto.emailVerificationMethod !== undefined) assertValidEmailVerificationMethod(dto.emailVerificationMethod);
     // Validation must happen before any write, so this runs before the
     // transaction starts.
     const resolvedDefaultOrgId = await resolveDefaultOrgId(existing.id, dto.defaultOrgId);
@@ -375,6 +387,7 @@ export class AppsService {
                 ? Prisma.JsonNull
                 : (dto.activationEmailOverride as unknown as Prisma.InputJsonValue)),
             }),
+            ...(dto.emailVerificationMethod !== undefined && { emailVerificationMethod: dto.emailVerificationMethod }),
           },
           include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
         });

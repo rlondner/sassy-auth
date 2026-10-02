@@ -82,7 +82,7 @@ describe('AppsService', () => {
     mockPrisma.saApp.count.mockResolvedValue(1);
     const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
     expect(result).toEqual({
-      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, favicon: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null }],
+      items: [{ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, favicon: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, emailVerificationMethod: 'link' }],
       total: 1, page: 1, pageSize: 25,
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
@@ -112,7 +112,7 @@ describe('AppsService', () => {
       isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null,
       passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy,
       activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null,
-      privacyPolicyUrl: null, termsUrl: null, gdprUrl: null,
+      privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, emailVerificationMethod: 'link',
     });
     expect(checkPermission).toHaveBeenCalledWith('ba-caller', [
       'platform.apps.manage',
@@ -187,7 +187,7 @@ describe('AppsService', () => {
       },
     });
     expect(mockPrisma.saApp.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { publicId: 'sq_1' } });
-    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, favicon: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null });
+    expect(result).toEqual({ publicId: 'sq_1', name: 'Customer Portal', url: 'https://portal.example.com', logo: null, favicon: null, isPlatform: false, twoFactorTrustDays: null, twoFactorPromptEnabled: null, requireTwoFactor: false, redirectUris: [], isConfidential: false, clientSecretUpdatedAt: null, defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, effectivePasswordPolicy: globalPasswordPolicy, activationWebhookUrl: null, hasActivationWebhookSecret: false, activationEmailOverride: null, privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, emailVerificationMethod: 'link' });
   });
 
   it('createApp stores a provided twoFactorTrustDays', async () => {
@@ -355,6 +355,24 @@ describe('AppsService', () => {
       include: { defaultOrg: { select: { publicId: true } }, defaultRole: { select: { publicId: true } } },
     });
     expect(result.activationEmailOverride).toEqual(override);
+  });
+
+  it('updateApp sets emailVerificationMethod to "code"', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.saApp.update.mockResolvedValue({ ...appRow, emailVerificationMethod: 'code' });
+    const result = await service.updateApp('ba-caller', 'sq_1', { emailVerificationMethod: 'code' });
+    expect(mockPrisma.saApp.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { publicId: 'sq_1' },
+      data: expect.objectContaining({ emailVerificationMethod: 'code' }),
+    }));
+    expect(result.emailVerificationMethod).toBe('code');
+  });
+
+  it('updateApp rejects an invalid emailVerificationMethod value', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    await expect(
+      service.updateApp('ba-caller', 'sq_1', { emailVerificationMethod: 'carrier-pigeon' as unknown as 'link' }),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('updateApp rejects a malformed fromAddress', async () => {
