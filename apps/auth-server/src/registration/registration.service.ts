@@ -464,6 +464,95 @@ export class RegistrationService {
     return { ok: true };
   }
 
+  async completeRegistration(
+    dto: CompleteRegistrationDto,
+    ip: string = 'unknown',
+  ): Promise<{ ok: true; orgPublicId: string; redirectUrl?: string }> {
+    const app = await prisma.saApp.findUnique({ where: { publicId: dto.appPublicId } });
+    if (!app) throw new NotFoundException('App not found');
+
+    // Enforce the password policy before ever consuming the OTP — a
+    // rejected password must not burn the user's one-shot code.
+    validatePasswordOrThrow(dto.password, resolvePasswordPolicy(app));
+
+    const country = resolveCountryFromIp(ip);
+    const requiredConsent = resolveRequiredConsent(app, country);
+    for (const doc of requiredConsent) {
+      const field = doc.documentType === 'privacy_policy' ? 'privacyPolicy'
+        : doc.documentType === 'terms' ? 'terms'
+        : 'gdpr';
+      const accepted = doc.documentType === 'privacy_policy' ? dto.acceptedPrivacyPolicy
+        : doc.documentType === 'terms' ? dto.acceptedTerms
+        : dto.acceptedGdpr;
+      if (accepted !== true) {
+        throw new BadRequestException(`You must accept the ${field} before signing up`);
+      }
+    }
+
+    let defaultOrg: { id: number; publicId: string } | null = null;
+    if (app.defaultOrgId) {
+      defaultOrg = await prisma.saOrg.findUnique({
+        where: { id: app.defaultOrgId },
+        select: { id: true, publicId: true },
+      });
+      if (!defaultOrg) throw new NotFoundException('Default org not found');
+    } else if (!dto.companyName?.trim()) {
+      throw new BadRequestException('companyName is required');
+    }
+
+    // Consume the code for real and flip emailVerified — this is also the
+    // guard against completing without ever having gone through steps 1-2
+    // for this email (a stale/guessed otp fails here even if it happened to
+    // pass the non-consuming checkVerificationOTP check earlier).
+    let baUserId: string;
+    try {
+      const result = await auth.api.verifyEmailOTP({ body: { email: dto.email, otp: dto.otp } });
+      baUserId = result.user.id;
+    } catch (e: unknown) {
+      throw this.mapOtpError(e);
+    }
+
+    // The account was created in startRegistration with name: '' — fill in
+    // the real name now that it's known.
+    await prisma.user.update({ where: { id: baUserId }, data: { name: `${dto.firstName} ${dto.lastName}`.trim() } });
+
+    // Replace the placeholder password from startRegistration with the real
+    // one, via BetterAuth's own session-less resetPassword token flow
+    // (confirmed against password.mjs: it looks up a Verification row keyed
+    // `reset-password:<token>` with `value` = the BetterAuth user id — same
+    // format resolve-app-for-reset-token.ts already reads elsewhere in this
+    // codebase — then hashes and stores the new password with no session
+    // required). The token is minted and redeemed in the same request, so a
+    // short expiry is enough.
+    const resetToken = randomBytes(24).toString('base64url');
+    await prisma.verification.create({
+      data: {
+        id: randomUUID(),
+        identifier: `reset-password:${resetToken}`,
+        value: baUserId,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      },
+    });
+    await auth.api.resetPassword({ body: { newPassword: dto.password, token: resetToken } });
+
+    return this.finishRegistration({
+      app,
+      baUserId,
+      dto: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        companyName: dto.companyName,
+        next: dto.next,
+        marketingOptIn: dto.marketingOptIn ?? false,
+      },
+      defaultOrg,
+      requiredConsent,
+      saUserStatus: 'active',
+      sendLinkVerificationEmail: false,
+      email: dto.email,
+    });
+  }
+
   async getAppName(
     appPublicId: string,
     ip: string = 'unknown',

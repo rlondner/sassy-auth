@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { RegistrationService } from './registration.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { TurnstileService } from './turnstile.service';
@@ -1065,5 +1065,129 @@ describe('RegistrationService.verifyRegistrationCode', () => {
     await expect(
       service.verifyRegistrationCode({ email: 'nobody@example.com', otp: '123456' }),
     ).rejects.toMatchObject({ status: 400, response: { code: 'INVALID_OTP' } });
+  });
+});
+
+describe('RegistrationService.completeRegistration', () => {
+  let service: RegistrationService;
+  let mockOauthService: { generateCode: jest.Mock };
+
+  const completeDto = {
+    email: 'alice@example.com',
+    otp: '123456',
+    password: 'StrongPass123',
+    firstName: 'Alice',
+    lastName: 'Wonder',
+    companyName: 'Acme Inc',
+    appPublicId: 'sq_1',
+  };
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        RegistrationService,
+        { provide: SqidService, useValue: sqidFake },
+        { provide: TurnstileService, useValue: { verify: jest.fn().mockResolvedValue(true) } },
+        { provide: OauthService, useValue: { generateCode: jest.fn() } },
+      ],
+    }).compile();
+    service = module.get(RegistrationService);
+    mockOauthService = module.get(OauthService) as unknown as { generateCode: jest.Mock };
+    jest.clearAllMocks();
+
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    authApi.verifyEmailOTP.mockResolvedValue({ status: true, token: null, user: { id: baUserId } });
+    mockPrisma.user.update.mockResolvedValue({ id: baUserId });
+    mockPrisma.verification.create.mockResolvedValue({});
+    authApi.resetPassword.mockResolvedValue({ status: true });
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+      cb({
+        saOrg: { create: mockPrisma.saOrg.create, update: mockPrisma.saOrg.update },
+        saUser: { create: mockPrisma.saUser.create },
+        saUserRole: { create: mockPrisma.saUserRole.create },
+        saUserConsent: { createMany: mockPrisma.saUserConsent.createMany },
+      }),
+    );
+    mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+    mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+    mockPrisma.saUser.create.mockResolvedValue({ id: 99, publicId: baUserId.slice(0, 12) });
+  });
+
+  it('404s for an unknown app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(null);
+    await expect(service.completeRegistration({ ...completeDto, appPublicId: 'sq_missing' })).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('rejects a password that fails the resolved policy before consuming the OTP', async () => {
+    await expect(service.completeRegistration({ ...completeDto, password: 'short' })).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(authApi.verifyEmailOTP).not.toHaveBeenCalled();
+  });
+
+  it('maps an invalid/expired code the same way verifyRegistrationCode does', async () => {
+    authApi.verifyEmailOTP.mockRejectedValue({ body: { code: 'OTP_EXPIRED' } });
+    await expect(service.completeRegistration(completeDto)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'OTP_EXPIRED' },
+    });
+  });
+
+  it('consumes the OTP, sets the real name and password, and creates an active SaUser', async () => {
+    const result = await service.completeRegistration(completeDto);
+
+    expect(authApi.verifyEmailOTP).toHaveBeenCalledWith({ body: { email: 'alice@example.com', otp: '123456' } });
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: baUserId },
+      data: { name: 'Alice Wonder' },
+    });
+    expect(mockPrisma.verification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ identifier: expect.stringMatching(/^reset-password:/), value: baUserId }),
+      }),
+    );
+    const resetToken = mockPrisma.verification.create.mock.calls[0][0].data.identifier.replace('reset-password:', '');
+    expect(authApi.resetPassword).toHaveBeenCalledWith({ body: { newPassword: 'StrongPass123', token: resetToken } });
+    expect(mockPrisma.saUser.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'active', marketingOptIn: false }) }),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.orgPublicId).toBe('sq_10');
+  });
+
+  it('persists marketingOptIn when provided', async () => {
+    await service.completeRegistration({ ...completeDto, marketingOptIn: true });
+    expect(mockPrisma.saUser.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ marketingOptIn: true }) }),
+    );
+  });
+
+  it('never calls sendVerificationEmail — the email is already verified', async () => {
+    await service.completeRegistration(completeDto);
+    expect(mockSendVerificationEmail).not.toHaveBeenCalled();
+  });
+
+  it('mints a redirect code when a valid PKCE next is recovered', async () => {
+    mockOauthService.generateCode.mockResolvedValue('signup-code-xyz');
+    mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([{ uri: 'https://app.example.com/callback', kind: 'login' }]);
+    const next = nextUrl({
+      client_id: 'sq_1',
+      redirect_uri: 'https://app.example.com/callback',
+      code_challenge: 'abc',
+      code_challenge_method: 'S256',
+      state: 'xyz',
+    });
+
+    const result = await service.completeRegistration({ ...completeDto, next });
+
+    expect(result.redirectUrl).toBe('https://app.example.com/callback?code=signup-code-xyz&state=xyz');
+  });
+
+  it('compensates by deleting the BetterAuth user if the transaction fails', async () => {
+    mockPrisma.$transaction.mockRejectedValue(new Error('db down'));
+    await expect(service.completeRegistration(completeDto)).rejects.toThrow('db down');
+    expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: baUserId } });
   });
 });
