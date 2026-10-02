@@ -111,6 +111,11 @@ enum UserStatus {
   unverified
 }
 
+enum EmailVerificationMethod {
+  link
+  code
+}
+
 model SaApp {
   id          Int            @id @default(autoincrement())
   publicId    String         @unique
@@ -150,6 +155,10 @@ model SaApp {
   /// null, or any field omitted within it, means "use the platform default"
   /// for that field.
   activationEmailOverride Json?
+  /// Which mechanism self-serve signup uses to verify a new user's email.
+  /// 'link' (default) preserves today's behavior; 'code' sends a 6-digit
+  /// code instead, reusing the same activationEmailOverride branding.
+  emailVerificationMethod EmailVerificationMethod @default(link)
   /// URL to this app's Privacy Policy. When set, self-serve signup and
   /// login both require the user to accept it (see SaUserConsent).
   privacyPolicyUrl String?
