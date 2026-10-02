@@ -992,4 +992,23 @@ describe('RegistrationService.startRegistration', () => {
       service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
     ).rejects.toThrow(ConflictException);
   });
+
+  // Same synthetic-user guard as register() (see its 'duplicate email under
+  // autoSignIn=false (synthetic response)' describe block above): with
+  // emailAndPassword.autoSignIn disabled, BetterAuth can resolve signUpEmail
+  // successfully with an id that was never persisted, to avoid leaking which
+  // emails are registered. Taking that id at face value would hand back
+  // success for an account that doesn't exist.
+  it('returns 409 when signUpEmail resolves with an id that is not in the database', async () => {
+    // First call is the "existing account?" lookup (none); second call is
+    // the post-signUp persisted-synthetic-user guard (never persisted).
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
+    ).rejects.toThrow(ConflictException);
+    expect(authApi.createVerificationOTP).not.toHaveBeenCalled();
+  });
 });

@@ -329,6 +329,19 @@ export class RegistrationService {
     // signup just works. Anything else with this email — a verified
     // account, or an unverified one that already has a SaUser (shouldn't
     // happen, but fail closed) — is a real duplicate.
+    //
+    // Confirmed this is the ONLY flow that can leave a User row in that
+    // exact shape (emailVerified: false, no linked SaUser), so reuse here
+    // can't adopt a dangling account from somewhere else: every social
+    // provider and the emailOTP plugin set disableSignUp: true (auth.config.ts)
+    // so they never create a User row for an unrecognized email; the
+    // magicLink plugin does create one on sign-up, but always with
+    // emailVerified: true from the start (better-auth's magic-link/index.mjs);
+    // invitation acceptance (invitations.service.ts) only ever updates a
+    // User row that users.service.ts's createUser already created alongside
+    // its SaUser in the same transaction; and register()'s own failure path
+    // deletes the BetterAuth user it just created rather than leaving it
+    // behind unverified.
     const existing = await prisma.user.findUnique({
       where: { email: dto.email },
       include: { saUser: true },
@@ -346,6 +359,8 @@ export class RegistrationService {
       let signUp: { user: { id: string } };
       try {
         signUp = await auth.api.signUpEmail({
+          // `name` is a placeholder too — the real first/last name is
+          // collected and written in completeRegistration (Task 6).
           body: { email: dto.email, password: placeholderPassword, name: '' },
         });
       } catch (e: unknown) {
@@ -361,6 +376,13 @@ export class RegistrationService {
         throw new ConflictException('email already registered');
       }
       baUserId = persisted.id;
+      // Unlike register()'s catch block, there is no compensating delete of
+      // this freshly-created BetterAuth user if sendVerificationCode below
+      // throws. None is needed: the "reuse an abandoned step-1 signup"
+      // branch at the top of this method IS the recovery path for exactly
+      // that failure. A retry of startRegistration for the same email will
+      // find this still-unverified, SaUser-less account and reuse it rather
+      // than erroring, instead of needing a delete-and-start-over.
     }
 
     const branding = (app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
