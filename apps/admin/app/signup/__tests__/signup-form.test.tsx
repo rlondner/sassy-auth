@@ -253,7 +253,7 @@ describe('SignupForm', () => {
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith('/signup/check-email?email=alice%40example.com'),
+      expect(mockPush).toHaveBeenCalledWith('/signup/check-email?email=alice%40example.com&clientId=sq_1'),
     )
   })
 
@@ -270,7 +270,7 @@ describe('SignupForm', () => {
     )
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
-        '/signup/check-email?email=alice%40example.com&next=%2Forgs',
+        '/signup/check-email?email=alice%40example.com&clientId=sq_1&next=%2Forgs',
       ),
     )
   })
