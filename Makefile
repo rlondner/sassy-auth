@@ -14,21 +14,23 @@ caddy:
 	powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-caddy.ps1
 
 # Builds and starts auth-server with no file-watching (production-style run).
+# Routed through `turbo run build` (not `pnpm --filter ... run build`) so an
+# unchanged auth-server is a cache hit instead of a full rebuild every time.
 start-auth-server: caddy
-	pnpm --filter @sassy-auth/auth-server run build
+	pnpm exec turbo run build --filter=@sassy-auth/auth-server
 	pnpm --filter @sassy-auth/auth-server run start
 
 # Builds and starts admin with no file-watching (production-style run).
+# Same turbo-caching rationale as start-auth-server above.
 start-admin: caddy
-	pnpm --filter @sassy-auth/admin run build
+	pnpm exec turbo run build --filter=@sassy-auth/admin
 	pnpm --filter @sassy-auth/admin run start
 
 # Runs both servers without file-watching, behind Caddy. Each target builds
 # first since `start` scripts expect a prior build; run in parallel so both
 # servers come up concurrently once Caddy is confirmed running.
-start-no-watch: 
-	pnpm --filter @sassy-auth/auth-server run build
-	pnpm --filter @sassy-auth/admin run build
+start-no-watch:
+	pnpm exec turbo run build --filter=@sassy-auth/auth-server --filter=@sassy-auth/admin
 	$(MAKE) -j2 _run-auth-server _run-admin
 
 _run-auth-server:
