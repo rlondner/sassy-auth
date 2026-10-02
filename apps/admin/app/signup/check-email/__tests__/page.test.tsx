@@ -20,17 +20,7 @@ jest.mock('../check-email-card', () => ({
   CheckEmailCard: () => <div data-testid="check-email-card" />,
 }))
 
-jest.mock('../verify-code-card', () => ({
-  VerifyCodeCard: () => <div data-testid="verify-code-card" />,
-}))
-
 const mockFetchAppInfo = fetchAppInfo as jest.MockedFunction<typeof fetchAppInfo>
-
-const BASE_APP_INFO = {
-  name: null, hasDefaultOrg: false, passwordPolicy: null, logo: null, favicon: null,
-  privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, gdprRequired: false,
-  emailVerificationMethod: 'link' as const,
-}
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -41,27 +31,11 @@ describe('CheckEmailPage', () => {
     const ui = await CheckEmailPage({ searchParams: Promise.resolve({}) })
     render(ui)
     expect(screen.getByText('signup.checkEmail.missingEmail')).toBeInTheDocument()
-    expect(mockFetchAppInfo).not.toHaveBeenCalled()
   })
 
-  it('renders CheckEmailCard when no clientId is given (fail open)', async () => {
+  it('always renders CheckEmailCard — code-method apps never reach this page (see signup-wizard.tsx)', async () => {
     const ui = await CheckEmailPage({ searchParams: Promise.resolve({ email: 'a@x.com' }) })
     render(ui)
     expect(screen.getByTestId('check-email-card')).toBeInTheDocument()
-    expect(mockFetchAppInfo).not.toHaveBeenCalled()
-  })
-
-  it('renders CheckEmailCard when the app is configured for the link method', async () => {
-    mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, emailVerificationMethod: 'link' })
-    const ui = await CheckEmailPage({ searchParams: Promise.resolve({ email: 'a@x.com', clientId: 'sq_1' }) })
-    render(ui)
-    expect(screen.getByTestId('check-email-card')).toBeInTheDocument()
-  })
-
-  it('renders VerifyCodeCard when the app is configured for the code method', async () => {
-    mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, emailVerificationMethod: 'code' })
-    const ui = await CheckEmailPage({ searchParams: Promise.resolve({ email: 'a@x.com', clientId: 'sq_1' }) })
-    render(ui)
-    expect(screen.getByTestId('verify-code-card')).toBeInTheDocument()
   })
 })
