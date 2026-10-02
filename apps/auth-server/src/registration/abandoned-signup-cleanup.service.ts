@@ -46,6 +46,10 @@ export class AbandonedSignupCleanupService implements OnModuleInit, OnModuleDest
    */
   async sweep(): Promise<number> {
     try {
+      // Safe to delete unconditionally on this shape: see registration.service.ts's
+      // startRegistration comment for the proof that no other flow (social sign-in,
+      // magic-link, invitations) can produce a User row with emailVerified:false and
+      // no SaUser.
       const { count } = await prisma.user.deleteMany({
         where: {
           emailVerified: false,

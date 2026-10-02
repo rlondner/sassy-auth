@@ -95,8 +95,13 @@ describe('AbandonedSignupCleanupService scheduling', () => {
   it('sweeps again on every interval tick', () => {
     const service = makeService();
     service.onModuleInit();
+
     jest.advanceTimersByTime(ABANDONED_SIGNUP_SWEEP_INTERVAL_MS);
     expect(mockPrisma.user.deleteMany).toHaveBeenCalledTimes(2);
+
+    jest.advanceTimersByTime(ABANDONED_SIGNUP_SWEEP_INTERVAL_MS);
+    expect(mockPrisma.user.deleteMany).toHaveBeenCalledTimes(3);
+
     service.onModuleDestroy();
   });
 
@@ -121,5 +126,9 @@ describe('AbandonedSignupCleanupService scheduling', () => {
     service.onModuleInit();
     expect(mockPrisma.user.deleteMany).not.toHaveBeenCalled();
     service.onModuleDestroy();
+  });
+
+  it('tolerates onModuleDestroy without a prior onModuleInit', () => {
+    expect(() => makeService().onModuleDestroy()).not.toThrow();
   });
 });
