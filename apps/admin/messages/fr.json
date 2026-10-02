@@ -643,7 +643,16 @@
     "acceptTerms": "J'ai lu et j'accepte les <link>conditions générales</link>",
     "acceptGdpr": "J'ai lu et j'accepte la <link>déclaration RGPD</link>",
     "submit": "Créer le compte",
+    "continue": "Continuer",
+    "marketingOptIn": "Merci de me tenir informé(e) des produits, actualités, événements et offres",
     "backToLogin": "Retour à la connexion",
+    "passwordStrength": {
+      "weak": "Faible",
+      "fair": "Moyen",
+      "good": "Bon",
+      "strong": "Fort",
+      "veryStrong": "Très fort"
+    },
     "checkEmail": {
       "title": "Vérifiez votre e-mail",
       "subtitle": "Nous avons envoyé un lien de vérification à {email}.",
