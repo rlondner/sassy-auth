@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RegistrationService } from './registration.service';
 import { RegistrationController } from './registration.controller';
+import { AbandonedSignupCleanupService } from './abandoned-signup-cleanup.service';
 import {
   RateLimitGuard,
   AppLookupRateLimitGuard,
@@ -29,6 +30,7 @@ import { TokenModule } from '../token/token.module';
     VerifyRegistrationCodeRateLimitGuard,
     CompleteRegistrationRateLimitGuard,
     TurnstileService,
+    AbandonedSignupCleanupService,
   ],
 })
 export class RegistrationModule {}
