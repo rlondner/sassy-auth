@@ -67,3 +67,4 @@ packages/types/dist/
 .certs/
 
 .superpowers/
+.env.production
