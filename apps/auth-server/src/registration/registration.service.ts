@@ -245,6 +245,11 @@ export class RegistrationService {
             firstName: dto.firstName,
             lastName: dto.lastName,
             status: saUserStatus,
+            // register() never supplies marketingOptIn — omit the key
+            // entirely here rather than defaulting it, so register()'s
+            // saUser.create call shape (and its existing exact-match tests)
+            // stay unchanged; completeRegistration applies its own
+            // `?? false` default before calling this.
             ...(dto.marketingOptIn !== undefined ? { marketingOptIn: dto.marketingOptIn } : {}),
           },
         });
@@ -326,10 +331,17 @@ export class RegistrationService {
           codeChallengeMethod = 'S256';
         }
       } else if (isConfidential && loginUris && loginUris.length > 0) {
+        // When an app has multiple registered login redirect URIs and no
+        // usable `next` named one of them, there's no per-request way to
+        // indicate which one signup should target — pick the
+        // oldest-registered one deterministically.
         redirectUri = loginUris[0].uri;
       }
 
       let redirectUrl: string | undefined;
+      // A public client's code must carry a PKCE challenge to be
+      // redeemable; a confidential client's client secret substitutes for
+      // one.
       if (redirectUri && (codeChallenge || isConfidential)) {
         const code = await this.oauthService.generateCode(
           saUserPublicId,
@@ -350,6 +362,7 @@ export class RegistrationService {
 
       return { ok: true as const, orgPublicId: org.publicId, ...(redirectUrl !== undefined && { redirectUrl }) };
     } catch (e: unknown) {
+      // Compensation: delete the BetterAuth user so the email can be re-used
       await prisma.user.delete({ where: { id: baUserId } }).catch(() => {
         // Swallow — we still re-throw the original error below
       });
