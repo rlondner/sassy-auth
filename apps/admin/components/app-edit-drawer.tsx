@@ -77,6 +77,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [activationFromAddress, setActivationFromAddress] = React.useState<string>(app.activationEmailOverride?.fromAddress ?? '')
   const [activationSubject, setActivationSubject] = React.useState<string>(app.activationEmailOverride?.subject ?? '')
   const [activationMessage, setActivationMessage] = React.useState<string>(app.activationEmailOverride?.message ?? '')
+  const [emailVerificationMethod, setEmailVerificationMethod] = React.useState<'link' | 'code'>(app.emailVerificationMethod ?? 'link')
   // The `app` prop is sourced from the apps list row, whose `select` omits
   // `activationEmailOverride` (see AppsService.listApps) — so it's always
   // undefined here at mount. The real value only arrives via the fetch-on-open
@@ -138,6 +139,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setActivationFromAddress(app.activationEmailOverride?.fromAddress ?? '')
     setActivationSubject(app.activationEmailOverride?.subject ?? '')
     setActivationMessage(app.activationEmailOverride?.message ?? '')
+    setEmailVerificationMethod(app.emailVerificationMethod ?? 'link')
     setActivationOverrideOriginal(app.activationEmailOverride ?? null)
     setErrorKey(null)
     setNewClientSecret(null)
@@ -255,7 +257,8 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     activationFromAddress.trim() !== (activationOverrideBaseline.fromAddress ?? '') ||
     activationSubject.trim() !== (activationOverrideBaseline.subject ?? '') ||
     activationMessage.trim() !== (activationOverrideBaseline.message ?? '')
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || favicon !== originalFavicon || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty
+  const emailVerificationMethodDirty = emailVerificationMethod !== (app.emailVerificationMethod ?? 'link')
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || favicon !== originalFavicon || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty || emailVerificationMethodDirty
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -268,7 +271,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; favicon?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; twoFactorPromptEnabled?: boolean | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; favicon?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; twoFactorPromptEnabled?: boolean | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null; emailVerificationMethod?: 'link' | 'code' } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
@@ -301,6 +304,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       const trimmed = gdprUrl.trim()
       patch.gdprUrl = trimmed === '' ? null : trimmed
     }
+    if (emailVerificationMethodDirty) patch.emailVerificationMethod = emailVerificationMethod
     if (activationDirty) {
       const trimmed = {
         fromName: activationFromName.trim(),
@@ -852,6 +856,24 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                   </p>
                 </div>
               </div>
+            </div>
+            <div>
+              <Label htmlFor="emailVerificationMethod">{t('apps.fields.emailVerificationMethod')}</Label>
+              <Select
+                value={emailVerificationMethod}
+                onValueChange={(v) => setEmailVerificationMethod(v as 'link' | 'code')}
+              >
+                <SelectTrigger id="emailVerificationMethod">
+                  <SelectValue placeholder={t('apps.fields.emailVerificationMethod')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="link">{t('apps.fields.emailVerificationMethodLink')}</SelectItem>
+                  <SelectItem value="code">{t('apps.fields.emailVerificationMethodCode')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                {t('apps.fields.emailVerificationMethodHint')}
+              </p>
             </div>
             {errorKey && (
               <p role="alert" className="text-body-sm text-destructive">

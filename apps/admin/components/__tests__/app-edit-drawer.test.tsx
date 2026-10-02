@@ -562,6 +562,30 @@ describe('AppEditDrawer', () => {
     expect(save).toBeDisabled()
   })
 
+  it('changes emailVerificationMethod and includes it in the patch when changed', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, emailVerificationMethod: 'code' },
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    fireEvent.change(screen.getByLabelText(en.apps.fields.emailVerificationMethod), { target: { value: 'code' } })
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', { emailVerificationMethod: 'code' }),
+    )
+  })
+
+  it('does not mark the form dirty when emailVerificationMethod is re-selected to its current value', () => {
+    const appWithCode = { ...app, emailVerificationMethod: 'code' as const }
+    render(withIntl(<AppEditDrawer app={appWithCode} open onOpenChange={() => undefined} />))
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    expect(save).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText(en.apps.fields.emailVerificationMethod), { target: { value: 'code' } })
+    expect(save).toBeDisabled()
+  })
+
   // Task 8: Privacy Policy / Terms / GDPR URL fields (signup/login legal
   // consent). Plain URL inputs following the same dirty-tracking/patch
   // pattern as webhookUrl above.
