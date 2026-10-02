@@ -184,12 +184,43 @@ export class RegistrationService {
       throw new ConflictException('email already registered');
     }
 
-    // 3. Atomically create/resolve the org, create the saUser (always
-    // 'unverified' — see auth.config.ts's emailVerification block), and
-    // assign the app's default role if one is set.
+    return this.finishRegistration({
+      app,
+      baUserId,
+      dto: { firstName: dto.firstName, lastName: dto.lastName, companyName: dto.companyName, next: dto.next },
+      defaultOrg,
+      requiredConsent,
+      saUserStatus: 'unverified',
+      sendLinkVerificationEmail: true,
+      email: dto.email,
+    });
+  }
+
+  /**
+   * Shared by register() ('link'-method apps, and 'code'-method apps that
+   * call POST /api/register directly rather than going through the
+   * code-first wizard) and completeRegistration() (the wizard's final step,
+   * where the email is already verified — see its own doc comment for why
+   * `saUserStatus`/`sendLinkVerificationEmail` differ there). Creates the
+   * org/SaUser/consent atomically, optionally sends the link-verification
+   * email, and mints a signup-flow OAuth code to redirect back to the
+   * relying app — identical logic to what register() always ran inline
+   * before this method existed.
+   */
+  private async finishRegistration(args: {
+    app: NonNullable<Awaited<ReturnType<typeof prisma.saApp.findUnique>>>;
+    baUserId: string;
+    dto: { firstName: string; lastName: string; companyName?: string; next?: string; marketingOptIn?: boolean };
+    defaultOrg: { id: number; publicId: string } | null;
+    requiredConsent: ReturnType<typeof resolveRequiredConsent>;
+    saUserStatus: 'unverified' | 'active';
+    sendLinkVerificationEmail: boolean;
+    email: string;
+  }): Promise<{ ok: true; orgPublicId: string; redirectUrl?: string }> {
+    const { app, baUserId, dto, defaultOrg, requiredConsent, saUserStatus, sendLinkVerificationEmail, email } = args;
     try {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-      const { org, saUserPublicId } = await prisma.$transaction(async (tx: Tx) => {
+      const { org, saUserId, saUserPublicId } = await prisma.$transaction(async (tx: Tx) => {
         let targetOrg: { id: number; publicId: string };
         if (defaultOrg) {
           targetOrg = defaultOrg;
@@ -213,20 +244,38 @@ export class RegistrationService {
             orgId: targetOrg.id,
             firstName: dto.firstName,
             lastName: dto.lastName,
-            status: 'unverified',
+            status: saUserStatus,
+            ...(dto.marketingOptIn !== undefined ? { marketingOptIn: dto.marketingOptIn } : {}),
           },
         });
         if (app.defaultRoleId) {
           await tx.saUserRole.create({ data: { userId: createdSaUser.id, roleId: app.defaultRoleId } });
         }
         await recordConsent(tx, createdSaUser.id, app.id, requiredConsent);
-        return { org: targetOrg, saUserPublicId: createdSaUser.publicId };
+        return { org: targetOrg, saUserId: createdSaUser.id, saUserPublicId: createdSaUser.publicId };
       });
 
-      const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
-      await auth.api.sendVerificationEmail({
-        body: { email: dto.email, callbackURL: `${adminUrl}/signup/verified?email=${encodeURIComponent(dto.email)}` },
-      });
+      if (sendLinkVerificationEmail) {
+        const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+        await auth.api.sendVerificationEmail({
+          body: { email, callbackURL: `${adminUrl}/signup/verified?email=${encodeURIComponent(email)}` },
+        });
+      } else {
+        // The email was already verified before this SaUser existed, so
+        // auth.config.ts's afterEmailVerification hook never ran for it
+        // (its `updateMany({ where: { status: 'unverified' } })` found no
+        // row to promote) — fire the activation webhook explicitly here
+        // instead, since this is the one code path that transitions
+        // straight to 'active' without going through that hook.
+        await notifyActivation({
+          id: saUserId,
+          publicId: saUserPublicId,
+          orgId: org.id,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          email,
+        });
+      }
 
       // Authenticate the new (still-pending) user against the target app
       // immediately, so it can redirect back with a working access token
@@ -277,17 +326,10 @@ export class RegistrationService {
           codeChallengeMethod = 'S256';
         }
       } else if (isConfidential && loginUris && loginUris.length > 0) {
-        // When an app has multiple registered login redirect URIs and no
-        // usable `next` named one of them, there's no per-request way to
-        // indicate which one signup should target — pick the
-        // oldest-registered one deterministically.
         redirectUri = loginUris[0].uri;
       }
 
       let redirectUrl: string | undefined;
-      // A public client's code must carry a PKCE challenge to be
-      // redeemable; a confidential client's client secret substitutes for
-      // one.
       if (redirectUri && (codeChallenge || isConfidential)) {
         const code = await this.oauthService.generateCode(
           saUserPublicId,
@@ -308,7 +350,6 @@ export class RegistrationService {
 
       return { ok: true as const, orgPublicId: org.publicId, ...(redirectUrl !== undefined && { redirectUrl }) };
     } catch (e: unknown) {
-      // Compensation: delete the BetterAuth user so the email can be re-used
       await prisma.user.delete({ where: { id: baUserId } }).catch(() => {
         // Swallow — we still re-throw the original error below
       });
