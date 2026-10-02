@@ -27,7 +27,7 @@ import { appendConsentRedirect } from '../social/resolve-social-consent-redirect
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
 import { notifyActivation } from '../activation/notify-activation';
 import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
-import { envInt } from '../common/config/rate-limit-config';
+import { envInt, AUTH_THROTTLE } from '../common/config/rate-limit-config';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -181,6 +181,31 @@ export const auth = betterAuth({
       // back to better-auth's generic default, which is generous enough to
       // let a client hammer an arbitrary inbox with verification emails.
       '/send-verification-email': { window: 60, max: 3 },
+      // better-auth's own built-in "special rules" (dist/api/rate-limiter,
+      // getDefaultSpecialRules) hardcode window:10/max:3 for /sign-in*,
+      // /sign-up*, /change-password, /change-email, and window:60/max:3 for
+      // /request-password-reset, /forget-password*,
+      // /email-otp/send-verification-otp and /email-otp/request-password-reset
+      // — active whenever `rateLimit.enabled` is true, which this config
+      // leaves at its library default of `isProduction` (NODE_ENV ===
+      // 'production'). auth-rate-limit.ts's Express middleware is meant to be
+      // the project's single configurable rate limiter for these same
+      // credential paths (via AUTH_RATE_LIMIT / AUTH_RATE_WINDOW_MS, disabled
+      // under NODE_ENV=test for e2e) — but it sits in front of better-auth,
+      // not instead of it, so any NODE_ENV=production run (including the
+      // Caddy-proxied local dev setup in README §6b) silently also enforced
+      // the hardcoded 3-requests-per-10s floor underneath whatever
+      // AUTH_RATE_LIMIT said, with no way to raise it. Mirror the same
+      // AUTH_THROTTLE-derived values here so there is one configurable limit
+      // instead of two disagreeing ones.
+      '/sign-in/*': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/sign-up/*': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/change-password': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/change-email': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/request-password-reset': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/forget-password': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/email-otp/send-verification-otp': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/email-otp/request-password-reset': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
     },
   },
   // bug-0186: BetterAuth creates a Session row on every successful

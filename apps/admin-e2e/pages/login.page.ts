@@ -14,7 +14,7 @@ export class LoginPage {
   constructor(page: Page) {
     this.page = page
     this.emailInput = page.getByLabel(t('login.email'))
-    this.passwordInput = page.getByLabel(t('login.password'))
+    this.passwordInput = page.getByLabel(t('login.password'), { exact: true })
     this.submitButton = page.locator('form').getByRole('button', { name: t('login.submit') })
     // Single error <p> in app/login/page.tsx renders one of three dynamic
     // error keys; selecting by testid avoids coupling to a specific key.
