@@ -86,6 +86,8 @@ export function SignupWizard({
         return
       }
       setStep('code')
+    } catch {
+      setError(t('errors.validationError'))
     } finally {
       setSubmitting(false)
     }
@@ -102,6 +104,8 @@ export function SignupWizard({
         return
       }
       setStep('password')
+    } catch {
+      setError(t('errors.validationError'))
     } finally {
       setSubmitting(false)
     }
@@ -143,13 +147,27 @@ export function SignupWizard({
       })
       if ('error' in result) {
         if (result.error === 'OTP_EXPIRED') {
-          // The code expired while filling in password/name. Resend a fresh
-          // one (reusing the already-captured captcha token — the user
-          // already proved they're human on step 1, don't make them do it
-          // again) and bounce back to the code step — password/name stay in
-          // this component's state, so nothing typed is lost.
+          // The code expired while filling in password/name. Try to resend a
+          // fresh one, reusing the already-captured captcha token. Turnstile
+          // tokens are single-use/short-lived, though — the SAME token was
+          // already consumed by the original startRegistrationAction call on
+          // the email step, so this resend will very plausibly fail with
+          // captchaFailed. Don't assume success: if the resend itself errors,
+          // no new code was actually sent, so bounce the user back to the
+          // email step to re-verify (email stays filled in, nothing is
+          // lost) rather than stranding them on the code step waiting for an
+          // email that will never arrive. Only on a successful resend do we
+          // go to the code step — password/name stay in this component's
+          // state either way, so nothing typed is lost.
           if (captchaToken) {
-            await startRegistrationAction({ clientId, email, turnstileToken: captchaToken })
+            const resendResult = await startRegistrationAction({ clientId, email, turnstileToken: captchaToken })
+            if ('error' in resendResult) {
+              setCaptchaToken(null)
+              setOtp('')
+              setError(t('errors.captchaRequired'))
+              setStep('email')
+              return
+            }
           }
           setOtp('')
           setError(t('verifyCode.errorExpired'))
@@ -164,6 +182,8 @@ export function SignupWizard({
         return
       }
       router.push('/signup/verified')
+    } catch {
+      setError(t('errors.validationError'))
     } finally {
       setSubmitting(false)
     }

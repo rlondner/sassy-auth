@@ -202,4 +202,26 @@ describe('SignupWizard', () => {
     await screen.findByLabelText('firstName')
     expect(screen.getByLabelText('firstName')).toHaveValue('Alice')
   })
+
+  it('sends the user back to the email step to re-verify when the expired-code resend itself fails (stale captcha token)', async () => {
+    await advanceToPasswordStep()
+    fireEvent.change(screen.getByLabelText('password'), { target: { value: 'StrongPass123' } })
+    fireEvent.change(screen.getByLabelText('confirmPassword'), { target: { value: 'StrongPass123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'continue' }))
+    await screen.findByLabelText('firstName')
+    fireEvent.change(screen.getByLabelText('firstName'), { target: { value: 'Alice' } })
+    fireEvent.change(screen.getByLabelText('lastName'), { target: { value: 'Wonder' } })
+
+    // The captcha token captured on the email step was already consumed by
+    // the original startRegistrationAction call, so reusing it for the
+    // resend fails — no new code is actually sent.
+    mockComplete.mockResolvedValue({ error: 'OTP_EXPIRED' })
+    mockStart.mockResolvedValue({ error: 'captchaFailed' })
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }))
+
+    await screen.findByLabelText('email')
+    expect(screen.getByTestId('signup-error')).toHaveTextContent('errors.captchaRequired')
+    expect(screen.getByLabelText('email')).toHaveValue('alice@example.com')
+    expect(screen.getByTestId('mock-turnstile-success')).toBeInTheDocument()
+  })
 })
