@@ -5,6 +5,7 @@ import { prisma } from '@sassy-auth/db';
 import type { ActivationEmailBranding } from '@sassy-auth/types';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { verificationEmail } from '../email/templates/verify-email.template';
+import { sendVerificationCode } from './verification-code-sender';
 import { getEmailer } from '../email/email.singleton';
 import { captureResetUrl } from './reset-url-context';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
@@ -488,7 +489,7 @@ export const auth = betterAuth({
       const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
       const saUser = await prisma.saUser.findUnique({
         where: { betterAuthUserId: user.id },
-        select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
+        select: { org: { select: { app: { select: { name: true, activationEmailOverride: true, emailVerificationMethod: true } } } } },
       });
       const appName = saUser?.org.app.name ?? 'Sassy Auth';
       // AppsService.assertValidActivationEmailOverride is the only write path
@@ -496,6 +497,20 @@ export const auth = betterAuth({
       // guarantee — verificationEmail()'s optional chaining degrades to
       // defaults on any malformed/missing field regardless.
       const branding = (saUser?.org.app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
+
+      if (saUser?.org.app.emailVerificationMethod === 'code') {
+        // `auth` (this module's own export, defined by the betterAuth(...)
+        // call this object literal is part of) is referenced here via
+        // closure, not read at definition time — safe, since this callback
+        // only runs on a real request, long after module evaluation (and
+        // thus the `auth` binding) has completed.
+        await sendVerificationCode(
+          { createOtp: (d) => auth.api.createVerificationOTP({ body: d }), emailer: getEmailer() },
+          { email: user.email, firstName, appName, branding },
+        );
+        return;
+      }
+
       await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url, appName, branding }) });
     },
     afterEmailVerification: async (updatedUser: { id: string }) => {

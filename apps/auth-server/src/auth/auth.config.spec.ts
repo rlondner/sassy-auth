@@ -264,7 +264,7 @@ describe('auth.config — emailVerification', () => {
     const { auth } = await import('./auth.config');
     const { prisma } = require('@sassy-auth/db');
     prisma.saUser.findUnique.mockResolvedValue({
-      org: { app: { name: 'Vibecast', activationEmailOverride: { fromName: 'Vibecast', fromAddress: 'no-reply@vibecast.io' } } },
+      org: { app: { name: 'Vibecast', activationEmailOverride: { fromName: 'Vibecast', fromAddress: 'no-reply@vibecast.io' }, emailVerificationMethod: 'link' } },
     });
     const options = (auth as unknown as { options: Record<string, unknown> }).options;
     const ev = options['emailVerification'] as {
@@ -273,7 +273,7 @@ describe('auth.config — emailVerification', () => {
     await ev.sendVerificationEmail({ user: { id: 'ba-user-1', email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
     expect(prisma.saUser.findUnique).toHaveBeenCalledWith({
       where: { betterAuthUserId: 'ba-user-1' },
-      select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
+      select: { org: { select: { app: { select: { name: true, activationEmailOverride: true, emailVerificationMethod: true } } } } },
     });
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -298,6 +298,53 @@ describe('auth.config — emailVerification', () => {
     };
     await ev.sendVerificationEmail({ user: { id: 'ba-unknown', email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
     expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ subject: 'Verify your Sassy Auth email address' }));
+  });
+
+  it('sendVerificationEmail sends a 6-digit code instead of a link when the app is configured for emailVerificationMethod "code"', async () => {
+    const sendMock = jest.fn().mockResolvedValue({ sent: true });
+    jest.doMock('../email/email.singleton', () => ({ getEmailer: () => ({ send: sendMock }) }));
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique.mockResolvedValue({
+      org: { app: { name: 'Vibecast', activationEmailOverride: { fromName: 'Vibecast' }, emailVerificationMethod: 'code' } },
+    });
+    (auth.api as unknown as { createVerificationOTP: jest.Mock }).createVerificationOTP = jest.fn().mockResolvedValue('123456');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as {
+      sendVerificationEmail: (args: { user: { id: string; email: string; name?: string }; url: string }) => Promise<void>;
+    };
+    await ev.sendVerificationEmail({ user: { id: 'ba-user-1', email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
+    expect((auth.api as unknown as { createVerificationOTP: jest.Mock }).createVerificationOTP).toHaveBeenCalledWith({
+      body: { email: 'jane@example.com', type: 'email-verification' },
+    });
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'jane@example.com',
+        subject: 'Verify your Vibecast email address',
+        from: 'Vibecast',
+        html: expect.stringContaining('123456'),
+      }),
+    );
+    // The link-based email must never also be sent.
+    expect(sendMock).not.toHaveBeenCalledWith(expect.objectContaining({ html: expect.stringContaining('https://x/verify-email?token=abc') }));
+  });
+
+  it('sendVerificationEmail sends the link when emailVerificationMethod is "link" (default)', async () => {
+    const sendMock = jest.fn().mockResolvedValue({ sent: true });
+    jest.doMock('../email/email.singleton', () => ({ getEmailer: () => ({ send: sendMock }) }));
+    jest.resetModules();
+    const { auth } = await import('./auth.config');
+    const { prisma } = require('@sassy-auth/db');
+    prisma.saUser.findUnique.mockResolvedValue({
+      org: { app: { name: 'Vibecast', activationEmailOverride: null, emailVerificationMethod: 'link' } },
+    });
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const ev = options['emailVerification'] as {
+      sendVerificationEmail: (args: { user: { id: string; email: string; name?: string }; url: string }) => Promise<void>;
+    };
+    await ev.sendVerificationEmail({ user: { id: 'ba-user-1', email: 'jane@example.com', name: 'Jane Doe' }, url: 'https://x/verify-email?token=abc' });
+    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ html: expect.stringContaining('https://x/verify-email?token=abc') }));
   });
 
   it('afterEmailVerification flips a matching unverified SaUser to active', async () => {
