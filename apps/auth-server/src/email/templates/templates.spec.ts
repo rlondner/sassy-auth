@@ -2,6 +2,7 @@ import { invitationEmail } from './invitation.template';
 import { passwordResetEmail } from './password-reset.template';
 import { signInCodeEmail } from './sign-in-code.template';
 import { verificationEmail } from './verify-email.template';
+import { verificationCodeEmail } from './verify-email-code.template';
 
 describe('email templates', () => {
   it('invitationEmail embeds the invite URL and name in html + text', () => {
@@ -110,5 +111,71 @@ describe('email templates', () => {
     });
     expect(out.subject).toBe('Verify your Vibecast email address');
     expect(out.html).toContain('Confirm your email address to finish setting up your account:');
+  });
+});
+
+describe('verificationCodeEmail', () => {
+  it('uses the default subject/message and embeds the code and appName when no branding is given', () => {
+    const out = verificationCodeEmail({ firstName: 'Jane', otp: '123456', appName: 'Vibecast' });
+    expect(out.subject).toBe('Verify your Vibecast email address');
+    expect(out.html).toContain('123456');
+    expect(out.html).toContain('Enter this code to verify your email address:');
+    expect(out.text).toContain('123456');
+    expect(out.text).toContain('Jane');
+    expect(out.from).toBeUndefined();
+  });
+
+  it('renders a custom subject/message with placeholders', () => {
+    const out = verificationCodeEmail({
+      firstName: 'Jane',
+      otp: '123456',
+      appName: 'Vibecast',
+      branding: { subject: 'Confirm your {{appName}} account, {{firstName}}!', message: 'Welcome to {{appName}}, {{firstName}}! Your code:' },
+    });
+    expect(out.subject).toBe('Confirm your Vibecast account, Jane!');
+    expect(out.html).toContain('Welcome to Vibecast, Jane! Your code:');
+    expect(out.text).toContain('Welcome to Vibecast, Jane! Your code:');
+    expect(out.html).toContain('123456');
+  });
+
+  it('computes from from fromName + fromAddress', () => {
+    const out = verificationCodeEmail({
+      firstName: 'Jane', otp: '123456', appName: 'Vibecast',
+      branding: { fromName: 'Vibecast', fromAddress: 'no-reply@vibecast.io' },
+    });
+    expect(out.from).toBe('Vibecast <no-reply@vibecast.io>');
+  });
+
+  it('escapes HTML in a custom message', () => {
+    const out = verificationCodeEmail({
+      firstName: 'Jane',
+      otp: '123456',
+      appName: 'Vibecast',
+      branding: { message: '<a href="https://evil.example/phish">Click here</a> & "confirm" now' },
+    });
+    expect(out.html).not.toContain('<a href="https://evil.example/phish">');
+    expect(out.html).toContain('&lt;a href=&quot;https://evil.example/phish&quot;&gt;Click here&lt;/a&gt; &amp; &quot;confirm&quot; now');
+    expect(out.html).toContain('123456');
+    expect(out.text).toContain('<a href="https://evil.example/phish">Click here</a> & "confirm" now');
+  });
+
+  it('converts message line breaks to <br> in html but keeps them literal in text', () => {
+    const out = verificationCodeEmail({
+      firstName: 'Jane',
+      otp: '123456',
+      appName: 'Vibecast',
+      branding: { message: 'Line one.\nLine two.\r\nLine three.' },
+    });
+    expect(out.html).toContain('Line one.<br>Line two.<br>Line three.');
+    expect(out.text).toContain('Line one.\nLine two.\r\nLine three.');
+  });
+
+  it('falls back to the default subject/message when branding fields are whitespace-only', () => {
+    const out = verificationCodeEmail({
+      firstName: 'Jane', otp: '123456', appName: 'Vibecast',
+      branding: { subject: '   ', message: '   ' },
+    });
+    expect(out.subject).toBe('Verify your Vibecast email address');
+    expect(out.html).toContain('Enter this code to verify your email address:');
   });
 });
