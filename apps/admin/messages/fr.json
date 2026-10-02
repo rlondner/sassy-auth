@@ -650,6 +650,21 @@
       "resendError": "Impossible de renvoyer l'e-mail. Veuillez réessayer dans un instant.",
       "backToLogin": "Retour à la connexion"
     },
+    "verifyCode": {
+      "title": "Saisissez votre code",
+      "subtitle": "Nous avons envoyé un code à 6 chiffres à {email}.",
+      "codeLabel": "Code de vérification",
+      "submit": "Vérifier",
+      "resendButton": "Renvoyer le code",
+      "resendCooldown": "Renvoyer dans {seconds}s",
+      "resendSent": "Un nouveau code est en route.",
+      "resendError": "Impossible de renvoyer le code. Veuillez réessayer dans un instant.",
+      "errorInvalid": "Ce code est incorrect. Veuillez réessayer.",
+      "errorExpired": "Ce code a expiré. Demandez-en un nouveau ci-dessous.",
+      "errorTooManyAttempts": "Trop de tentatives. Demandez un nouveau code ci-dessous.",
+      "errorGeneric": "Une erreur s'est produite. Veuillez réessayer.",
+      "backToLogin": "Retour à la connexion"
+    },
     "verified": {
       "title": "Adresse e-mail vérifiée",
       "subtitle": "Votre compte est prêt. Vous pouvez maintenant vous connecter.",

@@ -650,6 +650,21 @@
       "resendError": "We couldn't resend the email. Please try again in a moment.",
       "backToLogin": "Back to sign in"
     },
+    "verifyCode": {
+      "title": "Enter your code",
+      "subtitle": "We sent a 6-digit code to {email}.",
+      "codeLabel": "Verification code",
+      "submit": "Verify",
+      "resendButton": "Resend code",
+      "resendCooldown": "Resend in {seconds}s",
+      "resendSent": "A new code is on its way.",
+      "resendError": "We couldn't resend the code. Please try again in a moment.",
+      "errorInvalid": "That code isn't right. Please try again.",
+      "errorExpired": "That code has expired. Request a new one below.",
+      "errorTooManyAttempts": "Too many attempts. Request a new code below.",
+      "errorGeneric": "Something went wrong. Please try again.",
+      "backToLogin": "Back to sign in"
+    },
     "verified": {
       "title": "Email verified",
       "subtitle": "Your account is ready. You can now sign in.",
