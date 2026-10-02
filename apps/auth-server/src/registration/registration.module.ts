@@ -1,7 +1,13 @@
 import { Module } from '@nestjs/common';
 import { RegistrationService } from './registration.service';
 import { RegistrationController } from './registration.controller';
-import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
+import {
+  RateLimitGuard,
+  AppLookupRateLimitGuard,
+  RegisterStartRateLimitGuard,
+  VerifyRegistrationCodeRateLimitGuard,
+  CompleteRegistrationRateLimitGuard,
+} from './rate-limit.guard';
 import { PasswordPolicyController } from '../auth/password-policy.controller';
 import { TurnstileService } from './turnstile.service';
 import { TokenModule } from '../token/token.module';
@@ -15,6 +21,14 @@ import { TokenModule } from '../token/token.module';
 @Module({
   imports: [TokenModule],
   controllers: [RegistrationController, PasswordPolicyController],
-  providers: [RegistrationService, RateLimitGuard, AppLookupRateLimitGuard, TurnstileService],
+  providers: [
+    RegistrationService,
+    RateLimitGuard,
+    AppLookupRateLimitGuard,
+    RegisterStartRateLimitGuard,
+    VerifyRegistrationCodeRateLimitGuard,
+    CompleteRegistrationRateLimitGuard,
+    TurnstileService,
+  ],
 })
 export class RegistrationModule {}
