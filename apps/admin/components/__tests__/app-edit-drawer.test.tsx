@@ -586,6 +586,24 @@ describe('AppEditDrawer', () => {
     expect(save).toBeDisabled()
   })
 
+  // Critical finding (code review of f6197ea): the list-sourced `app` prop's
+  // `emailVerificationMethod` is always undefined (same payload-size reason
+  // as `logo`/`activationEmailOverride` above), so the drawer must backfill
+  // it from the single-app fetch on open too, not just default to 'link'.
+  it('backfills emailVerificationMethod from getAppAction', async () => {
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, emailVerificationMethod: 'code' },
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(en.apps.fields.emailVerificationMethod) as HTMLSelectElement).value,
+      ).toBe('code'),
+    )
+  })
+
   // Task 8: Privacy Policy / Terms / GDPR URL fields (signup/login legal
   // consent). Plain URL inputs following the same dirty-tracking/patch
   // pattern as webhookUrl above.

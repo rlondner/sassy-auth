@@ -172,6 +172,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
         setActivationSubject(result.app.activationEmailOverride?.subject ?? '')
         setActivationMessage(result.app.activationEmailOverride?.message ?? '')
         setActivationOverrideOriginal(result.app.activationEmailOverride ?? null)
+        setEmailVerificationMethod(result.app.emailVerificationMethod ?? 'link')
       }
     })
     setSocialLoading(true)
