@@ -65,6 +65,9 @@ export class RegistrationController {
   @Post('start')
   @UseGuards(RegisterStartRateLimitGuard)
   start(@Body() dto: StartRegistrationDto, @Req() req: Request) {
+    // `req` is intentionally unused: unlike register()/completeRegistration()/
+    // getAppName(), startRegistration() never needs the client IP (it doesn't
+    // consult resolveCountryFromIp for GDPR consent at this step).
     return this.service.startRegistration(dto);
   }
 
