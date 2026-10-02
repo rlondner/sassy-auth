@@ -3,7 +3,7 @@ import { SignupWizard } from '../signup-wizard'
 import { startRegistrationAction, verifyRegistrationCodeAction, completeRegistrationAction } from '../wizard-actions'
 
 // This codebase's established convention for these specs (see
-// verify-code-card.test.tsx and check-email-card.test.tsx) is to mock
+// check-email-card.test.tsx) is to mock
 // next-intl's useTranslations to ignore the namespace argument and return the
 // key itself (with an interpolated-values suffix when present), since the
 // real component scopes its translator with useTranslations('signup') (and
