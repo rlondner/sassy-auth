@@ -10,6 +10,7 @@ export async function fetchAppInfo(
   name: string | null; hasDefaultOrg: boolean; passwordPolicy: PasswordPolicy | null; logo: string | null;
   favicon: string | null;
   privacyPolicyUrl: string | null; termsUrl: string | null; gdprUrl: string | null; gdprRequired: boolean;
+  emailVerificationMethod: 'link' | 'code';
 }> {
   try {
     const forwardedIp = await getForwardedClientIpHeader()
@@ -20,15 +21,19 @@ export async function fetchAppInfo(
     if (!res.ok) {
       // Fail toward hasDefaultOrg: false, not true: a Company name field shown
       // but ignored by the server is harmless, whereas defaulting to true could
-      // hide a required field and produce a signup-blocking dead end.
+      // hide a required field and produce a signup-blocking dead end. Same
+      // fail-safe reasoning for emailVerificationMethod: 'link' is the
+      // existing, always-supported flow.
       return {
         name: null, hasDefaultOrg: false, passwordPolicy: null, logo: null, favicon: null,
         privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, gdprRequired: false,
+        emailVerificationMethod: 'link',
       }
     }
     const body = (await res.json()) as {
       name?: string; hasDefaultOrg?: boolean; passwordPolicy?: PasswordPolicy; logo?: string | null; favicon?: string | null;
       privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null; gdprRequired?: boolean;
+      emailVerificationMethod?: 'link' | 'code';
     }
     return {
       name: typeof body.name === 'string' ? body.name : null,
@@ -40,12 +45,14 @@ export async function fetchAppInfo(
       termsUrl: typeof body.termsUrl === 'string' ? body.termsUrl : null,
       gdprUrl: typeof body.gdprUrl === 'string' ? body.gdprUrl : null,
       gdprRequired: body.gdprRequired === true,
+      emailVerificationMethod: body.emailVerificationMethod === 'code' ? 'code' : 'link',
     }
   } catch {
-    // Same reasoning as the !res.ok branch above: fail toward false.
+    // Same reasoning as the !res.ok branch above: fail toward false/link.
     return {
       name: null, hasDefaultOrg: false, passwordPolicy: null, logo: null, favicon: null,
       privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, gdprRequired: false,
+      emailVerificationMethod: 'link',
     }
   }
 }

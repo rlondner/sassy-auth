@@ -34,6 +34,7 @@ const BASE_APP_INFO = {
   termsUrl: null,
   gdprUrl: null,
   gdprRequired: false,
+  emailVerificationMethod: 'link' as const,
 }
 
 describe('SignupPage subtitle', () => {

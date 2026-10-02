@@ -37,6 +37,7 @@ describe('fetchAppInfo', () => {
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,
+      emailVerificationMethod: 'link',
       gdprRequired: false,
     })
   })
@@ -56,6 +57,7 @@ describe('fetchAppInfo', () => {
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,
+      emailVerificationMethod: 'link',
       gdprRequired: false,
     })
   })
@@ -75,6 +77,7 @@ describe('fetchAppInfo', () => {
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,
+      emailVerificationMethod: 'link',
       gdprRequired: false,
     })
   })
@@ -91,6 +94,7 @@ describe('fetchAppInfo', () => {
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,
+      emailVerificationMethod: 'link',
       gdprRequired: false,
     })
   })
@@ -110,7 +114,18 @@ describe('fetchAppInfo', () => {
       privacyPolicyUrl: null,
       termsUrl: null,
       gdprUrl: null,
+      emailVerificationMethod: 'link',
       gdprRequired: false,
     })
+  })
+
+  it('returns emailVerificationMethod "code" from a successful response', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ name: 'Acme', hasDefaultOrg: true, passwordPolicy: POLICY, emailVerificationMethod: 'code' }),
+    } as Response)
+
+    const result = await fetchAppInfo('sq_1')
+    expect(result.emailVerificationMethod).toBe('code')
   })
 })
