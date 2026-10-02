@@ -719,6 +719,7 @@ describe('RegistrationService', () => {
         termsUrl: null,
         gdprUrl: null,
         gdprRequired: false,
+        emailVerificationMethod: 'link',
       });
     });
 
@@ -734,6 +735,7 @@ describe('RegistrationService', () => {
         termsUrl: null,
         gdprUrl: null,
         gdprRequired: false,
+        emailVerificationMethod: 'link',
       });
     });
   });
@@ -787,7 +789,7 @@ describe('RegistrationService', () => {
 
   describe('getAppName', () => {
     it('returns the app name, logo, and favicon for a known appPublicId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: 'data:image/png;base64,AAA=', favicon: 'data:image/png;base64,FFF=' });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: 'data:image/png;base64,AAA=', favicon: 'data:image/png;base64,FFF=', emailVerificationMethod: 'link' });
 
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
@@ -799,6 +801,7 @@ describe('RegistrationService', () => {
         termsUrl: null,
         gdprUrl: null,
         gdprRequired: false,
+        emailVerificationMethod: 'link',
       });
       expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
         where: { publicId: 'sq_1' },
@@ -811,6 +814,7 @@ describe('RegistrationService', () => {
           privacyPolicyUrl: true,
           termsUrl: true,
           gdprUrl: true,
+          emailVerificationMethod: true,
         },
       });
     });
@@ -828,6 +832,7 @@ describe('RegistrationService', () => {
         termsUrl: null,
         gdprUrl: null,
         gdprRequired: false,
+        emailVerificationMethod: 'link',
       });
     });
 
@@ -859,6 +864,15 @@ describe('RegistrationService', () => {
       expect(result.gdprUrl).toBe('https://myapp.example.com/gdpr');
       // 'unknown' IP resolves to no country → fail-closed → gdprRequired true
       expect(result.gdprRequired).toBe(true);
+    });
+
+    it('reports emailVerificationMethod "code" when the app is configured for it', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null, favicon: null,
+        privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, emailVerificationMethod: 'code',
+      });
+      const result = await service.getAppName('sq_1');
+      expect(result.emailVerificationMethod).toBe('code');
     });
   });
 

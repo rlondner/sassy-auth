@@ -318,6 +318,7 @@ export class RegistrationService {
     termsUrl: string | null;
     gdprUrl: string | null;
     gdprRequired: boolean;
+    emailVerificationMethod: 'link' | 'code';
   }> {
     if (!appPublicId) throw new NotFoundException('App not found');
     const app = await prisma.saApp.findUnique({
@@ -331,6 +332,7 @@ export class RegistrationService {
         privacyPolicyUrl: true,
         termsUrl: true,
         gdprUrl: true,
+        emailVerificationMethod: true,
       },
     });
     if (!app) throw new NotFoundException('App not found');
@@ -350,6 +352,11 @@ export class RegistrationService {
       // second time, so the two expressions of "is GDPR required" can't
       // drift out of sync.
       gdprRequired: resolveRequiredConsent(app, country).some((d) => d.documentType === 'gdpr'),
+      // Defaults to 'link' for the same reason formatApp (apps.service.ts)
+      // does — a real Prisma row always has this NOT NULL column populated,
+      // but hand-built test fixtures and any other caller that doesn't
+      // select it should still get the safe, existing-behavior default.
+      emailVerificationMethod: (app.emailVerificationMethod ?? 'link') as 'link' | 'code',
     };
   }
 }
