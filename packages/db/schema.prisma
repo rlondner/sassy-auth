@@ -237,9 +237,9 @@ model SaUser {
   firstName        String
   lastName         String
   /// Captured at signup for `code`-method apps' step-4 "keep me updated"
-  /// checkbox. Nothing in the platform consumes this yet — recorded for a
-  /// future use. link apps can collect it too via the same field; nothing
-  /// here is 'code'-method-specific.
+  /// checkbox. Nothing in the platform consumes this yet — recorded for
+  /// future use. `link` apps can collect it too via the same field; nothing
+  /// here is `code`-method-specific.
   marketingOptIn   Boolean            @default(false)
   // bug-0147: partial-unique semantics. Both fields are nullable so
   // multiple NULL rows coexist (Postgres treats NULLs as distinct in a
