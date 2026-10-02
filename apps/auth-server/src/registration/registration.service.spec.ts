@@ -1012,3 +1012,58 @@ describe('RegistrationService.startRegistration', () => {
     expect(authApi.createVerificationOTP).not.toHaveBeenCalled();
   });
 });
+
+describe('RegistrationService.verifyRegistrationCode', () => {
+  let service: RegistrationService;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        RegistrationService,
+        { provide: SqidService, useValue: sqidFake },
+        { provide: TurnstileService, useValue: { verify: jest.fn().mockResolvedValue(true) } },
+        { provide: OauthService, useValue: { generateCode: jest.fn() } },
+      ],
+    }).compile();
+    service = module.get(RegistrationService);
+    jest.clearAllMocks();
+  });
+
+  it('resolves ok when the code checks out', async () => {
+    authApi.checkVerificationOTP.mockResolvedValue({ success: true });
+    await expect(
+      service.verifyRegistrationCode({ email: 'alice@example.com', otp: '123456' }),
+    ).resolves.toEqual({ ok: true });
+    expect(authApi.checkVerificationOTP).toHaveBeenCalledWith({
+      body: { email: 'alice@example.com', type: 'email-verification', otp: '123456' },
+    });
+  });
+
+  it('maps an invalid code to a 400 with code INVALID_OTP', async () => {
+    authApi.checkVerificationOTP.mockRejectedValue({ body: { code: 'INVALID_OTP' } });
+    await expect(
+      service.verifyRegistrationCode({ email: 'alice@example.com', otp: '000000' }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'INVALID_OTP' } });
+  });
+
+  it('maps an expired code to a 400 with code OTP_EXPIRED', async () => {
+    authApi.checkVerificationOTP.mockRejectedValue({ body: { code: 'OTP_EXPIRED' } });
+    await expect(
+      service.verifyRegistrationCode({ email: 'alice@example.com', otp: '123456' }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'OTP_EXPIRED' } });
+  });
+
+  it('maps too-many-attempts to a 403 with code TOO_MANY_ATTEMPTS', async () => {
+    authApi.checkVerificationOTP.mockRejectedValue({ body: { code: 'TOO_MANY_ATTEMPTS' } });
+    await expect(
+      service.verifyRegistrationCode({ email: 'alice@example.com', otp: '123456' }),
+    ).rejects.toMatchObject({ status: 403, response: { code: 'TOO_MANY_ATTEMPTS' } });
+  });
+
+  it('collapses an unknown-user error to INVALID_OTP rather than leaking it', async () => {
+    authApi.checkVerificationOTP.mockRejectedValue({ body: { code: 'USER_NOT_FOUND' } });
+    await expect(
+      service.verifyRegistrationCode({ email: 'nobody@example.com', otp: '123456' }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'INVALID_OTP' } });
+  });
+});

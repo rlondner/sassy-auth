@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -391,6 +392,34 @@ export class RegistrationService {
       { email: dto.email, firstName: 'there', appName: app.name, branding },
     );
 
+    return { ok: true };
+  }
+
+  /**
+   * BetterAuth's OTP-check/verify endpoints throw an object whose `.body.code`
+   * names the failure (confirmed against the installed better-auth@1.6.11's
+   * email-otp/routes.mjs and better-call's error.mjs: APIError instances
+   * carry `.status`/`.body`). USER_NOT_FOUND collapses into INVALID_OTP —
+   * routes.mjs's own comment on that check says it's "safe to leak the
+   * existence of a user, given the user has already the OTP from the email",
+   * but there's no reason to expose the distinction to this flow's caller
+   * either.
+   */
+  private mapOtpError(e: unknown): BadRequestException | ForbiddenException {
+    const code = (e as { body?: { code?: string } })?.body?.code;
+    if (code === 'OTP_EXPIRED') return new BadRequestException({ code: 'OTP_EXPIRED' });
+    if (code === 'TOO_MANY_ATTEMPTS') return new ForbiddenException({ code: 'TOO_MANY_ATTEMPTS' });
+    return new BadRequestException({ code: 'INVALID_OTP' });
+  }
+
+  async verifyRegistrationCode(dto: VerifyRegistrationCodeDto): Promise<{ ok: true }> {
+    try {
+      await auth.api.checkVerificationOTP({
+        body: { email: dto.email, type: 'email-verification', otp: dto.otp },
+      });
+    } catch (e: unknown) {
+      throw this.mapOtpError(e);
+    }
     return { ok: true };
   }
 
