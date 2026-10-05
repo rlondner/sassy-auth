@@ -595,7 +595,9 @@ describe('UsersService', () => {
     });
 
     it('checks platform/org permission before resending', async () => {
-      mockPrisma.saUser.findUnique.mockResolvedValue(makeSaUser({ status: 'unverified', orgId: 10 }));
+      mockPrisma.saUser.findUnique.mockResolvedValue(
+        makeSaUser({ status: 'unverified', orgId: 10, org: { publicId: 'org1', app: { publicId: 'app1' } } }),
+      );
       await service.resendActivationEmail('ba-caller', 'usr1');
       expect(mockCheckPermission).toHaveBeenCalledWith(
         'ba-caller',
@@ -604,15 +606,21 @@ describe('UsersService', () => {
       );
     });
 
-    it('calls sendVerificationEmail with the user email and a callbackURL carrying that email', async () => {
+    it('calls sendVerificationEmail with the user email and a callbackURL carrying that email and client_id', async () => {
       mockPrisma.saUser.findUnique.mockResolvedValue(
-        makeSaUser({ status: 'unverified', betterAuthUser: { email: 'jane@example.com' } }),
+        makeSaUser({
+          status: 'unverified',
+          betterAuthUser: { email: 'jane@example.com' },
+          org: { publicId: 'org1', app: { publicId: 'app1' } },
+        }),
       );
       await service.resendActivationEmail('ba-caller', 'usr1');
       expect(mockSendVerificationEmail).toHaveBeenCalledWith({
         body: {
           email: 'jane@example.com',
-          callbackURL: expect.stringContaining(`/signup/verified?email=${encodeURIComponent('jane@example.com')}`),
+          callbackURL: expect.stringContaining(
+            `/signup/verified?email=${encodeURIComponent('jane@example.com')}&client_id=${encodeURIComponent('app1')}`,
+          ),
         },
       });
     });

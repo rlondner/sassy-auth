@@ -263,7 +263,10 @@ export class RegistrationService {
       if (sendLinkVerificationEmail) {
         const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
         await auth.api.sendVerificationEmail({
-          body: { email, callbackURL: `${adminUrl}/signup/verified?email=${encodeURIComponent(email)}` },
+          body: {
+            email,
+            callbackURL: `${adminUrl}/signup/verified?email=${encodeURIComponent(email)}&client_id=${encodeURIComponent(app.publicId)}`,
+          },
         });
       } else {
         // The email was already verified before this SaUser existed, so

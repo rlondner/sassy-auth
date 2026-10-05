@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
+import { fetchAppBranding } from '@/lib/app-branding'
 import { LinkExpiredCard } from './link-expired-card'
 
 export const dynamic = 'force-dynamic'
@@ -14,13 +15,23 @@ const PUBLIC_AUTH_SERVER =
 export default async function SignupVerifiedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; email?: string }>
+  searchParams: Promise<{ error?: string; email?: string; client_id?: string }>
 }) {
-  const { error, email } = await searchParams
+  const { error, email, client_id: clientId } = await searchParams
   const t = await getTranslations()
+  const branding = await fetchAppBranding(clientId ?? null)
 
   if (error === 'TOKEN_EXPIRED' && email) {
-    return <LinkExpiredCard email={email} authServerUrl={PUBLIC_AUTH_SERVER} />
+    return (
+      <LinkExpiredCard
+        email={email}
+        authServerUrl={PUBLIC_AUTH_SERVER}
+        pageLightBackgroundColor={branding.pageLightBackgroundColor}
+        pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
+        cardLightBackgroundColor={branding.cardLightBackgroundColor}
+        cardDarkBackgroundColor={branding.cardDarkBackgroundColor}
+      />
+    )
   }
 
   if (error) {
@@ -28,6 +39,10 @@ export default async function SignupVerifiedPage({
       <AuthCard
         title={t('signup.verified.invalid.title')}
         subtitle={t('signup.verified.invalid.subtitle')}
+        pageLightBackgroundColor={branding.pageLightBackgroundColor}
+        pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
+        cardLightBackgroundColor={branding.cardLightBackgroundColor}
+        cardDarkBackgroundColor={branding.cardDarkBackgroundColor}
         footer={
           <Link href="/login" className="text-label-md text-primary hover:underline">
             {t('signup.verified.invalid.backToLogin')}
@@ -41,6 +56,10 @@ export default async function SignupVerifiedPage({
     <AuthCard
       title={t('signup.verified.title')}
       subtitle={t('signup.verified.subtitle')}
+      pageLightBackgroundColor={branding.pageLightBackgroundColor}
+      pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
+      cardLightBackgroundColor={branding.cardLightBackgroundColor}
+      cardDarkBackgroundColor={branding.cardDarkBackgroundColor}
       icon={
         <span
           className="material-symbols-outlined text-[48px] text-primary"

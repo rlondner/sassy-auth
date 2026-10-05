@@ -196,7 +196,9 @@ describe('RegistrationService', () => {
       expect(mockSendVerificationEmail).toHaveBeenCalledWith({
         body: {
           email: baseDto.email,
-          callbackURL: expect.stringContaining(`/signup/verified?email=${encodeURIComponent(baseDto.email)}`),
+          callbackURL: expect.stringContaining(
+            `/signup/verified?email=${encodeURIComponent(baseDto.email)}&client_id=${encodeURIComponent(appRow.publicId)}`,
+          ),
         },
       });
 
