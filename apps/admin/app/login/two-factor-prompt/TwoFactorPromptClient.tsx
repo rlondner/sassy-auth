@@ -4,10 +4,23 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
+import { AuthBackgroundStyle } from '@/components/auth-background-style'
 
-interface Props { next: string }
+interface Props {
+  next: string
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
+}
 
-export function TwoFactorPromptClient({ next }: Props) {
+export function TwoFactorPromptClient({
+  next,
+  pageLightBackgroundColor = null,
+  pageDarkBackgroundColor = null,
+  cardLightBackgroundColor = null,
+  cardDarkBackgroundColor = null,
+}: Props) {
   const t = useTranslations('twoFactorPrompt')
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -35,8 +48,20 @@ export function TwoFactorPromptClient({ next }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
-      <div className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm text-center space-y-4">
+    <div
+      className="flex min-h-screen items-center justify-center bg-[var(--background)]"
+      data-auth-page-bg=""
+    >
+      <AuthBackgroundStyle
+        pageLightBackgroundColor={pageLightBackgroundColor}
+        pageDarkBackgroundColor={pageDarkBackgroundColor}
+        cardLightBackgroundColor={cardLightBackgroundColor}
+        cardDarkBackgroundColor={cardDarkBackgroundColor}
+      />
+      <div
+        className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm text-center space-y-4"
+        data-auth-card-bg=""
+      >
         <h1 className="text-headline-sm text-[var(--foreground)]">{t('title')}</h1>
         <p className="text-body-sm text-[var(--muted-foreground)]">{t('body')}</p>
         <div className="flex flex-col gap-3 pt-2">
