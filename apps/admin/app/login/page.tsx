@@ -1,18 +1,19 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getBetterAuthCookieName } from '@sassy-auth/types'
+import { getBetterAuthCookieName, isSecureCookieEnv } from '@sassy-auth/types'
 import { validateNextUrl } from '@/lib/safe-next'
 import { fetchSocialProviders } from '@/lib/social-providers'
 import { LoginForm } from './login-form'
 
-// Must match the exact production check auth.config.ts uses for
-// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
+// Must match the exact check auth.config.ts uses for
+// `advanced.useSecureCookies` — see isSecureCookieEnv's doc comment
+// (@sassy-auth/types) for why this can't just be `NODE_ENV === 'production'`.
 // bug-0293: must match auth.config.ts's `advanced.cookiePrefix` — see
 // getBetterAuthCookieName's doc comment.
 const SESSION_COOKIE_NAME = getBetterAuthCookieName(
   'session_token',
-  process.env.NODE_ENV === 'production',
+  isSecureCookieEnv(),
   process.env.COOKIE_PREFIX || 'better-auth',
 )
 
