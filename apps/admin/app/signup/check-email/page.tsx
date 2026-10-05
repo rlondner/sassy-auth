@@ -21,6 +21,7 @@ export default async function CheckEmailPage({
     return (
       <AuthCard
         title={t('title')}
+        logoUrl={branding.logo}
         subtitle={t('missingEmail')}
         pageLightBackgroundColor={branding.pageLightBackgroundColor}
         pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
@@ -37,6 +38,7 @@ export default async function CheckEmailPage({
       email={email}
       next={next ?? ''}
       authServerUrl={PUBLIC_AUTH_SERVER}
+      logo={branding.logo}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
       cardLightBackgroundColor={branding.cardLightBackgroundColor}
