@@ -27,11 +27,19 @@ export function LoginForm({
   next,
   providers = [],
   logo = null,
+  pageLightBackgroundColor = null,
+  pageDarkBackgroundColor = null,
+  cardLightBackgroundColor = null,
+  cardDarkBackgroundColor = null,
   authServerUrl,
 }: {
   next: string
   providers?: string[]
   logo?: string | null
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
   authServerUrl: string
 }) {
   const t = useTranslations('login')
@@ -63,6 +71,10 @@ export function LoginForm({
       subtitle={t('subtitle')}
       logoUrl={logo}
       logoAlt={t('logoAlt')}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
       footer={
         clientId ? (
           <p className="text-center text-label-md text-muted-foreground">

@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('LoginPage generateMetadata', () => {
   it('sets the title to "{appName} Sign In" when next resolves to a named app', async () => {
-    mockFetchSocialProviders.mockResolvedValue({ providers: [], logo: null, name: 'Acme', favicon: null })
+    mockFetchSocialProviders.mockResolvedValue({ providers: [], logo: null, name: 'Acme', favicon: null, pageLightBackgroundColor: null, pageDarkBackgroundColor: null, cardLightBackgroundColor: null, cardDarkBackgroundColor: null })
     const metadata = await generateMetadata({ searchParams: Promise.resolve({ next: AUTHORIZE_NEXT }) })
     expect(metadata.title).toBe('Acme Sign In')
   })
@@ -34,19 +34,19 @@ describe('LoginPage generateMetadata', () => {
   })
 
   it('leaves the title unset when next does not resolve to a named app', async () => {
-    mockFetchSocialProviders.mockResolvedValue({ providers: [], logo: null, name: null, favicon: null })
+    mockFetchSocialProviders.mockResolvedValue({ providers: [], logo: null, name: null, favicon: null, pageLightBackgroundColor: null, pageDarkBackgroundColor: null, cardLightBackgroundColor: null, cardDarkBackgroundColor: null })
     const metadata = await generateMetadata({ searchParams: Promise.resolve({ next: AUTHORIZE_NEXT }) })
     expect(metadata.title).toBeUndefined()
   })
 
   it('sets the tab icon when the resolved app has a favicon', async () => {
-    mockFetchSocialProviders.mockResolvedValue({ providers: [], logo: null, name: 'Acme', favicon: 'data:image/png;base64,FFF=' })
+    mockFetchSocialProviders.mockResolvedValue({ providers: [], logo: null, name: 'Acme', favicon: 'data:image/png;base64,FFF=' , pageLightBackgroundColor: null, pageDarkBackgroundColor: null, cardLightBackgroundColor: null, cardDarkBackgroundColor: null })
     const metadata = await generateMetadata({ searchParams: Promise.resolve({ next: AUTHORIZE_NEXT }) })
     expect(metadata.icons).toEqual({ icon: 'data:image/png;base64,FFF=' })
   })
 
   it('leaves the icon unset when the resolved app has no favicon', async () => {
-    mockFetchSocialProviders.mockResolvedValue({ providers: [], logo: null, name: 'Acme', favicon: null })
+    mockFetchSocialProviders.mockResolvedValue({ providers: [], logo: null, name: 'Acme', favicon: null, pageLightBackgroundColor: null, pageDarkBackgroundColor: null, cardLightBackgroundColor: null, cardDarkBackgroundColor: null })
     const metadata = await generateMetadata({ searchParams: Promise.resolve({ next: AUTHORIZE_NEXT }) })
     expect(metadata.icons).toBeUndefined()
   })

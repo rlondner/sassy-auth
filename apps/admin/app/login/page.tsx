@@ -84,7 +84,21 @@ export default async function LoginPage({
     redirect(nextSafe)
   }
 
-  const { providers, logo } = await fetchSocialProviders(nextSafe ?? '')
+  const {
+    providers, logo, pageLightBackgroundColor, pageDarkBackgroundColor,
+    cardLightBackgroundColor, cardDarkBackgroundColor,
+  } = await fetchSocialProviders(nextSafe ?? '')
 
-  return <LoginForm next={nextSafe ?? ''} providers={providers} logo={logo} authServerUrl={PUBLIC_AUTH_SERVER} />
+  return (
+    <LoginForm
+      next={nextSafe ?? ''}
+      providers={providers}
+      logo={logo}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
+      authServerUrl={PUBLIC_AUTH_SERVER}
+    />
+  )
 }
