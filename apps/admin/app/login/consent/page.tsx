@@ -35,6 +35,7 @@ export default async function LoginConsentPage({
   return (
     <AuthCard
       title={t('loginConsent.title')}
+      logoUrl={branding.logo}
       className="max-w-md"
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
