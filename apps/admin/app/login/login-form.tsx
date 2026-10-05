@@ -105,7 +105,10 @@ export function LoginForm({
           </p>
         )}
 
-        <Link href="/forgot-password" className="self-end text-label-md text-primary hover:underline">
+        <Link
+          href={clientId ? `/forgot-password?client_id=${encodeURIComponent(clientId)}` : '/forgot-password'}
+          className="self-end text-label-md text-primary hover:underline"
+        >
           {t('forgotPassword')}
         </Link>
         <Link
