@@ -566,6 +566,7 @@
   },
   "forgotPassword": {
     "title": "Reset your password",
+    "logoAlt": "Company logo",
     "subtitle": "Enter your email and we'll send you a reset link.",
     "email": "Email Address",
     "submit": "Send reset link",

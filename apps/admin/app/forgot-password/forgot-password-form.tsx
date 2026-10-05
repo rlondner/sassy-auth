@@ -7,11 +7,15 @@ import { AuthCard, Button, FormField } from '@sassy-auth/ui'
 import { requestPasswordResetAction } from './actions'
 
 export function ForgotPasswordForm({
+  next = '',
+  logo = null,
   pageLightBackgroundColor = null,
   pageDarkBackgroundColor = null,
   cardLightBackgroundColor = null,
   cardDarkBackgroundColor = null,
 }: {
+  next?: string
+  logo?: string | null
   pageLightBackgroundColor?: string | null
   pageDarkBackgroundColor?: string | null
   cardLightBackgroundColor?: string | null
@@ -27,12 +31,17 @@ export function ForgotPasswordForm({
     <AuthCard
       title={t('title')}
       subtitle={t('subtitle')}
+      logoUrl={logo}
+      logoAlt={t('logoAlt')}
       pageLightBackgroundColor={pageLightBackgroundColor}
       pageDarkBackgroundColor={pageDarkBackgroundColor}
       cardLightBackgroundColor={cardLightBackgroundColor}
       cardDarkBackgroundColor={cardDarkBackgroundColor}
       footer={
-        <Link href="/login" className="text-label-md text-primary hover:underline">
+        <Link
+          href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}
+          className="text-label-md text-primary hover:underline"
+        >
           {t('backToLogin')}
         </Link>
       }

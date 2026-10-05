@@ -16,6 +16,7 @@ export default async function LoginCodePage({
   return (
     <LoginOtpForm
       next={nextSafe ?? ''}
+      logo={branding.logo}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
       cardLightBackgroundColor={branding.cardLightBackgroundColor}

@@ -1,3 +1,5 @@
+import { validateNextUrl } from '@/lib/safe-next'
+import { clientIdFromNext } from '@/lib/client-id-from-next'
 import { fetchAppBranding } from '@/lib/app-branding'
 import { ForgotPasswordForm } from './forgot-password-form'
 
@@ -6,12 +8,15 @@ export const dynamic = 'force-dynamic'
 export default async function ForgotPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ client_id?: string }>
+  searchParams: Promise<{ next?: string }>
 }) {
-  const { client_id: clientId } = await searchParams
-  const branding = await fetchAppBranding(clientId ?? null)
+  const { next } = await searchParams
+  const nextSafe = validateNextUrl(next)
+  const branding = await fetchAppBranding(clientIdFromNext(nextSafe ?? ''))
   return (
     <ForgotPasswordForm
+      next={nextSafe ?? ''}
+      logo={branding.logo}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
       cardLightBackgroundColor={branding.cardLightBackgroundColor}

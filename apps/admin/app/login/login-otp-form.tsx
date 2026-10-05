@@ -10,12 +10,14 @@ import { requestOtp, verifyOtp } from './actions'
 
 export function LoginOtpForm({
   next,
+  logo = null,
   pageLightBackgroundColor = null,
   pageDarkBackgroundColor = null,
   cardLightBackgroundColor = null,
   cardDarkBackgroundColor = null,
 }: {
   next: string
+  logo?: string | null
   pageLightBackgroundColor?: string | null
   pageDarkBackgroundColor?: string | null
   cardLightBackgroundColor?: string | null
@@ -61,6 +63,8 @@ export function LoginOtpForm({
     <AuthCard
       title={t('otp.title')}
       subtitle={t('otp.subtitle')}
+      logoUrl={logo}
+      logoAlt={t('logoAlt')}
       pageLightBackgroundColor={pageLightBackgroundColor}
       pageDarkBackgroundColor={pageDarkBackgroundColor}
       cardLightBackgroundColor={cardLightBackgroundColor}
@@ -82,7 +86,10 @@ export function LoginOtpForm({
             <p data-testid="otp-error" className="text-label-md text-destructive">{errKey(reqState.error)}</p>
           )}
           <Button type="submit" className="w-full" loading={reqPending}>{t('otp.sendCode')}</Button>
-          <Link href="/login" className="self-center text-label-md text-primary hover:underline">
+          <Link
+            href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}
+            className="self-center text-label-md text-primary hover:underline"
+          >
             {t('otp.usePassword')}
           </Link>
         </form>

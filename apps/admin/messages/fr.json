@@ -566,6 +566,7 @@
   },
   "forgotPassword": {
     "title": "Réinitialiser votre mot de passe",
+    "logoAlt": "Logo de l'entreprise",
     "subtitle": "Saisissez votre adresse e-mail et nous vous enverrons un lien de réinitialisation.",
     "email": "Adresse e-mail",
     "submit": "Envoyer le lien",

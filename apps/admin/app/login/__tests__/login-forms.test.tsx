@@ -192,15 +192,18 @@ describe('LoginForm', () => {
     expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
   })
 
-  it('carries client_id on the forgot-password link when next has one', () => {
+  it('carries next on the forgot-password link so client_id and branding survive', () => {
     wrap(<LoginForm next="/api/token/oauth/authorize?client_id=sq_1&redirect_uri=x" authServerUrl="https://auth.test" />)
 
     const link = screen.getByText(messages.login.forgotPassword).closest('a')
-    expect(link).toHaveAttribute('href', '/forgot-password?client_id=sq_1')
+    expect(link).toHaveAttribute(
+      'href',
+      '/forgot-password?next=%2Fapi%2Ftoken%2Foauth%2Fauthorize%3Fclient_id%3Dsq_1%26redirect_uri%3Dx',
+    )
   })
 
-  it('does not carry client_id on the forgot-password link when next has none', () => {
-    wrap(<LoginForm next="/orgs" authServerUrl="https://auth.test" />)
+  it('does not carry next on the forgot-password link when there is none', () => {
+    wrap(<LoginForm next="" authServerUrl="https://auth.test" />)
 
     const link = screen.getByText(messages.login.forgotPassword).closest('a')
     expect(link).toHaveAttribute('href', '/forgot-password')
