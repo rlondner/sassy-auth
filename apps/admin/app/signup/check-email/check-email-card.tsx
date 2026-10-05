@@ -10,10 +10,18 @@ export function CheckEmailCard({
   email,
   next,
   authServerUrl,
+  pageLightBackgroundColor = null,
+  pageDarkBackgroundColor = null,
+  cardLightBackgroundColor = null,
+  cardDarkBackgroundColor = null,
 }: {
   email: string
   next: string
   authServerUrl: string
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
 }) {
   const t = useTranslations('signup.checkEmail')
   const { resend, status, cooldown } = useResendVerificationEmail({ email, authServerUrl })
@@ -24,6 +32,10 @@ export function CheckEmailCard({
     <AuthCard
       title={t('title')}
       subtitle={t('subtitle', { email })}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
       footer={
         <Link href={loginHref} className="text-label-md text-primary hover:underline">
           {t('backToLogin')}

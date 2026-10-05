@@ -41,8 +41,11 @@ export default async function SignupPage({
     )
   }
 
-  const { name: appName, hasDefaultOrg, passwordPolicy, logo, privacyPolicyUrl, termsUrl, gdprUrl, gdprRequired, emailVerificationMethod } =
-    await fetchAppInfo(clientId)
+  const {
+    name: appName, hasDefaultOrg, passwordPolicy, logo, privacyPolicyUrl, termsUrl, gdprUrl, gdprRequired,
+    emailVerificationMethod,
+    pageLightBackgroundColor, pageDarkBackgroundColor, cardLightBackgroundColor, cardDarkBackgroundColor,
+  } = await fetchAppInfo(clientId)
   const nextSafe = next ?? ''
   const footer = (
     <Link
@@ -65,6 +68,10 @@ export default async function SignupPage({
         gdprUrl={gdprRequired ? gdprUrl : null}
         appName={appName}
         logo={logo}
+        pageLightBackgroundColor={pageLightBackgroundColor}
+        pageDarkBackgroundColor={pageDarkBackgroundColor}
+        cardLightBackgroundColor={cardLightBackgroundColor}
+        cardDarkBackgroundColor={cardDarkBackgroundColor}
         footer={footer}
       />
     )
@@ -76,6 +83,10 @@ export default async function SignupPage({
       subtitle={hasDefaultOrg ? t('signup.subtitleDefaultOrg') : t('signup.subtitle')}
       logoUrl={logo}
       logoAlt={appName ?? t('signup.title')}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
       footer={footer}
     >
       <SignupForm

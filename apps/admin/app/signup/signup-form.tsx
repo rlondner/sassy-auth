@@ -105,7 +105,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         return
       }
       router.push(
-        `/signup/check-email?email=${encodeURIComponent(email)}&clientId=${encodeURIComponent(clientId)}${next ? `&next=${encodeURIComponent(next)}` : ''}`,
+        `/signup/check-email?email=${encodeURIComponent(email)}&client_id=${encodeURIComponent(clientId)}${next ? `&next=${encodeURIComponent(next)}` : ''}`,
       )
     } catch {
       setError(t('signup.errors.validationError'))

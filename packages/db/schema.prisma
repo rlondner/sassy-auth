@@ -126,6 +126,15 @@ model SaApp {
   /// Full data URI. null = no favicon set; the signup/login pages fall back
   /// to the browser's default icon (no site-wide favicon exists either way).
   favicon     String?
+  /// 6-digit hex (e.g. "#0F172A"). null = use the default theme background.
+  /// Overrides the page's background on sign in/sign up (light mode).
+  pageLightBackgroundColor String?
+  /// Same as pageLightBackgroundColor, for dark mode.
+  pageDarkBackgroundColor  String?
+  /// Same as pageLightBackgroundColor, but for the card, not the page.
+  cardLightBackgroundColor String?
+  /// Same as cardLightBackgroundColor, for dark mode.
+  cardDarkBackgroundColor  String?
   twoFactorTrustDays Int?
   twoFactorPromptEnabled Boolean? // null = inherit system default (TWO_FACTOR_PROMPT_ENABLED)
   requireTwoFactor   Boolean        @default(false)

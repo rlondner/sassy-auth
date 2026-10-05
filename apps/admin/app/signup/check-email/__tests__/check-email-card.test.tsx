@@ -57,4 +57,20 @@ describe('CheckEmailCard', () => {
       '/login?next=%2Forgs',
     )
   })
+
+  it('applies background color overrides when provided', () => {
+    const { container } = render(
+      <CheckEmailCard
+        email="alice@example.com"
+        next=""
+        authServerUrl="https://auth.example.com"
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
+  })
 })

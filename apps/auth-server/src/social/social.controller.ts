@@ -51,7 +51,9 @@ export class SocialController {
   @SkipThrottle({ default: true, auth: true })
   @Get()
   async list(@Query('client_id') clientId?: string): Promise<{
-    providers: string[]; logo: string | null; name: string | null; favicon: string | null
+    providers: string[]; logo: string | null; name: string | null; favicon: string | null;
+    pageLightBackgroundColor: string | null; pageDarkBackgroundColor: string | null;
+    cardLightBackgroundColor: string | null; cardDarkBackgroundColor: string | null;
   }> {
     const [providers, branding] = await Promise.all([
       this.social.listForApp(clientId),

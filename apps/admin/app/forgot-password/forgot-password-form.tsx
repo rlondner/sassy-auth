@@ -6,7 +6,17 @@ import { useActionState } from 'react'
 import { AuthCard, Button, FormField } from '@sassy-auth/ui'
 import { requestPasswordResetAction } from './actions'
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({
+  pageLightBackgroundColor = null,
+  pageDarkBackgroundColor = null,
+  cardLightBackgroundColor = null,
+  cardDarkBackgroundColor = null,
+}: {
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
+} = {}) {
   const t = useTranslations('forgotPassword')
   const [state, formAction, isPending] = useActionState(
     async (_prev: { done?: boolean } | { done: true }, formData: FormData) => requestPasswordResetAction(formData),
@@ -17,6 +27,10 @@ export function ForgotPasswordForm() {
     <AuthCard
       title={t('title')}
       subtitle={t('subtitle')}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
       footer={
         <Link href="/login" className="text-label-md text-primary hover:underline">
           {t('backToLogin')}

@@ -47,22 +47,74 @@ describe('SocialService.getBrandingForApp', () => {
       name: 'Acme',
       logo: 'data:image/png;base64,AAA=',
       favicon: 'data:image/png;base64,FFF=',
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
     });
   });
 
   it('returns all-null fields for a known app with none set', async () => {
     const svc = makeService([], { id: 7, name: null, logo: null, favicon: null });
-    await expect(svc.getBrandingForApp('qp31')).resolves.toEqual({ name: null, logo: null, favicon: null });
+    await expect(svc.getBrandingForApp('qp31')).resolves.toEqual({
+      name: null, logo: null, favicon: null,
+      pageLightBackgroundColor: null, pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null, cardDarkBackgroundColor: null,
+    });
   });
 
   it('returns all-null fields for an unknown client_id rather than throwing', async () => {
     const svc = makeService([], null);
-    await expect(svc.getBrandingForApp('nope')).resolves.toEqual({ name: null, logo: null, favicon: null });
+    await expect(svc.getBrandingForApp('nope')).resolves.toEqual({
+      name: null, logo: null, favicon: null,
+      pageLightBackgroundColor: null, pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null, cardDarkBackgroundColor: null,
+    });
   });
 
   it('returns all-null fields when no client_id is given', async () => {
     const svc = makeService([], null);
-    await expect(svc.getBrandingForApp(undefined)).resolves.toEqual({ name: null, logo: null, favicon: null });
+    await expect(svc.getBrandingForApp(undefined)).resolves.toEqual({
+      name: null, logo: null, favicon: null,
+      pageLightBackgroundColor: null, pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null, cardDarkBackgroundColor: null,
+    });
+  });
+
+  it('getBrandingForApp includes the 4 background color overrides', async () => {
+    const db = {
+      saApp: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 1, name: 'App', logo: null, favicon: null,
+          pageLightBackgroundColor: '#111111',
+          pageDarkBackgroundColor: '#222222',
+          cardLightBackgroundColor: '#333333',
+          cardDarkBackgroundColor: '#444444',
+        }),
+      },
+      saSocialProvider: { findMany: jest.fn(), upsert: jest.fn() },
+    };
+    const service = new SocialService(db as never, {} as never);
+
+    const result = await service.getBrandingForApp('client-1');
+
+    expect(result.pageLightBackgroundColor).toBe('#111111');
+    expect(result.pageDarkBackgroundColor).toBe('#222222');
+    expect(result.cardLightBackgroundColor).toBe('#333333');
+    expect(result.cardDarkBackgroundColor).toBe('#444444');
+  });
+
+  it('getBrandingForApp defaults the 4 background color overrides to null for an unknown client_id', async () => {
+    const db = {
+      saApp: { findUnique: jest.fn().mockResolvedValue(null) },
+      saSocialProvider: { findMany: jest.fn(), upsert: jest.fn() },
+    };
+    const service = new SocialService(db as never, {} as never);
+
+    const result = await service.getBrandingForApp('unknown');
+
+    expect(result.pageLightBackgroundColor).toBeNull();
+    expect(result.cardDarkBackgroundColor).toBeNull();
   });
 });
 

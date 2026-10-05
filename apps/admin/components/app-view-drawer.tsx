@@ -124,6 +124,33 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
               )}
             </div>
           </div>
+          {(displayApp.pageLightBackgroundColor || displayApp.pageDarkBackgroundColor || displayApp.cardLightBackgroundColor || displayApp.cardDarkBackgroundColor) && (
+            <div>
+              <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">
+                {t('apps.fields.backgroundColors')}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-3">
+                {([
+                  ['pageLightBackgroundColor', displayApp.pageLightBackgroundColor],
+                  ['pageDarkBackgroundColor', displayApp.pageDarkBackgroundColor],
+                  ['cardLightBackgroundColor', displayApp.cardLightBackgroundColor],
+                  ['cardDarkBackgroundColor', displayApp.cardDarkBackgroundColor],
+                ] as const).map(([key, color]) =>
+                  color ? (
+                    <div key={key} className="flex items-center gap-2 rounded border border-border bg-card px-2 py-1">
+                      <span
+                        className="h-4 w-4 shrink-0 rounded-full border border-border"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-body-sm text-muted-foreground">
+                        {t(`apps.fields.${key}`)}: {color}
+                      </span>
+                    </div>
+                  ) : null,
+                )}
+              </div>
+            </div>
+          )}
           <RedirectUriGroup
             label={t('apps.fields.loginRedirectUris')}
             uris={(displayApp.redirectUris ?? []).filter((r) => r.kind === 'login')}

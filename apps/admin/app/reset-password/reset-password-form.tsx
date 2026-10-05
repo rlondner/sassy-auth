@@ -23,18 +23,25 @@ export function ResetPasswordForm({ token }: { token: string }) {
   // enforcement (Task 7) is the real gate regardless of what this checklist
   // shows.
   const [policy, setPolicy] = React.useState<PasswordPolicy>(FALLBACK_PASSWORD_POLICY)
+  const [branding, setBranding] = React.useState<{
+    pageLightBackgroundColor: string | null
+    pageDarkBackgroundColor: string | null
+    cardLightBackgroundColor: string | null
+    cardDarkBackgroundColor: string | null
+  }>({ pageLightBackgroundColor: null, pageDarkBackgroundColor: null, cardLightBackgroundColor: null, cardDarkBackgroundColor: null })
 
   React.useEffect(() => {
     let cancelled = false
     getPasswordPolicyForResetToken(token)
       .then((fetched) => {
         if (cancelled) return
-        setPolicy(fetched)
+        setPolicy(fetched.passwordPolicy)
+        setBranding(fetched)
       })
       .catch(() => {
-        // Silently keep FALLBACK_POLICY: the server-side hooks.before
-        // enforcement is the real gate regardless of what this checklist
-        // shows.
+        // Silently keep FALLBACK_POLICY/all-null branding: the server-side
+        // hooks.before enforcement is the real gate regardless of what this
+        // checklist/background shows.
       })
     return () => {
       cancelled = true
@@ -72,6 +79,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
             {t('backToLogin')}
           </Link>
         }
+        pageLightBackgroundColor={branding.pageLightBackgroundColor}
+        pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
+        cardLightBackgroundColor={branding.cardLightBackgroundColor}
+        cardDarkBackgroundColor={branding.cardDarkBackgroundColor}
       >
         <p data-testid="reset-success" className="text-center text-body-md text-foreground">{t('success')}</p>
       </AuthCard>
@@ -79,7 +90,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <AuthCard title={t('title')}>
+    <AuthCard
+      title={t('title')}
+      pageLightBackgroundColor={branding.pageLightBackgroundColor}
+      pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
+      cardLightBackgroundColor={branding.cardLightBackgroundColor}
+      cardDarkBackgroundColor={branding.cardDarkBackgroundColor}
+    >
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <FormField

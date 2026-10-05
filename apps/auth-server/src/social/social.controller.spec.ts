@@ -29,7 +29,18 @@ const authedSession = { user: { id: 'ba-caller' }, session: {} };
 describe('SocialController (public reachability)', () => {
   let app: INestApplication;
 
-  async function buildApp(listForApp: jest.Mock, branding: { name: string | null; logo: string | null; favicon: string | null } = { name: null, logo: null, favicon: null }): Promise<INestApplication> {
+  async function buildApp(
+    listForApp: jest.Mock,
+    branding: {
+      name: string | null; logo: string | null; favicon: string | null;
+      pageLightBackgroundColor?: string | null; pageDarkBackgroundColor?: string | null;
+      cardLightBackgroundColor?: string | null; cardDarkBackgroundColor?: string | null;
+    } = {
+      name: null, logo: null, favicon: null,
+      pageLightBackgroundColor: null, pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null, cardDarkBackgroundColor: null,
+    },
+  ): Promise<INestApplication> {
     const getBrandingForApp = jest.fn().mockResolvedValue(branding);
     const moduleRef = await Test.createTestingModule({
       controllers: [SocialController],
@@ -51,7 +62,11 @@ describe('SocialController (public reachability)', () => {
       .get('/api/social-providers')
       .query({ client_id: 'qp31' });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ providers: ['google'], logo: null, name: null, favicon: null });
+    expect(res.body).toEqual({
+      providers: ['google'], logo: null, name: null, favicon: null,
+      pageLightBackgroundColor: null, pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null, cardDarkBackgroundColor: null,
+    });
   });
 
   it('answers 200 with an empty list for an unknown client_id — never 404', async () => {
@@ -60,7 +75,32 @@ describe('SocialController (public reachability)', () => {
       .get('/api/social-providers')
       .query({ client_id: 'doesnotexist' });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ providers: [], logo: null, name: null, favicon: null });
+    expect(res.body).toEqual({
+      providers: [], logo: null, name: null, favicon: null,
+      pageLightBackgroundColor: null, pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null, cardDarkBackgroundColor: null,
+    });
+  });
+
+  it('passes through the 4 background color overrides from getBrandingForApp', async () => {
+    app = await buildApp(jest.fn().mockResolvedValue(['google']), {
+      name: 'Acme', logo: null, favicon: null,
+      pageLightBackgroundColor: '#111111',
+      pageDarkBackgroundColor: '#222222',
+      cardLightBackgroundColor: '#333333',
+      cardDarkBackgroundColor: '#444444',
+    });
+    const res = await request(app.getHttpServer())
+      .get('/api/social-providers')
+      .query({ client_id: 'qp31' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      providers: ['google'], logo: null, name: 'Acme', favicon: null,
+      pageLightBackgroundColor: '#111111',
+      pageDarkBackgroundColor: '#222222',
+      cardLightBackgroundColor: '#333333',
+      cardDarkBackgroundColor: '#444444',
+    });
   });
 
   it('sends no cookie/authorization header, proving the route needs none', async () => {

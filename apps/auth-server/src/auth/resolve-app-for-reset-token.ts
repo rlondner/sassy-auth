@@ -13,7 +13,14 @@ import type { PrismaClient } from '@sassy-auth/db';
 export async function resolveAppForResetToken(
   prisma: Pick<PrismaClient, 'verification' | 'saUser' | 'saApp'>,
   token: string,
-): Promise<{ id: number; passwordPolicyOverride: unknown } | null> {
+): Promise<{
+  id: number;
+  passwordPolicyOverride: unknown;
+  pageLightBackgroundColor: string | null;
+  pageDarkBackgroundColor: string | null;
+  cardLightBackgroundColor: string | null;
+  cardDarkBackgroundColor: string | null;
+} | null> {
   const verification = await prisma.verification.findFirst({
     where: { identifier: `reset-password:${token}` },
   });
@@ -27,6 +34,13 @@ export async function resolveAppForResetToken(
 
   return prisma.saApp.findUnique({
     where: { id: user.org.appId },
-    select: { id: true, passwordPolicyOverride: true },
+    select: {
+      id: true,
+      passwordPolicyOverride: true,
+      pageLightBackgroundColor: true,
+      pageDarkBackgroundColor: true,
+      cardLightBackgroundColor: true,
+      cardDarkBackgroundColor: true,
+    },
   });
 }

@@ -16,6 +16,10 @@ interface SignupWizardCardProps {
   gdprUrl: string | null
   appName: string | null
   logo: string | null
+  pageLightBackgroundColor: string | null
+  pageDarkBackgroundColor: string | null
+  cardLightBackgroundColor: string | null
+  cardDarkBackgroundColor: string | null
   footer: React.ReactNode
 }
 
@@ -29,6 +33,10 @@ export function SignupWizardCard({
   gdprUrl,
   appName,
   logo,
+  pageLightBackgroundColor,
+  pageDarkBackgroundColor,
+  cardLightBackgroundColor,
+  cardDarkBackgroundColor,
   footer,
 }: SignupWizardCardProps) {
   const t = useTranslations('signup')
@@ -39,7 +47,17 @@ export function SignupWizardCard({
     step === 'code' ? t('verifyCode.headerSubtitle') : hasDefaultOrg ? t('subtitleDefaultOrg') : t('subtitle')
 
   return (
-    <AuthCard title={title} subtitle={subtitle} logoUrl={logo} logoAlt={appName ?? t('title')} footer={footer}>
+    <AuthCard
+      title={title}
+      subtitle={subtitle}
+      logoUrl={logo}
+      logoAlt={appName ?? t('title')}
+      footer={footer}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
+    >
       <SignupWizard
         clientId={clientId}
         next={next}

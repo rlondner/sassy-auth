@@ -3,12 +3,27 @@
 import { useState, useActionState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@sassy-auth/ui'
+import { AuthBackgroundStyle } from '@/components/auth-background-style'
 import { verifyTotp, verifyBackupCode } from '../actions'
 
 const inputClass =
   'flex h-9 w-full rounded border border-[var(--border)] bg-[var(--card)] px-3 text-body-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] tracking-widest'
 
-export function TwoFactorForm({ next, trustDays = 14 }: { next: string; trustDays?: number }) {
+export function TwoFactorForm({
+  next,
+  trustDays = 14,
+  pageLightBackgroundColor = null,
+  pageDarkBackgroundColor = null,
+  cardLightBackgroundColor = null,
+  cardDarkBackgroundColor = null,
+}: {
+  next: string
+  trustDays?: number
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
+}) {
   const t = useTranslations('twoFactor')
   const [mode, setMode] = useState<'totp' | 'backup'>('totp')
   const [trustDevice, setTrustDevice] = useState(true)
@@ -45,8 +60,20 @@ export function TwoFactorForm({ next, trustDays = 14 }: { next: string; trustDay
   )
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
-      <div className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm">
+    <div
+      className="flex min-h-screen items-center justify-center bg-[var(--background)]"
+      data-auth-page-bg=""
+    >
+      <AuthBackgroundStyle
+        pageLightBackgroundColor={pageLightBackgroundColor}
+        pageDarkBackgroundColor={pageDarkBackgroundColor}
+        cardLightBackgroundColor={cardLightBackgroundColor}
+        cardDarkBackgroundColor={cardDarkBackgroundColor}
+      />
+      <div
+        className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm"
+        data-auth-card-bg=""
+      >
         <div className="mb-6 text-center">
           <h1 className="text-headline-sm text-[var(--foreground)]">
             {mode === 'totp' ? t('title') : t('backupTitle')}

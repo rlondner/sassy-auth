@@ -124,6 +124,10 @@ describe('AppCreateDrawer', () => {
         url: 'https://x.example',
         logo: null,
         favicon: null,
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
         redirectUris: [],
         // 2FA per-app enforcement (bug-free defaults for a fresh app): the
         // drawer always sends both fields so an unchecked box is an explicit

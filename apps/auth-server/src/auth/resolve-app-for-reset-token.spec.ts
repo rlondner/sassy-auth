@@ -35,4 +35,23 @@ describe('resolveAppForResetToken', () => {
     const app = await resolveAppForResetToken(prisma as any, 'tok');
     expect(app).toEqual({ id: 7, passwordPolicyOverride: null });
   });
+
+  it('includes the 4 background color overrides', async () => {
+    const prisma = {
+      verification: { findFirst: jest.fn().mockResolvedValue({ value: 'ba-user-1' }) },
+      saUser: { findFirst: jest.fn().mockResolvedValue({ org: { appId: 1 } }) },
+      saApp: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 1, passwordPolicyOverride: null,
+          pageLightBackgroundColor: '#111111', pageDarkBackgroundColor: '#222222',
+          cardLightBackgroundColor: '#333333', cardDarkBackgroundColor: '#444444',
+        }),
+      },
+    };
+
+    const result = await resolveAppForResetToken(prisma as never, 'token-1');
+
+    expect(result?.pageLightBackgroundColor).toBe('#111111');
+    expect(result?.cardDarkBackgroundColor).toBe('#444444');
+  });
 });

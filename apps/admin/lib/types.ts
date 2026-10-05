@@ -94,6 +94,10 @@ export interface App {
   url: string;
   logo?: string | null;
   favicon?: string | null;
+  pageLightBackgroundColor?: string | null;
+  pageDarkBackgroundColor?: string | null;
+  cardLightBackgroundColor?: string | null;
+  cardDarkBackgroundColor?: string | null;
   redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
@@ -124,6 +128,10 @@ export interface CreateAppPayload {
   url: string;
   logo?: string | null;
   favicon?: string | null;
+  pageLightBackgroundColor?: string | null;
+  pageDarkBackgroundColor?: string | null;
+  cardLightBackgroundColor?: string | null;
+  cardDarkBackgroundColor?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   twoFactorPromptEnabled?: boolean | null;
@@ -136,6 +144,10 @@ export interface UpdateAppPayload {
   url?: string;
   logo?: string | null;
   favicon?: string | null;
+  pageLightBackgroundColor?: string | null;
+  pageDarkBackgroundColor?: string | null;
+  cardLightBackgroundColor?: string | null;
+  cardDarkBackgroundColor?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   twoFactorPromptEnabled?: boolean | null;
