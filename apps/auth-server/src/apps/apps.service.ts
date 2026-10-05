@@ -17,6 +17,10 @@ import { ListAppsQueryDto } from './dto/list-apps-query.dto';
 type RedirectUriRow = { uri: string; kind: string };
 type AppRow = {
   publicId: string; name: string; url: string; logo?: string | null; favicon?: string | null; isPlatform: boolean;
+  pageLightBackgroundColor?: string | null;
+  pageDarkBackgroundColor?: string | null;
+  cardLightBackgroundColor?: string | null;
+  cardDarkBackgroundColor?: string | null;
   twoFactorTrustDays: number | null; twoFactorPromptEnabled: boolean | null; requireTwoFactor: boolean;
   allowOfflineAccess: boolean;
   redirectUris?: RedirectUriRow[];
@@ -39,6 +43,10 @@ type AppRow = {
 function formatApp(a: AppRow) {
   return {
     publicId: a.publicId, name: a.name, url: a.url, logo: a.logo ?? null, favicon: a.favicon ?? null, isPlatform: a.isPlatform,
+    pageLightBackgroundColor: a.pageLightBackgroundColor ?? null,
+    pageDarkBackgroundColor: a.pageDarkBackgroundColor ?? null,
+    cardLightBackgroundColor: a.cardLightBackgroundColor ?? null,
+    cardDarkBackgroundColor: a.cardDarkBackgroundColor ?? null,
     twoFactorTrustDays: a.twoFactorTrustDays ?? null,
     twoFactorPromptEnabled: a.twoFactorPromptEnabled ?? null,
     requireTwoFactor: a.requireTwoFactor,
@@ -280,7 +288,13 @@ export class AppsService {
       type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
       const created = await prisma.$transaction(async (tx: Tx) => {
         const draft = await tx.saApp.create({
-          data: { publicId: generatePendingPublicId(), name: dto.name, url: dto.url, logo: dto.logo ?? null, favicon: dto.favicon ?? null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null, twoFactorPromptEnabled: dto.twoFactorPromptEnabled ?? null, requireTwoFactor: dto.requireTwoFactor ?? false, allowOfflineAccess: dto.allowOfflineAccess ?? false },
+          data: {
+            publicId: generatePendingPublicId(), name: dto.name, url: dto.url, logo: dto.logo ?? null, favicon: dto.favicon ?? null, isPlatform: false, twoFactorTrustDays: dto.twoFactorTrustDays ?? null, twoFactorPromptEnabled: dto.twoFactorPromptEnabled ?? null, requireTwoFactor: dto.requireTwoFactor ?? false, allowOfflineAccess: dto.allowOfflineAccess ?? false,
+            pageLightBackgroundColor: dto.pageLightBackgroundColor ?? null,
+            pageDarkBackgroundColor: dto.pageDarkBackgroundColor ?? null,
+            cardLightBackgroundColor: dto.cardLightBackgroundColor ?? null,
+            cardDarkBackgroundColor: dto.cardDarkBackgroundColor ?? null,
+          },
         });
         const updated = await tx.saApp.update({ where: { id: draft.id }, data: { publicId: this.sqids.encode(draft.id) } });
         if (dto.redirectUris) {
@@ -305,6 +319,10 @@ export class AppsService {
       dto.url === undefined &&
       dto.logo === undefined &&
       dto.favicon === undefined &&
+      dto.pageLightBackgroundColor === undefined &&
+      dto.pageDarkBackgroundColor === undefined &&
+      dto.cardLightBackgroundColor === undefined &&
+      dto.cardDarkBackgroundColor === undefined &&
       dto.twoFactorTrustDays === undefined &&
       dto.twoFactorPromptEnabled === undefined &&
       dto.requireTwoFactor === undefined &&
@@ -321,7 +339,7 @@ export class AppsService {
       dto.emailVerificationMethod === undefined
     ) {
       throw new BadRequestException(
-        'At least one of name, url, logo, favicon, twoFactorTrustDays, twoFactorPromptEnabled, requireTwoFactor, allowOfflineAccess, redirectUris, defaultOrgId, defaultRoleId, passwordPolicyOverride, activationWebhookUrl, privacyPolicyUrl, termsUrl, gdprUrl, activationEmailOverride, or emailVerificationMethod must be provided',
+        'At least one of name, url, logo, favicon, pageLightBackgroundColor, pageDarkBackgroundColor, cardLightBackgroundColor, cardDarkBackgroundColor, twoFactorTrustDays, twoFactorPromptEnabled, requireTwoFactor, allowOfflineAccess, redirectUris, defaultOrgId, defaultRoleId, passwordPolicyOverride, activationWebhookUrl, privacyPolicyUrl, termsUrl, gdprUrl, activationEmailOverride, or emailVerificationMethod must be provided',
       );
     }
     await checkPermission(callerBaId, 'platform.apps.manage');
@@ -349,6 +367,10 @@ export class AppsService {
             ...(dto.url !== undefined && { url: dto.url }),
             ...(dto.logo !== undefined && { logo: dto.logo }),
             ...(dto.favicon !== undefined && { favicon: dto.favicon }),
+            ...(dto.pageLightBackgroundColor !== undefined && { pageLightBackgroundColor: dto.pageLightBackgroundColor }),
+            ...(dto.pageDarkBackgroundColor !== undefined && { pageDarkBackgroundColor: dto.pageDarkBackgroundColor }),
+            ...(dto.cardLightBackgroundColor !== undefined && { cardLightBackgroundColor: dto.cardLightBackgroundColor }),
+            ...(dto.cardDarkBackgroundColor !== undefined && { cardDarkBackgroundColor: dto.cardDarkBackgroundColor }),
             ...(dto.twoFactorTrustDays !== undefined && {
               twoFactorTrustDays: dto.twoFactorTrustDays,
             }),
