@@ -5,23 +5,9 @@ import { useTranslations } from 'next-intl'
 import { useActionState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuthCard, Button, FormField } from '@sassy-auth/ui'
+import { clientIdFromNext } from '@/lib/client-id-from-next'
 import { signIn } from './actions'
 import { SocialButtons } from './social-buttons'
-
-/**
- * `next` may be a relative or absolute authorize URL carrying `client_id` —
- * the same shape `applyPerAppTrustCookie` (app/login/actions.ts) already
- * parses for trust-day lookups. A placeholder base lets a relative `next`
- * parse without throwing.
- */
-function clientIdFromNext(next: string): string | null {
-  if (!next) return null
-  try {
-    return new URL(next, 'http://placeholder.invalid').searchParams.get('client_id')
-  } catch {
-    return null
-  }
-}
 
 export function LoginForm({
   next,
