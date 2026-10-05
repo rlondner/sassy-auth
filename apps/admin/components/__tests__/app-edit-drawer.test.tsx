@@ -229,6 +229,38 @@ describe('AppEditDrawer', () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
+  it('includes a changed favicon in the update payload', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: { ...app, name: 'X2' } })
+    const onOpenChange = jest.fn()
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+
+    const file = new File(['a'.repeat(10)], 'favicon.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText(en.apps.fields.favicon), { target: { files: [file] } })
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith(
+        'sq_1',
+        expect.objectContaining({ favicon: expect.stringMatching(/^data:image\/png;base64,/) }),
+      ),
+    )
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  it('backfills the favicon from getAppAction and does not mark the form dirty from that alone', async () => {
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, favicon: 'data:image/png;base64,EXISTING=' },
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    await waitFor(() =>
+      expect(screen.getByRole('img')).toHaveAttribute('src', 'data:image/png;base64,EXISTING='),
+    )
+    expect(screen.getByRole('button', { name: en.apps.drawer.save })).toBeDisabled()
+  })
+
   // Task 4: the single callbackUrl input is gone — apps now register a
   // repeatable list of login/post_logout redirect URIs.
   it('shows the no-login-URIs warning when the app has none registered', () => {
@@ -528,6 +560,48 @@ describe('AppEditDrawer', () => {
     // control touched at all".
     fireEvent.change(screen.getByLabelText(en.apps.fields.twoFactorPromptEnabled), { target: { value: 'true' } })
     expect(save).toBeDisabled()
+  })
+
+  it('changes emailVerificationMethod and includes it in the patch when changed', async () => {
+    ;(actions.updateAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, emailVerificationMethod: 'code' },
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    fireEvent.change(screen.getByLabelText(en.apps.fields.emailVerificationMethod), { target: { value: 'code' } })
+    fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
+
+    await waitFor(() =>
+      expect(actions.updateAppAction).toHaveBeenCalledWith('sq_1', { emailVerificationMethod: 'code' }),
+    )
+  })
+
+  it('does not mark the form dirty when emailVerificationMethod is re-selected to its current value', () => {
+    const appWithCode = { ...app, emailVerificationMethod: 'code' as const }
+    render(withIntl(<AppEditDrawer app={appWithCode} open onOpenChange={() => undefined} />))
+    const save = screen.getByRole('button', { name: en.apps.drawer.save })
+    expect(save).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText(en.apps.fields.emailVerificationMethod), { target: { value: 'code' } })
+    expect(save).toBeDisabled()
+  })
+
+  // Critical finding (code review of f6197ea): the list-sourced `app` prop's
+  // `emailVerificationMethod` is always undefined (same payload-size reason
+  // as `logo`/`activationEmailOverride` above), so the drawer must backfill
+  // it from the single-app fetch on open too, not just default to 'link'.
+  it('backfills emailVerificationMethod from getAppAction', async () => {
+    ;(actions.getAppAction as jest.Mock).mockResolvedValue({
+      app: { ...app, emailVerificationMethod: 'code' },
+    })
+    render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+
+    await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(en.apps.fields.emailVerificationMethod) as HTMLSelectElement).value,
+      ).toBe('code'),
+    )
   })
 
   // Task 8: Privacy Policy / Terms / GDPR URL fields (signup/login legal

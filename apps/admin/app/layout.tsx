@@ -15,6 +15,15 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: 'SassyAuth Admin',
   description: 'Platform administration console',
+  icons: {
+    icon: [
+      { url: '/favicon/favicon.ico' },
+      { url: '/favicon/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+    ],
+    apple: '/favicon/apple-touch-icon.png',
+  },
+  manifest: '/favicon/site.webmanifest',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

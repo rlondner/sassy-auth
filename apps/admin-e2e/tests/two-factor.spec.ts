@@ -337,12 +337,16 @@ test.describe('2FA — trust device', () => {
     // worked. By removing only the session cookie, the server treats the second
     // sign-in as a fresh authentication and must rely on the trust cookie to
     // skip the TOTP step.
-    await page.context().clearCookies({ name: 'better-auth.session_token' })
+    // Match by suffix, not the bare 'better-auth.session_token': under
+    // NODE_ENV=production (this suite's Caddy-proxied local setup)
+    // getBetterAuthCookieName prefixes it `__Secure-` and can swap in a
+    // custom COOKIE_PREFIX, unlike CI's unprefixed name.
+    await page.context().clearCookies({ name: /\.session_token$/ })
     await page.goto('/login')
 
     // ── Second login: trust cookie present, session gone → TOTP skipped ─────
     await page.getByLabel('Email').fill(TFA_EMAIL)
-    await page.getByLabel('Password').fill(TFA_PASSWORD)
+    await page.getByLabel('Password', { exact: true }).fill(TFA_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await page.waitForURL(
       /(\/users|\/login\/two-factor-prompt|\/login\/two-factor)/,
@@ -366,7 +370,7 @@ test.describe('2FA — trust device', () => {
     try {
       await freshPage.goto(`${ADMIN_URL}/login`)
       await freshPage.getByLabel('Email').fill(TFA_EMAIL)
-      await freshPage.getByLabel('Password').fill(TFA_PASSWORD)
+      await freshPage.getByLabel('Password', { exact: true }).fill(TFA_PASSWORD)
       await freshPage.getByRole('button', { name: /sign in/i }).click()
       await freshPage.waitForURL(
         /(\/login\/two-factor|\/users|\/login\/two-factor-prompt)/,
@@ -510,7 +514,7 @@ test.describe('2FA — admin reset', () => {
     try {
       await freshPage.goto(`${ADMIN_URL}/login`)
       await freshPage.getByLabel('Email').fill(TFA_EMAIL)
-      await freshPage.getByLabel('Password').fill(TFA_PASSWORD)
+      await freshPage.getByLabel('Password', { exact: true }).fill(TFA_PASSWORD)
       await freshPage.getByRole('button', { name: /sign in/i }).click()
       await freshPage.waitForURL(
         /(\/users|\/login\/two-factor-prompt|\/login\/two-factor)/,

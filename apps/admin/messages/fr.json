@@ -61,6 +61,20 @@
       "logoHint": "Affiché sur les pages de connexion et d'inscription de cette application. PNG, JPEG, WebP ou SVG, 250 Ko maximum.",
       "removeLogo": "Supprimer le logo",
       "noLogo": "Aucun logo configuré",
+      "favicon": "Favicon de l'application",
+      "faviconHint": "Affiché comme icône d'onglet sur les pages de connexion et d'inscription de cette application. PNG, JPEG, WebP ou SVG, 250 Ko maximum.",
+      "removeFavicon": "Supprimer le favicon",
+      "noFavicon": "Aucun favicon configuré",
+      "pageLightBackgroundColor": "Arrière-plan de la page (clair)",
+      "pageLightBackgroundColorHint": "Remplace l'arrière-plan de la page derrière la carte de connexion/inscription en mode clair.",
+      "pageDarkBackgroundColor": "Arrière-plan de la page (sombre)",
+      "pageDarkBackgroundColorHint": "Remplace l'arrière-plan de la page derrière la carte de connexion/inscription en mode sombre.",
+      "cardLightBackgroundColor": "Arrière-plan de la carte (clair)",
+      "cardLightBackgroundColorHint": "Remplace l'arrière-plan de la carte de connexion/inscription elle-même en mode clair.",
+      "cardDarkBackgroundColor": "Arrière-plan de la carte (sombre)",
+      "cardDarkBackgroundColorHint": "Remplace l'arrière-plan de la carte de connexion/inscription elle-même en mode sombre.",
+      "backgroundColors": "Couleurs d'arrière-plan",
+      "resetColorToDefault": "Réinitialiser par défaut",
       "twoFactorTrustDays": "Intervalle de confiance 2FA (jours)",
       "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",
       "twoFactorTrustDaysSystemDefault": "Valeur par défaut système",
@@ -118,7 +132,7 @@
       "webhookSecretConfigured": "Un secret est configuré.",
       "noWebhookSecret": "Aucun secret configuré.",
       "activationEmail": "E-mail d'activation",
-      "activationEmailHint": "Personnalisez l'e-mail envoyé lorsqu'une nouvelle inscription doit confirmer son adresse. Les variables '{{firstName}}', '{{appName}}' et '{{activationUrl}}' sont disponibles dans l'objet et le message.",
+      "activationEmailHint": "Personnalisez l'e-mail envoyé lorsqu'une nouvelle inscription doit confirmer son adresse. Les variables '{{firstName}}' et '{{appName}}' sont toujours disponibles dans l'objet et le message ; '{{activationUrl}}' est disponible en plus lors de l'utilisation de la méthode par lien.",
       "activationEmailFromName": "Nom de l'expéditeur",
       "activationEmailFromNamePlaceholder": "ex. Vibecast",
       "activationEmailFromAddress": "Adresse de l'expéditeur",
@@ -128,7 +142,11 @@
       "activationEmailSubjectPlaceholder": "Vérifiez votre adresse e-mail '{{appName}}'",
       "activationEmailMessage": "Message",
       "activationEmailMessagePlaceholder": "Confirmez votre adresse e-mail pour terminer la création de votre compte :",
-      "activationEmailMessageHint": "Affiché au-dessus du bouton de confirmation, qui est toujours ajouté automatiquement.",
+      "activationEmailMessageHint": "Affiché au-dessus du bouton de confirmation (méthode par lien) ou du code (méthode par code à 6 chiffres), tous deux toujours ajoutés automatiquement.",
+      "emailVerificationMethod": "Méthode de vérification",
+      "emailVerificationMethodHint": "Comment les nouveaux inscrits confirment leur adresse e-mail.",
+      "emailVerificationMethodLink": "Lien cliquable",
+      "emailVerificationMethodCode": "Code à 6 chiffres",
       "passwordPolicy": "Politique de mot de passe",
       "passwordPolicyOverrideToggle": "Remplacer la politique globale pour cette application",
       "passwordPolicyInherited": "Politique globale héritée : {summary}",
@@ -172,6 +190,9 @@
       "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
       "logoInvalidType": "Veuillez choisir une image PNG, JPEG, WebP ou SVG.",
       "logoTooLarge": "Cette image est trop volumineuse. Veuillez en choisir une de moins de 250 Ko.",
+      "invalidHexColor": "Saisissez une couleur hexadécimale à 6 chiffres (ex. #0F172A).",
+      "faviconInvalidType": "Veuillez choisir une image PNG, JPEG, WebP ou SVG.",
+      "faviconTooLarge": "Cette image est trop volumineuse. Veuillez en choisir une de moins de 250 Ko.",
       "nameRequired": "Le nom de l’application est requis.",
       "activationEmailInvalid": "Veuillez vérifier les paramètres de l'e-mail d'activation — l'adresse d'expéditeur doit être une adresse e-mail valide et aucun champ ne doit contenir de saut de ligne."
     },
@@ -503,7 +524,8 @@
       "activate": "Activer",
       "delete": "Supprimer",
       "resendInvitation": "Renvoyer l’invitation",
-      "resend": "Resend Invitation"
+      "resend": "Resend Invitation",
+      "resendActivation": "Renvoyer l’e-mail d’activation"
     },
     "toast": {
       "created": "User created",
@@ -512,7 +534,8 @@
       "resent": "Invitation resent",
       "resetLinkGenerated": "Lien de réinitialisation généré",
       "activated": "Utilisateur activé",
-      "deactivated": "Utilisateur désactivé"
+      "deactivated": "Utilisateur désactivé",
+      "activationResent": "E-mail d’activation renvoyé"
     },
     "confirmDelete": {
       "title": "Supprimer l’utilisateur",
@@ -532,6 +555,7 @@
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "noPassword": "Cet utilisateur n’a pas de mot de passe à réinitialiser.",
       "notPending": "Cet utilisateur n’est plus en attente d’invitation.",
+      "notUnverified": "L’adresse e-mail de cet utilisateur est déjà vérifiée.",
       "rolesSetFailed": "Échec de la mise à jour des rôles.",
       "directPermissionsSetFailed": "Échec de la mise à jour des permissions directes.",
       "selfDeactivate": "Vous ne pouvez pas désactiver votre propre compte.",
@@ -615,10 +639,10 @@
     }
   },
   "signup": {
-    "title": "Créez votre compte",
-    "titleWithApp": "Créez votre compte pour {appName}",
-    "subtitle": "Configurez votre organisation pour commencer.",
-    "subtitleDefaultOrg": "Créez votre compte pour commencer.",
+    "title": "Bienvenue",
+    "titleWithApp": "Bienvenue sur {appName}",
+    "subtitle": "Commençons par vous inscrire.",
+    "subtitleDefaultOrg": "Commençons par vous inscrire.",
     "invalidLink": "Ce lien d'inscription a expiré ou est invalide. Contactez l'application concernée pour en obtenir un nouveau.",
     "firstName": "Prénom",
     "lastName": "Nom",
@@ -630,7 +654,16 @@
     "acceptTerms": "J'ai lu et j'accepte les <link>conditions générales</link>",
     "acceptGdpr": "J'ai lu et j'accepte la <link>déclaration RGPD</link>",
     "submit": "Créer le compte",
+    "continue": "Continuer",
+    "marketingOptIn": "Merci de me tenir informé(e) des produits, actualités, événements et offres",
     "backToLogin": "Retour à la connexion",
+    "passwordStrength": {
+      "weak": "Faible",
+      "fair": "Moyen",
+      "good": "Bon",
+      "strong": "Fort",
+      "veryStrong": "Très fort"
+    },
     "checkEmail": {
       "title": "Vérifiez votre e-mail",
       "subtitle": "Nous avons envoyé un lien de vérification à {email}.",
@@ -641,10 +674,42 @@
       "resendError": "Impossible de renvoyer l'e-mail. Veuillez réessayer dans un instant.",
       "backToLogin": "Retour à la connexion"
     },
+    "verifyCode": {
+      "title": "Authentification",
+      "headerSubtitle": "La sécurité est essentielle pour nous.",
+      "subtitle": "Nous avons envoyé un message contenant un code à 6 chiffres à {email}.",
+      "codeLabel": "Entrez le code :",
+      "digitAriaLabel": "Chiffre {position} sur {total}",
+      "verifying": "Vérification en cours...",
+      "didntReceiveIt": "Vous ne l'avez pas reçu ?",
+      "resendButton": "Renvoyer le code",
+      "resendCooldown": "Renvoyer dans {seconds}s",
+      "resendSent": "Un nouveau code est en route.",
+      "resendError": "Impossible de renvoyer le code. Veuillez réessayer dans un instant.",
+      "errorInvalid": "Ce code est incorrect. Veuillez réessayer.",
+      "errorExpired": "Ce code a expiré. Demandez-en un nouveau ci-dessous.",
+      "errorTooManyAttempts": "Trop de tentatives. Demandez un nouveau code ci-dessous.",
+      "errorGeneric": "Une erreur s'est produite. Veuillez réessayer.",
+      "backToLogin": "Retour à la connexion"
+    },
     "verified": {
       "title": "Adresse e-mail vérifiée",
       "subtitle": "Votre compte est prêt. Vous pouvez maintenant vous connecter.",
-      "continueToLogin": "Continuer vers la connexion"
+      "continueToLogin": "Continuer vers la connexion",
+      "expired": {
+        "title": "Lien expiré",
+        "subtitle": "Votre lien d’activation pour {email} a expiré.",
+        "resendButton": "Renvoyer le lien",
+        "resendCooldown": "Renvoyer dans {seconds}s",
+        "resendSent": "Un nouveau lien d’activation est en route.",
+        "resendError": "Impossible de renvoyer l’e-mail. Veuillez réessayer dans un instant.",
+        "backToLogin": "Retour à la connexion"
+      },
+      "invalid": {
+        "title": "Ce lien n’est pas valide",
+        "subtitle": "Ce lien d’activation est invalide ou a déjà été utilisé.",
+        "backToLogin": "Retour à la connexion"
+      }
     },
     "errors": {
       "invalidEmail": "Veuillez saisir une adresse e-mail valide.",
@@ -657,7 +722,9 @@
       "emailTaken": "Un compte existe déjà avec cette adresse e-mail.",
       "tooManyRequests": "Trop de tentatives. Veuillez patienter une minute et réessayer.",
       "serverUnavailable": "Impossible de joindre le serveur. Veuillez réessayer dans un instant.",
-      "validationError": "Impossible de créer votre compte. Vérifiez vos informations et réessayez."
+      "validationError": "Impossible de créer votre compte. Vérifiez vos informations et réessayez.",
+      "INVALID_OTP": "Ce code n'est pas correct. Veuillez réessayer.",
+      "TOO_MANY_ATTEMPTS": "Trop de tentatives. Veuillez demander un nouveau code ci-dessous."
     }
   },
   "security": {

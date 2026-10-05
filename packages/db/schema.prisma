@@ -111,6 +111,11 @@ enum UserStatus {
   unverified
 }
 
+enum EmailVerificationMethod {
+  link
+  code
+}
+
 model SaApp {
   id          Int            @id @default(autoincrement())
   publicId    String         @unique
@@ -118,6 +123,18 @@ model SaApp {
   url         String
   /// Full data URI (e.g. "data:image/png;base64,...."). null = no logo set.
   logo        String?
+  /// Full data URI. null = no favicon set; the signup/login pages fall back
+  /// to the browser's default icon (no site-wide favicon exists either way).
+  favicon     String?
+  /// 6-digit hex (e.g. "#0F172A"). null = use the default theme background.
+  /// Overrides the page's background on sign in/sign up (light mode).
+  pageLightBackgroundColor String?
+  /// Same as pageLightBackgroundColor, for dark mode.
+  pageDarkBackgroundColor  String?
+  /// Same as pageLightBackgroundColor, but for the card, not the page.
+  cardLightBackgroundColor String?
+  /// Same as cardLightBackgroundColor, for dark mode.
+  cardDarkBackgroundColor  String?
   twoFactorTrustDays Int?
   twoFactorPromptEnabled Boolean? // null = inherit system default (TWO_FACTOR_PROMPT_ENABLED)
   requireTwoFactor   Boolean        @default(false)
@@ -147,6 +164,10 @@ model SaApp {
   /// null, or any field omitted within it, means "use the platform default"
   /// for that field.
   activationEmailOverride Json?
+  /// Which mechanism self-serve signup uses to verify a new user's email.
+  /// 'link' (default) preserves today's behavior; 'code' sends a 6-digit
+  /// code instead, reusing the same activationEmailOverride branding.
+  emailVerificationMethod EmailVerificationMethod @default(link)
   /// URL to this app's Privacy Policy. When set, self-serve signup and
   /// login both require the user to accept it (see SaUserConsent).
   privacyPolicyUrl String?
@@ -224,6 +245,11 @@ model SaUser {
   org              SaOrg              @relation(fields: [orgId], references: [id])
   firstName        String
   lastName         String
+  /// Captured at signup for `code`-method apps' step-4 "keep me updated"
+  /// checkbox. Nothing in the platform consumes this yet — recorded for
+  /// future use. `link` apps can collect it too via the same field; nothing
+  /// here is `code`-method-specific.
+  marketingOptIn   Boolean            @default(false)
   // bug-0147: partial-unique semantics. Both fields are nullable so
   // multiple NULL rows coexist (Postgres treats NULLs as distinct in a
   // standard unique index — CREATE UNIQUE INDEX on a nullable column

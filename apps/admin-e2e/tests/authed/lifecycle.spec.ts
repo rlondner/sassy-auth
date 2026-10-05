@@ -148,7 +148,7 @@ test.describe('Lifecycle (authed) — provision + accept invite + sign-in', () =
     // BetterAuth's scrypt verifier couldn't decode. Now the same Set Password
     // path stores a scrypt hash and email sign-in succeeds.
     await page.getByLabel(t('login.email')).fill(USER_EMAIL)
-    await page.getByLabel(t('login.password')).fill(USER_PASSWORD)
+    await page.getByLabel(t('login.password'), { exact: true }).fill(USER_PASSWORD)
     await page.locator('form').getByRole('button', { name: t('login.submit') }).click()
 
     // The new user has only e2e.t<ts>.read — they should NOT remain on
@@ -170,10 +170,15 @@ test.describe('Lifecycle (authed) — provision + accept invite + sign-in', () =
     }
     expect(outcome).toBe('success')
 
-    // Cookie-level sanity check: better-auth.session_token must be set on
+    // Cookie-level sanity check: the BetterAuth session cookie must be set on
     // this context now, with a non-empty value bound to the admin origin.
+    // Name varies with NODE_ENV: getBetterAuthCookieName (@sassy-auth/types)
+    // prefixes it `__Secure-` and swaps in COOKIE_PREFIX when
+    // NODE_ENV=production (as this suite's Caddy-proxied local setup runs),
+    // unlike CI's bare `better-auth.session_token`. Match by suffix so the
+    // check holds under both.
     const cookies = await page.context().cookies()
-    const sessionCookie = cookies.find((c) => c.name === 'better-auth.session_token')
+    const sessionCookie = cookies.find((c) => c.name.endsWith('.session_token'))
     expect(sessionCookie?.value).toBeTruthy()
 
     // 9. Open a fresh super-admin context to drive the edit drawer ─────

@@ -1,8 +1,9 @@
-import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PasswordPolicy, ActivationEmailBranding } from '@sassy-auth/types';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 import { IsAppLogo } from '../../common/config/is-app-logo.decorator';
+import { IsAppFavicon } from '../../common/config/is-app-favicon.decorator';
 
 // "At least one of name / url" is enforced server-side in
 // AppsService.updateApp rather than in a DTO-level ValidateIf trick (which is
@@ -19,6 +20,23 @@ export class UpdateAppDto {
   @IsOptional()
   @IsAppLogo()
   logo?: string | null;
+
+  /**
+   * Full data URI, validated by IsAppFavicon against the same shared
+   * size/type rule as logo. `null` clears the favicon.
+   */
+  @IsOptional()
+  @IsAppFavicon()
+  favicon?: string | null;
+
+  /**
+   * 6-digit hex (e.g. "#0F172A"). null clears the override, reverting to
+   * the default theme background. Independent of the other 3 color fields.
+   */
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) pageLightBackgroundColor?: string | null;
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) pageDarkBackgroundColor?: string | null;
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) cardLightBackgroundColor?: string | null;
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) cardDarkBackgroundColor?: string | null;
 
   /**
    * Per-app 2FA trust / re-prompt interval in days.
@@ -116,4 +134,13 @@ export class UpdateAppDto {
   @ApiPropertyOptional({ type: Object })
   @IsOptional()
   activationEmailOverride?: ActivationEmailBranding | null;
+
+  /**
+   * Which mechanism self-serve signup uses to verify a new user's email for
+   * this app. 'link' (default) sends a clickable verification link; 'code'
+   * sends a 6-digit code instead, reusing the same activationEmailOverride
+   * branding. See AppsService.assertValidEmailVerificationMethod for the
+   * service-layer defense-in-depth check.
+   */
+  @IsOptional() @IsEnum(['link', 'code']) emailVerificationMethod?: 'link' | 'code';
 }

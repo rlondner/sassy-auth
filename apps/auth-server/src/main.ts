@@ -2,6 +2,14 @@ import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
 loadEnv({ path: resolve(process.cwd(), '../../.env.local') });
+// `pnpm start` (the production-style run used by `make start-no-watch`) overlays
+// this file to force NODE_ENV=production without touching the shared dev
+// .env.local — npm/pnpm set npm_lifecycle_event to the script name, so `dev`
+// (nest start --watch) never loads it. override:true lets it win over the
+// NODE_ENV already read from .env.local above.
+if (process.env.npm_lifecycle_event === 'start') {
+  loadEnv({ path: resolve(process.cwd(), '../../.env.production'), override: true });
+}
 import './instrument';
 import 'reflect-metadata';
 import express from 'express';

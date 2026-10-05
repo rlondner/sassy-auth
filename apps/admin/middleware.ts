@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getBetterAuthCookieName } from '@sassy-auth/types'
+import { getBetterAuthCookieName, isSecureCookieEnv } from '@sassy-auth/types'
 import { AUTH_SERVER_URL } from '@/lib/config'
 
 const PUBLIC_PATHS = ['/login', '/accept-invite', '/signup', '/oauth-error', '/forgot-password', '/reset-password']
 
-// Must match the exact production check auth.config.ts uses for
-// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
+// Must match the exact check auth.config.ts uses for
+// `advanced.useSecureCookies` — see isSecureCookieEnv's doc comment
+// (@sassy-auth/types) for why this can't just be `NODE_ENV === 'production'`.
 // bug-0293: must match auth.config.ts's `advanced.cookiePrefix` — see
 // getBetterAuthCookieName's doc comment.
 const SESSION_COOKIE_NAME = getBetterAuthCookieName(
   'session_token',
-  process.env.NODE_ENV === 'production',
+  isSecureCookieEnv(),
   process.env.COOKIE_PREFIX || 'better-auth',
 )
 const SESSION_COOKIE_PATTERN = new RegExp(

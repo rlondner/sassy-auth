@@ -137,6 +137,13 @@ describe('SignupForm', () => {
     expect(mockRegisterAction).not.toHaveBeenCalled()
   })
 
+  it('does not show an invalid email error when blurring an untouched, empty email field (bug-0295)', () => {
+    render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
+    fireEvent.blur(screen.getByLabelText('signup.email'))
+
+    expect(screen.queryByText('signup.errors.invalidEmail')).not.toBeInTheDocument()
+  })
+
   it('clears the invalid email error once the user edits the field again', () => {
     render(<SignupForm clientId="sq_1" next="" hasDefaultOrg={false} passwordPolicy={POLICY} privacyPolicyUrl={null} termsUrl={null} gdprUrl={null} />)
     fillValidForm()
@@ -246,7 +253,7 @@ describe('SignupForm', () => {
     fireEvent.click(screen.getByText('signup.submit'))
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith('/signup/check-email?email=alice%40example.com'),
+      expect(mockPush).toHaveBeenCalledWith('/signup/check-email?email=alice%40example.com&client_id=sq_1'),
     )
   })
 
@@ -263,7 +270,7 @@ describe('SignupForm', () => {
     )
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
-        '/signup/check-email?email=alice%40example.com&next=%2Forgs',
+        '/signup/check-email?email=alice%40example.com&client_id=sq_1&next=%2Forgs',
       ),
     )
   })

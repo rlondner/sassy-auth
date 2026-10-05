@@ -60,7 +60,13 @@ const VALID = 'Str0ngPassw0rd'
 
 beforeEach(() => {
   jest.clearAllMocks()
-  mockGetPolicy.mockResolvedValue(POLICY)
+  mockGetPolicy.mockResolvedValue({
+    passwordPolicy: POLICY,
+    pageLightBackgroundColor: null,
+    pageDarkBackgroundColor: null,
+    cardLightBackgroundColor: null,
+    cardDarkBackgroundColor: null,
+  })
 })
 
 describe('ResetPasswordForm client-side validation', () => {

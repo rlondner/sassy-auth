@@ -176,6 +176,35 @@ describe('LoginForm', () => {
     wrap(<LoginForm next="" authServerUrl="https://auth.test" />)
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
+
+  it('applies background color overrides when provided', () => {
+    const { container } = wrap(
+      <LoginForm
+        next=""
+        authServerUrl="https://auth.test"
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
+  })
+
+  it('carries client_id on the forgot-password link when next has one', () => {
+    wrap(<LoginForm next="/api/token/oauth/authorize?client_id=sq_1&redirect_uri=x" authServerUrl="https://auth.test" />)
+
+    const link = screen.getByText(messages.login.forgotPassword).closest('a')
+    expect(link).toHaveAttribute('href', '/forgot-password?client_id=sq_1')
+  })
+
+  it('does not carry client_id on the forgot-password link when next has none', () => {
+    wrap(<LoginForm next="/orgs" authServerUrl="https://auth.test" />)
+
+    const link = screen.getByText(messages.login.forgotPassword).closest('a')
+    expect(link).toHaveAttribute('href', '/forgot-password')
+  })
 })
 
 describe('LoginOtpForm', () => {
@@ -231,6 +260,20 @@ describe('LoginOtpForm', () => {
     await waitFor(() =>
       expect(screen.getByTestId('otp-error')).toHaveTextContent(text),
     )
+  })
+
+  it('applies background color overrides when provided', () => {
+    const { container } = wrap(
+      <LoginOtpForm
+        next=""
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
   })
 })
 

@@ -3,8 +3,10 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { magicLink, emailOTP, openAPI, twoFactor, genericOAuth } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 import type { ActivationEmailBranding } from '@sassy-auth/types';
+import { isSecureCookieEnv } from '@sassy-auth/types';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { verificationEmail } from '../email/templates/verify-email.template';
+import { sendVerificationCode } from './verification-code-sender';
 import { getEmailer } from '../email/email.singleton';
 import { captureResetUrl } from './reset-url-context';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
@@ -26,6 +28,7 @@ import { appendConsentRedirect } from '../social/resolve-social-consent-redirect
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
 import { notifyActivation } from '../activation/notify-activation';
 import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
+import { envInt, AUTH_THROTTLE } from '../common/config/rate-limit-config';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -105,7 +108,7 @@ export const auth = betterAuth({
     defaultCookieAttributes: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecureCookieEnv(),
     },
     // dev(sec) https rollout: BetterAuth derives `useSecureCookies` (which
     // renames every session cookie with a `__Secure-` prefix, per RFC 6265bis)
@@ -120,9 +123,13 @@ export const auth = betterAuth({
     // upstream but admin's forwardSessionCookie() found no cookie named
     // `better-auth.session_token`, returned false, and the login form
     // showed "Sign-in service is unavailable." Pin this to the same
-    // production-only condition as `secure` above so dev keeps the
-    // unprefixed name regardless of the auth-server's protocol.
-    useSecureCookies: process.env.NODE_ENV === 'production',
+    // check apps/admin uses (`isSecureCookieEnv()`, @sassy-auth/types) so
+    // dev/e2e keep the unprefixed name and production/staging keep the
+    // `__Secure-` one, regardless of the auth-server's protocol. Plain
+    // `NODE_ENV === 'production'` isn't enough on its own — see
+    // isSecureCookieEnv's doc comment for why apps/admin can't rely on
+    // that check alone.
+    useSecureCookies: isSecureCookieEnv(),
     // bug-0293: staging and production are forced to share the same
     // COOKIE_DOMAIN (`.milissai.com` — see below), because
     // auth-staging.milissai.com/auth-api-staging.milissai.com don't share a
@@ -179,6 +186,31 @@ export const auth = betterAuth({
       // back to better-auth's generic default, which is generous enough to
       // let a client hammer an arbitrary inbox with verification emails.
       '/send-verification-email': { window: 60, max: 3 },
+      // better-auth's own built-in "special rules" (dist/api/rate-limiter,
+      // getDefaultSpecialRules) hardcode window:10/max:3 for /sign-in*,
+      // /sign-up*, /change-password, /change-email, and window:60/max:3 for
+      // /request-password-reset, /forget-password*,
+      // /email-otp/send-verification-otp and /email-otp/request-password-reset
+      // — active whenever `rateLimit.enabled` is true, which this config
+      // leaves at its library default of `isProduction` (NODE_ENV ===
+      // 'production'). auth-rate-limit.ts's Express middleware is meant to be
+      // the project's single configurable rate limiter for these same
+      // credential paths (via AUTH_RATE_LIMIT / AUTH_RATE_WINDOW_MS, disabled
+      // under NODE_ENV=test for e2e) — but it sits in front of better-auth,
+      // not instead of it, so any NODE_ENV=production run (including the
+      // Caddy-proxied local dev setup in README §6b) silently also enforced
+      // the hardcoded 3-requests-per-10s floor underneath whatever
+      // AUTH_RATE_LIMIT said, with no way to raise it. Mirror the same
+      // AUTH_THROTTLE-derived values here so there is one configurable limit
+      // instead of two disagreeing ones.
+      '/sign-in/*': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/sign-up/*': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/change-password': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/change-email': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/request-password-reset': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/forget-password': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/email-otp/send-verification-otp': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
+      '/email-otp/request-password-reset': { window: AUTH_THROTTLE.ttl / 1000, max: AUTH_THROTTLE.limit },
     },
   },
   // bug-0186: BetterAuth creates a Session row on every successful
@@ -479,11 +511,15 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
+    // Unset, blank, zero, or non-numeric all fall back to 3600 (envInt only
+    // accepts a finite, positive number) — matches the .env.example comment
+    // for EMAIL_VERIFICATION_EXPIRES_IN_SECONDS exactly.
+    expiresIn: envInt('EMAIL_VERIFICATION_EXPIRES_IN_SECONDS', 3600),
     sendVerificationEmail: async ({ user, url }: { user: { id: string; email: string; name?: string }; url: string }) => {
       const firstName = (user.name ?? '').trim().split(' ')[0] || 'there';
       const saUser = await prisma.saUser.findUnique({
         where: { betterAuthUserId: user.id },
-        select: { org: { select: { app: { select: { name: true, activationEmailOverride: true } } } } },
+        select: { org: { select: { app: { select: { name: true, activationEmailOverride: true, emailVerificationMethod: true } } } } },
       });
       const appName = saUser?.org.app.name ?? 'Sassy Auth';
       // AppsService.assertValidActivationEmailOverride is the only write path
@@ -491,6 +527,20 @@ export const auth = betterAuth({
       // guarantee — verificationEmail()'s optional chaining degrades to
       // defaults on any malformed/missing field regardless.
       const branding = (saUser?.org.app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
+
+      if (saUser?.org.app.emailVerificationMethod === 'code') {
+        // `auth` (this module's own export, defined by the betterAuth(...)
+        // call this object literal is part of) is referenced here via
+        // closure, not read at definition time — safe, since this callback
+        // only runs on a real request, long after module evaluation (and
+        // thus the `auth` binding) has completed.
+        await sendVerificationCode(
+          { createOtp: (d) => auth.api.createVerificationOTP({ body: d }), emailer: getEmailer() },
+          { email: user.email, firstName, appName, branding },
+        );
+        return;
+      }
+
       await getEmailer().send({ to: user.email, ...verificationEmail({ firstName, verifyUrl: url, appName, branding }) });
     },
     afterEmailVerification: async (updatedUser: { id: string }) => {

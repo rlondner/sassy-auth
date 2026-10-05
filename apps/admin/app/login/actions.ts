@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { trace } from '@opentelemetry/api'
-import { getBetterAuthCookieName } from '@sassy-auth/types'
+import { getBetterAuthCookieName, isSecureCookieEnv } from '@sassy-auth/types'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
@@ -14,9 +14,10 @@ import { shouldPromptTwoFactor, getSystemTrustDaysClient, getSystemPromptEnabled
 
 const tracer = trace.getTracer('sassy-auth.admin')
 
-// Must match the exact production check auth.config.ts uses for
-// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
-const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+// Must match the exact check auth.config.ts uses for
+// `advanced.useSecureCookies` — see isSecureCookieEnv's doc comment
+// (@sassy-auth/types) for why this can't just be `NODE_ENV === 'production'`.
+const IS_PRODUCTION = isSecureCookieEnv()
 // bug-0293: must match auth.config.ts's `advanced.cookiePrefix` — see
 // getBetterAuthCookieName's doc comment.
 const COOKIE_PREFIX = process.env.COOKIE_PREFIX || 'better-auth'

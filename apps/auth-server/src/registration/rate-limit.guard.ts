@@ -74,3 +74,29 @@ export class RateLimitGuard implements CanActivate {
  */
 @Injectable()
 export class AppLookupRateLimitGuard extends RateLimitGuard {}
+
+/**
+ * POST /api/register/start — creates a placeholder BetterAuth account and
+ * sends the first verification code. Same abuse profile as POST
+ * /api/register (account creation), so it reuses REGISTER_RATE_LIMIT /
+ * REGISTER_RATE_WINDOW_MS, but as its own DI singleton with its own
+ * independent counter — see AppLookupRateLimitGuard's doc comment above for
+ * why these never share a budget with each other.
+ */
+@Injectable()
+export class RegisterStartRateLimitGuard extends RateLimitGuard {}
+
+/**
+ * POST /api/register/verify-code — checked on every code-entry submit, a
+ * brute-force surface distinct from account creation. Own DI singleton and
+ * budget.
+ */
+@Injectable()
+export class VerifyRegistrationCodeRateLimitGuard extends RateLimitGuard {}
+
+/**
+ * POST /api/register/complete — finalizes the account. Own DI singleton and
+ * budget, same reasoning as the two guards above.
+ */
+@Injectable()
+export class CompleteRegistrationRateLimitGuard extends RateLimitGuard {}

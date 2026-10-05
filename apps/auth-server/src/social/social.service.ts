@@ -4,7 +4,11 @@ import { availableSocialProviders } from './build-social-providers';
 import { resolveEnabledProviders, type SocialProviderId } from './resolve-enabled-providers';
 
 type Db = {
-  saApp: { findUnique(args: unknown): Promise<{ id: number; isPlatform?: boolean; logo?: string | null } | null> };
+  saApp: { findUnique(args: unknown): Promise<{
+    id: number; isPlatform?: boolean; name?: string | null; logo?: string | null; favicon?: string | null;
+    pageLightBackgroundColor?: string | null; pageDarkBackgroundColor?: string | null;
+    cardLightBackgroundColor?: string | null; cardDarkBackgroundColor?: string | null;
+  } | null> };
   saSocialProvider: {
     findMany(args?: unknown): Promise<{ appId: number | null; provider: string; enabled: boolean }[]>;
     upsert(args: unknown): Promise<unknown>;
@@ -63,15 +67,41 @@ export class SocialService {
   }
 
   /**
-   * The logo to show on the login screen for this app, or null if the app
-   * has none or the client_id is unknown/absent. Mirrors listForApp's
-   * enumeration-safety rule: an unknown client_id yields null, never a
-   * throw, so this stays indistinguishable from "app has no logo".
+   * The name, logo, favicon, and background color overrides to show on the
+   * login/signup screen for this app, or all-null if the app has none of
+   * these or the client_id is unknown/absent. Mirrors listForApp's
+   * enumeration-safety rule: an unknown client_id yields all-null fields,
+   * never a throw, so this stays indistinguishable from "app has none of
+   * these set."
    */
-  async getLogoForApp(clientId: string | undefined): Promise<string | null> {
-    if (!clientId) return null;
-    const app = await this.db.saApp.findUnique({ where: { publicId: clientId }, select: { id: true, logo: true } });
-    return app?.logo ?? null;
+  async getBrandingForApp(clientId: string | undefined): Promise<{
+    name: string | null; logo: string | null; favicon: string | null;
+    pageLightBackgroundColor: string | null; pageDarkBackgroundColor: string | null;
+    cardLightBackgroundColor: string | null; cardDarkBackgroundColor: string | null;
+  }> {
+    const allNull = {
+      name: null, logo: null, favicon: null,
+      pageLightBackgroundColor: null, pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null, cardDarkBackgroundColor: null,
+    };
+    if (!clientId) return allNull;
+    const app = await this.db.saApp.findUnique({
+      where: { publicId: clientId },
+      select: {
+        id: true, name: true, logo: true, favicon: true,
+        pageLightBackgroundColor: true, pageDarkBackgroundColor: true,
+        cardLightBackgroundColor: true, cardDarkBackgroundColor: true,
+      },
+    });
+    return {
+      name: app?.name ?? null,
+      logo: app?.logo ?? null,
+      favicon: app?.favicon ?? null,
+      pageLightBackgroundColor: app?.pageLightBackgroundColor ?? null,
+      pageDarkBackgroundColor: app?.pageDarkBackgroundColor ?? null,
+      cardLightBackgroundColor: app?.cardLightBackgroundColor ?? null,
+      cardDarkBackgroundColor: app?.cardDarkBackgroundColor ?? null,
+    };
   }
 
   /**

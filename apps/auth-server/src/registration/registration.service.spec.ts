@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { RegistrationService } from './registration.service';
 import { SqidService } from '../common/sqid/sqid.service';
 import { TurnstileService } from './turnstile.service';
@@ -18,7 +18,8 @@ jest.mock('@sassy-auth/db', () => ({
     saUserRole: { create: jest.fn() },
     saUserConsent: { createMany: jest.fn() },
     saAppRedirectUri: { findFirst: jest.fn(), findMany: jest.fn() },
-    user: { delete: jest.fn(), findUnique: jest.fn() },
+    user: { delete: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    verification: { create: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -29,8 +30,20 @@ jest.mock('../auth/auth.config', () => ({
     api: {
       signUpEmail: jest.fn(),
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+      createVerificationOTP: jest.fn(),
+      checkVerificationOTP: jest.fn(),
+      verifyEmailOTP: jest.fn(),
+      resetPassword: jest.fn(),
     },
   },
+}));
+
+jest.mock('../email/email.singleton', () => ({
+  getEmailer: () => ({ send: jest.fn().mockResolvedValue({ sent: true }) }),
+}));
+
+jest.mock('../activation/notify-activation', () => ({
+  notifyActivation: jest.fn().mockResolvedValue(undefined),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -41,14 +54,22 @@ const mockPrisma = require('@sassy-auth/db').prisma as {
   saUserRole: { create: jest.Mock };
   saUserConsent: { createMany: jest.Mock };
   saAppRedirectUri: { findFirst: jest.Mock; findMany: jest.Mock };
-  user: { delete: jest.Mock; findUnique: jest.Mock };
+  user: { delete: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+  verification: { create: jest.Mock };
   $transaction: jest.Mock;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const mockSignUpEmail = require('../auth/auth.config').auth.api.signUpEmail as jest.Mock;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const mockSendVerificationEmail = require('../auth/auth.config').auth.api.sendVerificationEmail as jest.Mock;
+const authApi = require('../auth/auth.config').auth.api as {
+  signUpEmail: jest.Mock;
+  sendVerificationEmail: jest.Mock;
+  createVerificationOTP: jest.Mock;
+  checkVerificationOTP: jest.Mock;
+  verifyEmailOTP: jest.Mock;
+  resetPassword: jest.Mock;
+};
+const mockSignUpEmail = authApi.signUpEmail;
+const mockSendVerificationEmail = authApi.sendVerificationEmail;
 
 const sqidFake: Pick<SqidService, 'encode' | 'decode'> = {
   encode: (n: number) => `sq_${n}`,
@@ -173,7 +194,12 @@ describe('RegistrationService', () => {
         },
       });
       expect(mockSendVerificationEmail).toHaveBeenCalledWith({
-        body: { email: baseDto.email, callbackURL: expect.stringContaining('/signup/verified') },
+        body: {
+          email: baseDto.email,
+          callbackURL: expect.stringContaining(
+            `/signup/verified?email=${encodeURIComponent(baseDto.email)}&client_id=${encodeURIComponent(appRow.publicId)}`,
+          ),
+        },
       });
 
       expect(result).toEqual({ ok: true, orgPublicId: finalOrgRow.publicId });
@@ -705,30 +731,42 @@ describe('RegistrationService', () => {
 
   describe('getAppName — hasDefaultOrg', () => {
     it('reports hasDefaultOrg: true when the app has a defaultOrgId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99, passwordPolicyOverride: null, logo: null });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: 99, passwordPolicyOverride: null, logo: null, favicon: null });
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: true,
         passwordPolicy: expect.any(Object),
         logo: null,
+        favicon: null,
         privacyPolicyUrl: null,
         termsUrl: null,
         gdprUrl: null,
         gdprRequired: false,
+        emailVerificationMethod: 'link',
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
       });
     });
 
     it('reports hasDefaultOrg: false when the app has no defaultOrgId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null });
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null, favicon: null });
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: null,
+        favicon: null,
         privacyPolicyUrl: null,
         termsUrl: null,
         gdprUrl: null,
         gdprRequired: false,
+        emailVerificationMethod: 'link',
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
       });
     });
   });
@@ -781,18 +819,24 @@ describe('RegistrationService', () => {
   });
 
   describe('getAppName', () => {
-    it('returns the app name and logo for a known appPublicId', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: 'data:image/png;base64,AAA=' });
+    it('returns the app name, logo, and favicon for a known appPublicId', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: 'data:image/png;base64,AAA=', favicon: 'data:image/png;base64,FFF=', emailVerificationMethod: 'link' });
 
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: 'data:image/png;base64,AAA=',
+        favicon: 'data:image/png;base64,FFF=',
         privacyPolicyUrl: null,
         termsUrl: null,
         gdprUrl: null,
         gdprRequired: false,
+        emailVerificationMethod: 'link',
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
       });
       expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
         where: { publicId: 'sq_1' },
@@ -801,25 +845,37 @@ describe('RegistrationService', () => {
           defaultOrgId: true,
           passwordPolicyOverride: true,
           logo: true,
+          favicon: true,
           privacyPolicyUrl: true,
           termsUrl: true,
           gdprUrl: true,
+          emailVerificationMethod: true,
+          pageLightBackgroundColor: true,
+          pageDarkBackgroundColor: true,
+          cardLightBackgroundColor: true,
+          cardDarkBackgroundColor: true,
         },
       });
     });
 
-    it('returns logo: null when the app has no logo set', async () => {
-      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null });
+    it('returns logo: null and favicon: null when the app has neither set', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null, favicon: null });
 
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
         passwordPolicy: expect.any(Object),
         logo: null,
+        favicon: null,
         privacyPolicyUrl: null,
         termsUrl: null,
         gdprUrl: null,
         gdprRequired: false,
+        emailVerificationMethod: 'link',
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
       });
     });
 
@@ -840,6 +896,7 @@ describe('RegistrationService', () => {
         defaultOrgId: null,
         passwordPolicyOverride: null,
         logo: null,
+        favicon: null,
         privacyPolicyUrl: 'https://myapp.example.com/privacy',
         termsUrl: null,
         gdprUrl: 'https://myapp.example.com/gdpr',
@@ -851,6 +908,333 @@ describe('RegistrationService', () => {
       // 'unknown' IP resolves to no country → fail-closed → gdprRequired true
       expect(result.gdprRequired).toBe(true);
     });
+
+    it('reports emailVerificationMethod "code" when the app is configured for it', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        name: 'MyApp', defaultOrgId: null, passwordPolicyOverride: null, logo: null, favicon: null,
+        privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, emailVerificationMethod: 'code',
+      });
+      const result = await service.getAppName('sq_1');
+      expect(result.emailVerificationMethod).toBe('code');
+    });
+
+    it('getAppName includes the 4 background color overrides', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        name: 'App',
+        defaultOrgId: null,
+        passwordPolicyOverride: null,
+        logo: null,
+        favicon: null,
+        privacyPolicyUrl: null,
+        termsUrl: null,
+        gdprUrl: null,
+        emailVerificationMethod: 'link',
+        pageLightBackgroundColor: '#111111',
+        pageDarkBackgroundColor: '#222222',
+        cardLightBackgroundColor: '#333333',
+        cardDarkBackgroundColor: '#444444',
+      });
+
+      const result = await service.getAppName('app-1');
+
+      expect(result.pageLightBackgroundColor).toBe('#111111');
+      expect(result.pageDarkBackgroundColor).toBe('#222222');
+      expect(result.cardLightBackgroundColor).toBe('#333333');
+      expect(result.cardDarkBackgroundColor).toBe('#444444');
+    });
   });
 
+});
+
+describe('RegistrationService.startRegistration', () => {
+  let service: RegistrationService;
+  let mockVerify: jest.Mock;
+
+  beforeEach(async () => {
+    mockVerify = jest.fn().mockResolvedValue(true);
+    const module = await Test.createTestingModule({
+      providers: [
+        RegistrationService,
+        { provide: SqidService, useValue: sqidFake },
+        { provide: TurnstileService, useValue: { verify: mockVerify } },
+        { provide: OauthService, useValue: { generateCode: jest.fn() } },
+      ],
+    }).compile();
+    service = module.get(RegistrationService);
+    jest.clearAllMocks();
+    mockVerify.mockResolvedValue(true);
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+    authApi.createVerificationOTP.mockResolvedValue('123456');
+  });
+
+  it('rejects when the captcha fails', async () => {
+    mockVerify.mockResolvedValue(false);
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'bad' }),
+    ).rejects.toThrow(UnprocessableEntityException);
+  });
+
+  it('404s for an unknown app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(null);
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_missing', turnstileToken: 'tok' }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('creates a placeholder BetterAuth account and sends a verification code', async () => {
+    // First call is the "existing account?" lookup (none); second call is
+    // the post-signUp persisted-synthetic-user guard (really persisted).
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: baUserId });
+
+    await service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' });
+
+    expect(mockSignUpEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.objectContaining({ email: 'alice@example.com', name: '' }) }),
+    );
+    // The placeholder password must be a real, unguessable value — never
+    // something fixed like '' or 'placeholder'.
+    const placeholderPassword = mockSignUpEmail.mock.calls[0][0].body.password;
+    expect(typeof placeholderPassword).toBe('string');
+    expect(placeholderPassword.length).toBeGreaterThanOrEqual(16);
+
+    expect(authApi.createVerificationOTP).toHaveBeenCalledWith({
+      body: { email: 'alice@example.com', type: 'email-verification' },
+    });
+  });
+
+  it('rejects when the email already belongs to a verified account', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: baUserId, emailVerified: true, saUser: null });
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
+    ).rejects.toThrow(ConflictException);
+    expect(mockSignUpEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the email already has a fully-registered SaUser', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: baUserId, emailVerified: false, saUser: { id: 5 } });
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
+    ).rejects.toThrow(ConflictException);
+    expect(mockSignUpEmail).not.toHaveBeenCalled();
+  });
+
+  it('reuses an abandoned, unverified, SaUser-less account and resends a code instead of erroring', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: baUserId, emailVerified: false, saUser: null });
+
+    await service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' });
+
+    expect(mockSignUpEmail).not.toHaveBeenCalled();
+    expect(authApi.createVerificationOTP).toHaveBeenCalledWith({
+      body: { email: 'alice@example.com', type: 'email-verification' },
+    });
+  });
+
+  it('throws ConflictException when signUpEmail reports a duplicate email', async () => {
+    mockSignUpEmail.mockRejectedValue({ status: 'UNPROCESSABLE_ENTITY' });
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  // Same synthetic-user guard as register() (see its 'duplicate email under
+  // autoSignIn=false (synthetic response)' describe block above): with
+  // emailAndPassword.autoSignIn disabled, BetterAuth can resolve signUpEmail
+  // successfully with an id that was never persisted, to avoid leaking which
+  // emails are registered. Taking that id at face value would hand back
+  // success for an account that doesn't exist.
+  it('returns 409 when signUpEmail resolves with an id that is not in the database', async () => {
+    // First call is the "existing account?" lookup (none); second call is
+    // the post-signUp persisted-synthetic-user guard (never persisted).
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      service.startRegistration({ email: 'alice@example.com', appPublicId: 'sq_1', turnstileToken: 'tok' }),
+    ).rejects.toThrow(ConflictException);
+    expect(authApi.createVerificationOTP).not.toHaveBeenCalled();
+  });
+});
+
+describe('RegistrationService.verifyRegistrationCode', () => {
+  let service: RegistrationService;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        RegistrationService,
+        { provide: SqidService, useValue: sqidFake },
+        { provide: TurnstileService, useValue: { verify: jest.fn().mockResolvedValue(true) } },
+        { provide: OauthService, useValue: { generateCode: jest.fn() } },
+      ],
+    }).compile();
+    service = module.get(RegistrationService);
+    jest.clearAllMocks();
+  });
+
+  it('resolves ok when the code checks out', async () => {
+    authApi.checkVerificationOTP.mockResolvedValue({ success: true });
+    await expect(
+      service.verifyRegistrationCode({ email: 'alice@example.com', otp: '123456' }),
+    ).resolves.toEqual({ ok: true });
+    expect(authApi.checkVerificationOTP).toHaveBeenCalledWith({
+      body: { email: 'alice@example.com', type: 'email-verification', otp: '123456' },
+    });
+  });
+
+  it('maps an invalid code to a 400 with code INVALID_OTP', async () => {
+    authApi.checkVerificationOTP.mockRejectedValue({ body: { code: 'INVALID_OTP' } });
+    await expect(
+      service.verifyRegistrationCode({ email: 'alice@example.com', otp: '000000' }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'INVALID_OTP' } });
+  });
+
+  it('maps an expired code to a 400 with code OTP_EXPIRED', async () => {
+    authApi.checkVerificationOTP.mockRejectedValue({ body: { code: 'OTP_EXPIRED' } });
+    await expect(
+      service.verifyRegistrationCode({ email: 'alice@example.com', otp: '123456' }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'OTP_EXPIRED' } });
+  });
+
+  it('maps too-many-attempts to a 403 with code TOO_MANY_ATTEMPTS', async () => {
+    authApi.checkVerificationOTP.mockRejectedValue({ body: { code: 'TOO_MANY_ATTEMPTS' } });
+    await expect(
+      service.verifyRegistrationCode({ email: 'alice@example.com', otp: '123456' }),
+    ).rejects.toMatchObject({ status: 403, response: { code: 'TOO_MANY_ATTEMPTS' } });
+  });
+
+  it('collapses an unknown-user error to INVALID_OTP rather than leaking it', async () => {
+    authApi.checkVerificationOTP.mockRejectedValue({ body: { code: 'USER_NOT_FOUND' } });
+    await expect(
+      service.verifyRegistrationCode({ email: 'nobody@example.com', otp: '123456' }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'INVALID_OTP' } });
+  });
+});
+
+describe('RegistrationService.completeRegistration', () => {
+  let service: RegistrationService;
+  let mockOauthService: { generateCode: jest.Mock };
+
+  const completeDto = {
+    email: 'alice@example.com',
+    otp: '123456',
+    password: 'StrongPass123',
+    firstName: 'Alice',
+    lastName: 'Wonder',
+    companyName: 'Acme Inc',
+    appPublicId: 'sq_1',
+  };
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        RegistrationService,
+        { provide: SqidService, useValue: sqidFake },
+        { provide: TurnstileService, useValue: { verify: jest.fn().mockResolvedValue(true) } },
+        { provide: OauthService, useValue: { generateCode: jest.fn() } },
+      ],
+    }).compile();
+    service = module.get(RegistrationService);
+    mockOauthService = module.get(OauthService) as unknown as { generateCode: jest.Mock };
+    jest.clearAllMocks();
+
+    mockPrisma.saApp.findUnique.mockResolvedValue(appRow);
+    authApi.verifyEmailOTP.mockResolvedValue({ status: true, token: null, user: { id: baUserId } });
+    mockPrisma.user.update.mockResolvedValue({ id: baUserId });
+    mockPrisma.verification.create.mockResolvedValue({});
+    authApi.resetPassword.mockResolvedValue({ status: true });
+    mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+      cb({
+        saOrg: { create: mockPrisma.saOrg.create, update: mockPrisma.saOrg.update },
+        saUser: { create: mockPrisma.saUser.create },
+        saUserRole: { create: mockPrisma.saUserRole.create },
+        saUserConsent: { createMany: mockPrisma.saUserConsent.createMany },
+      }),
+    );
+    mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+    mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+    mockPrisma.saUser.create.mockResolvedValue({ id: 99, publicId: baUserId.slice(0, 12) });
+  });
+
+  it('404s for an unknown app', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue(null);
+    await expect(service.completeRegistration({ ...completeDto, appPublicId: 'sq_missing' })).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('rejects a password that fails the resolved policy before consuming the OTP', async () => {
+    await expect(service.completeRegistration({ ...completeDto, password: 'short' })).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(authApi.verifyEmailOTP).not.toHaveBeenCalled();
+  });
+
+  it('maps an invalid/expired code the same way verifyRegistrationCode does', async () => {
+    authApi.verifyEmailOTP.mockRejectedValue({ body: { code: 'OTP_EXPIRED' } });
+    await expect(service.completeRegistration(completeDto)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'OTP_EXPIRED' },
+    });
+  });
+
+  it('consumes the OTP, sets the real name and password, and creates an active SaUser', async () => {
+    const result = await service.completeRegistration(completeDto);
+
+    expect(authApi.verifyEmailOTP).toHaveBeenCalledWith({ body: { email: 'alice@example.com', otp: '123456' } });
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: baUserId },
+      data: { name: 'Alice Wonder' },
+    });
+    expect(mockPrisma.verification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ identifier: expect.stringMatching(/^reset-password:/), value: baUserId }),
+      }),
+    );
+    const resetToken = mockPrisma.verification.create.mock.calls[0][0].data.identifier.replace('reset-password:', '');
+    expect(authApi.resetPassword).toHaveBeenCalledWith({ body: { newPassword: 'StrongPass123', token: resetToken } });
+    expect(mockPrisma.saUser.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'active', marketingOptIn: false }) }),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.orgPublicId).toBe('sq_10');
+  });
+
+  it('persists marketingOptIn when provided', async () => {
+    await service.completeRegistration({ ...completeDto, marketingOptIn: true });
+    expect(mockPrisma.saUser.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ marketingOptIn: true }) }),
+    );
+  });
+
+  it('never calls sendVerificationEmail — the email is already verified', async () => {
+    await service.completeRegistration(completeDto);
+    expect(mockSendVerificationEmail).not.toHaveBeenCalled();
+  });
+
+  it('mints a redirect code when a valid PKCE next is recovered', async () => {
+    mockOauthService.generateCode.mockResolvedValue('signup-code-xyz');
+    mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([{ uri: 'https://app.example.com/callback', kind: 'login' }]);
+    const next = nextUrl({
+      client_id: 'sq_1',
+      redirect_uri: 'https://app.example.com/callback',
+      code_challenge: 'abc',
+      code_challenge_method: 'S256',
+      state: 'xyz',
+    });
+
+    const result = await service.completeRegistration({ ...completeDto, next });
+
+    expect(result.redirectUrl).toBe('https://app.example.com/callback?code=signup-code-xyz&state=xyz');
+  });
+
+  it('compensates by deleting the BetterAuth user if the transaction fails', async () => {
+    mockPrisma.$transaction.mockRejectedValue(new Error('db down'));
+    await expect(service.completeRegistration(completeDto)).rejects.toThrow('db down');
+    expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: baUserId } });
+  });
 });

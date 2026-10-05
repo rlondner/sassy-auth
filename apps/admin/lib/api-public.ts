@@ -25,9 +25,16 @@ export async function acceptInvitation(token: string, password: string): Promise
   if (!res.ok) throw new Error(`API error ${res.status}: accept invitation`)
 }
 
-export async function getPasswordPolicyForResetToken(token: string): Promise<PasswordPolicy> {
+export interface PasswordPolicyAndBranding {
+  passwordPolicy: PasswordPolicy
+  pageLightBackgroundColor: string | null
+  pageDarkBackgroundColor: string | null
+  cardLightBackgroundColor: string | null
+  cardDarkBackgroundColor: string | null
+}
+
+export async function getPasswordPolicyForResetToken(token: string): Promise<PasswordPolicyAndBranding> {
   const res = await fetch(`${BASE}/api/password-policy?resetToken=${encodeURIComponent(token)}`)
   if (!res.ok) throw new Error(`API error ${res.status}: fetching password policy`)
-  const body = (await res.json()) as { passwordPolicy: PasswordPolicy }
-  return body.passwordPolicy
+  return res.json()
 }

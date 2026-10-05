@@ -1,5 +1,11 @@
 import { ExecutionContext, HttpException } from '@nestjs/common';
-import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
+import {
+  RateLimitGuard,
+  AppLookupRateLimitGuard,
+  RegisterStartRateLimitGuard,
+  VerifyRegistrationCodeRateLimitGuard,
+  CompleteRegistrationRateLimitGuard,
+} from './rate-limit.guard';
 
 function makeCtx(ip: string): ExecutionContext {
   return {
@@ -131,5 +137,21 @@ describe('RateLimitGuard', () => {
     expect(appLookupGuard.canActivate(ctx)).toBe(true);
     expect(appLookupGuard.canActivate(ctx)).toBe(true);
     expect(() => appLookupGuard.canActivate(ctx)).toThrow(HttpException);
+  });
+
+  it('gives each of the three code-first-signup guards its own independent budget', () => {
+    process.env.REGISTER_RATE_LIMIT = '1';
+    process.env.REGISTER_RATE_WINDOW_MS = '3600000';
+    const startGuard = new RegisterStartRateLimitGuard();
+    const verifyGuard = new VerifyRegistrationCodeRateLimitGuard();
+    const completeGuard = new CompleteRegistrationRateLimitGuard();
+    const ctx = makeCtx('10.0.0.7');
+
+    expect(startGuard.canActivate(ctx)).toBe(true);
+    expect(() => startGuard.canActivate(ctx)).toThrow(HttpException);
+
+    // Exhausting startGuard's budget must not affect the other two.
+    expect(verifyGuard.canActivate(ctx)).toBe(true);
+    expect(completeGuard.canActivate(ctx)).toBe(true);
   });
 });

@@ -20,6 +20,7 @@ const mockUsersService = {
   assignRole: jest.fn(),
   removeRole: jest.fn(),
   resendInvitation: jest.fn(),
+  resendActivationEmail: jest.fn(),
 };
 
 function makeReq(baUserId = 'ba-caller') {
@@ -130,6 +131,14 @@ describe('UsersController', () => {
       mockUsersService.resendInvitation.mockResolvedValue({ inviteUrl: 'x' });
       await controller.resendInvitation(makeReq('ba-9'), 'usr-1');
       expect(mockUsersService.resendInvitation).toHaveBeenCalledWith('ba-9', 'usr-1');
+    });
+  });
+
+  describe('resendActivation', () => {
+    it('forwards caller id and id to UsersService.resendActivationEmail', async () => {
+      mockUsersService.resendActivationEmail.mockResolvedValue(undefined);
+      await controller.resendActivation(makeReq('ba-9'), 'usr-1');
+      expect(mockUsersService.resendActivationEmail).toHaveBeenCalledWith('ba-9', 'usr-1');
     });
   });
 
