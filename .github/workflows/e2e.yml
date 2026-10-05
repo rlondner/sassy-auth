@@ -60,6 +60,15 @@ jobs:
       NEXT_PUBLIC_AUTH_SERVER_URL: http://localhost:3010
       ADMIN_URL: http://localhost:3001
       NODE_ENV: test
+      # `next build` (admin console) bakes every `process.env.NODE_ENV`
+      # reference into the literal 'production' for any non-dev build,
+      # regardless of this job's NODE_ENV=test — so admin's BetterAuth
+      # cookie-naming check (isSecureCookieEnv, @sassy-auth/types) can't
+      # rely on NODE_ENV alone the way auth-server's plain-runtime check
+      # can. COOKIE_SECURE is a distinct env var name that webpack never
+      # inlines, so setting it here keeps admin and auth-server agreeing
+      # on the unprefixed `better-auth.session_token` cookie name.
+      COOKIE_SECURE: 'false'
       # Cloudflare's documented always-pass Turnstile test keypair (see
       # .env.example) — without these the /signup captcha widget throws
       # `Invalid input for parameter "sitekey"` and every signup spec fails.

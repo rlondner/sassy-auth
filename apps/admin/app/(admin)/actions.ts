@@ -3,17 +3,18 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
-import { getBetterAuthCookieName } from '@sassy-auth/types'
+import { getBetterAuthCookieName, isSecureCookieEnv } from '@sassy-auth/types'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { AUTH_SERVER_URL } from '@/lib/config'
 
-// Must match the exact production check auth.config.ts uses for
-// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
+// Must match the exact check auth.config.ts uses for
+// `advanced.useSecureCookies` — see isSecureCookieEnv's doc comment
+// (@sassy-auth/types) for why this can't just be `NODE_ENV === 'production'`.
 // bug-0293: must match auth.config.ts's `advanced.cookiePrefix` — see
 // getBetterAuthCookieName's doc comment.
 const SESSION_COOKIE_NAME = getBetterAuthCookieName(
   'session_token',
-  process.env.NODE_ENV === 'production',
+  isSecureCookieEnv(),
   process.env.COOKIE_PREFIX || 'better-auth',
 )
 
@@ -29,7 +30,7 @@ export async function setLocaleAction(locale: string, pathname: string) {
   cookieStore.set('NEXT_LOCALE', locale, {
     path: '/',
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecureCookieEnv(),
     maxAge: LOCALE_COOKIE_MAX_AGE_SECONDS,
   })
   Sentry.addBreadcrumb({

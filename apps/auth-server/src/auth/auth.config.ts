@@ -3,6 +3,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { magicLink, emailOTP, openAPI, twoFactor, genericOAuth } from 'better-auth/plugins';
 import { prisma } from '@sassy-auth/db';
 import type { ActivationEmailBranding } from '@sassy-auth/types';
+import { isSecureCookieEnv } from '@sassy-auth/types';
 import { passwordResetEmail } from '../email/templates/password-reset.template';
 import { verificationEmail } from '../email/templates/verify-email.template';
 import { sendVerificationCode } from './verification-code-sender';
@@ -107,7 +108,7 @@ export const auth = betterAuth({
     defaultCookieAttributes: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecureCookieEnv(),
     },
     // dev(sec) https rollout: BetterAuth derives `useSecureCookies` (which
     // renames every session cookie with a `__Secure-` prefix, per RFC 6265bis)
@@ -122,9 +123,13 @@ export const auth = betterAuth({
     // upstream but admin's forwardSessionCookie() found no cookie named
     // `better-auth.session_token`, returned false, and the login form
     // showed "Sign-in service is unavailable." Pin this to the same
-    // production-only condition as `secure` above so dev keeps the
-    // unprefixed name regardless of the auth-server's protocol.
-    useSecureCookies: process.env.NODE_ENV === 'production',
+    // check apps/admin uses (`isSecureCookieEnv()`, @sassy-auth/types) so
+    // dev/e2e keep the unprefixed name and production/staging keep the
+    // `__Secure-` one, regardless of the auth-server's protocol. Plain
+    // `NODE_ENV === 'production'` isn't enough on its own — see
+    // isSecureCookieEnv's doc comment for why apps/admin can't rely on
+    // that check alone.
+    useSecureCookies: isSecureCookieEnv(),
     // bug-0293: staging and production are forced to share the same
     // COOKIE_DOMAIN (`.milissai.com` — see below), because
     // auth-staging.milissai.com/auth-api-staging.milissai.com don't share a

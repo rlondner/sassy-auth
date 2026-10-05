@@ -243,3 +243,34 @@ export function getBetterAuthCookieName(
   const base = `${prefix}.${cookie}`;
   return isProduction ? `__Secure-${base}` : base;
 }
+
+/**
+ * Decides whether BetterAuth cookies should get the `__Secure-` treatment
+ * (see getBetterAuthCookieName above). Both auth-server and apps/admin used
+ * to each compute `process.env.NODE_ENV === 'production'` independently —
+ * which works for auth-server (plain NestJS, reads `process.env` live at
+ * request time) but silently breaks for apps/admin: `next build` bakes
+ * every `process.env.NODE_ENV` reference into the literal `'production'`
+ * via webpack's DefinePlugin, for ANY non-dev build, regardless of what
+ * `NODE_ENV` is actually set to when the build runs or the server starts.
+ * A CI/e2e admin build run with `NODE_ENV=test` therefore still compiled
+ * `IS_PRODUCTION = true`, so admin expected `__Secure-better-auth.session_token`
+ * while the auth-server (correctly reading `NODE_ENV=test` at runtime) set
+ * the unprefixed `better-auth.session_token` — sign-in "succeeded" upstream
+ * but admin's forwardSessionCookie() found no matching Set-Cookie and every
+ * e2e sign-in failed.
+ *
+ * `COOKIE_SECURE` is a brand-new env var name, so it is NOT in webpack's
+ * DefinePlugin substitution list (only NODE_ENV/NEXT_RUNTIME/a few internal
+ * keys are) — reading it stays a genuine runtime `process.env` lookup even
+ * inside an admin server bundle. Leaving it unset preserves the old
+ * behavior exactly (falls back to the NODE_ENV check), so production and
+ * staging need no config changes; e2e/test environments set
+ * `COOKIE_SECURE=false` explicitly to get the correct, non-inlined answer.
+ */
+export function isSecureCookieEnv(): boolean {
+  if (process.env.COOKIE_SECURE !== undefined) {
+    return process.env.COOKIE_SECURE === 'true';
+  }
+  return process.env.NODE_ENV === 'production';
+}

@@ -13,6 +13,72 @@
 
 It models four things — **apps**, **orgs**, **users**, and **permissions/roles** — so one deployment can serve several products, each with its own tenants, without any of them sharing a permission namespace or an admin UI.
 
+## Table of Contents
+
+- [SassyAuth](#sassyauth)
+  - [Who it's for](#who-its-for)
+  - [Permissions that reach the API, not just the UI](#permissions-that-reach-the-api-not-just-the-ui)
+  - [Screenshots](#screenshots)
+  - [Quick Start (Docker)](#quick-start-docker)
+  - [Deployment](#deployment)
+  - [Quick Start (Flox)](#quick-start-flox)
+  - [What SassyAuth is not](#what-sassyauth-is-not)
+  - [How it compares](#how-it-compares)
+  - [The name](#the-name)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Project Structure](#project-structure)
+  - [Getting Started](#getting-started)
+    - [1. Clone and install dependencies](#1-clone-and-install-dependencies)
+    - [2. Configure environment variables](#2-configure-environment-variables)
+    - [3. Set up the database](#3-set-up-the-database)
+    - [4. Generate the Prisma client](#4-generate-the-prisma-client)
+    - [5. Seed platform data](#5-seed-platform-data)
+    - [6. Local HTTPS certificates (auth-server)](#6-local-https-certificates-auth-server)
+    - [6b. Optional — Caddy proxy for prod-like hostnames (Windows only)](#6b-optional--caddy-proxy-for-prod-like-hostnames-windows-only)
+    - [7. Start the development servers](#7-start-the-development-servers)
+  - [RSA Key Pair Generation](#rsa-key-pair-generation)
+  - [Environment Variables](#environment-variables)
+    - [Required](#required)
+    - [Admin console](#admin-console)
+    - [Rate limiting (optional)](#rate-limiting-optional)
+    - [Cookie security (`NODE_ENV`, `COOKIE_SECURE`, `COOKIE_PREFIX`, `COOKIE_DOMAIN`)](#cookie-security-node_env-cookie_secure-cookie_prefix-cookie_domain)
+    - [Password policy (optional)](#password-policy-optional)
+    - [Legal consent — Privacy Policy / Terms / GDPR (optional)](#legal-consent--privacy-policy--terms--gdpr-optional)
+    - [Signup captcha (optional)](#signup-captcha-optional)
+    - [Observability (optional)](#observability-optional)
+    - [Email (optional)](#email-optional)
+    - [Test credentials (optional)](#test-credentials-optional)
+    - [Social providers (optional)](#social-providers-optional)
+  - [Auth Flows](#auth-flows)
+    - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
+    - [Flow B: Direct Login](#flow-b-direct-login)
+    - [Flow C: Invite + Accept](#flow-c-invite--accept)
+    - [OIDC support](#oidc-support)
+  - [JWKS and Token Verification](#jwks-and-token-verification)
+  - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
+  - [Social Sign-In](#social-sign-in)
+  - [Activation Webhook](#activation-webhook)
+  - [Activation Email Branding](#activation-email-branding)
+  - [API Reference](#api-reference)
+    - [API documentation](#api-documentation)
+  - [Self-serve Registration (`POST /api/register`)](#self-serve-registration-post-apiregister)
+    - [Request](#request)
+    - [Responses](#responses)
+    - [Rate limiting](#rate-limiting)
+  - [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
+  - [Admin Console](#admin-console-1)
+  - [Observability](#observability)
+  - [Running Tests](#running-tests)
+    - [Unit tests](#unit-tests)
+    - [E2E tests](#e2e-tests)
+  - [Local email testing (Mailpit)](#local-email-testing-mailpit)
+  - [Known Limitations](#known-limitations)
+  - [Contributing](#contributing)
+  - [License](#license)
+
+---
+
 ## Who it's for
 
 SassyAuth is built for **solo founders and small teams shipping SaaS** who have decided that identity is one part of the stack they would rather own than rent.
@@ -203,70 +269,6 @@ Rough orientation, not a benchmark — pick the one whose trade-offs you want:
 ## The name
 
 **Sassy** is a light pun on **SaaS** — as in SaaS Authentication and Authorization, which is what it is for. No deeper meaning, and no relation to anything else called Sassy.
-
----
-
-## Table of Contents
-
-- [SassyAuth](#sassyauth)
-  - [Who it's for](#who-its-for)
-  - [Permissions that reach the API, not just the UI](#permissions-that-reach-the-api-not-just-the-ui)
-  - [Screenshots](#screenshots)
-  - [Quick Start (Docker)](#quick-start-docker)
-  - [Deployment](#deployment)
-  - [Quick Start (Flox)](#quick-start-flox)
-  - [What SassyAuth is not](#what-sassyauth-is-not)
-  - [How it compares](#how-it-compares)
-  - [The name](#the-name)
-  - [Table of Contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-  - [Project Structure](#project-structure)
-  - [Getting Started](#getting-started)
-    - [1. Clone and install dependencies](#1-clone-and-install-dependencies)
-    - [2. Configure environment variables](#2-configure-environment-variables)
-    - [3. Set up the database](#3-set-up-the-database)
-    - [4. Generate the Prisma client](#4-generate-the-prisma-client)
-    - [5. Seed platform data](#5-seed-platform-data)
-    - [6. Local HTTPS certificates (auth-server)](#6-local-https-certificates-auth-server)
-    - [7. Start the development servers](#7-start-the-development-servers)
-  - [RSA Key Pair Generation](#rsa-key-pair-generation)
-  - [Environment Variables](#environment-variables)
-    - [Required](#required)
-    - [Admin console](#admin-console)
-    - [Rate limiting (optional)](#rate-limiting-optional)
-    - [Cross-subdomain cookies (required for live deployments)](#cross-subdomain-cookies-required-for-live-deployments)
-    - [Password policy (optional)](#password-policy-optional)
-    - [Legal consent — Privacy Policy / Terms / GDPR (optional)](#legal-consent--privacy-policy--terms--gdpr-optional)
-    - [Signup captcha (optional)](#signup-captcha-optional)
-    - [Observability (optional)](#observability-optional)
-    - [Email (optional)](#email-optional)
-    - [Test credentials (optional)](#test-credentials-optional)
-    - [Social providers (optional)](#social-providers-optional)
-  - [Auth Flows](#auth-flows)
-    - [Flow A: OAuth2 Authorization Code with PKCE (S256)](#flow-a-oauth2-authorization-code-with-pkce-s256)
-    - [Flow B: Direct Login](#flow-b-direct-login)
-    - [Flow C: Invite + Accept](#flow-c-invite--accept)
-    - [OIDC support](#oidc-support)
-  - [JWKS and Token Verification](#jwks-and-token-verification)
-  - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
-  - [Social Sign-In](#social-sign-in)
-  - [Activation Webhook](#activation-webhook)
-  - [Activation Email Branding](#activation-email-branding)
-  - [API Reference](#api-reference)
-  - [Self-serve Registration (`POST /api/register`)](#self-serve-registration-post-apiregister)
-    - [Request](#request)
-    - [Responses](#responses)
-    - [Rate limiting](#rate-limiting)
-  - [Sample Resource Server (FastAPI)](#sample-resource-server-fastapi)
-  - [Admin Console](#admin-console-1)
-  - [Observability](#observability)
-  - [Running Tests](#running-tests)
-    - [Unit tests](#unit-tests)
-    - [E2E tests](#e2e-tests)
-  - [Local email testing (Mailpit)](#local-email-testing-mailpit)
-  - [Known Limitations](#known-limitations)
-  - [Contributing](#contributing)
-  - [License](#license)
 
 ---
 
@@ -494,6 +496,21 @@ pnpm --filter @sassy-auth/admin dev            # port 3001
 
 Open <http://localhost:3001/login> to access the admin console.
 
+> **This is dev mode, not a production rehearsal.** `pnpm dev` runs both apps
+> with `NODE_ENV` unset (→ `development`), on plain HTTP ports that share the
+> literal host `localhost` — so `COOKIE_DOMAIN`/`COOKIE_PREFIX` never come
+> into play and the session cookie is never `Secure`, because browsers refuse
+> a `Secure` cookie over plain `http://`. That's fine for day-to-day admin
+> console/auth-server work, but it does **not** exercise the things that
+> matter once a resource server is involved on its own domain: HTTPS,
+> `Secure`/`__Secure-` cookies, and cross-subdomain cookie sharing are all
+> load-bearing in a real deployment, not optional extras you can skip
+> locally and expect to work the first time in production. To actually
+> rehearse that — building the admin console with `NODE_ENV=production` (or
+> `COOKIE_SECURE=true`) the way a real deploy does, running a resource
+> server against it, and seeing the PKCE round-trip and cookie behavior for
+> real — see [DEPLOYMENT.md §8, "Local mock deployment"](DEPLOYMENT.md#8-local-mock-deployment-custom-ports).
+
 ---
 
 ## RSA Key Pair Generation
@@ -518,8 +535,9 @@ Copy the two output lines directly into your `.env.local` file.
 | `RSA_PRIVATE_KEY`     | Base64-encoded PKCS8 PEM private key (for signing JWTs)        |
 | `RSA_PUBLIC_KEY`      | Base64-encoded SPKI PEM public key (served via JWKS endpoint)  |
 | `JWT_KEY_ID`          | `kid` written into every issued JWT header and the JWKS document. Resource servers use it to pick the right key from the JWKS. Rotate together with the RSA key pair. Default: `sassy-auth-1` |
-| `BETTER_AUTH_SECRET`  | Random string, 32+ characters                                  |
-| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `https://localhost:3010`. Also used as the JWT `iss` claim. |
+| `BETTER_AUTH_SECRET`  | Random string, 32+ characters. Signs BetterAuth's session cookies and CSRF tokens — treat it like any other signing key (rotating it signs out every session; see [DEPLOYMENT.md §7](DEPLOYMENT.md#7-operational-notes)). |
+| `BETTER_AUTH_URL`     | Base URL of the auth server, e.g. `https://localhost:3010`. Also used as the JWT `iss` claim and the OAuth/OIDC metadata issuer — resource servers verify against it, so it must exactly match what they expect. Must be `https://` (not `http://`) whenever the admin console and auth server live on different hosts/ports and you need the session cookie to survive — see [Cookie security](#cookie-security-node_env-cookie_secure-cookie_prefix-cookie_domain) below. |
+| `NODE_ENV`            | Standard Node environment flag (`development` \| `test` \| `production`). Beyond the usual framework effects (API docs mount, Sentry sampling, rate-limit bypass in `test`), it's also the **default** source for whether BetterAuth cookies get the `Secure` flag / `__Secure-` prefix — see [Cookie security](#cookie-security-node_env-cookie_secure-cookie_prefix-cookie_domain). `pnpm dev` leaves it unset (→ `development`); CI/e2e sets it to `test`; a production deploy sets it to `production`. |
 | `TRUSTED_ORIGINS`     | Comma-separated list of origins allowed by BetterAuth CSRF. Default: `http://localhost:3001` |
 | `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` | Dev only. Set to `true` to allow registering apps whose `url` or `callbackUrl` uses `http` or a localhost/loopback host. Any other value (or unset) requires `https` with a public host. Default: unset (secure) |
 | `SEED_ADMIN_PASSWORD` | Password given to every account created by the seed scripts. Falls back to `E2E_ADMIN_PASSWORD`, then to the documented dev default `Pass@word1234`. **Required when `NODE_ENV` is anything other than `development` or `test`** — the seed throws rather than provision admins with a publicly known password. |
@@ -556,16 +574,24 @@ Two NestJS throttler buckets (`@nestjs/throttler`), applied globally, keyed per-
 
 See also [Self-serve Registration rate limiting](#rate-limiting) for the separate, differently-defaulted `REGISTER_RATE_LIMIT`/`REGISTER_RATE_WINDOW_MS` pair that guards `POST /api/register`.
 
-### Cross-subdomain cookies (required for live deployments)
+### Cookie security (`NODE_ENV`, `COOKIE_SECURE`, `COOKIE_PREFIX`, `COOKIE_DOMAIN`)
 
-| Variable | Description | Default |
-|----------|--------------|---------|
+BetterAuth issues two cookies that matter here — the session cookie, and (when 2FA is involved) the two-factor-challenge and trust-device cookies. Four env vars jointly decide their name and attributes, and **both `apps/auth-server` and `apps/admin` must agree on all four** or sign-in breaks in one of two ways: either a sign-in that "succeeds" upstream but never actually logs the admin console in (the two sides disagree on the cookie's *name*), or a cookie the browser silently refuses to store at all (the two sides disagree on whether it needs `https`).
+
+| Variable | Decides | Default |
+|----------|---------|---------|
+| `NODE_ENV` | The **fallback** source for whether cookies get the `Secure` flag and `__Secure-` name prefix (RFC 6265bis), when `COOKIE_SECURE` is unset. `=== 'production'` → secure/prefixed; anything else → not. | — |
+| `COOKIE_SECURE` | Explicit `true`/`false` override for the same decision, read by `auth-server` (`advanced.useSecureCookies`) and `admin` (`isSecureCookieEnv()` in `@sassy-auth/types`). Takes precedence over the `NODE_ENV` fallback when set. | *(unset — falls back to `NODE_ENV`)* |
 | `COOKIE_DOMAIN` | Parent domain shared by the admin console and this auth server when they're deployed on sibling subdomains (e.g. `.example.com` for `auth.example.com` + `auth-api.example.com`). Enables BetterAuth's `crossSubDomainCookies` so the session cookie set at sign-in carries a `Domain` attribute and is sent by the browser to both origins. | *(unset)* |
 | `COOKIE_PREFIX` | Overrides BetterAuth's default cookie name prefix (`better-auth`). Both this server (`advanced.cookiePrefix`) and the admin console (`getBetterAuthCookieName` in `@sassy-auth/types`) read the same env var and must agree. Only needed when two separate deployments (e.g. staging and production) are forced to share the same `COOKIE_DOMAIN` — see below. | *(unset — uses `better-auth`)* |
 
-Without this, BetterAuth issues a host-only session cookie, scoped to whichever origin sets it (the admin console). That's invisible in local dev, where the admin console and auth server both run on the literal host `localhost` (differing only by port — cookies aren't port-scoped). It breaks the moment they're deployed to two different subdomains in production: a resource server's `/oauth/authorize` redirect hits the auth server directly in the browser, finds no session cookie, and bounces to the admin console's `/login`. That page's own session check is a server-to-server fetch — unaffected by the missing cookie domain — so it thinks the user is signed in and redirects straight back to `/oauth/authorize`, producing an infinite redirect loop until the client is throttled. Set `COOKIE_DOMAIN` to the shared parent domain on the auth server for any live deployment where the admin console and auth server are on sibling subdomains — see [DEPLOYMENT.md](DEPLOYMENT.md#4-environment-variable-reference-production).
+**Why `COOKIE_SECURE` exists, not just `NODE_ENV`.** `apps/auth-server` is plain NestJS — it reads `process.env.NODE_ENV` live, on every request. `apps/admin` is Next.js, and `next build` bakes every `process.env.NODE_ENV` reference in the compiled output into the literal string `'production'` for *any* non-dev build — **regardless of what `NODE_ENV` was actually set to during that build**, and regardless of what it's set to later when `next start` runs. So if you build the admin console without `NODE_ENV=production` and then run it with `NODE_ENV=production`, the admin's cookie-naming check is already permanently baked to `true` from the build, which happens to still agree here — but if `auth-server` and the admin console's *build step* ever see different `NODE_ENV` values (CI's e2e job once did exactly this: the admin build used `NODE_ENV=test` as intended, but that still compiles to `__Secure-` cookies in admin's bundle while auth-server correctly used the unprefixed name at runtime — see [the CI fix](.github/workflows/e2e.yml)), sign-in silently breaks. `COOKIE_SECURE` sidesteps all of this: it's a plain env var Next.js never inlines, so admin reads it live at runtime exactly like auth-server does. Leave it unset for a normal single-`NODE_ENV`-per-environment setup; set it explicitly (the same value on both services) whenever you build and run the admin console under different `NODE_ENV` values, or want cookie security decided independently of `NODE_ENV` — see [DEPLOYMENT.md §8.4](DEPLOYMENT.md#84-start-the-auth-server-port-3100) for the local production-like mock, where this comes up directly.
 
-**If two deployments end up with the same `COOKIE_DOMAIN`, set a distinct `COOKIE_PREFIX` on each (bug-0293).** This project's own staging and production environments are an example: `auth-staging.example.com`/`auth-api-staging.example.com` don't share a narrower suffix than `.example.com` either, so staging is forced onto the exact same `COOKIE_DOMAIN` as production. Without a distinct prefix, both environments would write an identically-named session cookie to the same `Domain`/`Path` — whichever environment a browser visited most recently would silently overwrite the other's cookie in the shared cookie jar. `render.staging.yaml` sets `COOKIE_PREFIX=sassy-staging`; production leaves it unset so existing production sessions aren't invalidated by the change.
+**`COOKIE_DOMAIN`.** Without it, BetterAuth issues a host-only session cookie, scoped to whichever origin sets it (the admin console). That's invisible in local dev, where the admin console and auth server both run on the literal host `localhost` (differing only by port — cookies aren't port-scoped). It breaks the moment they're deployed to two different subdomains in production: a resource server's `/oauth/authorize` redirect hits the auth server directly in the browser, finds no session cookie, and bounces to the admin console's `/login`. That page's own session check is a server-to-server fetch — unaffected by the missing cookie domain — so it thinks the user is signed in and redirects straight back to `/oauth/authorize`, producing an infinite redirect loop until the client is throttled. Set `COOKIE_DOMAIN` to the shared parent domain on the auth server for any live deployment where the admin console and auth server are on sibling subdomains — see [DEPLOYMENT.md](DEPLOYMENT.md#4-environment-variable-reference-production).
+
+**`COOKIE_PREFIX`.** If two deployments end up with the same `COOKIE_DOMAIN`, set a distinct `COOKIE_PREFIX` on each (bug-0293). This project's own staging and production environments are an example: `auth-staging.example.com`/`auth-api-staging.example.com` don't share a narrower suffix than `.example.com` either, so staging is forced onto the exact same `COOKIE_DOMAIN` as production. Without a distinct prefix, both environments would write an identically-named session cookie to the same `Domain`/`Path` — whichever environment a browser visited most recently would silently overwrite the other's cookie in the shared cookie jar. `render.staging.yaml` sets `COOKIE_PREFIX=sassy-staging`; production leaves it unset so existing production sessions aren't invalidated by the change.
+
+**Where to set these.** All four live in the **root `.env.local`** (see [Configure environment variables](#2-configure-environment-variables)) — `apps/auth-server` and `apps/admin` both read it, and in production both services' env groups in `render.yaml`/`render.staging.yaml` set identical values for whichever of these four they define. `apps/resource-server-fastapi` never reads any of them — it only consumes JWTs and never sees a BetterAuth cookie.
 
 ### Password policy (optional)
 
