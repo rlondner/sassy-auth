@@ -106,4 +106,20 @@ describe('AuthCard', () => {
     expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
     expect(container.querySelector('[data-auth-card-bg]')).toBeNull()
   })
+
+  it('silently ignores malformed background color values instead of emitting them into the <style> tag', () => {
+    const { container } = render(
+      <AuthCard
+        title="Hi"
+        pageLightBackgroundColor="</style><script>alert(1)</script>"
+        pageDarkBackgroundColor="not-a-color"
+        cardLightBackgroundColor="#12345"
+        cardDarkBackgroundColor="#1234567"
+      />,
+    )
+    expect(container.querySelector('style')).toBeNull()
+    expect(container.querySelector('script')).toBeNull()
+    expect(container.querySelector('[data-auth-page-bg]')).toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).toBeNull()
+  })
 })
