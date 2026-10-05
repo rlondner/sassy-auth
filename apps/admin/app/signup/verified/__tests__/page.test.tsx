@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import VerifiedPage from '../page'
+import VerifiedPage, { generateMetadata } from '../page'
 import { fetchAppBranding } from '@/lib/app-branding'
 
 jest.mock('next-intl/server', () => ({
@@ -128,4 +128,38 @@ describe('SignupVerifiedPage', () => {
       expect(screen.getByText('signup.verified.invalid.title')).toBeInTheDocument()
     },
   )
+})
+
+describe('SignupVerifiedPage generateMetadata', () => {
+  it('returns no metadata when there is no client_id', async () => {
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({}) })
+    expect(metadata).toEqual({})
+    expect(mockFetchAppBranding).not.toHaveBeenCalled()
+  })
+
+  it('sets the tab icon when the app has a favicon', async () => {
+    mockFetchAppBranding.mockResolvedValue({
+      logo: null,
+      favicon: 'data:image/png;base64,FFF=',
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
+    })
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
+    expect(metadata).toEqual({ icons: { icon: 'data:image/png;base64,FFF=' } })
+  })
+
+  it('leaves the icon unset when the app has no favicon', async () => {
+    mockFetchAppBranding.mockResolvedValue({
+      logo: null,
+      favicon: null,
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
+    })
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
+    expect(metadata).toEqual({})
+  })
 })

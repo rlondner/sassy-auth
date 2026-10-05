@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
@@ -11,6 +12,17 @@ export const dynamic = 'force-dynamic'
 // directly from the browser, so it needs the origin the browser can reach.
 const PUBLIC_AUTH_SERVER =
   process.env.PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ client_id?: string }>
+}): Promise<Metadata> {
+  const { client_id: clientId } = await searchParams
+  if (!clientId) return {}
+  const { favicon } = await fetchAppBranding(clientId)
+  return favicon ? { icons: { icon: favicon } } : {}
+}
 
 export default async function SignupVerifiedPage({
   searchParams,
