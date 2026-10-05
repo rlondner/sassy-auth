@@ -28,6 +28,7 @@ import type { App, RedirectUri, OrgRow, RoleRow, PasswordPolicy } from '@/lib/ty
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 import { AppLogoField } from './app-logo-field'
 import { AppFaviconField } from './app-favicon-field'
+import { AppColorField } from './app-color-field'
 
 interface Props {
   app: App
@@ -49,6 +50,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const [originalLogo, setOriginalLogo] = React.useState<string | null>(app.logo ?? null)
   const [favicon, setFavicon] = React.useState<string | null>(app.favicon ?? null)
   const [originalFavicon, setOriginalFavicon] = React.useState<string | null>(app.favicon ?? null)
+  const [pageLightBackgroundColor, setPageLightBackgroundColor] = React.useState<string | null>(app.pageLightBackgroundColor ?? null)
+  const [pageDarkBackgroundColor, setPageDarkBackgroundColor] = React.useState<string | null>(app.pageDarkBackgroundColor ?? null)
+  const [cardLightBackgroundColor, setCardLightBackgroundColor] = React.useState<string | null>(app.cardLightBackgroundColor ?? null)
+  const [cardDarkBackgroundColor, setCardDarkBackgroundColor] = React.useState<string | null>(app.cardDarkBackgroundColor ?? null)
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>(app.redirectUris ?? [])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(app.twoFactorTrustDays ?? null)
   const [twoFactorPromptEnabled, setTwoFactorPromptEnabled] = React.useState<boolean | null>(app.twoFactorPromptEnabled ?? null)
@@ -121,6 +126,10 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     setOriginalLogo(app.logo ?? null)
     setFavicon(app.favicon ?? null)
     setOriginalFavicon(app.favicon ?? null)
+    setPageLightBackgroundColor(app.pageLightBackgroundColor ?? null)
+    setPageDarkBackgroundColor(app.pageDarkBackgroundColor ?? null)
+    setCardLightBackgroundColor(app.cardLightBackgroundColor ?? null)
+    setCardDarkBackgroundColor(app.cardDarkBackgroundColor ?? null)
     setRedirectUris(app.redirectUris ?? [])
     setTwoFactorTrustDays(app.twoFactorTrustDays ?? null)
     setTwoFactorPromptEnabled(app.twoFactorPromptEnabled ?? null)
@@ -259,7 +268,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
     activationSubject.trim() !== (activationOverrideBaseline.subject ?? '') ||
     activationMessage.trim() !== (activationOverrideBaseline.message ?? '')
   const emailVerificationMethodDirty = emailVerificationMethod !== (app.emailVerificationMethod ?? 'link')
-  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || favicon !== originalFavicon || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty || emailVerificationMethodDirty
+  const dirty = name !== app.name || url !== app.url || logo !== originalLogo || favicon !== originalFavicon || redirectUrisDirty || twoFactorTrustDays !== (app.twoFactorTrustDays ?? null) || twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null) || requireTwoFactor !== (app.requireTwoFactor ?? false) || allowOfflineAccess !== (app.allowOfflineAccess ?? false) || socialDirty || defaultOrgId !== (app.defaultOrgId ?? null) || defaultRoleId !== (app.defaultRoleId ?? null) || passwordPolicyDirty || webhookUrlDirty || activationDirty || privacyPolicyUrlDirty || termsUrlDirty || gdprUrlDirty || emailVerificationMethodDirty || pageLightBackgroundColor !== (app.pageLightBackgroundColor ?? null) || pageDarkBackgroundColor !== (app.pageDarkBackgroundColor ?? null) || cardLightBackgroundColor !== (app.cardLightBackgroundColor ?? null) || cardDarkBackgroundColor !== (app.cardDarkBackgroundColor ?? null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -272,11 +281,15 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
       setErrorKey('apps.errors.nameRequired')
       return
     }
-    const patch: { name?: string; url?: string; logo?: string | null; favicon?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; twoFactorPromptEnabled?: boolean | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null; emailVerificationMethod?: 'link' | 'code' } = {}
+    const patch: { name?: string; url?: string; logo?: string | null; favicon?: string | null; redirectUris?: RedirectUri[]; twoFactorTrustDays?: number | null; twoFactorPromptEnabled?: boolean | null; requireTwoFactor?: boolean; allowOfflineAccess?: boolean; defaultOrgId?: string | null; defaultRoleId?: string | null; passwordPolicyOverride?: PasswordPolicy | null; activationWebhookUrl?: string | null; activationEmailOverride?: import('@/lib/types').ActivationEmailBranding | null; privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null; emailVerificationMethod?: 'link' | 'code'; pageLightBackgroundColor?: string | null; pageDarkBackgroundColor?: string | null; cardLightBackgroundColor?: string | null; cardDarkBackgroundColor?: string | null } = {}
     if (name !== app.name) patch.name = name.trim()
     if (url !== app.url) patch.url = url.trim()
     if (logo !== originalLogo) patch.logo = logo
     if (favicon !== originalFavicon) patch.favicon = favicon
+    if (pageLightBackgroundColor !== (app.pageLightBackgroundColor ?? null)) patch.pageLightBackgroundColor = pageLightBackgroundColor
+    if (pageDarkBackgroundColor !== (app.pageDarkBackgroundColor ?? null)) patch.pageDarkBackgroundColor = pageDarkBackgroundColor
+    if (cardLightBackgroundColor !== (app.cardLightBackgroundColor ?? null)) patch.cardLightBackgroundColor = cardLightBackgroundColor
+    if (cardDarkBackgroundColor !== (app.cardDarkBackgroundColor ?? null)) patch.cardDarkBackgroundColor = cardDarkBackgroundColor
     if (redirectUrisDirty) patch.redirectUris = redirectUris
     if (twoFactorTrustDays !== (app.twoFactorTrustDays ?? null)) patch.twoFactorTrustDays = twoFactorTrustDays
     if (twoFactorPromptEnabled !== (app.twoFactorPromptEnabled ?? null)) patch.twoFactorPromptEnabled = twoFactorPromptEnabled
@@ -376,6 +389,42 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
             </div>
             <div>
               <AppFaviconField value={favicon} onValueChange={setFavicon} />
+            </div>
+            <div>
+              <AppColorField
+                value={pageLightBackgroundColor}
+                onValueChange={setPageLightBackgroundColor}
+                inputId="appPageLightBg"
+                label={t('apps.fields.pageLightBackgroundColor')}
+                hint={t('apps.fields.pageLightBackgroundColorHint')}
+              />
+            </div>
+            <div>
+              <AppColorField
+                value={pageDarkBackgroundColor}
+                onValueChange={setPageDarkBackgroundColor}
+                inputId="appPageDarkBg"
+                label={t('apps.fields.pageDarkBackgroundColor')}
+                hint={t('apps.fields.pageDarkBackgroundColorHint')}
+              />
+            </div>
+            <div>
+              <AppColorField
+                value={cardLightBackgroundColor}
+                onValueChange={setCardLightBackgroundColor}
+                inputId="appCardLightBg"
+                label={t('apps.fields.cardLightBackgroundColor')}
+                hint={t('apps.fields.cardLightBackgroundColorHint')}
+              />
+            </div>
+            <div>
+              <AppColorField
+                value={cardDarkBackgroundColor}
+                onValueChange={setCardDarkBackgroundColor}
+                inputId="appCardDarkBg"
+                label={t('apps.fields.cardDarkBackgroundColor')}
+                hint={t('apps.fields.cardDarkBackgroundColorHint')}
+              />
             </div>
             <div>
               <Label>{t('apps.fields.redirectUris')}</Label>

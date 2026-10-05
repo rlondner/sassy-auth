@@ -73,6 +73,7 @@
       "cardLightBackgroundColorHint": "Remplace l'arrière-plan de la carte de connexion/inscription elle-même en mode clair.",
       "cardDarkBackgroundColor": "Arrière-plan de la carte (sombre)",
       "cardDarkBackgroundColorHint": "Remplace l'arrière-plan de la carte de connexion/inscription elle-même en mode sombre.",
+      "backgroundColors": "Couleurs d'arrière-plan",
       "resetColorToDefault": "Réinitialiser par défaut",
       "twoFactorTrustDays": "Intervalle de confiance 2FA (jours)",
       "twoFactorTrustDaysPlaceholder": "ex. 14 (par défaut système)",

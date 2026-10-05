@@ -25,6 +25,7 @@ import type { RedirectUri } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 import { AppLogoField } from './app-logo-field'
 import { AppFaviconField } from './app-favicon-field'
+import { AppColorField } from './app-color-field'
 
 interface Props {
   open: boolean
@@ -38,6 +39,10 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
   const [url, setUrl] = React.useState('')
   const [logo, setLogo] = React.useState<string | null>(null)
   const [favicon, setFavicon] = React.useState<string | null>(null)
+  const [pageLightBackgroundColor, setPageLightBackgroundColor] = React.useState<string | null>(null)
+  const [pageDarkBackgroundColor, setPageDarkBackgroundColor] = React.useState<string | null>(null)
+  const [cardLightBackgroundColor, setCardLightBackgroundColor] = React.useState<string | null>(null)
+  const [cardDarkBackgroundColor, setCardDarkBackgroundColor] = React.useState<string | null>(null)
   const [redirectUris, setRedirectUris] = React.useState<RedirectUri[]>([])
   const [twoFactorTrustDays, setTwoFactorTrustDays] = React.useState<number | null>(null)
   const [requireTwoFactor, setRequireTwoFactor] = React.useState<boolean>(false)
@@ -51,6 +56,10 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
       setUrl('')
       setLogo(null)
       setFavicon(null)
+      setPageLightBackgroundColor(null)
+      setPageDarkBackgroundColor(null)
+      setCardLightBackgroundColor(null)
+      setCardDarkBackgroundColor(null)
       setRedirectUris([])
       setTwoFactorTrustDays(null)
       setRequireTwoFactor(false)
@@ -72,6 +81,10 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
         url: url.trim(),
         logo,
         favicon,
+        pageLightBackgroundColor,
+        pageDarkBackgroundColor,
+        cardLightBackgroundColor,
+        cardDarkBackgroundColor,
         redirectUris,
         twoFactorTrustDays,
         requireTwoFactor,
@@ -126,6 +139,42 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
             </div>
             <div>
               <AppFaviconField value={favicon} onValueChange={setFavicon} />
+            </div>
+            <div>
+              <AppColorField
+                value={pageLightBackgroundColor}
+                onValueChange={setPageLightBackgroundColor}
+                inputId="appPageLightBg"
+                label={t('apps.fields.pageLightBackgroundColor')}
+                hint={t('apps.fields.pageLightBackgroundColorHint')}
+              />
+            </div>
+            <div>
+              <AppColorField
+                value={pageDarkBackgroundColor}
+                onValueChange={setPageDarkBackgroundColor}
+                inputId="appPageDarkBg"
+                label={t('apps.fields.pageDarkBackgroundColor')}
+                hint={t('apps.fields.pageDarkBackgroundColorHint')}
+              />
+            </div>
+            <div>
+              <AppColorField
+                value={cardLightBackgroundColor}
+                onValueChange={setCardLightBackgroundColor}
+                inputId="appCardLightBg"
+                label={t('apps.fields.cardLightBackgroundColor')}
+                hint={t('apps.fields.cardLightBackgroundColorHint')}
+              />
+            </div>
+            <div>
+              <AppColorField
+                value={cardDarkBackgroundColor}
+                onValueChange={setCardDarkBackgroundColor}
+                inputId="appCardDarkBg"
+                label={t('apps.fields.cardDarkBackgroundColor')}
+                hint={t('apps.fields.cardDarkBackgroundColorHint')}
+              />
             </div>
             <div>
               <Label>{t('apps.fields.redirectUris')}</Label>

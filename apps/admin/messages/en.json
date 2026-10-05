@@ -73,6 +73,7 @@
       "cardLightBackgroundColorHint": "Overrides the sign in/sign up card's own background in light mode.",
       "cardDarkBackgroundColor": "Card background (dark)",
       "cardDarkBackgroundColorHint": "Overrides the sign in/sign up card's own background in dark mode.",
+      "backgroundColors": "Background colors",
       "resetColorToDefault": "Reset to default",
       "twoFactorTrustDays": "2FA trust interval (days)",
       "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
