@@ -31,6 +31,8 @@ export interface PasswordPolicyAndBranding {
   pageDarkBackgroundColor: string | null
   cardLightBackgroundColor: string | null
   cardDarkBackgroundColor: string | null
+  logo: string | null
+  favicon: string | null
 }
 
 export async function getPasswordPolicyForResetToken(token: string): Promise<PasswordPolicyAndBranding> {

@@ -20,6 +20,8 @@ export async function resolveAppForResetToken(
   pageDarkBackgroundColor: string | null;
   cardLightBackgroundColor: string | null;
   cardDarkBackgroundColor: string | null;
+  logo: string | null;
+  favicon: string | null;
 } | null> {
   const verification = await prisma.verification.findFirst({
     where: { identifier: `reset-password:${token}` },
@@ -41,6 +43,8 @@ export async function resolveAppForResetToken(
       pageDarkBackgroundColor: true,
       cardLightBackgroundColor: true,
       cardDarkBackgroundColor: true,
+      logo: true,
+      favicon: true,
     },
   });
 }
