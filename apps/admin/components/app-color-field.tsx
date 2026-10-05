@@ -57,8 +57,15 @@ export function AppColorField({ value, onValueChange, inputId, label, hint }: Pr
           className="relative h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded border border-border"
           style={{ backgroundColor: HEX_COLOR_PATTERN.test(draft) ? draft : '#ffffff' }}
         >
+          {/*
+            This native color picker is aria-hidden and excluded from tab order on purpose:
+            the always-visible hex text input below is the real accessible way to set a color,
+            and this swatch is just a convenience affordance for sighted mouse users. Don't wire
+            it into tab order to "fix" accessibility — that would duplicate the text input's role.
+          */}
           <input
             type="color"
+            value={HEX_COLOR_PATTERN.test(draft) ? draft : '#000000'}
             aria-hidden="true"
             tabIndex={-1}
             onChange={(e) => {

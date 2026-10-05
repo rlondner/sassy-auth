@@ -10,7 +10,17 @@ function wrap(ui: React.ReactElement) {
 describe('AppColorField', () => {
   it('renders the hex text input with the current value', () => {
     wrap(<AppColorField value="#111111" onValueChange={jest.fn()} inputId="x" label="Page background (light)" hint="hint" />)
-    expect(screen.getByDisplayValue('#111111')).toBeInTheDocument()
+    // Scoped to the accessible text input rather than getByDisplayValue: the native
+    // <input type="color"> swatch is also kept in sync with the current value (so the OS
+    // picker opens on the right color), and getByDisplayValue matches any form control's
+    // live value/defaultValue regardless of type, so an unscoped query here would now match
+    // both inputs and throw.
+    expect(screen.getByLabelText('Page background (light)')).toHaveValue('#111111')
+  })
+
+  it('syncs the color swatch input to the current value', () => {
+    const { container } = wrap(<AppColorField value="#111111" onValueChange={jest.fn()} inputId="x" label="Page background (light)" hint="hint" />)
+    expect(container.querySelector('input[type="color"]')).toHaveValue('#111111')
   })
 
   it('calls onValueChange with a valid 6-digit hex value', () => {
