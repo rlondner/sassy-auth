@@ -247,6 +247,20 @@ describe('LoginOtpForm', () => {
       expect(screen.getByTestId('otp-error')).toHaveTextContent(text),
     )
   })
+
+  it('applies background color overrides when provided', () => {
+    const { container } = wrap(
+      <LoginOtpForm
+        next=""
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
+  })
 })
 
 describe('TwoFactorForm', () => {

@@ -8,7 +8,19 @@ import { useRouter } from 'next/navigation'
 import { AuthCard, Button, FormField } from '@sassy-auth/ui'
 import { requestOtp, verifyOtp } from './actions'
 
-export function LoginOtpForm({ next }: { next: string }) {
+export function LoginOtpForm({
+  next,
+  pageLightBackgroundColor = null,
+  pageDarkBackgroundColor = null,
+  cardLightBackgroundColor = null,
+  cardDarkBackgroundColor = null,
+}: {
+  next: string
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
+}) {
   const t = useTranslations('login')
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -46,7 +58,14 @@ export function LoginOtpForm({ next }: { next: string }) {
       : e
 
   return (
-    <AuthCard title={t('otp.title')} subtitle={t('otp.subtitle')}>
+    <AuthCard
+      title={t('otp.title')}
+      subtitle={t('otp.subtitle')}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
+    >
       {step === 'email' ? (
         <form action={requestAction} className="flex flex-col gap-4">
           <FormField
