@@ -5,8 +5,10 @@ import { CheckEmailCard } from './check-email-card'
 
 export const dynamic = 'force-dynamic'
 
-const PUBLIC_AUTH_SERVER =
-  process.env.PUBLIC_AUTH_SERVER_URL ?? process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
+// This page's resend button fetches directly from the browser, so it needs
+// an origin the browser can reach — see the matching comment on
+// app/login/page.tsx's AUTH_SERVER for why AUTH_SERVER_URL already is one.
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export default async function CheckEmailPage({
   searchParams,
@@ -36,7 +38,7 @@ export default async function CheckEmailPage({
     <CheckEmailCard
       email={email}
       next={next ?? ''}
-      authServerUrl={PUBLIC_AUTH_SERVER}
+      authServerUrl={AUTH_SERVER}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
       cardLightBackgroundColor={branding.cardLightBackgroundColor}

@@ -374,7 +374,7 @@ Do **not** set `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` in production.
 
 | Variable | Production value |
 |----------|------------------|
-| `PUBLIC_AUTH_SERVER_URL` | `https://auth-api.milissai.com` |
+| `NEXT_PUBLIC_AUTH_SERVER_URL` | `https://auth-api.milissai.com` — same value as `AUTH_SERVER_URL` in the shared group above, `NEXT_PUBLIC_`-prefixed so Next.js inlines it into the client bundle (required by `lib/api-public.ts`'s client-component calls) |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | `https://testapp.milissai.com` |
 
 ### Resource server only
@@ -516,7 +516,7 @@ BETTER_AUTH_SECRET="<random-32+-chars>"
 # Mock "production" URLs on custom ports
 BETTER_AUTH_URL="http://localhost:3100"
 AUTH_SERVER_URL="http://localhost:3100"
-PUBLIC_AUTH_SERVER_URL="http://localhost:3100"
+NEXT_PUBLIC_AUTH_SERVER_URL="http://localhost:3100"
 ADMIN_URL="http://localhost:3101"
 TRUSTED_ORIGINS="http://localhost:3101,http://localhost:8100"
 LOGIN_NEXT_ALLOWED_ORIGINS="http://localhost:8100"
@@ -715,7 +715,6 @@ docker run --rm -p 3010:3010 \
 # Admin console
 docker run --rm -p 3001:3001 \
   -e AUTH_SERVER_URL="https://auth-api.milissai.com" \
-  -e PUBLIC_AUTH_SERVER_URL="https://auth-api.milissai.com" \
   -e ADMIN_URL="https://auth.milissai.com" \
   -e LOGIN_NEXT_ALLOWED_ORIGINS="https://testapp.milissai.com" \
   sassy-auth-admin

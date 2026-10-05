@@ -162,8 +162,6 @@ services:
       - fromGroup: sassy-auth-staging
       - key: NODE_VERSION
         value: "24"
-      - key: PUBLIC_AUTH_SERVER_URL
-        value: https://auth-api-staging.milissai.com
       # NEXT_PUBLIC_ so Next.js inlines it at build time — see the matching
       # comment in render.yaml. Paired with TURNSTILE_SECRET_KEY on
       # sassy-auth-server-staging.
