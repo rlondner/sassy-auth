@@ -18,6 +18,10 @@ describe('fetchSocialProviders', () => {
       logo: 'data:image/png;base64,AAA=',
       name: 'Acme',
       favicon: 'data:image/png;base64,FFF=',
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
     })
   })
 
@@ -29,6 +33,10 @@ describe('fetchSocialProviders', () => {
       logo: null,
       name: null,
       favicon: null,
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
     })
   })
 
@@ -40,6 +48,10 @@ describe('fetchSocialProviders', () => {
       logo: null,
       name: null,
       favicon: null,
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
     })
   })
 
@@ -54,6 +66,10 @@ describe('fetchSocialProviders', () => {
       logo: null,
       name: null,
       favicon: null,
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
     })
   })
 })
