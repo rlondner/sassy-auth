@@ -11,9 +11,9 @@ const PUBLIC_AUTH_SERVER =
 export default async function CheckEmailPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string; next?: string; clientId?: string }>
+  searchParams: Promise<{ email?: string; next?: string; client_id?: string }>
 }) {
-  const { email, next, clientId } = await searchParams
+  const { email, next, client_id: clientId } = await searchParams
   const t = await getTranslations('signup.checkEmail')
   const branding = await fetchAppBranding(clientId ?? null)
 

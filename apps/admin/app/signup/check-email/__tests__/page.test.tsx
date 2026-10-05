@@ -62,7 +62,7 @@ describe('CheckEmailPage', () => {
       cardLightBackgroundColor: '#ffffff',
       cardDarkBackgroundColor: '#111111',
     })
-    const ui = await CheckEmailPage({ searchParams: Promise.resolve({ clientId: 'sq_1' }) })
+    const ui = await CheckEmailPage({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
     const { container } = render(ui)
     expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
     expect(mockFetchAppBranding).toHaveBeenCalledWith('sq_1')
