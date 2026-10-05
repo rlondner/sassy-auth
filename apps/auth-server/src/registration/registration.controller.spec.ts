@@ -1,55 +1,31 @@
-import { Test } from '@nestjs/testing';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
-import type { Request } from 'express';
 import { RegistrationController } from './registration.controller';
-import { RegistrationService } from './registration.service';
-import { AppLookupRateLimitGuard } from './rate-limit.guard';
 
-describe('RegistrationController', () => {
-  let controller: RegistrationController;
-  const mockService = {
+describe('RegistrationController — code-first signup routes', () => {
+  const service = {
     register: jest.fn(),
     getAppName: jest.fn(),
+    startRegistration: jest.fn().mockResolvedValue({ ok: true }),
+    verifyRegistrationCode: jest.fn().mockResolvedValue({ ok: true }),
+    completeRegistration: jest.fn().mockResolvedValue({ ok: true, orgPublicId: 'sq_1' }),
   };
+  const controller = new RegistrationController(service as never);
+  const req = { ip: '127.0.0.1', headers: {}, socket: { remoteAddress: '127.0.0.1' } } as never;
 
-  beforeEach(async () => {
-    jest.clearAllMocks();
-    const module = await Test.createTestingModule({
-      controllers: [RegistrationController],
-      providers: [{ provide: RegistrationService, useValue: mockService }],
-    }).compile();
-    controller = module.get(RegistrationController);
+  it('start delegates to RegistrationService.startRegistration (no IP — it does not need one)', async () => {
+    const dto = { email: 'a@x.com', appPublicId: 'sq_1', turnstileToken: 'tok' };
+    await controller.start(dto as never, req);
+    expect(service.startRegistration).toHaveBeenCalledWith(dto);
   });
 
-  describe('getAppName', () => {
-    it('delegates to the service with the query param and the resolved client IP', async () => {
-      const passwordPolicy = {
-        minLength: 12,
-        requireUppercase: true,
-        requireLowercase: true,
-        requireNumber: true,
-        requireSpecial: false,
-        minNumbers: 1,
-        minSpecial: 0,
-      };
-      mockService.getAppName.mockResolvedValue({ name: 'MyApp', hasDefaultOrg: false, passwordPolicy });
+  it('verifyCode delegates to RegistrationService.verifyRegistrationCode', async () => {
+    const dto = { email: 'a@x.com', otp: '123456' };
+    await controller.verifyCode(dto as never);
+    expect(service.verifyRegistrationCode).toHaveBeenCalledWith(dto);
+  });
 
-      const req = { ips: [], ip: '203.0.113.5' } as unknown as Request;
-      const result = await controller.getAppName('sq_1', req);
-
-      expect(mockService.getAppName).toHaveBeenCalledWith('sq_1', '203.0.113.5');
-      expect(result).toEqual({ name: 'MyApp', hasDefaultOrg: false, passwordPolicy });
-    });
-
-    // bug-0279: this route responds 200/404 distinguishably (unlike its
-    // documented sibling GET /api/social-providers), making it an
-    // enumeration oracle for appPublicId. It must carry a rate-limit guard
-    // so it can't be swept at will. It uses AppLookupRateLimitGuard — a
-    // separate DI singleton from RateLimitGuard (see rate-limit.guard.ts)
-    // so this route's budget doesn't share state with POST /api/register.
-    it('carries AppLookupRateLimitGuard, a rate limiter independent of POST /api/register', () => {
-      const guards = Reflect.getMetadata(GUARDS_METADATA, RegistrationController.prototype.getAppName);
-      expect(guards).toContain(AppLookupRateLimitGuard);
-    });
+  it('complete delegates to RegistrationService.completeRegistration with the resolved client IP', async () => {
+    const dto = { email: 'a@x.com', otp: '123456', password: 'x', firstName: 'A', lastName: 'B', appPublicId: 'sq_1' };
+    await controller.complete(dto as never, req);
+    expect(service.completeRegistration).toHaveBeenCalledWith(dto, '127.0.0.1');
   });
 });

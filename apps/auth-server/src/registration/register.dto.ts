@@ -25,3 +25,32 @@ export class RegisterDto {
   // docs/superpowers/specs/2026-09-23-signup-pkce-redirect-design.md.
   @IsString() @IsOptional() @MinLength(1) @MaxLength(4096) next?: string;
 }
+
+export class StartRegistrationDto {
+  @IsEmail() email!: string;
+  @IsString() @MinLength(1) appPublicId!: string;
+  @IsString() @MinLength(1) turnstileToken!: string;
+}
+
+export class VerifyRegistrationCodeDto {
+  @IsEmail() email!: string;
+  @IsString() @MinLength(6) @MaxLength(6) otp!: string;
+}
+
+export class CompleteRegistrationDto {
+  @IsEmail() email!: string;
+  @IsString() @MinLength(6) @MaxLength(6) otp!: string;
+  // Complexity is policy-driven, same as RegisterDto.password — the DTO
+  // only guards shape and the fixed DoS-prevention length cap.
+  @IsString() @MinLength(1) @MaxLength(256) password!: string;
+  @IsString() @MinLength(1) firstName!: string;
+  @IsString() @MinLength(1) lastName!: string;
+  @IsString() @IsOptional() @MinLength(1) companyName?: string;
+  @IsString() @MinLength(1) appPublicId!: string;
+  @IsOptional() @IsBoolean() acceptedPrivacyPolicy?: boolean;
+  @IsOptional() @IsBoolean() acceptedTerms?: boolean;
+  @IsOptional() @IsBoolean() acceptedGdpr?: boolean;
+  @IsOptional() @IsBoolean() marketingOptIn?: boolean;
+  // Same PKCE-redirect-recovery field as RegisterDto.next — see its comment.
+  @IsString() @IsOptional() @MinLength(1) @MaxLength(4096) next?: string;
+}

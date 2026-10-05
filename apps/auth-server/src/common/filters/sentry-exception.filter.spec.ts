@@ -1,5 +1,5 @@
 import { SentryExceptionFilter } from './sentry-exception.filter';
-import { HttpException, HttpStatus, ArgumentsHost } from '@nestjs/common';
+import { HttpException, HttpStatus, ArgumentsHost, BadRequestException } from '@nestjs/common';
 
 // Mock Sentry
 jest.mock('@sentry/nestjs', () => ({
@@ -50,6 +50,26 @@ describe('SentryExceptionFilter', () => {
         path: '/api/test',
       }),
     );
+  });
+
+  it('passes through a `code` field from the exception response when present', () => {
+    const exception = new BadRequestException({ code: 'OTP_EXPIRED' });
+    filter.catch(exception, mockHost);
+
+    expect(mockJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 400,
+        code: 'OTP_EXPIRED',
+      }),
+    );
+  });
+
+  it('omits the `code` field entirely when the exception response has none', () => {
+    const exception = new HttpException('Not found', HttpStatus.NOT_FOUND);
+    filter.catch(exception, mockHost);
+
+    const jsonArg = mockJson.mock.calls[0][0] as Record<string, unknown>;
+    expect('code' in jsonArg).toBe(false);
   });
 
   it('does NOT send 4xx HttpExceptions to Sentry', () => {

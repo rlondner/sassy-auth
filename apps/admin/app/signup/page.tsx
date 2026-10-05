@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
 import { fetchAppInfo } from '@/lib/app-info'
 import { SignupForm } from './signup-form'
+import { SignupWizard } from './signup-wizard'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,7 @@ export default async function SignupPage({
     )
   }
 
-  const { name: appName, hasDefaultOrg, passwordPolicy, logo, privacyPolicyUrl, termsUrl, gdprUrl, gdprRequired } =
+  const { name: appName, hasDefaultOrg, passwordPolicy, logo, privacyPolicyUrl, termsUrl, gdprUrl, gdprRequired, emailVerificationMethod } =
     await fetchAppInfo(clientId)
   const nextSafe = next ?? ''
 
@@ -59,15 +60,27 @@ export default async function SignupPage({
         </Link>
       }
     >
-      <SignupForm
-        clientId={clientId}
-        next={nextSafe}
-        hasDefaultOrg={hasDefaultOrg}
-        passwordPolicy={passwordPolicy}
-        privacyPolicyUrl={privacyPolicyUrl}
-        termsUrl={termsUrl}
-        gdprUrl={gdprRequired ? gdprUrl : null}
-      />
+      {emailVerificationMethod === 'code' ? (
+        <SignupWizard
+          clientId={clientId}
+          next={nextSafe}
+          hasDefaultOrg={hasDefaultOrg}
+          passwordPolicy={passwordPolicy}
+          privacyPolicyUrl={privacyPolicyUrl}
+          termsUrl={termsUrl}
+          gdprUrl={gdprRequired ? gdprUrl : null}
+        />
+      ) : (
+        <SignupForm
+          clientId={clientId}
+          next={nextSafe}
+          hasDefaultOrg={hasDefaultOrg}
+          passwordPolicy={passwordPolicy}
+          privacyPolicyUrl={privacyPolicyUrl}
+          termsUrl={termsUrl}
+          gdprUrl={gdprRequired ? gdprUrl : null}
+        />
+      )}
     </AuthCard>
   )
 }

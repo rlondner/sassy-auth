@@ -18,6 +18,10 @@ jest.mock('../signup-form', () => ({
   SignupForm: () => <div data-testid="signup-form" />,
 }))
 
+jest.mock('../signup-wizard', () => ({
+  SignupWizard: () => <div data-testid="signup-wizard" />,
+}))
+
 const mockFetchAppInfo = fetchAppInfo as jest.MockedFunction<typeof fetchAppInfo>
 
 beforeEach(() => {
@@ -60,6 +64,24 @@ describe('SignupPage subtitle', () => {
     render(ui)
 
     expect(screen.getByText('signup.subtitle')).toBeInTheDocument()
+  })
+})
+
+describe('SignupPage verification method', () => {
+  it('renders SignupForm when the app uses the link verification method', async () => {
+    mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, emailVerificationMethod: 'link' })
+    const ui = await SignupPage({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
+    render(ui)
+    expect(screen.getByTestId('signup-form')).toBeInTheDocument()
+    expect(screen.queryByTestId('signup-wizard')).not.toBeInTheDocument()
+  })
+
+  it('renders SignupWizard when the app uses the code verification method', async () => {
+    mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, emailVerificationMethod: 'code' })
+    const ui = await SignupPage({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
+    render(ui)
+    expect(screen.getByTestId('signup-wizard')).toBeInTheDocument()
+    expect(screen.queryByTestId('signup-form')).not.toBeInTheDocument()
   })
 })
 

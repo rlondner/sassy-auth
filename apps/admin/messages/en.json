@@ -643,7 +643,16 @@
     "acceptTerms": "I have read and accept the <link>Terms and Conditions</link>",
     "acceptGdpr": "I have read and accept the <link>GDPR Disclosure</link>",
     "submit": "Create account",
+    "continue": "Continue",
+    "marketingOptIn": "Please keep me updated on products, news, events & offers",
     "backToLogin": "Back to sign in",
+    "passwordStrength": {
+      "weak": "Weak",
+      "fair": "Fair",
+      "good": "Good",
+      "strong": "Strong",
+      "veryStrong": "Very strong"
+    },
     "checkEmail": {
       "title": "Check your email",
       "subtitle": "We sent a verification link to {email}.",
@@ -699,7 +708,9 @@
       "emailTaken": "An account with this email already exists.",
       "tooManyRequests": "Too many attempts. Please wait a minute and try again.",
       "serverUnavailable": "We could not reach the server. Please try again in a moment.",
-      "validationError": "We couldn't create your account. Please check your details and try again."
+      "validationError": "We couldn't create your account. Please check your details and try again.",
+      "INVALID_OTP": "That code isn't right. Please try again.",
+      "TOO_MANY_ATTEMPTS": "Too many attempts. Request a new code below."
     }
   },
   "security": {
