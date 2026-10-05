@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsHexColor, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PasswordPolicy, ActivationEmailBranding } from '@sassy-auth/types';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
@@ -28,6 +28,15 @@ export class UpdateAppDto {
   @IsOptional()
   @IsAppFavicon()
   favicon?: string | null;
+
+  /**
+   * 6-digit hex (e.g. "#0F172A"). null clears the override, reverting to
+   * the default theme background. Independent of the other 3 color fields.
+   */
+  @IsOptional() @IsHexColor() pageLightBackgroundColor?: string | null;
+  @IsOptional() @IsHexColor() pageDarkBackgroundColor?: string | null;
+  @IsOptional() @IsHexColor() cardLightBackgroundColor?: string | null;
+  @IsOptional() @IsHexColor() cardDarkBackgroundColor?: string | null;
 
   /**
    * Per-app 2FA trust / re-prompt interval in days.
