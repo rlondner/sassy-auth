@@ -19,6 +19,7 @@ export default async function TwoFactorPage({
     <TwoFactorForm
       next={nextSafe ?? ''}
       trustDays={trustDays}
+      logo={branding.logo}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
       cardLightBackgroundColor={branding.cardLightBackgroundColor}
