@@ -71,4 +71,39 @@ describe('AuthCard', () => {
     expect(card).not.toBeNull()
     expect(card?.className).not.toContain('max-w-sm')
   })
+
+  it('renders a scoped style block with the light/dark overrides when background colors are set', () => {
+    const { container } = render(
+      <AuthCard
+        title="Hi"
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    const style = container.querySelector('style')
+    expect(style).not.toBeNull()
+    expect(style?.textContent).toContain('#111111')
+    expect(style?.textContent).toContain('#222222')
+    expect(style?.textContent).toContain('#333333')
+    expect(style?.textContent).toContain('#444444')
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
+  })
+
+  it('renders no style block and no data attributes when no background colors are set', () => {
+    const { container } = render(<AuthCard title="Hi" />)
+    expect(container.querySelector('style')).toBeNull()
+    expect(container.querySelector('[data-auth-page-bg]')).toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).toBeNull()
+  })
+
+  it('only emits the page override when only page colors are set', () => {
+    const { container } = render(
+      <AuthCard title="Hi" pageLightBackgroundColor="#111111" pageDarkBackgroundColor="#222222" />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).toBeNull()
+  })
 })

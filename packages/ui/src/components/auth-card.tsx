@@ -18,13 +18,64 @@ export interface AuthCardProps {
   footer?: React.ReactNode
   className?: string
   children?: React.ReactNode
+  /**
+   * Per-app page/card background color overrides (6-digit hex), independent
+   * per light/dark mode. Any combination may be set; an unset one falls
+   * back to the existing bg-background/bg-card theme default. Rendered via
+   * a scoped <style> block keyed off the `.dark` class next-themes already
+   * applies to <html> (see theme-provider.tsx), so this needs no client JS
+   * and has no FOUC.
+   */
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
 }
 
-export function AuthCard({ title, subtitle, icon, logoUrl, logoAlt = '', footer, className, children }: AuthCardProps) {
+export function AuthCard({
+  title,
+  subtitle,
+  icon,
+  logoUrl,
+  logoAlt = '',
+  footer,
+  className,
+  children,
+  pageLightBackgroundColor,
+  pageDarkBackgroundColor,
+  cardLightBackgroundColor,
+  cardDarkBackgroundColor,
+}: AuthCardProps) {
   const hasHeader = Boolean(title || subtitle || icon || logoUrl)
+
+  // Build one CSS rule per color that's actually set, keyed off the
+  // `[data-auth-*-bg]` attribute and (for dark) the `.dark` class
+  // next-themes applies to <html>. Rules render later in the document than
+  // Tailwind's own stylesheet, so an attribute-selector rule here beats the
+  // equal-specificity `.bg-background`/`.bg-card` utility class without
+  // needing `!important`; an unset color just leaves that utility class in
+  // charge, giving the existing theme default.
+  const pageRules = [
+    pageLightBackgroundColor && `[data-auth-page-bg]{background-color:${pageLightBackgroundColor};}`,
+    pageDarkBackgroundColor && `.dark [data-auth-page-bg]{background-color:${pageDarkBackgroundColor};}`,
+  ].filter(Boolean)
+  const cardRules = [
+    cardLightBackgroundColor && `[data-auth-card-bg]{background-color:${cardLightBackgroundColor};}`,
+    cardDarkBackgroundColor && `.dark [data-auth-card-bg]{background-color:${cardDarkBackgroundColor};}`,
+  ].filter(Boolean)
+  const hasPageOverride = pageRules.length > 0
+  const hasCardOverride = cardRules.length > 0
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <Card className={cn('w-full max-w-sm', className)}>
+    <div
+      className={cn('flex min-h-screen items-center justify-center bg-background p-6')}
+      {...(hasPageOverride ? { 'data-auth-page-bg': '' } : {})}
+    >
+      {(hasPageOverride || hasCardOverride) && <style>{[...pageRules, ...cardRules].join('')}</style>}
+      <Card
+        className={cn('w-full max-w-sm bg-card', className)}
+        {...(hasCardOverride ? { 'data-auth-card-bg': '' } : {})}
+      >
         {hasHeader && (
           <CardHeader className="text-center">
             {logoUrl && (
