@@ -26,6 +26,7 @@ export default async function SignupVerifiedPage({
       <LinkExpiredCard
         email={email}
         authServerUrl={PUBLIC_AUTH_SERVER}
+        logo={branding.logo}
         pageLightBackgroundColor={branding.pageLightBackgroundColor}
         pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
         cardLightBackgroundColor={branding.cardLightBackgroundColor}
@@ -38,6 +39,7 @@ export default async function SignupVerifiedPage({
     return (
       <AuthCard
         title={t('signup.verified.invalid.title')}
+        logoUrl={branding.logo}
         subtitle={t('signup.verified.invalid.subtitle')}
         pageLightBackgroundColor={branding.pageLightBackgroundColor}
         pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
@@ -55,6 +57,7 @@ export default async function SignupVerifiedPage({
   return (
     <AuthCard
       title={t('signup.verified.title')}
+      logoUrl={branding.logo}
       subtitle={t('signup.verified.subtitle')}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}

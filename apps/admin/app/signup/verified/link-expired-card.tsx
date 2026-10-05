@@ -8,6 +8,7 @@ import { useResendVerificationEmail } from '@/lib/use-resend-verification-email'
 export function LinkExpiredCard({
   email,
   authServerUrl,
+  logo = null,
   pageLightBackgroundColor = null,
   pageDarkBackgroundColor = null,
   cardLightBackgroundColor = null,
@@ -15,6 +16,7 @@ export function LinkExpiredCard({
 }: {
   email: string
   authServerUrl: string
+  logo?: string | null
   pageLightBackgroundColor?: string | null
   pageDarkBackgroundColor?: string | null
   cardLightBackgroundColor?: string | null
@@ -26,6 +28,7 @@ export function LinkExpiredCard({
   return (
     <AuthCard
       title={t('title')}
+      logoUrl={logo}
       subtitle={t('subtitle', { email })}
       pageLightBackgroundColor={pageLightBackgroundColor}
       pageDarkBackgroundColor={pageDarkBackgroundColor}
