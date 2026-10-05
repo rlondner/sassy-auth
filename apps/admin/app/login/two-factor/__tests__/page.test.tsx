@@ -6,7 +6,7 @@ jest.mock('@/lib/app-branding', () => ({
   fetchAppBranding: jest.fn(),
 }))
 
-const mockTwoFactorForm = jest.fn(() => <div data-testid="two-factor-form" />)
+const mockTwoFactorForm = jest.fn((_props: unknown) => <div data-testid="two-factor-form" />)
 
 jest.mock('../TwoFactorForm', () => ({
   TwoFactorForm: (props: unknown) => mockTwoFactorForm(props),

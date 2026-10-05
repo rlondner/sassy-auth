@@ -21,7 +21,7 @@ jest.mock('@/lib/app-branding', () => ({
   fetchAppBranding: jest.fn(),
 }))
 
-const mockCheckEmailCard = jest.fn(() => <div data-testid="check-email-card" />)
+const mockCheckEmailCard = jest.fn((_props: unknown) => <div data-testid="check-email-card" />)
 
 jest.mock('../check-email-card', () => ({
   CheckEmailCard: (props: unknown) => mockCheckEmailCard(props),

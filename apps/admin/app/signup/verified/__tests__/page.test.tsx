@@ -21,7 +21,7 @@ jest.mock('@/lib/app-branding', () => ({
   fetchAppBranding: jest.fn(),
 }))
 
-const mockLinkExpiredCard = jest.fn(() => <div data-testid="link-expired-card" />)
+const mockLinkExpiredCard = jest.fn((_props: unknown) => <div data-testid="link-expired-card" />)
 
 jest.mock('../link-expired-card', () => ({
   LinkExpiredCard: (props: unknown) => mockLinkExpiredCard(props),
