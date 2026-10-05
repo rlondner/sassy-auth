@@ -28,6 +28,17 @@ const BLACK: Contrast = { hex: '#000000', hsl: '0 0% 0%' }
 const WHITE: Contrast = { hex: '#FFFFFF', hsl: '0 0% 100%' }
 
 /**
+ * The button's own fill is `pageContrast` (see `.bg-primary` below), so its
+ * label must contrast against THAT, not against the card's contrast color —
+ * those two can land in the same bucket (e.g. a monochrome app where both
+ * page and card are dark), which would otherwise render invisible
+ * same-color-on-same-color button text.
+ */
+function invert(contrast: Contrast): Contrast {
+  return contrast.hex === BLACK.hex ? WHITE : BLACK
+}
+
+/**
  * Standard luminance threshold (0-255 RGB scale): >128 is light enough for
  * black text/elements to read clearly; otherwise white reads better. No
  * WCAG contrast-ratio math — a simple binary choice, deliberately.
@@ -103,7 +114,7 @@ export function buildAuthColorStyleSheet({
     const pageContrast = contrastOf(safePageLight)
     const errorColor = errorColorFor(cardContrast)
     textRules.push(
-      `[data-auth-card-bg]{--foreground:${cardContrast.hsl};--card-foreground:${cardContrast.hsl};--muted-foreground:${cardContrast.hsl};--primary:${cardContrast.hsl};--primary-foreground:${cardContrast.hsl};}`,
+      `[data-auth-card-bg]{--foreground:${cardContrast.hsl};--card-foreground:${cardContrast.hsl};--muted-foreground:${cardContrast.hsl};--primary:${cardContrast.hsl};--primary-foreground:${invert(pageContrast).hsl};}`,
       `[data-auth-card-bg] .bg-primary{background-color:${pageContrast.hex};border:1.5px solid ${cardContrast.hex};}`,
       `[data-auth-card-bg] .text-destructive{color:${errorColor};}`,
     )
@@ -114,7 +125,7 @@ export function buildAuthColorStyleSheet({
     const pageContrast = contrastOf(safePageDark)
     const errorColor = errorColorFor(cardContrast)
     textRules.push(
-      `.dark [data-auth-card-bg]{--foreground:${cardContrast.hsl};--card-foreground:${cardContrast.hsl};--muted-foreground:${cardContrast.hsl};--primary:${cardContrast.hsl};--primary-foreground:${cardContrast.hsl};}`,
+      `.dark [data-auth-card-bg]{--foreground:${cardContrast.hsl};--card-foreground:${cardContrast.hsl};--muted-foreground:${cardContrast.hsl};--primary:${cardContrast.hsl};--primary-foreground:${invert(pageContrast).hsl};}`,
       `.dark [data-auth-card-bg] .bg-primary{background-color:${pageContrast.hex};border:1.5px solid ${cardContrast.hex};}`,
       `.dark [data-auth-card-bg] .text-destructive{color:${errorColor};}`,
     )

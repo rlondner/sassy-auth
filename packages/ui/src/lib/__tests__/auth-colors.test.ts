@@ -62,6 +62,23 @@ describe('buildAuthColorStyleSheet', () => {
     expect(result.css).toContain('.dark [data-auth-card-bg] .text-destructive{color:#FB923C;}')
   })
 
+  it('keeps button text legible when page and card land in the SAME contrast bucket', () => {
+    // Both #1A1A2E (luminance ~28) and #16213E (luminance ~33) are well under
+    // the 128 threshold, so both compute to white contrast -- the exact
+    // same-bucket scenario that used to make the button render
+    // white-text-on-white-background.
+    const result = buildAuthColorStyleSheet({
+      pageLightBackgroundColor: '#1A1A2E',
+      cardLightBackgroundColor: '#16213E',
+    })
+    // Card text/foreground is white (card contrast), but the button's own
+    // fill is also white (page contrast) -- so --primary-foreground must be
+    // inverted (black) rather than matching --foreground, or the button
+    // label would be invisible against its own background.
+    expect(result.css).toContain('[data-auth-card-bg]{--foreground:0 0% 100%;--card-foreground:0 0% 100%;--muted-foreground:0 0% 100%;--primary:0 0% 100%;--primary-foreground:0 0% 0%;}')
+    expect(result.css).toContain('[data-auth-card-bg] .bg-primary{background-color:#FFFFFF;')
+  })
+
   it('treats a malformed color the same as unset (no crash, no rule for that side)', () => {
     const result = buildAuthColorStyleSheet({
       pageLightBackgroundColor: 'not-a-color',
