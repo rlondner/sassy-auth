@@ -741,6 +741,10 @@ describe('RegistrationService', () => {
         gdprUrl: null,
         gdprRequired: false,
         emailVerificationMethod: 'link',
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
       });
     });
 
@@ -757,6 +761,10 @@ describe('RegistrationService', () => {
         gdprUrl: null,
         gdprRequired: false,
         emailVerificationMethod: 'link',
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
       });
     });
   });
@@ -823,6 +831,10 @@ describe('RegistrationService', () => {
         gdprUrl: null,
         gdprRequired: false,
         emailVerificationMethod: 'link',
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
       });
       expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith({
         where: { publicId: 'sq_1' },
@@ -836,6 +848,10 @@ describe('RegistrationService', () => {
           termsUrl: true,
           gdprUrl: true,
           emailVerificationMethod: true,
+          pageLightBackgroundColor: true,
+          pageDarkBackgroundColor: true,
+          cardLightBackgroundColor: true,
+          cardDarkBackgroundColor: true,
         },
       });
     });
@@ -854,6 +870,10 @@ describe('RegistrationService', () => {
         gdprUrl: null,
         gdprRequired: false,
         emailVerificationMethod: 'link',
+        pageLightBackgroundColor: null,
+        pageDarkBackgroundColor: null,
+        cardLightBackgroundColor: null,
+        cardDarkBackgroundColor: null,
       });
     });
 
@@ -894,6 +914,31 @@ describe('RegistrationService', () => {
       });
       const result = await service.getAppName('sq_1');
       expect(result.emailVerificationMethod).toBe('code');
+    });
+
+    it('getAppName includes the 4 background color overrides', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        name: 'App',
+        defaultOrgId: null,
+        passwordPolicyOverride: null,
+        logo: null,
+        favicon: null,
+        privacyPolicyUrl: null,
+        termsUrl: null,
+        gdprUrl: null,
+        emailVerificationMethod: 'link',
+        pageLightBackgroundColor: '#111111',
+        pageDarkBackgroundColor: '#222222',
+        cardLightBackgroundColor: '#333333',
+        cardDarkBackgroundColor: '#444444',
+      });
+
+      const result = await service.getAppName('app-1');
+
+      expect(result.pageLightBackgroundColor).toBe('#111111');
+      expect(result.pageDarkBackgroundColor).toBe('#222222');
+      expect(result.cardLightBackgroundColor).toBe('#333333');
+      expect(result.cardDarkBackgroundColor).toBe('#444444');
     });
   });
 

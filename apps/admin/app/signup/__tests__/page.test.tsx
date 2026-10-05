@@ -39,6 +39,10 @@ const BASE_APP_INFO = {
   gdprUrl: null,
   gdprRequired: false,
   emailVerificationMethod: 'link' as const,
+  pageLightBackgroundColor: null,
+  pageDarkBackgroundColor: null,
+  cardLightBackgroundColor: null,
+  cardDarkBackgroundColor: null,
 }
 
 describe('SignupPage subtitle', () => {

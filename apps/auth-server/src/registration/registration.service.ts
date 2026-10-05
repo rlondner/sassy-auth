@@ -580,6 +580,10 @@ export class RegistrationService {
     gdprUrl: string | null;
     gdprRequired: boolean;
     emailVerificationMethod: 'link' | 'code';
+    pageLightBackgroundColor: string | null;
+    pageDarkBackgroundColor: string | null;
+    cardLightBackgroundColor: string | null;
+    cardDarkBackgroundColor: string | null;
   }> {
     if (!appPublicId) throw new NotFoundException('App not found');
     const app = await prisma.saApp.findUnique({
@@ -594,6 +598,10 @@ export class RegistrationService {
         termsUrl: true,
         gdprUrl: true,
         emailVerificationMethod: true,
+        pageLightBackgroundColor: true,
+        pageDarkBackgroundColor: true,
+        cardLightBackgroundColor: true,
+        cardDarkBackgroundColor: true,
       },
     });
     if (!app) throw new NotFoundException('App not found');
@@ -618,6 +626,10 @@ export class RegistrationService {
       // but hand-built test fixtures and any other caller that doesn't
       // select it should still get the safe, existing-behavior default.
       emailVerificationMethod: (app.emailVerificationMethod ?? 'link') as 'link' | 'code',
+      pageLightBackgroundColor: app.pageLightBackgroundColor ?? null,
+      pageDarkBackgroundColor: app.pageDarkBackgroundColor ?? null,
+      cardLightBackgroundColor: app.cardLightBackgroundColor ?? null,
+      cardDarkBackgroundColor: app.cardDarkBackgroundColor ?? null,
     };
   }
 }
