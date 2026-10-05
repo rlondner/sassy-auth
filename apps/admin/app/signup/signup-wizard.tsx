@@ -3,15 +3,16 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Button, FormField } from '@sassy-auth/ui'
+import { Button, FormField, OtpInput } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
 import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
 import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
 import { PasswordStrengthMeter } from '@/components/password-strength-meter'
 import { Turnstile } from '@marsidev/react-turnstile'
+import { obfuscateEmail } from '@/lib/obfuscate-email'
 import { startRegistrationAction, verifyRegistrationCodeAction, completeRegistrationAction } from './wizard-actions'
 
-type Step = 'email' | 'code' | 'password' | 'name'
+export type Step = 'email' | 'code' | 'password' | 'name'
 
 interface SignupWizardProps {
   clientId: string
@@ -21,6 +22,7 @@ interface SignupWizardProps {
   privacyPolicyUrl: string | null
   termsUrl: string | null
   gdprUrl: string | null
+  onStepChange?: (step: Step) => void
 }
 
 const VERIFY_CODE_ERROR_KEY: Record<string, string> = {
@@ -28,6 +30,9 @@ const VERIFY_CODE_ERROR_KEY: Record<string, string> = {
   OTP_EXPIRED: 'verifyCode.errorExpired',
   TOO_MANY_ATTEMPTS: 'verifyCode.errorTooManyAttempts',
 }
+
+const RESEND_COOLDOWN_SECONDS = 30
+type ResendStatus = 'idle' | 'sending' | 'sent' | 'error'
 
 export function SignupWizard({
   clientId,
@@ -37,11 +42,17 @@ export function SignupWizard({
   privacyPolicyUrl,
   termsUrl,
   gdprUrl,
+  onStepChange,
 }: SignupWizardProps) {
   const t = useTranslations('signup')
   const tCommon = useTranslations('common')
   const router = useRouter()
   const [step, setStep] = React.useState<Step>('email')
+
+  React.useEffect(() => {
+    onStepChange?.(step)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
   const [email, setEmail] = React.useState('')
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null)
   const [otp, setOtp] = React.useState('')
@@ -56,12 +67,20 @@ export function SignupWizard({
   const [acceptedGdpr, setAcceptedGdpr] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [resendStatus, setResendStatus] = React.useState<ResendStatus>('idle')
+  const [resendCooldown, setResendCooldown] = React.useState(0)
 
   React.useEffect(() => {
     if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
       console.warn('NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set; the signup captcha widget will not function.')
     }
   }, [])
+
+  React.useEffect(() => {
+    if (resendCooldown === 0) return
+    const id = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(id)
+  }, [resendCooldown])
 
   const policy = passwordPolicy ?? FALLBACK_PASSWORD_POLICY
   const policyMet = evaluatePasswordPolicy(password, policy).every((r) => r.met)
@@ -93,12 +112,11 @@ export function SignupWizard({
     }
   }
 
-  async function handleCodeSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function verifyCode(code: string) {
     setError(null)
     setSubmitting(true)
     try {
-      const result = await verifyRegistrationCodeAction({ email, otp })
+      const result = await verifyRegistrationCodeAction({ email, otp: code })
       if ('error' in result) {
         setError(t(VERIFY_CODE_ERROR_KEY[result.error] ?? 'verifyCode.errorGeneric'))
         return
@@ -108,6 +126,52 @@ export function SignupWizard({
       setError(t('errors.validationError'))
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // Auto-verify as soon as all 6 digits are entered — no separate submit
+  // button on this step. Re-fires whenever `otp` changes back to a full
+  // 6-digit value (e.g. after correcting a wrong code), but not on every
+  // render, since it's only a dependency-change effect.
+  React.useEffect(() => {
+    if (step !== 'code' || otp.length !== 6) return
+    void verifyCode(otp)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, otp])
+
+  async function handleResend() {
+    if (resendCooldown > 0 || resendStatus === 'sending') return
+    // Same constraint as the OTP_EXPIRED resend in handleNameSubmit below:
+    // /register/start requires a Turnstile token, but the only one we have
+    // is the single-use/short-lived token captured on the email step, which
+    // was already consumed by that step's own startRegistrationAction call.
+    // Reusing it here will very plausibly fail with captchaFailed. Try it
+    // anyway (it can still succeed if the token hasn't expired/been
+    // consumed), but don't strand the user on a dead end if it doesn't —
+    // bounce back to the email step to re-verify, same as the expired-code
+    // path does.
+    if (!captchaToken) {
+      setOtp('')
+      setStep('email')
+      setError(t('errors.captchaRequired'))
+      return
+    }
+    setResendStatus('sending')
+    try {
+      const result = await startRegistrationAction({ clientId, email, turnstileToken: captchaToken })
+      if ('error' in result) {
+        setCaptchaToken(null)
+        setOtp('')
+        setStep('email')
+        setError(t('errors.captchaRequired'))
+        setResendStatus('idle')
+        return
+      }
+      setOtp('')
+      setResendStatus('sent')
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
+    } catch {
+      setResendStatus('error')
     }
   }
 
@@ -220,27 +284,54 @@ export function SignupWizard({
 
   if (step === 'code') {
     return (
-      <form onSubmit={handleCodeSubmit} className="flex flex-col gap-4">
-        <p className="text-body-md text-muted-foreground">{t('verifyCode.subtitle', { email })}</p>
-        <FormField
+      <div className="flex flex-col gap-4">
+        <p className="text-body-md text-muted-foreground">{t('verifyCode.subtitle', { email: obfuscateEmail(email) })}</p>
+        <OtpInput
           id="otp"
           data-testid="otp"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          required
           label={t('verifyCode.codeLabel')}
           value={otp}
-          onChange={(e) => setOtp(e.target.value)}
+          onChange={setOtp}
+          autoFocus
+          disabled={submitting}
+          digitAriaLabel={(position, total) => t('verifyCode.digitAriaLabel', { position: String(position), total: String(total) })}
         />
+        <p className="text-body-sm text-muted-foreground">
+          {t('verifyCode.didntReceiveIt')}{' '}
+          {resendCooldown > 0 ? (
+            t('verifyCode.resendCooldown', { seconds: String(resendCooldown) })
+          ) : (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendStatus === 'sending'}
+              className="text-primary hover:underline disabled:opacity-50"
+            >
+              {t('verifyCode.resendButton')}
+            </button>
+          )}
+        </p>
+        {resendStatus === 'sent' && (
+          <p data-testid="resend-sent" className="text-body-sm text-muted-foreground">
+            {t('verifyCode.resendSent')}
+          </p>
+        )}
+        {resendStatus === 'error' && (
+          <p data-testid="resend-error" className="text-label-md text-destructive">
+            {t('verifyCode.resendError')}
+          </p>
+        )}
         {error && (
           <p data-testid="signup-error" className="text-label-md text-destructive">
             {error}
           </p>
         )}
-        <Button type="submit" className="w-full" loading={submitting} disabled={submitting || otp.length !== 6}>
-          {t('verifyCode.submit')}
-        </Button>
-      </form>
+        {submitting && (
+          <p data-testid="verify-pending" className="text-body-sm text-muted-foreground">
+            {t('verifyCode.verifying')}
+          </p>
+        )}
+      </div>
     )
   }
 

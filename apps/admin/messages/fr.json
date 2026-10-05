@@ -628,10 +628,10 @@
     }
   },
   "signup": {
-    "title": "Créez votre compte",
-    "titleWithApp": "Créez votre compte pour {appName}",
-    "subtitle": "Configurez votre organisation pour commencer.",
-    "subtitleDefaultOrg": "Créez votre compte pour commencer.",
+    "title": "Bienvenue",
+    "titleWithApp": "Bienvenue sur {appName}",
+    "subtitle": "Commençons par vous inscrire.",
+    "subtitleDefaultOrg": "Commençons par vous inscrire.",
     "invalidLink": "Ce lien d'inscription a expiré ou est invalide. Contactez l'application concernée pour en obtenir un nouveau.",
     "firstName": "Prénom",
     "lastName": "Nom",
@@ -664,10 +664,13 @@
       "backToLogin": "Retour à la connexion"
     },
     "verifyCode": {
-      "title": "Saisissez votre code",
-      "subtitle": "Nous avons envoyé un code à 6 chiffres à {email}.",
-      "codeLabel": "Code de vérification",
-      "submit": "Vérifier",
+      "title": "Authentification",
+      "headerSubtitle": "La sécurité est essentielle pour nous.",
+      "subtitle": "Nous avons envoyé un message contenant un code à 6 chiffres à {email}.",
+      "codeLabel": "Entrez le code :",
+      "digitAriaLabel": "Chiffre {position} sur {total}",
+      "verifying": "Vérification en cours...",
+      "didntReceiveIt": "Vous ne l'avez pas reçu ?",
       "resendButton": "Renvoyer le code",
       "resendCooldown": "Renvoyer dans {seconds}s",
       "resendSent": "Un nouveau code est en route.",

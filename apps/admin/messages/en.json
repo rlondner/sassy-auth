@@ -628,10 +628,10 @@
     }
   },
   "signup": {
-    "title": "Create your account",
-    "titleWithApp": "Create your account with {appName}",
-    "subtitle": "Set up your organization to get started.",
-    "subtitleDefaultOrg": "Create your account to get started.",
+    "title": "Welcome",
+    "titleWithApp": "Welcome to {appName}",
+    "subtitle": "Let's start by signing up.",
+    "subtitleDefaultOrg": "Let's start by signing up.",
     "invalidLink": "This signup link has expired or is invalid. Contact the app you're signing up for to get a new one.",
     "firstName": "First Name",
     "lastName": "Last Name",
@@ -664,10 +664,13 @@
       "backToLogin": "Back to sign in"
     },
     "verifyCode": {
-      "title": "Enter your code",
-      "subtitle": "We sent a 6-digit code to {email}.",
-      "codeLabel": "Verification code",
-      "submit": "Verify",
+      "title": "Authentication",
+      "headerSubtitle": "Security is crucial for us.",
+      "subtitle": "We've sent a message containing a 6-digit code to {email}.",
+      "codeLabel": "Enter code:",
+      "digitAriaLabel": "Digit {position} of {total}",
+      "verifying": "Verifying...",
+      "didntReceiveIt": "Didn't receive it?",
       "resendButton": "Resend code",
       "resendCooldown": "Resend in {seconds}s",
       "resendSent": "A new code is on its way.",

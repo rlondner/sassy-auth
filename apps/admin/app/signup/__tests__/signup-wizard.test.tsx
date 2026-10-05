@@ -64,6 +64,15 @@ function completeCaptcha() {
   fireEvent.click(screen.getByTestId('mock-turnstile-success'))
 }
 
+// Real typing fires one onChange per keystroke (a single box replacing its
+// own digit), never a single event carrying the whole code — only a paste
+// does that. Simulate "entering the code" the same way a real paste would,
+// rather than relying on OtpInput's single-box overwrite behavior to also
+// happen to accept a multi-character value.
+function fillOtp(code: string) {
+  fireEvent.paste(screen.getByTestId('otp'), { clipboardData: { getData: () => code } })
+}
+
 async function advanceToPasswordStep() {
   render(<SignupWizard {...BASE_PROPS} />)
   mockStart.mockResolvedValue({ ok: true })
@@ -72,8 +81,7 @@ async function advanceToPasswordStep() {
   fireEvent.click(screen.getByRole('button', { name: 'continue' }))
   await screen.findByTestId('otp')
   mockVerify.mockResolvedValue({ ok: true })
-  fireEvent.change(screen.getByTestId('otp'), { target: { value: '123456' } })
-  fireEvent.click(screen.getByRole('button', { name: 'verifyCode.submit' }))
+  fillOtp('123456')
   await screen.findByLabelText('password')
 }
 
@@ -121,11 +129,58 @@ describe('SignupWizard', () => {
     await screen.findByTestId('otp')
 
     mockVerify.mockResolvedValue({ error: 'INVALID_OTP' })
-    fireEvent.change(screen.getByTestId('otp'), { target: { value: '000000' } })
-    fireEvent.click(screen.getByRole('button', { name: 'verifyCode.submit' }))
+    fillOtp('000000')
 
     expect(await screen.findByTestId('signup-error')).toHaveTextContent('verifyCode.errorInvalid')
     expect(screen.getByTestId('otp')).toBeInTheDocument()
+  })
+
+  it('auto-verifies as soon as the 6th digit is entered, with no submit button on the code step', async () => {
+    render(<SignupWizard {...BASE_PROPS} />)
+    mockStart.mockResolvedValue({ ok: true })
+    fireEvent.change(screen.getByLabelText('email'), { target: { value: 'alice@example.com' } })
+    completeCaptcha()
+    fireEvent.click(screen.getByRole('button', { name: 'continue' }))
+    await screen.findByTestId('otp')
+
+    expect(screen.queryByRole('button', { name: 'verifyCode.submit' })).not.toBeInTheDocument()
+
+    mockVerify.mockResolvedValue({ ok: true })
+    fillOtp('12345')
+    expect(mockVerify).not.toHaveBeenCalled()
+
+    fillOtp('123456')
+    await waitFor(() => expect(mockVerify).toHaveBeenCalledWith({ email: 'alice@example.com', otp: '123456' }))
+    await screen.findByLabelText('password')
+  })
+
+  it('auto-verifies after typing the final digit one keystroke at a time, including over an already-filled box', async () => {
+    render(<SignupWizard {...BASE_PROPS} />)
+    mockStart.mockResolvedValue({ ok: true })
+    fireEvent.change(screen.getByLabelText('email'), { target: { value: 'alice@example.com' } })
+    completeCaptcha()
+    fireEvent.click(screen.getByRole('button', { name: 'continue' }))
+    await screen.findByTestId('otp')
+
+    mockVerify.mockResolvedValue({ error: 'INVALID_OTP' })
+    fillOtp('111111')
+    await screen.findByTestId('signup-error')
+
+    // Retype the (different) correct code one box at a time, as a real
+    // keystroke would — not a bulk paste — exercising the same single-box
+    // overwrite-and-advance path a human retyping over a wrong code hits.
+    mockVerify.mockClear()
+    mockVerify.mockResolvedValue({ ok: true })
+    const boxes = screen.getAllByRole('textbox')
+    fireEvent.change(boxes[0], { target: { value: '2' } })
+    fireEvent.change(boxes[1], { target: { value: '2' } })
+    fireEvent.change(boxes[2], { target: { value: '2' } })
+    fireEvent.change(boxes[3], { target: { value: '2' } })
+    fireEvent.change(boxes[4], { target: { value: '2' } })
+    fireEvent.change(boxes[5], { target: { value: '2' } })
+
+    await waitFor(() => expect(mockVerify).toHaveBeenCalledWith({ email: 'alice@example.com', otp: '222222' }))
+    await screen.findByLabelText('password')
   })
 
   it('advances through password and name steps and submits on the final step', async () => {
@@ -194,8 +249,7 @@ describe('SignupWizard', () => {
 
     // Go forward again with a fresh code — password/name must still be there.
     mockVerify.mockResolvedValue({ ok: true })
-    fireEvent.change(screen.getByTestId('otp'), { target: { value: '654321' } })
-    fireEvent.click(screen.getByRole('button', { name: 'verifyCode.submit' }))
+    fillOtp('654321')
     await screen.findByLabelText('password')
     expect(screen.getByLabelText('password')).toHaveValue('StrongPass123')
     fireEvent.click(screen.getByRole('button', { name: 'continue' }))
@@ -223,5 +277,60 @@ describe('SignupWizard', () => {
     expect(screen.getByTestId('signup-error')).toHaveTextContent('errors.captchaRequired')
     expect(screen.getByLabelText('email')).toHaveValue('alice@example.com')
     expect(screen.getByTestId('mock-turnstile-success')).toBeInTheDocument()
+  })
+
+  describe('resend code', () => {
+    async function advanceToCodeStep() {
+      render(<SignupWizard {...BASE_PROPS} />)
+      mockStart.mockResolvedValue({ ok: true })
+      fireEvent.change(screen.getByLabelText('email'), { target: { value: 'alice@example.com' } })
+      completeCaptcha()
+      fireEvent.click(screen.getByRole('button', { name: 'continue' }))
+      await screen.findByTestId('otp')
+    }
+
+    it('resends a code reusing the captured captcha token and shows a confirmation', async () => {
+      await advanceToCodeStep()
+      mockStart.mockClear()
+      mockStart.mockResolvedValue({ ok: true })
+
+      fireEvent.click(screen.getByRole('button', { name: 'verifyCode.resendButton' }))
+
+      await screen.findByTestId('resend-sent')
+      expect(mockStart).toHaveBeenCalledWith({
+        clientId: 'sq_1',
+        email: 'alice@example.com',
+        turnstileToken: 'test-captcha-token',
+      })
+      expect(screen.getByTestId('otp')).toBeInTheDocument()
+    })
+
+    it('clears the entered code on a successful resend and shows the cooldown instead of the button', async () => {
+      await advanceToCodeStep()
+      mockVerify.mockResolvedValue({ error: 'INVALID_OTP' })
+      fillOtp('123456')
+      await screen.findByTestId('signup-error')
+      mockStart.mockClear()
+      mockStart.mockResolvedValue({ ok: true })
+
+      fireEvent.click(screen.getByRole('button', { name: 'verifyCode.resendButton' }))
+      await screen.findByTestId('resend-sent')
+
+      expect(screen.getByTestId('otp')).toHaveValue('')
+      expect(screen.getByText(/verifyCode\.resendCooldown/)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'verifyCode.resendButton' })).not.toBeInTheDocument()
+    })
+
+    it('bounces back to the email step when the resend fails (stale captcha token)', async () => {
+      await advanceToCodeStep()
+      mockStart.mockClear()
+      mockStart.mockResolvedValue({ error: 'captchaFailed' })
+
+      fireEvent.click(screen.getByRole('button', { name: 'verifyCode.resendButton' }))
+
+      await screen.findByLabelText('email')
+      expect(screen.getByTestId('signup-error')).toHaveTextContent('errors.captchaRequired')
+      expect(screen.getByLabelText('email')).toHaveValue('alice@example.com')
+    })
   })
 })

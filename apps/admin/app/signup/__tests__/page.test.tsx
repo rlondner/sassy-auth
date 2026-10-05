@@ -18,8 +18,8 @@ jest.mock('../signup-form', () => ({
   SignupForm: () => <div data-testid="signup-form" />,
 }))
 
-jest.mock('../signup-wizard', () => ({
-  SignupWizard: () => <div data-testid="signup-wizard" />,
+jest.mock('../signup-wizard-card', () => ({
+  SignupWizardCard: () => <div data-testid="signup-wizard" />,
 }))
 
 const mockFetchAppInfo = fetchAppInfo as jest.MockedFunction<typeof fetchAppInfo>
@@ -50,12 +50,12 @@ describe('SignupPage subtitle', () => {
     expect(screen.getByText('signup.subtitleDefaultOrg')).toBeInTheDocument()
   })
 
-  it('hides the default-org subtitle when signing up for a specific app', async () => {
+  it('still shows the default-org subtitle when signing up for a specific app', async () => {
     mockFetchAppInfo.mockResolvedValue({ ...BASE_APP_INFO, hasDefaultOrg: true, name: 'Acme' })
     const ui = await SignupPage({ searchParams: Promise.resolve({ client_id: 'sq_1' }) })
     render(ui)
 
-    expect(screen.queryByText('signup.subtitleDefaultOrg')).not.toBeInTheDocument()
+    expect(screen.getByText('signup.subtitleDefaultOrg')).toBeInTheDocument()
   })
 
   it('still shows the organization subtitle for a specific app without a default org', async () => {

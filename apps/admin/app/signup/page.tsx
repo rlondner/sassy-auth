@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
 import { fetchAppInfo } from '@/lib/app-info'
 import { SignupForm } from './signup-form'
-import { SignupWizard } from './signup-wizard'
+import { SignupWizardCard } from './signup-wizard-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,43 +44,49 @@ export default async function SignupPage({
   const { name: appName, hasDefaultOrg, passwordPolicy, logo, privacyPolicyUrl, termsUrl, gdprUrl, gdprRequired, emailVerificationMethod } =
     await fetchAppInfo(clientId)
   const nextSafe = next ?? ''
+  const footer = (
+    <Link
+      href={nextSafe ? `/login?next=${encodeURIComponent(nextSafe)}` : '/login'}
+      className="text-label-md text-primary hover:underline"
+    >
+      {t('signup.backToLogin')}
+    </Link>
+  )
+
+  if (emailVerificationMethod === 'code') {
+    return (
+      <SignupWizardCard
+        clientId={clientId}
+        next={nextSafe}
+        hasDefaultOrg={hasDefaultOrg}
+        passwordPolicy={passwordPolicy}
+        privacyPolicyUrl={privacyPolicyUrl}
+        termsUrl={termsUrl}
+        gdprUrl={gdprRequired ? gdprUrl : null}
+        appName={appName}
+        logo={logo}
+        footer={footer}
+      />
+    )
+  }
 
   return (
     <AuthCard
       title={appName ? t('signup.titleWithApp', { appName }) : t('signup.title')}
-      subtitle={hasDefaultOrg ? (appName ? undefined : t('signup.subtitleDefaultOrg')) : t('signup.subtitle')}
+      subtitle={hasDefaultOrg ? t('signup.subtitleDefaultOrg') : t('signup.subtitle')}
       logoUrl={logo}
       logoAlt={appName ?? t('signup.title')}
-      footer={
-        <Link
-          href={nextSafe ? `/login?next=${encodeURIComponent(nextSafe)}` : '/login'}
-          className="text-label-md text-primary hover:underline"
-        >
-          {t('signup.backToLogin')}
-        </Link>
-      }
+      footer={footer}
     >
-      {emailVerificationMethod === 'code' ? (
-        <SignupWizard
-          clientId={clientId}
-          next={nextSafe}
-          hasDefaultOrg={hasDefaultOrg}
-          passwordPolicy={passwordPolicy}
-          privacyPolicyUrl={privacyPolicyUrl}
-          termsUrl={termsUrl}
-          gdprUrl={gdprRequired ? gdprUrl : null}
-        />
-      ) : (
-        <SignupForm
-          clientId={clientId}
-          next={nextSafe}
-          hasDefaultOrg={hasDefaultOrg}
-          passwordPolicy={passwordPolicy}
-          privacyPolicyUrl={privacyPolicyUrl}
-          termsUrl={termsUrl}
-          gdprUrl={gdprRequired ? gdprUrl : null}
-        />
-      )}
+      <SignupForm
+        clientId={clientId}
+        next={nextSafe}
+        hasDefaultOrg={hasDefaultOrg}
+        passwordPolicy={passwordPolicy}
+        privacyPolicyUrl={privacyPolicyUrl}
+        termsUrl={termsUrl}
+        gdprUrl={gdprRequired ? gdprUrl : null}
+      />
     </AuthCard>
   )
 }
