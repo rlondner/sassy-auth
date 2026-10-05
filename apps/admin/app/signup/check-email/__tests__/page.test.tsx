@@ -21,8 +21,10 @@ jest.mock('@/lib/app-branding', () => ({
   fetchAppBranding: jest.fn(),
 }))
 
+const mockCheckEmailCard = jest.fn(() => <div data-testid="check-email-card" />)
+
 jest.mock('../check-email-card', () => ({
-  CheckEmailCard: () => <div data-testid="check-email-card" />,
+  CheckEmailCard: (props: unknown) => mockCheckEmailCard(props),
 }))
 
 const mockFetchAppInfo = fetchAppInfo as jest.MockedFunction<typeof fetchAppInfo>
@@ -47,10 +49,46 @@ describe('CheckEmailPage', () => {
     expect(screen.getByText('signup.checkEmail.missingEmail')).toBeInTheDocument()
   })
 
+  it('passes the app logo through to AuthCard on the missing-email branch', async () => {
+    mockFetchAppBranding.mockResolvedValue({
+      logo: 'data:image/png;base64,AAA=',
+      favicon: null,
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
+    })
+    const ui = await CheckEmailPage({ searchParams: Promise.resolve({}) })
+    const { container } = render(ui)
+    expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+  })
+
   it('always renders CheckEmailCard — code-method apps never reach this page (see signup-wizard.tsx)', async () => {
     const ui = await CheckEmailPage({ searchParams: Promise.resolve({ email: 'a@x.com' }) })
     render(ui)
     expect(screen.getByTestId('check-email-card')).toBeInTheDocument()
+  })
+
+  it('passes the app logo and background colors through to CheckEmailCard', async () => {
+    mockFetchAppBranding.mockResolvedValue({
+      logo: 'data:image/png;base64,AAA=',
+      favicon: null,
+      pageLightBackgroundColor: '#fff0f0',
+      pageDarkBackgroundColor: '#200000',
+      cardLightBackgroundColor: '#ffffff',
+      cardDarkBackgroundColor: '#111111',
+    })
+    const ui = await CheckEmailPage({ searchParams: Promise.resolve({ email: 'a@x.com' }) })
+    render(ui)
+    expect(mockCheckEmailCard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        logo: 'data:image/png;base64,AAA=',
+        pageLightBackgroundColor: '#fff0f0',
+        pageDarkBackgroundColor: '#200000',
+        cardLightBackgroundColor: '#ffffff',
+        cardDarkBackgroundColor: '#111111',
+      }),
+    )
   })
 
   it('applies per-app background colors', async () => {
