@@ -168,6 +168,32 @@ describe('AppsService', () => {
     expect(call.include).toBeUndefined();
   });
 
+  // Unlike logo/favicon (large base64 blobs, deliberately stripped above),
+  // the 4 background-color fields are small hex strings with no
+  // payload-size rationale to omit — listApps must select them and return
+  // the real values, not force-null them.
+  it('listApps selects the background color fields and returns their real values, not force-nulled', async () => {
+    mockPrisma.saApp.findMany.mockResolvedValue([{
+      ...appRow,
+      pageLightBackgroundColor: '#ffffff',
+      pageDarkBackgroundColor: '#111111',
+      cardLightBackgroundColor: '#eeeeee',
+      cardDarkBackgroundColor: '#222222',
+    }]);
+    mockPrisma.saApp.count.mockResolvedValue(1);
+    const result = await service.listApps('ba-caller', { page: 1, pageSize: 25 });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].pageLightBackgroundColor).toBe('#ffffff');
+    expect(result.items[0].pageDarkBackgroundColor).toBe('#111111');
+    expect(result.items[0].cardLightBackgroundColor).toBe('#eeeeee');
+    expect(result.items[0].cardDarkBackgroundColor).toBe('#222222');
+    const call = mockPrisma.saApp.findMany.mock.calls[0][0];
+    expect(call.select.pageLightBackgroundColor).toBe(true);
+    expect(call.select.pageDarkBackgroundColor).toBe(true);
+    expect(call.select.cardLightBackgroundColor).toBe(true);
+    expect(call.select.cardDarkBackgroundColor).toBe(true);
+  });
+
   it('createApp generates publicId via two-step transaction', async () => {
     mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma));
     mockPrisma.saApp.create.mockResolvedValue({ ...appRow, publicId: 'placeholder' });
