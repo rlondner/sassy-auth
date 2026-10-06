@@ -37,24 +37,35 @@ This spec:
 
 ## 2. The six sections
 
-Same grouping, order, and section `id`s (the persistence/ARIA keys) across
-Create, Edit, and View — but **Create only renders the sections it has
-fields for**. Today Create has no UI at all for default org/role, social
-providers, client secret, webhooks, legal URLs, activation email, or email
-verification method — those are configured via Edit after the app exists.
-This spec does not add those fields to Create; it only reorganizes what
-each drawer already has. So Create renders `general`, `branding`, and a
-`security` with fewer fields than Edit/View's (see table); it does not
-render `access`, `credentials`, or `legal` at all.
+Same section `id`s (the persistence keys) and ordering across Create, Edit,
+and View — but **each drawer only renders the sections it has fields for**.
+Neither Create nor View has UI today for everything Edit has; this spec
+reorganizes existing fields, it does not add new ones. Concretely:
 
-| id | Label | Edit / View fields | Create fields |
-|---|---|---|---|
-| `general` | General | name, URL, public ID *(View only)* | name, URL |
-| `branding` | Branding | logo, favicon, page/card background colors (light + dark) | same |
-| `security` | Sign-in & Security | redirect URIs, 2FA trust days, 2FA prompt, require 2FA, allow offline access, password policy | redirect URIs, 2FA trust days, 2FA prompt, require 2FA *(no allow-offline-access or password policy — Create has neither field today)* |
-| `access` | Org Defaults & Social | default org, default role, social sign-in providers | *(not rendered)* |
-| `credentials` | Credentials & Webhooks | client secret, activation webhook URL + secret | *(not rendered)* |
-| `legal` | Legal & Email | privacy policy/terms/GDPR URLs, activation email override, email verification method | *(not rendered)* |
+- **Create** has no UI for default org/role, social providers, client
+  secret, public ID, webhooks, legal URLs, activation email, or email
+  verification method — those are configured via Edit after the app
+  exists. Create renders `general`, `branding`, and a thinner `security`
+  (no allow-offline-access or password policy — neither field exists in
+  Create today). It does not render `access`, `credentials`, or `legal`.
+- **View** has no UI for legal URLs, activation email override, or email
+  verification method — nothing in `legal` exists there today. View also
+  never shows "name" as a field row (the app name is already the drawer's
+  header title, via `displayApp.name` in `<SheetTitle>`), so its `general`
+  holds only URL. View does not render `legal`.
+- `publicId` lives in `credentials`, not `general`, in both Edit and View —
+  it's rendered immediately next to Client Secret in the current code
+  (`app-edit-drawer.tsx:672-699`, `app-view-drawer.tsx:240-247`), not next
+  to name/URL.
+
+| id | Label | Edit fields | View fields | Create fields |
+|---|---|---|---|---|
+| `general` | General | name, URL | URL *(name is the header title)* | name, URL |
+| `branding` | Branding | logo, favicon, page/card background colors (light + dark) | logo, favicon, background colors (conditional summary block) | same as Edit |
+| `security` | Sign-in & Security | redirect URIs, 2FA trust days, 2FA prompt, require 2FA, allow offline access, password policy | login/post-logout redirect URIs, 2FA trust days, 2FA prompt, require 2FA, password policy | redirect URIs, 2FA trust days, 2FA prompt, require 2FA |
+| `access` | Org Defaults & Social | default org, default role, social sign-in providers | default org, default role, social sign-in providers | *(not rendered)* |
+| `credentials` | Credentials & Webhooks | public ID, client secret, activation webhook URL + secret | public ID, client secret, activation webhook URL + secret | *(not rendered)* |
+| `legal` | Legal & Email | privacy policy/terms/GDPR URLs, activation email override, email verification method | *(not rendered)* | *(not rendered)* |
 
 The existing Password Policy override toggle and its conditional field block
 (`app-edit-drawer.tsx:505-610`) move inside `security`'s body unchanged in
@@ -68,18 +79,18 @@ add it the same way `select`/`dialog`/etc. were added via the shadcn CLI, per
 
 ```tsx
 interface CollapsibleSectionProps {
-  id: string                 // stable id: "general" | "branding" | ...
-  title: string               // i18n'd label
-  defaultOpen: boolean         // caller-computed initial state (see §4)
-  onOpenChange?: (open: boolean) => void
+  title: string                // i18n'd label
+  open: boolean                 // controlled — caller owns the open/closed state
+  onOpenChange: (open: boolean) => void
   children: React.ReactNode
 }
 ```
 
 - Header: chevron icon (rotates on open/close) + title, full-width clickable,
   keyboard-operable (Enter/Space), `aria-expanded` on the trigger.
-- Uncontrolled internally (Radix `Collapsible` manages animation/open state)
-  but reports changes via `onOpenChange` so the parent drawer can persist them.
+- Fully controlled (Radix `Collapsible`'s `open`/`onOpenChange` props) — the
+  parent drawer (via `useSectionPersistence`, §4) owns the open/closed state
+  for every section id; `CollapsibleSection` itself is a stateless wrapper.
 - No badge/indicator for "has non-default values" — out of scope (YAGNI; can
   be added later if it turns out people miss sections with data in them).
 
@@ -127,12 +138,14 @@ generic library concern).
 - New `useSectionPersistence` unit tests in `apps/admin` (falls back to
   defaults when storage is empty, reads stored value when present, writes on
   toggle, swallows storage errors without throwing).
-- Existing `app-edit-drawer.test.tsx`, `app-create-drawer.test.tsx`,
-  `app-view-drawer.test.tsx` (if it has interaction tests) suites get updated:
-  since Edit now starts with everything but `general` collapsed, any test
-  touching a field outside `general` needs a `fireEvent.click` on that
-  section's header first. Clear `localStorage` in `beforeEach` so tests don't
-  leak state across cases.
+- Existing `app-edit-drawer.test.tsx` gets updated: since Edit now starts
+  with everything but `general` collapsed, any test touching a field outside
+  `general` needs a `fireEvent.click` on that section's header first. Clear
+  `localStorage` in `beforeEach` so tests don't leak state across cases.
+  `app-create-drawer.test.tsx` and `app-view-drawer.test.tsx` need no field-
+  interaction changes, since Create and View both default every section to
+  open — only the `beforeEach` `localStorage` clear is added there too, for
+  the same test-isolation reason.
 - The four existing Password Policy section tests (`app-edit-drawer.test.tsx`,
   the `describe('password policy section', ...)` block) keep asserting the
   override-toggle behavior unchanged; only the outer section now needs an
