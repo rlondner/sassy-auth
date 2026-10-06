@@ -550,9 +550,8 @@ Copy the two output lines directly into your `.env.local` file.
 | Variable              | Description                                                                                |
 |-----------------------|--------------------------------------------------------------------------------------------|
 | `ADMIN_URL`           | Public URL of the admin console, used by the API to build invitation links. Default: `http://localhost:3001` |
-| `AUTH_SERVER_URL`     | Internal URL the admin uses to reach the auth server. Default: `https://localhost:3010`      |
-| `PUBLIC_AUTH_SERVER_URL` | Optional. URL of the auth server as seen by the BROWSER, used to build the social sign-in redirect on the login page. Defaults to `AUTH_SERVER_URL`. Set separately when `AUTH_SERVER_URL` is an internal address (e.g. a docker-network hostname) the browser cannot resolve. |
-| `NEXT_PUBLIC_AUTH_SERVER_URL` | Same origin as `PUBLIC_AUTH_SERVER_URL`, but readable from CLIENT COMPONENT code — the `NEXT_PUBLIC_` prefix is required for Next.js to inline it into the browser bundle (plain server-only vars like `AUTH_SERVER_URL`/`PUBLIC_AUTH_SERVER_URL` are always `undefined` there). Used by the accept-invite and reset-password forms, which call the auth server directly from the browser. Default: `http://localhost:3000` |
+| `AUTH_SERVER_URL`     | URL of the auth server, used by both the admin's Server Actions and (via social sign-in redirects) the browser. Default: `https://localhost:3010`      |
+| `NEXT_PUBLIC_AUTH_SERVER_URL` | Same origin as `AUTH_SERVER_URL`, but readable from CLIENT COMPONENT code — the `NEXT_PUBLIC_` prefix is required for Next.js to inline it into the browser bundle (a plain server-only var like `AUTH_SERVER_URL` is always `undefined` there). Used by the accept-invite and reset-password forms, which call the auth server directly from the browser. Default: `http://localhost:3000` |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | Comma-separated origins allowed by `/login?next=` redirect validation (in addition to `AUTH_SERVER_URL`). Default: empty |
 | `SEED_DEMO`          | Set to `1` to seed demo data for the FastAPI resource server during `db:seed`. Default: unset |
 | `SEED_DEMO_MULTITENANT` | Set to `1` to seed multi-tenant demo data (app01 + Acme/Globex orgs) during `db:seed`. Default: unset |

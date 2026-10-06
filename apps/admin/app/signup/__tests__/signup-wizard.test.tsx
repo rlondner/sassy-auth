@@ -154,7 +154,7 @@ describe('SignupWizard', () => {
     await screen.findByLabelText('password')
   })
 
-  it('auto-verifies after typing the final digit one keystroke at a time, including over an already-filled box', async () => {
+  it('stops auto-verifying after a wrong code, requiring an explicit Verify click once corrected one keystroke at a time', async () => {
     render(<SignupWizard {...BASE_PROPS} />)
     mockStart.mockResolvedValue({ ok: true })
     fireEvent.change(screen.getByLabelText('email'), { target: { value: 'alice@example.com' } })
@@ -169,6 +169,9 @@ describe('SignupWizard', () => {
     // Retype the (different) correct code one box at a time, as a real
     // keystroke would — not a bulk paste — exercising the same single-box
     // overwrite-and-advance path a human retyping over a wrong code hits.
+    // Each edit keeps the otp string at length 6, so without disabling
+    // auto-submit after an error, every single digit edit would resubmit
+    // a still-partially-wrong code.
     mockVerify.mockClear()
     mockVerify.mockResolvedValue({ ok: true })
     const boxes = screen.getAllByRole('textbox')
@@ -179,7 +182,36 @@ describe('SignupWizard', () => {
     fireEvent.change(boxes[4], { target: { value: '2' } })
     fireEvent.change(boxes[5], { target: { value: '2' } })
 
+    expect(mockVerify).not.toHaveBeenCalled()
+    const verifyButton = await screen.findByRole('button', { name: 'verifyCode.verifyButton' })
+
+    fireEvent.click(verifyButton)
     await waitFor(() => expect(mockVerify).toHaveBeenCalledWith({ email: 'alice@example.com', otp: '222222' }))
+    await screen.findByLabelText('password')
+  })
+
+  it('re-enables auto-verify after a fresh code is requested via resend', async () => {
+    render(<SignupWizard {...BASE_PROPS} />)
+    mockStart.mockResolvedValue({ ok: true })
+    fireEvent.change(screen.getByLabelText('email'), { target: { value: 'alice@example.com' } })
+    completeCaptcha()
+    fireEvent.click(screen.getByRole('button', { name: 'continue' }))
+    await screen.findByTestId('otp')
+
+    mockVerify.mockResolvedValue({ error: 'INVALID_OTP' })
+    fillOtp('111111')
+    await screen.findByTestId('signup-error')
+    await screen.findByRole('button', { name: 'verifyCode.verifyButton' })
+
+    mockStart.mockResolvedValue({ ok: true })
+    fireEvent.click(screen.getByRole('button', { name: 'verifyCode.resendButton' }))
+    await screen.findByTestId('resend-sent')
+    expect(screen.queryByRole('button', { name: 'verifyCode.verifyButton' })).not.toBeInTheDocument()
+
+    mockVerify.mockClear()
+    mockVerify.mockResolvedValue({ ok: true })
+    fillOtp('654321')
+    await waitFor(() => expect(mockVerify).toHaveBeenCalledWith({ email: 'alice@example.com', otp: '654321' }))
     await screen.findByLabelText('password')
   })
 
