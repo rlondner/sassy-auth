@@ -400,7 +400,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 required
               />
             </div>
-            </CollapsibleSection>
+            </CollapsibleSection> {/* general */}
             <CollapsibleSection
               title={t('apps.sections.branding')}
               open={isOpen('branding')}
@@ -448,7 +448,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 hint={t('apps.fields.cardDarkBackgroundColorHint')}
               />
             </div>
-            </CollapsibleSection>
+            </CollapsibleSection> {/* branding */}
             <CollapsibleSection
               title={t('apps.sections.security')}
               open={isOpen('security')}
@@ -641,7 +641,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
               )}
             </div>
-            </CollapsibleSection>
+            </CollapsibleSection> {/* security */}
             <CollapsibleSection
               title={t('apps.sections.access')}
               open={isOpen('access')}
@@ -703,7 +703,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
               )}
             </div>
-            </CollapsibleSection>
+            </CollapsibleSection> {/* access */}
             <CollapsibleSection
               title={t('apps.sections.credentials')}
               open={isOpen('credentials')}
@@ -856,7 +856,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
               )}
             </div>
-            </CollapsibleSection>
+            </CollapsibleSection> {/* credentials */}
             <CollapsibleSection
               title={t('apps.sections.legal')}
               open={isOpen('legal')}
@@ -971,7 +971,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 {t('apps.fields.emailVerificationMethodHint')}
               </p>
             </div>
-            </CollapsibleSection>
+            </CollapsibleSection> {/* legal */}
             {errorKey && (
               <p role="alert" className="text-body-sm text-destructive">
                 {t(errorKey)}
