@@ -8,7 +8,21 @@ import { useRouter } from 'next/navigation'
 import { AuthCard, Button, FormField } from '@sassy-auth/ui'
 import { requestOtp, verifyOtp } from './actions'
 
-export function LoginOtpForm({ next }: { next: string }) {
+export function LoginOtpForm({
+  next,
+  logo = null,
+  pageLightBackgroundColor = null,
+  pageDarkBackgroundColor = null,
+  cardLightBackgroundColor = null,
+  cardDarkBackgroundColor = null,
+}: {
+  next: string
+  logo?: string | null
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
+}) {
   const t = useTranslations('login')
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -46,7 +60,16 @@ export function LoginOtpForm({ next }: { next: string }) {
       : e
 
   return (
-    <AuthCard title={t('otp.title')} subtitle={t('otp.subtitle')}>
+    <AuthCard
+      title={t('otp.title')}
+      subtitle={t('otp.subtitle')}
+      logoUrl={logo}
+      logoAlt={t('logoAlt')}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
+    >
       {step === 'email' ? (
         <form action={requestAction} className="flex flex-col gap-4">
           <FormField
@@ -63,7 +86,10 @@ export function LoginOtpForm({ next }: { next: string }) {
             <p data-testid="otp-error" className="text-label-md text-destructive">{errKey(reqState.error)}</p>
           )}
           <Button type="submit" className="w-full" loading={reqPending}>{t('otp.sendCode')}</Button>
-          <Link href="/login" className="self-center text-label-md text-primary hover:underline">
+          <Link
+            href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}
+            className="self-center text-label-md text-primary hover:underline"
+          >
             {t('otp.usePassword')}
           </Link>
         </form>

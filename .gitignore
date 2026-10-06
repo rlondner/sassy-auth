@@ -65,3 +65,6 @@ apps/auth-server/secrets/localhost.pem
 packages/types/dist/
 .vscode/settings.json
 .certs/
+
+.superpowers/
+.env.production

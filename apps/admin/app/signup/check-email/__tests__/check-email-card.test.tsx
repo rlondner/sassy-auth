@@ -34,7 +34,7 @@ describe('CheckEmailCard', () => {
         method: 'POST',
         body: JSON.stringify({
           email: 'alice@example.com',
-          callbackURL: `${window.location.origin}/signup/verified`,
+          callbackURL: `${window.location.origin}/signup/verified?email=${encodeURIComponent('alice@example.com')}`,
         }),
       }),
     )
@@ -56,5 +56,28 @@ describe('CheckEmailCard', () => {
       'href',
       '/login?next=%2Forgs',
     )
+  })
+
+  it('applies background color overrides when provided', () => {
+    const { container } = render(
+      <CheckEmailCard
+        email="alice@example.com"
+        next=""
+        authServerUrl="https://auth.example.com"
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
+  })
+
+  it('renders the app logo when provided', () => {
+    const { container } = render(
+      <CheckEmailCard email="a@b.com" next="" authServerUrl="https://auth.test" logo="data:image/png;base64,AAA=" />,
+    )
+    expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
   })
 })

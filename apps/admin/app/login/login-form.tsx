@@ -5,33 +5,27 @@ import { useTranslations } from 'next-intl'
 import { useActionState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuthCard, Button, FormField } from '@sassy-auth/ui'
+import { clientIdFromNext } from '@/lib/client-id-from-next'
 import { signIn } from './actions'
 import { SocialButtons } from './social-buttons'
-
-/**
- * `next` may be a relative or absolute authorize URL carrying `client_id` —
- * the same shape `applyPerAppTrustCookie` (app/login/actions.ts) already
- * parses for trust-day lookups. A placeholder base lets a relative `next`
- * parse without throwing.
- */
-function clientIdFromNext(next: string): string | null {
-  if (!next) return null
-  try {
-    return new URL(next, 'http://placeholder.invalid').searchParams.get('client_id')
-  } catch {
-    return null
-  }
-}
 
 export function LoginForm({
   next,
   providers = [],
   logo = null,
+  pageLightBackgroundColor = null,
+  pageDarkBackgroundColor = null,
+  cardLightBackgroundColor = null,
+  cardDarkBackgroundColor = null,
   authServerUrl,
 }: {
   next: string
   providers?: string[]
   logo?: string | null
+  pageLightBackgroundColor?: string | null
+  pageDarkBackgroundColor?: string | null
+  cardLightBackgroundColor?: string | null
+  cardDarkBackgroundColor?: string | null
   authServerUrl: string
 }) {
   const t = useTranslations('login')
@@ -63,6 +57,10 @@ export function LoginForm({
       subtitle={t('subtitle')}
       logoUrl={logo}
       logoAlt={t('logoAlt')}
+      pageLightBackgroundColor={pageLightBackgroundColor}
+      pageDarkBackgroundColor={pageDarkBackgroundColor}
+      cardLightBackgroundColor={cardLightBackgroundColor}
+      cardDarkBackgroundColor={cardDarkBackgroundColor}
       footer={
         clientId ? (
           <p className="text-center text-label-md text-muted-foreground">
@@ -107,7 +105,10 @@ export function LoginForm({
           </p>
         )}
 
-        <Link href="/forgot-password" className="self-end text-label-md text-primary hover:underline">
+        <Link
+          href={next ? `/forgot-password?next=${encodeURIComponent(next)}` : '/forgot-password'}
+          className="self-end text-label-md text-primary hover:underline"
+        >
           {t('forgotPassword')}
         </Link>
         <Link

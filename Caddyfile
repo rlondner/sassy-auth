@@ -1,16 +1,33 @@
 # Local reverse proxy for replicating the prod hostnames on this machine.
-# Terminates TLS on :443 for both hostnames and forwards plain HTTP to each
-# app's normal dev port. Requires the hosts file entries:
+# Terminates TLS on :443 for both hostnames. Requires the hosts file entries:
 #   127.0.0.1 auth-dev.milissai.com
 #   127.0.0.1 auth-api-dev.milissai.com
-# Run with: caddy run --config .\Caddyfile
+#
+# Normally loaded indirectly via ~/.caddy/Caddyfile (imported alongside
+# other repos' Caddyfiles -- see scripts/start-caddy.ps1), so this repo's
+# routes can share one Caddy instance on :443 with other projects. Can
+# still be run standalone: caddy run --config .\Caddyfile
 
+# apps/admin's dev server (next dev, no --experimental-https — see
+# apps/admin/package.json) is plain HTTP on :3001, so this hop stays plaintext.
 auth-dev.milissai.com {
-    tls internal
-    reverse_proxy 127.0.0.1:3001
+	tls internal
+	reverse_proxy 127.0.0.1:3001
 }
 
+# apps/auth-server terminates its own TLS on :3010 using the mkcert
+# certificate from README.md step 6 (see apps/auth-server/src/https-options.ts) —
+# it is never plain HTTP in dev. Without an explicit https:// upstream and a
+# transport that trusts that cert, Caddy's default plaintext-HTTP backend
+# connection fails against a TLS listener. tls_insecure_skip_verify is safe
+# here: the mkcert cert is issued for "localhost", not this IP literal, so
+# hostname verification would fail anyway, and this proxy never leaves the
+# developer's own machine.
 auth-api-dev.milissai.com {
-    tls internal
-    reverse_proxy 127.0.0.1:3010
+	tls internal
+	reverse_proxy https://127.0.0.1:3010 {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
 }

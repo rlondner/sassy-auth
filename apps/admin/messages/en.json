@@ -61,6 +61,20 @@
       "logoHint": "Shown on this app's sign in and sign up pages. PNG, JPEG, WebP, or SVG, up to 250KB.",
       "removeLogo": "Remove logo",
       "noLogo": "No logo configured",
+      "favicon": "App favicon",
+      "faviconHint": "Shown as the browser tab icon on this app's sign in and sign up pages. PNG, JPEG, WebP, or SVG, up to 250KB.",
+      "removeFavicon": "Remove favicon",
+      "noFavicon": "No favicon configured",
+      "pageLightBackgroundColor": "Page background (light)",
+      "pageLightBackgroundColorHint": "Overrides the page background behind the sign in/sign up card in light mode.",
+      "pageDarkBackgroundColor": "Page background (dark)",
+      "pageDarkBackgroundColorHint": "Overrides the page background behind the sign in/sign up card in dark mode.",
+      "cardLightBackgroundColor": "Card background (light)",
+      "cardLightBackgroundColorHint": "Overrides the sign in/sign up card's own background in light mode.",
+      "cardDarkBackgroundColor": "Card background (dark)",
+      "cardDarkBackgroundColorHint": "Overrides the sign in/sign up card's own background in dark mode.",
+      "backgroundColors": "Background colors",
+      "resetColorToDefault": "Reset to default",
       "twoFactorTrustDays": "2FA trust interval (days)",
       "twoFactorTrustDaysPlaceholder": "e.g. 14 (system default)",
       "twoFactorTrustDaysSystemDefault": "System default",
@@ -118,7 +132,7 @@
       "webhookSecretConfigured": "A secret is configured.",
       "noWebhookSecret": "No secret configured.",
       "activationEmail": "Activation email",
-      "activationEmailHint": "Customize the email sent when a new sign-up needs to confirm their address. Placeholders '{{firstName}}', '{{appName}}', and '{{activationUrl}}' are available in the subject and message.",
+      "activationEmailHint": "Customize the email sent when a new sign-up needs to confirm their address. Placeholders '{{firstName}}' and '{{appName}}' are always available in the subject and message; '{{activationUrl}}' is additionally available when using the link method.",
       "activationEmailFromName": "From name",
       "activationEmailFromNamePlaceholder": "e.g. Vibecast",
       "activationEmailFromAddress": "From address",
@@ -128,7 +142,11 @@
       "activationEmailSubjectPlaceholder": "Verify your '{{appName}}' email address",
       "activationEmailMessage": "Message",
       "activationEmailMessagePlaceholder": "Confirm your email address to finish setting up your account:",
-      "activationEmailMessageHint": "Shown above the confirmation button, which is always added automatically.",
+      "activationEmailMessageHint": "Shown above the confirmation button (link method) or the code (6-digit code method), both of which are always added automatically.",
+      "emailVerificationMethod": "Verification method",
+      "emailVerificationMethodHint": "How new sign-ups confirm their email address.",
+      "emailVerificationMethodLink": "Clickable link",
+      "emailVerificationMethodCode": "6-digit code",
       "passwordPolicy": "Password Policy",
       "passwordPolicyOverrideToggle": "Override global password policy for this app",
       "passwordPolicyInherited": "Inheriting the global policy: {summary}",
@@ -180,6 +198,9 @@
       "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
       "logoInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
       "logoTooLarge": "That image is too large. Please choose one under 250KB.",
+      "invalidHexColor": "Enter a 6-digit hex color (e.g. #0F172A).",
+      "faviconInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
+      "faviconTooLarge": "That image is too large. Please choose one under 250KB.",
       "nameRequired": "App name is required.",
       "activationEmailInvalid": "Please check the activation email settings — the from address must be a valid email, and no field may contain a line break."
     },
@@ -511,7 +532,8 @@
       "activate": "Activate",
       "delete": "Delete",
       "resendInvitation": "Resend Invitation",
-      "resend": "Resend Invitation"
+      "resend": "Resend Invitation",
+      "resendActivation": "Resend Activation Email"
     },
     "toast": {
       "created": "User created",
@@ -520,7 +542,8 @@
       "resent": "Invitation resent",
       "resetLinkGenerated": "Password reset link generated",
       "activated": "User activated",
-      "deactivated": "User deactivated"
+      "deactivated": "User deactivated",
+      "activationResent": "Activation email resent"
     },
     "confirmDelete": {
       "title": "Delete user",
@@ -540,6 +563,7 @@
       "generic": "Something went wrong. Please try again.",
       "noPassword": "This user has no password to reset.",
       "notPending": "This user is no longer pending an invitation.",
+      "notUnverified": "This user's email is already verified.",
       "rolesSetFailed": "Failed to update roles.",
       "directPermissionsSetFailed": "Failed to update direct permissions.",
       "selfDeactivate": "You cannot deactivate your own account.",
@@ -550,6 +574,7 @@
   },
   "forgotPassword": {
     "title": "Reset your password",
+    "logoAlt": "Company logo",
     "subtitle": "Enter your email and we'll send you a reset link.",
     "email": "Email Address",
     "submit": "Send reset link",
@@ -623,22 +648,45 @@
     }
   },
   "signup": {
-    "title": "Create your account",
-    "titleWithApp": "Create your account with {appName}",
-    "subtitle": "Set up your organization to get started.",
-    "subtitleDefaultOrg": "Create your account to get started.",
+    "title": "Welcome",
+    "titleWithApp": "Welcome to {appName}",
+    "subtitle": "Let's start by signing up.",
+    "subtitleDefaultOrg": "Let's start by signing up.",
     "invalidLink": "This signup link has expired or is invalid. Contact the app you're signing up for to get a new one.",
     "firstName": "First Name",
+    "firstNamePlaceholder": "Type your first name...",
     "lastName": "Last Name",
+    "lastNamePlaceholder": "Type your last name...",
     "companyName": "Company Name",
+    "companyNamePlaceholder": "Type your company name...",
     "email": "Email Address",
+    "emailPlaceholder": "Type your email...",
     "password": "Password",
+    "passwordPlaceholder": "Type your password...",
     "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Type your password again...",
     "acceptPrivacyPolicy": "I have read and accept the <link>Privacy Policy</link>",
     "acceptTerms": "I have read and accept the <link>Terms and Conditions</link>",
     "acceptGdpr": "I have read and accept the <link>GDPR Disclosure</link>",
     "submit": "Create account",
+    "continue": "Continue",
+    "marketingOptIn": "Please keep me updated on products, news, events & offers",
     "backToLogin": "Back to sign in",
+    "setPassword": {
+      "title": "Set your password",
+      "subtitle": "Create a strong password for your account"
+    },
+    "setName": {
+      "title": "How should we call you?",
+      "subtitle": "It's always nicer to know who we're talking to, no?"
+    },
+    "passwordStrength": {
+      "weak": "Weak",
+      "fair": "Fair",
+      "good": "Good",
+      "strong": "Strong",
+      "veryStrong": "Very strong"
+    },
     "checkEmail": {
       "title": "Check your email",
       "subtitle": "We sent a verification link to {email}.",
@@ -649,10 +697,43 @@
       "resendError": "We couldn't resend the email. Please try again in a moment.",
       "backToLogin": "Back to sign in"
     },
+    "verifyCode": {
+      "title": "Authentication",
+      "headerSubtitle": "Security is crucial for us.",
+      "subtitle": "We've sent a message containing a 6-digit code to {email}.",
+      "codeLabel": "Enter code:",
+      "digitAriaLabel": "Digit {position} of {total}",
+      "verifying": "Verifying...",
+      "verifyButton": "Verify",
+      "didntReceiveIt": "Didn't receive it?",
+      "resendButton": "Resend code",
+      "resendCooldown": "Resend in {seconds}s",
+      "resendSent": "A new code is on its way.",
+      "resendError": "We couldn't resend the code. Please try again in a moment.",
+      "errorInvalid": "That code isn't right. Please try again.",
+      "errorExpired": "That code has expired. Request a new one below.",
+      "errorTooManyAttempts": "Too many attempts. Request a new code below.",
+      "errorGeneric": "Something went wrong. Please try again.",
+      "backToLogin": "Back to sign in"
+    },
     "verified": {
       "title": "Email verified",
       "subtitle": "Your account is ready. You can now sign in.",
-      "continueToLogin": "Continue to sign in"
+      "continueToLogin": "Continue to sign in",
+      "expired": {
+        "title": "Link expired",
+        "subtitle": "Your activation link for {email} has expired.",
+        "resendButton": "Resend link",
+        "resendCooldown": "Resend in {seconds}s",
+        "resendSent": "A new activation link is on its way.",
+        "resendError": "We couldn't resend the email. Please try again in a moment.",
+        "backToLogin": "Back to sign in"
+      },
+      "invalid": {
+        "title": "This link isn't valid",
+        "subtitle": "This activation link is invalid or has already been used.",
+        "backToLogin": "Back to sign in"
+      }
     },
     "errors": {
       "invalidEmail": "Please enter a valid email address.",
@@ -665,7 +746,9 @@
       "emailTaken": "An account with this email already exists.",
       "tooManyRequests": "Too many attempts. Please wait a minute and try again.",
       "serverUnavailable": "We could not reach the server. Please try again in a moment.",
-      "validationError": "We couldn't create your account. Please check your details and try again."
+      "validationError": "We couldn't create your account. Please check your details and try again.",
+      "INVALID_OTP": "That code isn't right. Please try again.",
+      "TOO_MANY_ATTEMPTS": "Too many attempts. Request a new code below."
     }
   },
   "security": {

@@ -176,6 +176,38 @@ describe('LoginForm', () => {
     wrap(<LoginForm next="" authServerUrl="https://auth.test" />)
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
+
+  it('applies background color overrides when provided', () => {
+    const { container } = wrap(
+      <LoginForm
+        next=""
+        authServerUrl="https://auth.test"
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
+  })
+
+  it('carries next on the forgot-password link so client_id and branding survive', () => {
+    wrap(<LoginForm next="/api/token/oauth/authorize?client_id=sq_1&redirect_uri=x" authServerUrl="https://auth.test" />)
+
+    const link = screen.getByText(messages.login.forgotPassword).closest('a')
+    expect(link).toHaveAttribute(
+      'href',
+      '/forgot-password?next=%2Fapi%2Ftoken%2Foauth%2Fauthorize%3Fclient_id%3Dsq_1%26redirect_uri%3Dx',
+    )
+  })
+
+  it('does not carry next on the forgot-password link when there is none', () => {
+    wrap(<LoginForm next="" authServerUrl="https://auth.test" />)
+
+    const link = screen.getByText(messages.login.forgotPassword).closest('a')
+    expect(link).toHaveAttribute('href', '/forgot-password')
+  })
 })
 
 describe('LoginOtpForm', () => {
@@ -232,9 +264,35 @@ describe('LoginOtpForm', () => {
       expect(screen.getByTestId('otp-error')).toHaveTextContent(text),
     )
   })
+
+  it('applies background color overrides when provided', () => {
+    const { container } = wrap(
+      <LoginOtpForm
+        next=""
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
+  })
 })
 
 describe('TwoFactorForm', () => {
+  it('renders the app logo when a logo URL is provided', () => {
+    const { container } = wrap(
+      <TwoFactorForm next="" trustDays={14} logo="data:image/png;base64,AAA=" />,
+    )
+    expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+  })
+
+  it('renders no logo image when none is provided', () => {
+    const { container } = wrap(<TwoFactorForm next="" trustDays={14} />)
+    expect(container.querySelector('img')).not.toBeInTheDocument()
+  })
+
   it('defaults the trust-device box to checked and submits trustDevice=true', async () => {
     wrap(<TwoFactorForm next="/orgs" trustDays={14} />)
 

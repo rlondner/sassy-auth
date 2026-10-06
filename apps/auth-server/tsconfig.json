@@ -31,5 +31,12 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true
-  }
+  },
+  // The dev-only winston file transports (src/common/logger/winston.config.ts)
+  // write to ./logs continuously. Without this exclude, `nest start --watch`
+  // (plain tsc --watch) still recursively watches that directory as part of
+  // the project tree, so every log write is seen as a filesystem change and
+  // triggers a rebuild/restart — the server ends up restarting in response
+  // to its own logging.
+  "exclude": ["logs", "dist", "node_modules"]
 }

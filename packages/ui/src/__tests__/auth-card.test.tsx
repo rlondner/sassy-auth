@@ -71,4 +71,89 @@ describe('AuthCard', () => {
     expect(card).not.toBeNull()
     expect(card?.className).not.toContain('max-w-sm')
   })
+
+  it('renders a scoped style block with the light/dark overrides when background colors are set', () => {
+    const { container } = render(
+      <AuthCard
+        title="Hi"
+        pageLightBackgroundColor="#111111"
+        pageDarkBackgroundColor="#222222"
+        cardLightBackgroundColor="#333333"
+        cardDarkBackgroundColor="#444444"
+      />,
+    )
+    const style = container.querySelector('style')
+    expect(style).not.toBeNull()
+    expect(style?.textContent).toContain('#111111')
+    expect(style?.textContent).toContain('#222222')
+    expect(style?.textContent).toContain('#333333')
+    expect(style?.textContent).toContain('#444444')
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
+  })
+
+  it('renders no style block and no data attributes when no background colors are set', () => {
+    const { container } = render(<AuthCard title="Hi" />)
+    expect(container.querySelector('style')).toBeNull()
+    expect(container.querySelector('[data-auth-page-bg]')).toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).toBeNull()
+  })
+
+  it('only emits the page override when only page colors are set', () => {
+    const { container } = render(
+      <AuthCard title="Hi" pageLightBackgroundColor="#111111" pageDarkBackgroundColor="#222222" />,
+    )
+    expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).toBeNull()
+  })
+
+  it('silently ignores malformed background color values instead of emitting them into the <style> tag', () => {
+    const { container } = render(
+      <AuthCard
+        title="Hi"
+        pageLightBackgroundColor="</style><script>alert(1)</script>"
+        pageDarkBackgroundColor="not-a-color"
+        cardLightBackgroundColor="#12345"
+        cardDarkBackgroundColor="#1234567"
+      />,
+    )
+    expect(container.querySelector('style')).toBeNull()
+    expect(container.querySelector('script')).toBeNull()
+    expect(container.querySelector('[data-auth-page-bg]')).toBeNull()
+    expect(container.querySelector('[data-auth-card-bg]')).toBeNull()
+  })
+
+  it('recolors card text, links, and the button, and outlines the button, when both light-mode colors are set', () => {
+    const { container } = render(
+      <AuthCard
+        title="Hi"
+        pageLightBackgroundColor="#490080"
+        cardLightBackgroundColor="#f4ebf9"
+        footer={<a className="text-primary" href="#">Link</a>}
+      >
+        <button className="bg-primary text-primary-foreground">Go</button>
+      </AuthCard>,
+    )
+    const style = container.querySelector('style')
+    expect(style?.textContent).toContain('[data-auth-card-bg]{--foreground:0 0% 0%')
+    expect(style?.textContent).toContain('[data-auth-card-bg] .bg-primary{background-color:#FFFFFF;border:1.5px solid #000000;}')
+  })
+
+  it('gives error text a dedicated vivid color instead of the computed contrast', () => {
+    const { container } = render(
+      <AuthCard
+        title="Hi"
+        pageLightBackgroundColor="#490080"
+        cardLightBackgroundColor="#f4ebf9"
+      />,
+    )
+    expect(container.querySelector('style')?.textContent).toContain('[data-auth-card-bg] .text-destructive{color:#DC2626;}')
+  })
+
+  it('does not recolor text/button when only one of page/card light colors is set', () => {
+    const { container } = render(
+      <AuthCard title="Hi" pageLightBackgroundColor="#490080" />,
+    )
+    expect(container.querySelector('style')?.textContent ?? '').not.toContain('--foreground')
+  })
 })

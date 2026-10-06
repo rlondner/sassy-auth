@@ -2,8 +2,14 @@ import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/comm
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { RegistrationService } from './registration.service';
-import { RegisterDto } from './register.dto';
-import { RateLimitGuard, AppLookupRateLimitGuard } from './rate-limit.guard';
+import { CompleteRegistrationDto, RegisterDto, StartRegistrationDto, VerifyRegistrationCodeDto } from './register.dto';
+import {
+  RateLimitGuard,
+  AppLookupRateLimitGuard,
+  RegisterStartRateLimitGuard,
+  VerifyRegistrationCodeRateLimitGuard,
+  CompleteRegistrationRateLimitGuard,
+} from './rate-limit.guard';
 import { resolveClientIp } from '../common/net/resolve-client-ip';
 
 /**
@@ -49,5 +55,41 @@ export class RegistrationController {
   @UseGuards(AppLookupRateLimitGuard)
   getAppName(@Query('appPublicId') appPublicId: string, @Req() req: Request) {
     return this.service.getAppName(appPublicId, resolveClientIp(req));
+  }
+
+  /**
+   * POST /api/register/start — step 1 of the code-first signup wizard
+   * (emailVerificationMethod: 'code' apps only; see the design doc). Creates
+   * a placeholder BetterAuth account and emails the first verification code.
+   */
+  @Post('start')
+  @UseGuards(RegisterStartRateLimitGuard)
+  start(@Body() dto: StartRegistrationDto, @Req() req: Request) {
+    // `req` is intentionally unused: unlike register()/completeRegistration()/
+    // getAppName(), startRegistration() never needs the client IP (it doesn't
+    // consult resolveCountryFromIp for GDPR consent at this step).
+    return this.service.startRegistration(dto);
+  }
+
+  /**
+   * POST /api/register/verify-code — step 2. Checks (without consuming) the
+   * 6-digit code so the wizard can show an inline error before the user
+   * moves on to the password step.
+   */
+  @Post('verify-code')
+  @UseGuards(VerifyRegistrationCodeRateLimitGuard)
+  verifyCode(@Body() dto: VerifyRegistrationCodeDto) {
+    return this.service.verifyRegistrationCode(dto);
+  }
+
+  /**
+   * POST /api/register/complete — step 4. Consumes the code for real, sets
+   * the real password, and creates the org/SaUser exactly as POST /api/register
+   * does for the link flow.
+   */
+  @Post('complete')
+  @UseGuards(CompleteRegistrationRateLimitGuard)
+  complete(@Body() dto: CompleteRegistrationDto, @Req() req: Request) {
+    return this.service.completeRegistration(dto, resolveClientIp(req));
   }
 }

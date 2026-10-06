@@ -93,6 +93,11 @@ export interface App {
   name: string;
   url: string;
   logo?: string | null;
+  favicon?: string | null;
+  pageLightBackgroundColor?: string | null;
+  pageDarkBackgroundColor?: string | null;
+  cardLightBackgroundColor?: string | null;
+  cardDarkBackgroundColor?: string | null;
   redirectUris?: RedirectUri[];
   isPlatform: boolean;
   twoFactorTrustDays?: number | null;
@@ -115,12 +120,18 @@ export interface App {
   privacyPolicyUrl?: string | null;
   termsUrl?: string | null;
   gdprUrl?: string | null;
+  emailVerificationMethod?: 'link' | 'code';
 }
 
 export interface CreateAppPayload {
   name: string;
   url: string;
   logo?: string | null;
+  favicon?: string | null;
+  pageLightBackgroundColor?: string | null;
+  pageDarkBackgroundColor?: string | null;
+  cardLightBackgroundColor?: string | null;
+  cardDarkBackgroundColor?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   twoFactorPromptEnabled?: boolean | null;
@@ -132,6 +143,11 @@ export interface UpdateAppPayload {
   name?: string;
   url?: string;
   logo?: string | null;
+  favicon?: string | null;
+  pageLightBackgroundColor?: string | null;
+  pageDarkBackgroundColor?: string | null;
+  cardLightBackgroundColor?: string | null;
+  cardDarkBackgroundColor?: string | null;
   redirectUris?: RedirectUri[];
   twoFactorTrustDays?: number | null;
   twoFactorPromptEnabled?: boolean | null;
@@ -145,6 +161,7 @@ export interface UpdateAppPayload {
   privacyPolicyUrl?: string | null;
   termsUrl?: string | null;
   gdprUrl?: string | null;
+  emailVerificationMethod?: 'link' | 'code';
 }
 
 export interface ListAppsParams {

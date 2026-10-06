@@ -15,6 +15,52 @@ The repository ships a [`render.yaml`](render.yaml) Blueprint that provisions al
 
 ---
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [One-time setup for automated deploys](#one-time-setup-for-automated-deploys)
+- [Staging environment](#staging-environment)
+- [1. Neon database](#1-neon-database)
+- [2. Generate secrets (one time)](#2-generate-secrets-one-time)
+- [3. Deploy to Render](#3-deploy-to-render)
+  - [3.1 Apply the Blueprint](#31-apply-the-blueprint)
+  - [3.2 Custom domains and DNS](#32-custom-domains-and-dns)
+  - [3.3 Database migrations](#33-database-migrations)
+  - [3.4 First-time seed](#34-first-time-seed)
+- [4. Environment variable reference (production)](#4-environment-variable-reference-production)
+  - [Shared group (`sassy-auth-production`)](#shared-group-sassy-auth-production)
+  - [Auth server only](#auth-server-only)
+  - [Admin console only](#admin-console-only)
+  - [Resource server only](#resource-server-only)
+- [5. Register the resource-server app](#5-register-the-resource-server-app)
+  - [Option A — seed demo data (fastest)](#option-a--seed-demo-data-fastest)
+  - [Option B — manual registration](#option-b--manual-registration)
+  - [Verify the OAuth round-trip](#verify-the-oauth-round-trip)
+- [6. Social sign-in (optional)](#6-social-sign-in-optional)
+- [7. Operational notes](#7-operational-notes)
+  - [Email](#email)
+  - [Observability](#observability)
+  - [Scaling](#scaling)
+  - [Key rotation](#key-rotation)
+- [8. Local mock deployment (custom ports)](#8-local-mock-deployment-custom-ports)
+  - [8.1 PostgreSQL](#81-postgresql)
+  - [8.2 Root `.env.local`](#82-root-envlocal)
+  - [8.3 Install, migrate, seed](#83-install-migrate-seed)
+  - [8.4 Start the auth server (port 3100)](#84-start-the-auth-server-port-3100)
+  - [8.5 Start the resource server (port 8100)](#85-start-the-resource-server-port-8100)
+  - [8.6 Mock deployment checklist](#86-mock-deployment-checklist)
+  - [8.7 Mapping mock ports → production URLs](#87-mapping-mock-ports--production-urls)
+- [9. Troubleshooting](#9-troubleshooting)
+- [10. Files in this deployment](#10-files-in-this-deployment)
+- [11. Production Docker images](#11-production-docker-images)
+  - [Build](#build)
+  - [Run (example)](#run-example)
+  - [Use on Render instead of native buildpacks](#use-on-render-instead-of-native-buildpacks)
+  - [Local mock with Docker](#local-mock-with-docker)
+
+---
+
 ## Architecture
 
 ```mermaid
@@ -273,6 +319,7 @@ Set that value as `SASSY_CLIENT_ID` on `sassy-resource-server` and redeploy.
 | `ADMIN_URL` | `https://auth.milissai.com` |
 | `TRUSTED_ORIGINS` | `https://auth.milissai.com,https://testapp.milissai.com` |
 | `NODE_ENV` | `production` |
+| `COOKIE_SECURE` | *(unset — `NODE_ENV=production` on both services already implies secure cookies; see [§8.4](#84-start-the-auth-server-port-3100) for when to set this explicitly instead)* |
 | `GEOIP_DB_PATH` | *(unset)* |
 | `COOKIE_DOMAIN` | `.milissai.com` |
 | `COOKIE_PREFIX` | *(unset — production keeps BetterAuth's default `better-auth` prefix)* |
@@ -327,7 +374,7 @@ Do **not** set `SASSY_AUTH_ALLOW_INSECURE_APP_URLS` in production.
 
 | Variable | Production value |
 |----------|------------------|
-| `PUBLIC_AUTH_SERVER_URL` | `https://auth-api.milissai.com` |
+| `NEXT_PUBLIC_AUTH_SERVER_URL` | `https://auth-api.milissai.com` — same value as `AUTH_SERVER_URL` in the shared group above, `NEXT_PUBLIC_`-prefixed so Next.js inlines it into the client bundle (required by `lib/api-public.ts`'s client-component calls) |
 | `LOGIN_NEXT_ALLOWED_ORIGINS` | `https://testapp.milissai.com` |
 
 ### Resource server only
@@ -469,13 +516,18 @@ BETTER_AUTH_SECRET="<random-32+-chars>"
 # Mock "production" URLs on custom ports
 BETTER_AUTH_URL="http://localhost:3100"
 AUTH_SERVER_URL="http://localhost:3100"
-PUBLIC_AUTH_SERVER_URL="http://localhost:3100"
+NEXT_PUBLIC_AUTH_SERVER_URL="http://localhost:3100"
 ADMIN_URL="http://localhost:3101"
 TRUSTED_ORIGINS="http://localhost:3101,http://localhost:8100"
 LOGIN_NEXT_ALLOWED_ORIGINS="http://localhost:8100"
 
 # Required when NODE_ENV=production; optional in development
 SEED_ADMIN_PASSWORD="your-local-mock-password"
+
+# Optional — only needed if the admin console is ever built and started
+# with different NODE_ENV values (see §8.4's warning below); leave unset
+# for a straightforward NODE_ENV=production (or =development) mock.
+# COOKIE_SECURE="true"
 
 # Allow http://localhost app URLs in the admin console
 SASSY_AUTH_ALLOW_INSECURE_APP_URLS="true"
@@ -512,9 +564,11 @@ NODE_ENV=production PORT=3101 pnpm --filter @sassy-auth/admin build
 NODE_ENV=production PORT=3101 pnpm --filter @sassy-auth/admin exec next start -p 3101
 ```
 
-> **Why `NODE_ENV=production`?** The session cookie's `Secure` flag is tied to production mode. On plain `http://localhost`, production mode prevents the cookie from being stored. For this mock over HTTP, either run with `NODE_ENV=development` (accepting dev cookie behavior) or terminate TLS locally (e.g. mkcert + Caddy). The Render deployment uses HTTPS, so production mode is correct there.
+> **Why `NODE_ENV=production`?** The session cookie's `Secure` flag (and `__Secure-` name prefix) is tied to production mode by default — see [Cookie security](README.md#cookie-security-node_env-cookie_secure-cookie_prefix-cookie_domain) in the README. On plain `http://localhost`, a `Secure` cookie is refused by the browser, so this HTTP-only mock needs either `NODE_ENV=development` on *both* commands below (accepting dev cookie behavior) or TLS terminated locally (e.g. mkcert + Caddy, [README §6b](README.md#6b-optional--caddy-proxy-for-prod-like-hostnames-windows-only)). The Render deployment uses HTTPS, so production mode is correct there.
+>
+> **Set `NODE_ENV` identically on the `build` and `start`/`dev` commands — for the admin console, this is not optional.** `next build` bakes `NODE_ENV`'s value into the compiled output; `next start` does **not** re-read it live. Run `build` with `NODE_ENV=production` and `start` without it (or vice versa) and the admin console keeps whatever cookie-naming decision the *build* made, while `auth-server` (no build-time bake — it's plain NestJS) keeps reading `NODE_ENV` live at `start` — the two drift apart and sign-in breaks, same as the CI regression this mock deployment is meant to catch early. If you ever need the admin console built once and run under different `NODE_ENV` values afterward, set `COOKIE_SECURE=true` (or `false`) explicitly on both services instead of relying on `NODE_ENV` — it isn't baked in at build time, so it stays correct regardless of what `NODE_ENV` is during `start`.
 
-For a quick HTTP-only smoke test, use development mode:
+For a quick HTTP-only smoke test, use development mode on both:
 
 ```bash
 PORT=3100 pnpm --filter @sassy-auth/auth-server dev
@@ -575,6 +629,7 @@ When promoting from mock to Render, update every URL-shaped variable consistentl
 | `http://localhost:8100` | `https://testapp.milissai.com` |
 | `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true` | unset |
 | `NODE_ENV=development` (HTTP dev) | `NODE_ENV=production` |
+| `COOKIE_SECURE` unset (falls back to `NODE_ENV`) | unset is fine too — only set it explicitly if `NODE_ENV` ever differs between the admin console's build and runtime, see [§8.4](#84-start-the-auth-server-port-3100) |
 
 ---
 
@@ -590,6 +645,7 @@ When promoting from mock to Render, update every URL-shaped variable consistentl
 | Migrations fail on deploy | Neon unreachable or wrong `DATABASE_URL` | Verify pooled URL, `sslmode=require` |
 | Invitation emails not sent | No mail transport configured | Set `RESEND_API_KEY` or SMTP vars |
 | Third-party app's sign-in loops between `/login` and `/oauth/authorize` until throttled | Missing `COOKIE_DOMAIN` — session cookie is host-only, never reaches `auth-api.milissai.com` from the browser | Set `COOKIE_DOMAIN=.milissai.com` on the auth server (see [§4](#4-environment-variable-reference-production)) |
+| Admin login "succeeds" (auth-server logs a sign-in) but the admin console still shows logged out / bounces back to `/login` | Admin console and auth-server disagree on the session cookie name — usually `NODE_ENV` differed between the admin console's `next build` step and its `next start`/runtime, or between the two services entirely. `next build` bakes `NODE_ENV` into the compiled output; it is not re-read live at `next start` | Rebuild and restart the admin console with the **same** `NODE_ENV` both times, or set `COOKIE_SECURE` explicitly (same value) on both services — see [Cookie security](README.md#cookie-security-node_env-cookie_secure-cookie_prefix-cookie_domain) |
 
 ---
 
@@ -659,7 +715,6 @@ docker run --rm -p 3010:3010 \
 # Admin console
 docker run --rm -p 3001:3001 \
   -e AUTH_SERVER_URL="https://auth-api.milissai.com" \
-  -e PUBLIC_AUTH_SERVER_URL="https://auth-api.milissai.com" \
   -e ADMIN_URL="https://auth.milissai.com" \
   -e LOGIN_NEXT_ALLOWED_ORIGINS="https://testapp.milissai.com" \
   sassy-auth-admin

@@ -21,6 +21,15 @@ export class SentryExceptionFilter implements ExceptionFilter {
     let status: number;
     let message: string;
     let error: string;
+    // Set only when the thrown exception's response body carries a machine-
+    // readable `code` (e.g. `new BadRequestException({ code: 'OTP_EXPIRED' })`
+    // — see registration.service.ts's mapOtpError). Previously this field
+    // was silently dropped here even though callers already relied on it
+    // reaching the client (bug found in a whole-implementation review of the
+    // code-first signup wizard: verify-code/complete's OTP error codes never
+    // actually reached the browser because this filter rebuilds the entire
+    // response body and only ever copied `message`/`error` through).
+    let code: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -34,6 +43,9 @@ export class SentryExceptionFilter implements ExceptionFilter {
           ? (b['message'] as string[]).join(', ')
           : String(b['message'] ?? exception.message);
         error = String(b['error'] ?? HttpStatus[status] ?? 'Error');
+        if (typeof b['code'] === 'string') {
+          code = b['code'];
+        }
       } else {
         message = exception.message;
         error = HttpStatus[status] ?? 'Error';
@@ -71,6 +83,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
       statusCode: status,
       message,
       error,
+      ...(code !== undefined && { code }),
       path: request.url,
       timestamp: new Date().toISOString(),
     });

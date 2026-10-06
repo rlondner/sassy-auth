@@ -1,7 +1,8 @@
-import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsPositive, IsString, Matches, Max, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsAppUrl } from '../../common/config/is-app-url.decorator';
 import { IsAppLogo } from '../../common/config/is-app-logo.decorator';
+import { IsAppFavicon } from '../../common/config/is-app-favicon.decorator';
 
 export class CreateAppDto {
   @IsString() @MinLength(1) @MaxLength(120) name!: string;
@@ -15,6 +16,23 @@ export class CreateAppDto {
   @IsOptional()
   @IsAppLogo()
   logo?: string | null;
+
+  /**
+   * Full data URI, validated by IsAppFavicon against the same shared
+   * size/type rule as logo. Omitted or null means no favicon.
+   */
+  @IsOptional()
+  @IsAppFavicon()
+  favicon?: string | null;
+
+  /**
+   * 6-digit hex (e.g. "#0F172A"). Omitted or null means no override —
+   * the default theme background applies.
+   */
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) pageLightBackgroundColor?: string | null;
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) pageDarkBackgroundColor?: string | null;
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) cardLightBackgroundColor?: string | null;
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/) cardDarkBackgroundColor?: string | null;
 
   /**
    * Per-app 2FA trust / re-prompt interval in days.

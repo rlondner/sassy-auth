@@ -62,6 +62,17 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
     (!gdprUrl || acceptedGdpr)
 
   function validateEmail() {
+    // bug-0295: `validity.valid` is also false for an empty *required*
+    // field (ValidityState.valueMissing), not just a malformed one. Left
+    // unguarded, blurring the email field before typing anything — e.g.
+    // tabbing through the form — showed "Please enter a valid email
+    // address" on an untouched field. Only the format check belongs here;
+    // "required" is enforced separately (native constraint validation on
+    // submit, and the disabled-submit-button checks below).
+    if (emailRef.current?.value.length === 0) {
+      setEmailError(null)
+      return true
+    }
     const valid = emailRef.current?.validity.valid ?? true
     setEmailError(valid ? null : t('signup.errors.invalidEmail'))
     return valid
@@ -94,7 +105,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         return
       }
       router.push(
-        `/signup/check-email?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ''}`,
+        `/signup/check-email?email=${encodeURIComponent(email)}&client_id=${encodeURIComponent(clientId)}${next ? `&next=${encodeURIComponent(next)}` : ''}`,
       )
     } catch {
       setError(t('signup.errors.validationError'))
@@ -109,6 +120,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         <FormField
           id="firstName"
           label={t('signup.firstName')}
+          placeholder={t('signup.firstNamePlaceholder')}
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
           required
@@ -116,6 +128,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         <FormField
           id="lastName"
           label={t('signup.lastName')}
+          placeholder={t('signup.lastNamePlaceholder')}
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
           required
@@ -125,6 +138,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         <FormField
           id="companyName"
           label={t('signup.companyName')}
+          placeholder={t('signup.companyNamePlaceholder')}
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
           required
@@ -136,6 +150,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         type="email"
         autoComplete="email"
         label={t('signup.email')}
+        placeholder={t('signup.emailPlaceholder')}
         value={email}
         onChange={(e) => {
           setEmail(e.target.value)
@@ -150,6 +165,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
           id="password"
           type="password"
           label={t('signup.password')}
+          placeholder={t('signup.passwordPlaceholder')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           showPasswordLabel={t('common.showPassword')}
@@ -162,6 +178,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
         id="confirm-password"
         type="password"
         label={t('signup.confirmPassword')}
+        placeholder={t('signup.confirmPasswordPlaceholder')}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
         error={passwordsMismatch ? t('signup.errors.passwordMismatch') : undefined}

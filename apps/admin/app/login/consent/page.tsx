@@ -1,11 +1,24 @@
+import type { Metadata } from 'next'
 import { AuthCard } from '@sassy-auth/ui'
 import { getTranslations } from 'next-intl/server'
 import { redirect } from 'next/navigation'
+import { fetchAppBranding } from '@/lib/app-branding'
 import { fetchOutstandingConsent } from '@/lib/consent'
 import { validateNextUrl } from '@/lib/safe-next'
 import { ConsentGateClient } from './ConsentGateClient'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ appPublicId?: string }>
+}): Promise<Metadata> {
+  const { appPublicId } = await searchParams
+  if (!appPublicId) return {}
+  const { favicon } = await fetchAppBranding(appPublicId)
+  return favicon ? { icons: { icon: favicon } } : {}
+}
 
 export default async function LoginConsentPage({
   searchParams,
@@ -16,7 +29,10 @@ export default async function LoginConsentPage({
   const t = await getTranslations()
   const nextSafe = validateNextUrl(next) ?? ''
 
-  const outstanding = appPublicId ? await fetchOutstandingConsent(appPublicId) : []
+  const [outstanding, branding] = await Promise.all([
+    appPublicId ? fetchOutstandingConsent(appPublicId) : Promise.resolve([]),
+    fetchAppBranding(appPublicId ?? null),
+  ])
 
   // An empty outstanding list means either genuinely nothing is required, or
   // fetchOutstandingConsent fail-opened on a transport error — in both cases
@@ -29,7 +45,15 @@ export default async function LoginConsentPage({
   }
 
   return (
-    <AuthCard title={t('loginConsent.title')} className="max-w-md">
+    <AuthCard
+      title={t('loginConsent.title')}
+      logoUrl={branding.logo}
+      className="max-w-md"
+      pageLightBackgroundColor={branding.pageLightBackgroundColor}
+      pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
+      cardLightBackgroundColor={branding.cardLightBackgroundColor}
+      cardDarkBackgroundColor={branding.cardDarkBackgroundColor}
+    >
       <ConsentGateClient appPublicId={appPublicId ?? ''} next={nextSafe} outstanding={outstanding} />
     </AuthCard>
   )

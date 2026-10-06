@@ -2,6 +2,14 @@ import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
 loadEnv({ path: resolve(process.cwd(), '../../.env.local') });
+// `pnpm start` (the production-style run used by `make start-no-watch`) overlays
+// this file to force NODE_ENV=production without touching the shared dev
+// .env.local — npm/pnpm set npm_lifecycle_event to the script name, so `dev`
+// (nest start --watch) never loads it. override:true lets it win over the
+// NODE_ENV already read from .env.local above.
+if (process.env.npm_lifecycle_event === 'start') {
+  loadEnv({ path: resolve(process.cwd(), '../../.env.production'), override: true });
+}
 import './instrument';
 import 'reflect-metadata';
 import express from 'express';
@@ -77,8 +85,24 @@ function validateStartupEnv(): void {
 
 async function bootstrap() {
   validateStartupEnv();
-  const isDev = process.env.NODE_ENV !== 'production';
-  const httpsOptions = resolveHttpsOptions(isDev, path.join(__dirname, '..', 'secrets'));
+  // `AUTH_SERVER_HTTPS` overrides the NODE_ENV-based default. Needed because
+  // `pnpm start` (the production-style run used by `make start-no-watch` /
+  // `start-auth-server`, both documented as running "behind Caddy") forces
+  // NODE_ENV=production above to exercise prod-only behavior (cookie
+  // security, etc.) locally — but Caddyfile unconditionally proxies to this
+  // server over TLS using the mkcert dev cert, "it is never plain HTTP in
+  // dev." With no override, that NODE_ENV flip also silently turned off the
+  // dev TLS listener, so Caddy's TLS dial to :3010 hit a plaintext server
+  // and failed with "tls: first record does not look like a TLS handshake"
+  // (502), surfacing to users as a generic "Invalid email or password" with
+  // no corresponding auth-server log line. Render never sets this var, so
+  // real production (NODE_ENV=production via render.yaml, no npm wrapper)
+  // keeps today's behavior unchanged.
+  const serveHttps =
+    process.env.AUTH_SERVER_HTTPS !== undefined
+      ? process.env.AUTH_SERVER_HTTPS === 'true'
+      : process.env.NODE_ENV !== 'production';
+  const httpsOptions = resolveHttpsOptions(serveHttps, path.join(__dirname, '..', 'secrets'));
   const expressApp = express();
 
   // Render terminates TLS/HTTP at its edge and proxies to this app over one

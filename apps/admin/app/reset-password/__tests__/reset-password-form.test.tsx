@@ -60,7 +60,54 @@ const VALID = 'Str0ngPassw0rd'
 
 beforeEach(() => {
   jest.clearAllMocks()
-  mockGetPolicy.mockResolvedValue(POLICY)
+  mockGetPolicy.mockResolvedValue({
+    passwordPolicy: POLICY,
+    pageLightBackgroundColor: null,
+    pageDarkBackgroundColor: null,
+    cardLightBackgroundColor: null,
+    cardDarkBackgroundColor: null,
+    logo: null,
+  })
+})
+
+describe('ResetPasswordForm branding', () => {
+  it('renders the app logo on the form branch when provided', async () => {
+    mockGetPolicy.mockResolvedValue({
+      passwordPolicy: POLICY,
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
+      logo: 'data:image/png;base64,AAA=',
+    })
+    const { container } = renderForm()
+    await waitForPolicyFetch()
+
+    await waitFor(() =>
+      expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AAA='),
+    )
+  })
+
+  it('renders the app logo on the success branch when provided', async () => {
+    mockGetPolicy.mockResolvedValue({
+      passwordPolicy: POLICY,
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
+      logo: 'data:image/png;base64,AAA=',
+    })
+    mockSubmit.mockResolvedValue({ ok: true })
+    const { container } = renderForm()
+    await waitForPolicyFetch()
+
+    fillAndSubmit(VALID)
+
+    await waitFor(() =>
+      expect(screen.getByTestId('reset-success')).toBeInTheDocument(),
+    )
+    expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+  })
 })
 
 describe('ResetPasswordForm client-side validation', () => {

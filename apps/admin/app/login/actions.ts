@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { trace } from '@opentelemetry/api'
-import { getBetterAuthCookieName } from '@sassy-auth/types'
+import { getBetterAuthCookieName, isSecureCookieEnv } from '@sassy-auth/types'
 import { getForwardedOrigin } from '@/lib/auth-origin'
 import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
@@ -14,9 +14,10 @@ import { shouldPromptTwoFactor, getSystemTrustDaysClient, getSystemPromptEnabled
 
 const tracer = trace.getTracer('sassy-auth.admin')
 
-// Must match the exact production check auth.config.ts uses for
-// `advanced.useSecureCookies` — see getBetterAuthCookieName's doc comment.
-const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+// Must match the exact check auth.config.ts uses for
+// `advanced.useSecureCookies` — see isSecureCookieEnv's doc comment
+// (@sassy-auth/types) for why this can't just be `NODE_ENV === 'production'`.
+const IS_PRODUCTION = isSecureCookieEnv()
 // bug-0293: must match auth.config.ts's `advanced.cookiePrefix` — see
 // getBetterAuthCookieName's doc comment.
 const COOKIE_PREFIX = process.env.COOKIE_PREFIX || 'better-auth'
@@ -314,8 +315,19 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
 
   await maybeRedirectToConsent(nextSafe)
+  await maybeRedirectToTwoFactorPrompt(nextSafe)
 
-  // Optional 2FA interstitial: show once per interval for unenrolled users.
+  redirect(nextSafe ?? '/users')
+}
+
+/**
+ * Optional 2FA interstitial: show once per interval for unenrolled users,
+ * honoring the app's twoFactorPromptEnabled/twoFactorTrustDays override (via
+ * next's client_id). Shared by every sign-in method (password, OTP) so the
+ * per-app config applies regardless of how the session was established.
+ * Redirects (throws) when the prompt should show; otherwise returns normally.
+ */
+async function maybeRedirectToTwoFactorPrompt(nextSafe: string | null): Promise<void> {
   // Read twoFactorEnabled from the just-established session.
   const cookieStore2 = await cookies()
   let twoFactorEnabled = false
@@ -380,8 +392,6 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
     const encodedNext = nextSafe ? encodeURIComponent(nextSafe) : ''
     redirect(`/login/two-factor-prompt${encodedNext ? `?next=${encodedNext}` : ''}`)
   }
-
-  redirect(nextSafe ?? '/users')
 }
 
 export async function requestOtp(formData: FormData): Promise<{ sent: true } | { error: string }> {
@@ -459,6 +469,7 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
   const nextRaw = formData.get('next')
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
   await maybeRedirectToConsent(nextSafe)
+  await maybeRedirectToTwoFactorPrompt(nextSafe)
   redirect(nextSafe ?? '/users')
 }
 

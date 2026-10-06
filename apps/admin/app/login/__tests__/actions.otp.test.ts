@@ -236,9 +236,12 @@ describe('verifyOtp two-factor challenge', () => {
 
 describe('verifyOtp success', () => {
   it('sets the session cookie and redirects to /users by default', async () => {
-    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
-      upstream(200, {}, SESSION_COOKIE),
-    )
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      // get-session and two-factor-status, both after the session is set
+      .mockResolvedValueOnce(upstream(200, { user: { twoFactorEnabled: true } }))
+      .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
 
     const target = await callExpectingRedirect(
       verifyOtp,
@@ -254,9 +257,11 @@ describe('verifyOtp success', () => {
   })
 
   it('redirects to a safe next path when one is supplied', async () => {
-    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
-      upstream(200, {}, SESSION_COOKIE),
-    )
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      .mockResolvedValueOnce(upstream(200, { user: { twoFactorEnabled: true } }))
+      .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
 
     const target = await callExpectingRedirect(
       verifyOtp,
@@ -267,9 +272,11 @@ describe('verifyOtp success', () => {
   })
 
   it('ignores an off-origin next value and falls back to /users', async () => {
-    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
-      upstream(200, {}, SESSION_COOKIE),
-    )
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      .mockResolvedValueOnce(upstream(200, { user: { twoFactorEnabled: true } }))
+      .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
 
     const target = await callExpectingRedirect(
       verifyOtp,
@@ -300,7 +307,7 @@ describe('verifyOtp consent gate', () => {
   it('redirects to /login/consent when the target app has outstanding consent', async () => {
     mockExtractClientId.mockReturnValue('sq_1')
     mockFetchOutstandingConsent.mockResolvedValue([{ documentType: 'terms', url: 'https://a.example.com/terms' }])
-    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce(
       upstream(200, {}, SESSION_COOKIE),
     )
 
@@ -314,9 +321,11 @@ describe('verifyOtp consent gate', () => {
 
   it('does not call the consent check when next has no client_id', async () => {
     mockExtractClientId.mockReturnValue(null)
-    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
-      upstream(200, {}, SESSION_COOKIE),
-    )
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      .mockResolvedValueOnce(upstream(200, { user: { twoFactorEnabled: true } }))
+      .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
 
     const target = await callExpectingRedirect(
       verifyOtp,
@@ -325,5 +334,41 @@ describe('verifyOtp consent gate', () => {
 
     expect(target).toBe('/users')
     expect(mockFetchOutstandingConsent).not.toHaveBeenCalled()
+  })
+})
+
+// Mirrors signIn's "optional two-factor interstitial" coverage: the
+// twoFactorPromptEnabled/twoFactorTrustDays per-app override must apply
+// however the session was established, not just for password sign-in.
+describe('verifyOtp optional two-factor interstitial', () => {
+  it('redirects to the prompt when the user is unenrolled and never prompted', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      .mockResolvedValueOnce(upstream(200, { user: { twoFactorEnabled: false } }))
+      .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
+
+    const target = await callExpectingRedirect(
+      verifyOtp,
+      formData({ email: 'a@b.io', otp: '123456' }),
+    )
+
+    expect(target).toBe('/login/two-factor-prompt')
+  })
+
+  it('does not prompt when the per-app app-trust-days lookup returns promptEnabled: false', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    fetchMock
+      .mockResolvedValueOnce(upstream(200, {}, SESSION_COOKIE))
+      .mockResolvedValueOnce(upstream(200, { user: { twoFactorEnabled: false } }))
+      .mockResolvedValueOnce(upstream(200, { twoFactorPromptedAt: null }))
+      .mockResolvedValueOnce(upstream(200, { effectiveTrustDays: 14, promptEnabled: false }))
+
+    const target = await callExpectingRedirect(
+      verifyOtp,
+      formData({ email: 'a@b.io', otp: '123456', next: '/orgs?client_id=sq_1' }),
+    )
+
+    expect(target).toBe('/orgs?client_id=sq_1')
   })
 })
