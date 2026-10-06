@@ -140,6 +140,14 @@
       "passwordPolicyMinNumbers": "Minimum numbers",
       "passwordPolicyMinSpecial": "Minimum special characters"
     },
+    "sections": {
+      "general": "General",
+      "branding": "Branding",
+      "security": "Sign-in & Security",
+      "access": "Org Defaults & Social",
+      "credentials": "Credentials & Webhooks",
+      "legal": "Legal & Email"
+    },
     "actions": {
       "view": "View",
       "edit": "Edit",
