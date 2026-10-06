@@ -47,6 +47,9 @@ _run-admin:
 kill-auth-server:
 	powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-port.ps1 -Port 3010
 
+kill-admin:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-port.ps1 -Port 3001
+
 # Assumes the stack is already running and seeded (see apps/admin-e2e/README.md):
 #   pnpm dev  (Postgres + admin + auth-server), plus the platform-admin seed.
 e2e-tests:
