@@ -1,9 +1,9 @@
-'use client'
+"use client"
 
-import * as React from 'react'
-import * as CollapsiblePrimitive from '@radix-ui/react-collapsible'
-import { ChevronDown } from 'lucide-react'
-import { cn } from '../../lib/utils'
+import * as React from "react"
+import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"
+import { ChevronDown } from "lucide-react"
+import { cn } from "../../lib/utils"
 
 interface CollapsibleSectionProps {
   title: string
@@ -19,22 +19,16 @@ const CollapsibleSection = React.forwardRef<HTMLDivElement, CollapsibleSectionPr
       ref={ref}
       open={open}
       onOpenChange={onOpenChange}
-      className={cn('rounded border border-border', className)}
+      className={cn("rounded border border-border", className)}
     >
       <CollapsiblePrimitive.Trigger asChild>
         <button
           type="button"
           className="flex w-full items-center justify-between px-3 py-2 text-label-md font-semibold"
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              event.currentTarget.click()
-            }
-          }}
         >
           {title}
           <ChevronDown
-            className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')}
+            className={cn("h-4 w-4 shrink-0 transition-transform", open && "rotate-180")}
           />
         </button>
       </CollapsiblePrimitive.Trigger>
@@ -44,6 +38,6 @@ const CollapsibleSection = React.forwardRef<HTMLDivElement, CollapsibleSectionPr
     </CollapsiblePrimitive.Root>
   ),
 )
-CollapsibleSection.displayName = 'CollapsibleSection'
+CollapsibleSection.displayName = "CollapsibleSection"
 
 export { CollapsibleSection }
