@@ -36,7 +36,7 @@ export default async function SignupVerifiedPage({
     return (
       <LinkExpiredCard
         email={email}
-        authServerUrl={PUBLIC_AUTH_SERVER}
+        authServerUrl={AUTH_SERVER}
         logo={branding.logo}
         pageLightBackgroundColor={branding.pageLightBackgroundColor}
         pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
