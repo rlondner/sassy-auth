@@ -281,6 +281,18 @@ describe('LoginOtpForm', () => {
 })
 
 describe('TwoFactorForm', () => {
+  it('renders the app logo when a logo URL is provided', () => {
+    const { container } = wrap(
+      <TwoFactorForm next="" trustDays={14} logo="data:image/png;base64,AAA=" />,
+    )
+    expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+  })
+
+  it('renders no logo image when none is provided', () => {
+    const { container } = wrap(<TwoFactorForm next="" trustDays={14} />)
+    expect(container.querySelector('img')).not.toBeInTheDocument()
+  })
+
   it('defaults the trust-device box to checked and submits trustDevice=true', async () => {
     wrap(<TwoFactorForm next="/orgs" trustDays={14} />)
 

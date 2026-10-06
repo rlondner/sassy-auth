@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
 import { fetchAppBranding } from '@/lib/app-branding'
@@ -9,6 +10,17 @@ export const dynamic = 'force-dynamic'
 // an origin the browser can reach — see the matching comment on
 // app/login/page.tsx's AUTH_SERVER for why AUTH_SERVER_URL already is one.
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ client_id?: string }>
+}): Promise<Metadata> {
+  const { client_id: clientId } = await searchParams
+  if (!clientId) return {}
+  const { favicon } = await fetchAppBranding(clientId)
+  return favicon ? { icons: { icon: favicon } } : {}
+}
 
 export default async function CheckEmailPage({
   searchParams,
@@ -23,6 +35,7 @@ export default async function CheckEmailPage({
     return (
       <AuthCard
         title={t('title')}
+        logoUrl={branding.logo}
         subtitle={t('missingEmail')}
         pageLightBackgroundColor={branding.pageLightBackgroundColor}
         pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
@@ -38,7 +51,8 @@ export default async function CheckEmailPage({
     <CheckEmailCard
       email={email}
       next={next ?? ''}
-      authServerUrl={AUTH_SERVER}
+      authServerUrl={PUBLIC_AUTH_SERVER}
+      logo={branding.logo}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
       cardLightBackgroundColor={branding.cardLightBackgroundColor}

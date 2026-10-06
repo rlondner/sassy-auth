@@ -58,4 +58,29 @@ describe('PasswordPolicyController', () => {
     expect(result.cardLightBackgroundColor).toBeNull();
     expect(result.cardDarkBackgroundColor).toBeNull();
   });
+
+  it('includes logo and favicon for a valid resetToken', async () => {
+    const { resolveAppForResetToken } = require('./resolve-app-for-reset-token');
+    resolveAppForResetToken.mockResolvedValue({
+      id: 1,
+      passwordPolicyOverride: null,
+      pageLightBackgroundColor: null,
+      pageDarkBackgroundColor: null,
+      cardLightBackgroundColor: null,
+      cardDarkBackgroundColor: null,
+      logo: 'data:image/png;base64,AAA=',
+      favicon: 'data:image/png;base64,FFF=',
+    });
+    const controller = new PasswordPolicyController();
+    const result = await controller.get('tok');
+    expect(result.logo).toBe('data:image/png;base64,AAA=');
+    expect(result.favicon).toBe('data:image/png;base64,FFF=');
+  });
+
+  it('returns null logo and favicon when resetToken is omitted', async () => {
+    const controller = new PasswordPolicyController();
+    const result = await controller.get(undefined);
+    expect(result.logo).toBeNull();
+    expect(result.favicon).toBeNull();
+  });
 });

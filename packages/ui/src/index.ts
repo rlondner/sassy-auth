@@ -1,4 +1,5 @@
 export { cn } from './lib/utils'
+export { isHexColor, buildAuthColorStyleSheet, type AuthColorOverrides, type AuthColorStyleSheet } from './lib/auth-colors'
 
 // shadcn primitives
 export { Button, buttonVariants, type ButtonProps } from './components/ui/button'

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
@@ -10,6 +11,17 @@ export const dynamic = 'force-dynamic'
 // an origin the browser can reach — see the matching comment on
 // app/login/page.tsx's AUTH_SERVER for why AUTH_SERVER_URL already is one.
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ client_id?: string }>
+}): Promise<Metadata> {
+  const { client_id: clientId } = await searchParams
+  if (!clientId) return {}
+  const { favicon } = await fetchAppBranding(clientId)
+  return favicon ? { icons: { icon: favicon } } : {}
+}
 
 export default async function SignupVerifiedPage({
   searchParams,
@@ -24,7 +36,8 @@ export default async function SignupVerifiedPage({
     return (
       <LinkExpiredCard
         email={email}
-        authServerUrl={AUTH_SERVER}
+        authServerUrl={PUBLIC_AUTH_SERVER}
+        logo={branding.logo}
         pageLightBackgroundColor={branding.pageLightBackgroundColor}
         pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
         cardLightBackgroundColor={branding.cardLightBackgroundColor}
@@ -37,6 +50,7 @@ export default async function SignupVerifiedPage({
     return (
       <AuthCard
         title={t('signup.verified.invalid.title')}
+        logoUrl={branding.logo}
         subtitle={t('signup.verified.invalid.subtitle')}
         pageLightBackgroundColor={branding.pageLightBackgroundColor}
         pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
@@ -54,6 +68,7 @@ export default async function SignupVerifiedPage({
   return (
     <AuthCard
       title={t('signup.verified.title')}
+      logoUrl={branding.logo}
       subtitle={t('signup.verified.subtitle')}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}

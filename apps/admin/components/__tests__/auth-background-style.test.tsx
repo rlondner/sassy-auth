@@ -28,4 +28,14 @@ describe('AuthBackgroundStyle', () => {
     expect(container.querySelector('style')).toBeNull()
     expect(container.querySelector('script')).toBeNull()
   })
+
+  it('emits text/button/error contrast rules when both light-mode colors are set', () => {
+    const { container } = render(
+      <AuthBackgroundStyle pageLightBackgroundColor="#490080" cardLightBackgroundColor="#f4ebf9" />,
+    )
+    const text = container.querySelector('style')?.textContent ?? ''
+    expect(text).toContain('[data-auth-card-bg]{--foreground:0 0% 0%')
+    expect(text).toContain('[data-auth-card-bg] .bg-primary{background-color:#FFFFFF;border:1.5px solid #000000;}')
+    expect(text).toContain('[data-auth-card-bg] .text-destructive{color:#DC2626;}')
+  })
 })

@@ -12,6 +12,7 @@ const inputClass =
 export function TwoFactorForm({
   next,
   trustDays = 14,
+  logo = null,
   pageLightBackgroundColor = null,
   pageDarkBackgroundColor = null,
   cardLightBackgroundColor = null,
@@ -19,6 +20,7 @@ export function TwoFactorForm({
 }: {
   next: string
   trustDays?: number
+  logo?: string | null
   pageLightBackgroundColor?: string | null
   pageDarkBackgroundColor?: string | null
   cardLightBackgroundColor?: string | null
@@ -74,6 +76,11 @@ export function TwoFactorForm({
         className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm"
         data-auth-card-bg=""
       >
+        {logo && (
+          <div className="mb-4 flex justify-center">
+            <img src={logo} alt="" className="max-h-12 object-contain" />
+          </div>
+        )}
         <div className="mb-6 text-center">
           <h1 className="text-headline-sm text-[var(--foreground)]">
             {mode === 'totp' ? t('title') : t('backupTitle')}

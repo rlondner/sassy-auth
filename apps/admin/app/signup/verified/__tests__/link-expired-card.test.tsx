@@ -54,4 +54,11 @@ describe('LinkExpiredCard', () => {
     renderCard()
     expect(screen.getByRole('link', { name: 'backToLogin' })).toHaveAttribute('href', '/login')
   })
+
+  it('renders the app logo when provided', () => {
+    const { container } = render(
+      <LinkExpiredCard email="a@b.com" authServerUrl="https://auth.test" logo="data:image/png;base64,AAA=" />,
+    )
+    expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+  })
 })
