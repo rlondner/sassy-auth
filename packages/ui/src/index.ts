@@ -53,6 +53,7 @@ export {
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 export { ScrollArea, ScrollBar } from './components/ui/scroll-area'
 export { Separator } from './components/ui/separator'
+export { CollapsibleSection } from './components/ui/collapsible-section'
 export { Skeleton } from './components/ui/skeleton'
 
 // Domain components (still hand-authored)
