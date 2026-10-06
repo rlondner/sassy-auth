@@ -107,7 +107,10 @@ function withIntl(node: React.ReactNode) {
 }
 
 describe('AppCreateDrawer', () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => {
+    jest.clearAllMocks()
+    window.localStorage.clear()
+  })
 
   it('submits valid form and closes', async () => {
     ;(actions.createAppAction as jest.Mock).mockResolvedValue({
