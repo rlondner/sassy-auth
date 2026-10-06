@@ -1,4 +1,5 @@
 export { cn } from './lib/utils'
+export { isHexColor, buildAuthColorStyleSheet, type AuthColorOverrides, type AuthColorStyleSheet } from './lib/auth-colors'
 
 // shadcn primitives
 export { Button, buttonVariants, type ButtonProps } from './components/ui/button'
@@ -53,6 +54,7 @@ export {
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 export { ScrollArea, ScrollBar } from './components/ui/scroll-area'
 export { Separator } from './components/ui/separator'
+export { CollapsibleSection } from './components/ui/collapsible-section'
 export { Skeleton } from './components/ui/skeleton'
 
 // Domain components (still hand-authored)

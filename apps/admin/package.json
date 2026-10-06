@@ -6,7 +6,7 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start --port 3001",
-    "test": "OTEL_SDK_DISABLED=true node ../../scripts/log-test.mjs admin jest",
+    "test": "cross-env OTEL_SDK_DISABLED=true node ../../scripts/log-test.mjs admin jest",
     "typecheck": "tsc --noEmit",
     "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json"
   },
@@ -24,6 +24,7 @@
     "@sassy-auth/ui": "workspace:*",
     "@sentry/nextjs": "^10.54.0",
     "@tanstack/react-table": "^8.20.0",
+    "dotenv": "^16.4.5",
     "lucide-react": "^0.577.0",
     "next": "^15.5.24",
     "next-intl": "^3.26.0",

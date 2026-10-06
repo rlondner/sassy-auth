@@ -315,8 +315,19 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
 
   await maybeRedirectToConsent(nextSafe)
+  await maybeRedirectToTwoFactorPrompt(nextSafe)
 
-  // Optional 2FA interstitial: show once per interval for unenrolled users.
+  redirect(nextSafe ?? '/users')
+}
+
+/**
+ * Optional 2FA interstitial: show once per interval for unenrolled users,
+ * honoring the app's twoFactorPromptEnabled/twoFactorTrustDays override (via
+ * next's client_id). Shared by every sign-in method (password, OTP) so the
+ * per-app config applies regardless of how the session was established.
+ * Redirects (throws) when the prompt should show; otherwise returns normally.
+ */
+async function maybeRedirectToTwoFactorPrompt(nextSafe: string | null): Promise<void> {
   // Read twoFactorEnabled from the just-established session.
   const cookieStore2 = await cookies()
   let twoFactorEnabled = false
@@ -381,8 +392,6 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
     const encodedNext = nextSafe ? encodeURIComponent(nextSafe) : ''
     redirect(`/login/two-factor-prompt${encodedNext ? `?next=${encodedNext}` : ''}`)
   }
-
-  redirect(nextSafe ?? '/users')
 }
 
 export async function requestOtp(formData: FormData): Promise<{ sent: true } | { error: string }> {
@@ -460,6 +469,7 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
   const nextRaw = formData.get('next')
   const nextSafe = typeof nextRaw === 'string' ? validateNextUrl(nextRaw) : null
   await maybeRedirectToConsent(nextSafe)
+  await maybeRedirectToTwoFactorPrompt(nextSafe)
   redirect(nextSafe ?? '/users')
 }
 

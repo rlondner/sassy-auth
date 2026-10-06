@@ -12,6 +12,7 @@
     "dev:resource-server-fastapi": "uv run --directory apps/resource-server-fastapi uvicorn app.main:app --port 8010 --reload"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   },

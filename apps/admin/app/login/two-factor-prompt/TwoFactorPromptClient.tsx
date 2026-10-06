@@ -8,6 +8,7 @@ import { AuthBackgroundStyle } from '@/components/auth-background-style'
 
 interface Props {
   next: string
+  logo?: string | null
   pageLightBackgroundColor?: string | null
   pageDarkBackgroundColor?: string | null
   cardLightBackgroundColor?: string | null
@@ -16,6 +17,7 @@ interface Props {
 
 export function TwoFactorPromptClient({
   next,
+  logo = null,
   pageLightBackgroundColor = null,
   pageDarkBackgroundColor = null,
   cardLightBackgroundColor = null,
@@ -62,6 +64,11 @@ export function TwoFactorPromptClient({
         className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--card)] p-8 shadow-sm text-center space-y-4"
         data-auth-card-bg=""
       >
+        {logo && (
+          <div className="flex justify-center">
+            <img src={logo} alt="" className="max-h-12 object-contain" />
+          </div>
+        )}
         <h1 className="text-headline-sm text-[var(--foreground)]">{t('title')}</h1>
         <p className="text-body-sm text-[var(--muted-foreground)]">{t('body')}</p>
         <div className="flex flex-col gap-3 pt-2">

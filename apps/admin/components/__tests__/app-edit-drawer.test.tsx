@@ -146,9 +146,14 @@ function withIntl(node: React.ReactNode) {
   )
 }
 
+function expandSection(sectionLabel: string) {
+  fireEvent.click(screen.getByRole('button', { name: sectionLabel }))
+}
+
 describe('AppEditDrawer', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    window.localStorage.clear()
     // Finding 2 (final review): the list response no longer carries `logo`,
     // so the drawer fetches the single-app record on open to seed it. This
     // default keeps existing tests, which build their fixtures without a
@@ -161,6 +166,7 @@ describe('AppEditDrawer', () => {
 
   it('renders the publicId as read-only and copies on click', async () => {
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.credentials)
     const pubInput = screen.getByDisplayValue('sq_1') as HTMLInputElement
     expect(pubInput.readOnly).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: en.apps.actions.copy }))
@@ -204,6 +210,7 @@ describe('AppEditDrawer', () => {
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
 
     await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    expandSection(en.apps.sections.branding)
     await waitFor(() =>
       expect(screen.getByRole('img')).toHaveAttribute('src', 'data:image/png;base64,EXISTING='),
     )
@@ -214,6 +221,7 @@ describe('AppEditDrawer', () => {
     ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: { ...app, name: 'X2' } })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.branding)
 
     const file = new File(['a'.repeat(10)], 'logo.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText(en.apps.fields.logo), { target: { files: [file] } })
@@ -233,6 +241,7 @@ describe('AppEditDrawer', () => {
     ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: { ...app, name: 'X2' } })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.branding)
 
     const file = new File(['a'.repeat(10)], 'favicon.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText(en.apps.fields.favicon), { target: { files: [file] } })
@@ -255,6 +264,7 @@ describe('AppEditDrawer', () => {
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
 
     await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    expandSection(en.apps.sections.branding)
     await waitFor(() =>
       expect(screen.getByRole('img')).toHaveAttribute('src', 'data:image/png;base64,EXISTING='),
     )
@@ -265,6 +275,7 @@ describe('AppEditDrawer', () => {
   // repeatable list of login/post_logout redirect URIs.
   it('shows the no-login-URIs warning when the app has none registered', () => {
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.security)
     expect(screen.getByText(en.apps.fields.noLoginUrisWarning)).toBeInTheDocument()
   })
 
@@ -274,6 +285,7 @@ describe('AppEditDrawer', () => {
     })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.security)
 
     fireEvent.click(screen.getByRole('button', { name: en.apps.fields.addRedirectUri }))
     fireEvent.change(screen.getByLabelText(en.apps.fields.redirectUris), {
@@ -296,6 +308,7 @@ describe('AppEditDrawer', () => {
       redirectUris: [{ uri: 'https://app.example.com/cb', kind: 'login' as const }],
     }
     render(withIntl(<AppEditDrawer app={appWithUri} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.security)
     expect(screen.queryByText(en.apps.fields.noLoginUrisWarning)).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: en.apps.fields.removeRedirectUri }))
@@ -310,6 +323,7 @@ describe('AppEditDrawer', () => {
       enabled: ['google', 'microsoft'],
     })
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.access)
     await waitFor(() =>
       expect(actions.getSocialProviderSettingsAction).toHaveBeenCalledWith('sq_1'),
     )
@@ -333,6 +347,7 @@ describe('AppEditDrawer', () => {
     })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.access)
     const microsoft = (await screen.findByLabelText(en.apps.fields.socialProviderNames.microsoft)) as HTMLInputElement
     expect(microsoft.checked).toBe(false)
 
@@ -360,6 +375,7 @@ describe('AppEditDrawer', () => {
     })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.access)
     const microsoft = await screen.findByLabelText(en.apps.fields.socialProviderNames.microsoft)
     fireEvent.click(microsoft)
 
@@ -405,6 +421,7 @@ describe('AppEditDrawer', () => {
 
   it('shows "no client secret" for a public app and a Generate button', () => {
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.credentials)
     expect(screen.getByText(en.apps.fields.noClientSecret)).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: en.apps.fields.generateClientSecret }),
@@ -414,6 +431,7 @@ describe('AppEditDrawer', () => {
   it('shows the rotation date and a Regenerate button for a confidential app', () => {
     const confidentialApp = { ...app, isConfidential: true, clientSecretUpdatedAt: '2026-08-01T00:00:00Z' }
     render(withIntl(<AppEditDrawer app={confidentialApp} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.credentials)
     expect(
       screen.getByRole('button', { name: en.apps.fields.regenerateClientSecret }),
     ).toBeInTheDocument()
@@ -425,6 +443,7 @@ describe('AppEditDrawer', () => {
       clientSecret: 'plaintext-secret-value',
     })
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.credentials)
 
     fireEvent.click(screen.getByRole('button', { name: en.apps.fields.generateClientSecret }))
 
@@ -464,6 +483,7 @@ describe('AppEditDrawer', () => {
       pageSize: 200,
     })
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.access)
 
     await waitFor(() => expect(screen.getAllByText('Citadel').length).toBeGreaterThan(0))
     expect(screen.getAllByText('Managers').length).toBeGreaterThan(0)
@@ -487,6 +507,7 @@ describe('AppEditDrawer', () => {
     ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.access)
 
     await waitFor(() => expect(screen.getAllByText('Citadel').length).toBeGreaterThan(0))
 
@@ -513,6 +534,7 @@ describe('AppEditDrawer', () => {
     })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.security)
 
     const checkbox = screen.getByLabelText(en.apps.fields.allowOfflineAccess) as HTMLInputElement
     expect(checkbox.checked).toBe(false)
@@ -536,6 +558,7 @@ describe('AppEditDrawer', () => {
     })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.security)
 
     fireEvent.change(screen.getByLabelText(en.apps.fields.twoFactorPromptEnabled), { target: { value: 'false' } })
 
@@ -552,6 +575,7 @@ describe('AppEditDrawer', () => {
   it('does not mark the form dirty when twoFactorPromptEnabled is re-selected to its current value', () => {
     const appWithPrompt = { ...app, twoFactorPromptEnabled: true }
     render(withIntl(<AppEditDrawer app={appWithPrompt} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.security)
     const save = screen.getByRole('button', { name: en.apps.drawer.save })
     expect(save).toBeDisabled()
 
@@ -567,6 +591,7 @@ describe('AppEditDrawer', () => {
       app: { ...app, emailVerificationMethod: 'code' },
     })
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.legal)
 
     fireEvent.change(screen.getByLabelText(en.apps.fields.emailVerificationMethod), { target: { value: 'code' } })
     fireEvent.click(screen.getByRole('button', { name: en.apps.drawer.save }))
@@ -579,6 +604,7 @@ describe('AppEditDrawer', () => {
   it('does not mark the form dirty when emailVerificationMethod is re-selected to its current value', () => {
     const appWithCode = { ...app, emailVerificationMethod: 'code' as const }
     render(withIntl(<AppEditDrawer app={appWithCode} open onOpenChange={() => undefined} />))
+    expandSection(en.apps.sections.legal)
     const save = screen.getByRole('button', { name: en.apps.drawer.save })
     expect(save).toBeDisabled()
 
@@ -597,6 +623,7 @@ describe('AppEditDrawer', () => {
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
 
     await waitFor(() => expect(actions.getAppAction).toHaveBeenCalledWith('sq_1'))
+    expandSection(en.apps.sections.legal)
     await waitFor(() =>
       expect(
         (screen.getByLabelText(en.apps.fields.emailVerificationMethod) as HTMLSelectElement).value,
@@ -614,6 +641,7 @@ describe('AppEditDrawer', () => {
     })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.legal)
 
     fireEvent.change(screen.getByLabelText(en.apps.fields.privacyPolicyUrl), {
       target: { value: 'https://x.example.com/privacy' },
@@ -645,6 +673,7 @@ describe('AppEditDrawer', () => {
   describe('password policy section', () => {
     it('renders collapsed with the override toggle off by default', () => {
       render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      expandSection(en.apps.sections.security)
       const toggle = screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle) as HTMLInputElement
       expect(toggle.checked).toBe(false)
       expect(screen.queryByLabelText(en.apps.fields.passwordPolicyMinLength)).not.toBeInTheDocument()
@@ -652,12 +681,14 @@ describe('AppEditDrawer', () => {
 
     it('expands the policy fields when the override toggle is turned on', () => {
       render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      expandSection(en.apps.sections.security)
       fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle))
       expect(screen.getByLabelText(en.apps.fields.passwordPolicyMinLength)).toBeInTheDocument()
     })
 
     it('disables minNumbers/minSpecial inputs when their require-* checkbox is unchecked', () => {
       render(withIntl(<AppEditDrawer app={app} open onOpenChange={() => undefined} />))
+      expandSection(en.apps.sections.security)
       fireEvent.click(screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle))
 
       // Base fixture's effective policy has requireNumber: true, requireSpecial: false.
@@ -675,6 +706,7 @@ describe('AppEditDrawer', () => {
       ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app })
       const onOpenChange = jest.fn()
       render(withIntl(<AppEditDrawer app={app} open onOpenChange={onOpenChange} />))
+      expandSection(en.apps.sections.security)
 
       const save = screen.getByRole('button', { name: en.apps.drawer.save })
       expect(save).toBeDisabled()
@@ -714,6 +746,7 @@ describe('AppEditDrawer', () => {
       ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: appWithOverride })
       const onOpenChange = jest.fn()
       render(withIntl(<AppEditDrawer app={appWithOverride} open onOpenChange={onOpenChange} />))
+      expandSection(en.apps.sections.security)
 
       const toggle = screen.getByLabelText(en.apps.fields.passwordPolicyOverrideToggle) as HTMLInputElement
       expect(toggle.checked).toBe(true)
@@ -744,6 +777,7 @@ describe('AppEditDrawer', () => {
     ;(actions.updateAppAction as jest.Mock).mockResolvedValue({ app: appWithPartialOverride })
     const onOpenChange = jest.fn()
     render(withIntl(<AppEditDrawer app={appWithPartialOverride} open onOpenChange={onOpenChange} />))
+    expandSection(en.apps.sections.legal)
 
     const fromName = screen.getByLabelText(en.apps.fields.activationEmailFromName) as HTMLInputElement
     expect(fromName.value).toBe('Vibecast')

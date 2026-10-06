@@ -37,4 +37,32 @@ describe('PasswordStrengthMeter', () => {
     }
     expect(screen.getByText('veryStrong')).toBeInTheDocument()
   })
+
+  it('renders a thin 4px bar rather than the taller debug height', () => {
+    render(<PasswordStrengthMeter password="Aaaaaaaaaaa1" policy={POLICY} />)
+    expect(screen.getByTestId('strength-segment-0')).toHaveClass('h-1')
+    expect(screen.getByTestId('strength-segment-0')).not.toHaveClass('h-2.5')
+  })
+
+  it('colors lit segments red when only the weakest tier is met', () => {
+    // Non-empty, below minLength, no other rule met — met=0 rules still
+    // floors to 1 lit segment via Math.max(1, ...), landing in the red tier.
+    render(<PasswordStrengthMeter password="a" policy={POLICY} />)
+    expect(screen.getByTestId('strength-segment-0')).toHaveClass('bg-red-500')
+  })
+
+  it('colors lit segments orange in the middle tier', () => {
+    // 12 lowercase chars: minLength + requireLowercase met (2 of 4 rules) —
+    // rounds to 3 lit segments, the orange tier.
+    render(<PasswordStrengthMeter password="aaaaaaaaaaaa" policy={POLICY} />)
+    expect(screen.getByTestId('strength-segment-0')).toHaveClass('bg-orange-500')
+    expect(screen.getByTestId('strength-segment-2')).toHaveClass('bg-orange-500')
+  })
+
+  it('colors lit segments green when every rule is met', () => {
+    render(<PasswordStrengthMeter password="Aaaaaaaaaaa1" policy={POLICY} />)
+    for (let i = 0; i < 5; i++) {
+      expect(screen.getByTestId(`strength-segment-${i}`)).toHaveClass('bg-green-500')
+    }
+  })
 })

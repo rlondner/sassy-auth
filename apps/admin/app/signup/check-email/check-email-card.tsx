@@ -10,6 +10,7 @@ export function CheckEmailCard({
   email,
   next,
   authServerUrl,
+  logo = null,
   pageLightBackgroundColor = null,
   pageDarkBackgroundColor = null,
   cardLightBackgroundColor = null,
@@ -18,6 +19,7 @@ export function CheckEmailCard({
   email: string
   next: string
   authServerUrl: string
+  logo?: string | null
   pageLightBackgroundColor?: string | null
   pageDarkBackgroundColor?: string | null
   cardLightBackgroundColor?: string | null
@@ -31,6 +33,7 @@ export function CheckEmailCard({
   return (
     <AuthCard
       title={t('title')}
+      logoUrl={logo}
       subtitle={t('subtitle', { email })}
       pageLightBackgroundColor={pageLightBackgroundColor}
       pageDarkBackgroundColor={pageDarkBackgroundColor}

@@ -73,4 +73,11 @@ describe('CheckEmailCard', () => {
     expect(container.querySelector('[data-auth-page-bg]')).not.toBeNull()
     expect(container.querySelector('[data-auth-card-bg]')).not.toBeNull()
   })
+
+  it('renders the app logo when provided', () => {
+    const { container } = render(
+      <CheckEmailCard email="a@b.com" next="" authServerUrl="https://auth.test" logo="data:image/png;base64,AAA=" />,
+    )
+    expect(container.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+  })
 })

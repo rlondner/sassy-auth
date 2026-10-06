@@ -11,6 +11,7 @@ import {
   SheetTitle,
   Button,
   ButtonGroup,
+  CollapsibleSection,
   Input,
   Label,
   Select,
@@ -24,11 +25,20 @@ import { updateAppAction, getAppAction, getSocialProviderSettingsAction, updateS
 import { listOrgsAction } from '@/app/(admin)/orgs/actions'
 import { listRolesAction } from '@/app/(admin)/roles/actions'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
+import { useSectionPersistence, type SectionId } from '@/lib/use-section-persistence'
 import type { App, RedirectUri, OrgRow, RoleRow, PasswordPolicy } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 import { AppLogoField } from './app-logo-field'
 import { AppFaviconField } from './app-favicon-field'
 import { AppColorField } from './app-color-field'
+
+const EDIT_SECTION_DEFAULTS: Partial<Record<SectionId, boolean>> = {
+  branding: false,
+  security: false,
+  access: false,
+  credentials: false,
+  legal: false,
+}
 
 interface Props {
   app: App
@@ -39,6 +49,7 @@ interface Props {
 
 export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
+  const { isOpen, setOpen } = useSectionPersistence('edit', EDIT_SECTION_DEFAULTS)
   const [name, setName] = React.useState(app.name)
   const [url, setUrl] = React.useState(app.url)
   const [logo, setLogo] = React.useState<string | null>(app.logo ?? null)
@@ -365,6 +376,11 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
         </SheetHeader>
         <SheetBody>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <CollapsibleSection
+              title={t('apps.sections.general')}
+              open={isOpen('general')}
+              onOpenChange={(open) => setOpen('general', open)}
+            >
             <div>
               <Label htmlFor="appName">{t('apps.fields.name')}</Label>
               <Input
@@ -384,6 +400,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 required
               />
             </div>
+            </CollapsibleSection> {/* general */}
+            <CollapsibleSection
+              title={t('apps.sections.branding')}
+              open={isOpen('branding')}
+              onOpenChange={(open) => setOpen('branding', open)}
+            >
             <div>
               <AppLogoField value={logo} onValueChange={setLogo} />
             </div>
@@ -426,6 +448,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 hint={t('apps.fields.cardDarkBackgroundColorHint')}
               />
             </div>
+            </CollapsibleSection> {/* branding */}
+            <CollapsibleSection
+              title={t('apps.sections.security')}
+              open={isOpen('security')}
+              onOpenChange={(open) => setOpen('security', open)}
+            >
             <div>
               <Label>{t('apps.fields.redirectUris')}</Label>
               <p className="mt-1 text-body-sm text-muted-foreground">
@@ -613,6 +641,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
               )}
             </div>
+            </CollapsibleSection> {/* security */}
+            <CollapsibleSection
+              title={t('apps.sections.access')}
+              open={isOpen('access')}
+              onOpenChange={(open) => setOpen('access', open)}
+            >
             <div>
               <Label htmlFor="defaultOrgId">{t('apps.fields.defaultOrg')}</Label>
               <Select value={defaultOrgId ?? '__none__'} onValueChange={(v) => setDefaultOrgId(v === '__none__' ? null : v)}>
@@ -669,6 +703,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
               )}
             </div>
+            </CollapsibleSection> {/* access */}
+            <CollapsibleSection
+              title={t('apps.sections.credentials')}
+              open={isOpen('credentials')}
+              onOpenChange={(open) => setOpen('credentials', open)}
+            >
             <div>
               <Label htmlFor="appPublicId">{t('apps.fields.publicId')}</Label>
               <div className="flex gap-2">
@@ -816,6 +856,12 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 </div>
               )}
             </div>
+            </CollapsibleSection> {/* credentials */}
+            <CollapsibleSection
+              title={t('apps.sections.legal')}
+              open={isOpen('legal')}
+              onOpenChange={(open) => setOpen('legal', open)}
+            >
             <div>
               <Label htmlFor="privacyPolicyUrl">{t('apps.fields.privacyPolicyUrl')}</Label>
               <Input
@@ -925,6 +971,7 @@ export function AppEditDrawer({ app, open, onOpenChange, onSuccess }: Props) {
                 {t('apps.fields.emailVerificationMethodHint')}
               </p>
             </div>
+            </CollapsibleSection> {/* legal */}
             {errorKey && (
               <p role="alert" className="text-body-sm text-destructive">
                 {t(errorKey)}

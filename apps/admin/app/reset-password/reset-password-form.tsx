@@ -28,7 +28,14 @@ export function ResetPasswordForm({ token }: { token: string }) {
     pageDarkBackgroundColor: string | null
     cardLightBackgroundColor: string | null
     cardDarkBackgroundColor: string | null
-  }>({ pageLightBackgroundColor: null, pageDarkBackgroundColor: null, cardLightBackgroundColor: null, cardDarkBackgroundColor: null })
+    logo: string | null
+  }>({
+    pageLightBackgroundColor: null,
+    pageDarkBackgroundColor: null,
+    cardLightBackgroundColor: null,
+    cardDarkBackgroundColor: null,
+    logo: null,
+  })
 
   React.useEffect(() => {
     let cancelled = false
@@ -74,6 +81,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (success) {
     return (
       <AuthCard
+        logoUrl={branding.logo}
         footer={
           <Link href="/login" className="text-label-md text-primary hover:underline">
             {t('backToLogin')}
@@ -92,6 +100,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   return (
     <AuthCard
       title={t('title')}
+      logoUrl={branding.logo}
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}
       cardLightBackgroundColor={branding.cardLightBackgroundColor}

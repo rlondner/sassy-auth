@@ -1,4 +1,4 @@
-.PHONY: generate migrate migrate-deploy e2e-tests caddy start-auth-server start-admin start-no-watch _run-auth-server _run-admin
+.PHONY: generate migrate migrate-deploy e2e-tests caddy start-auth-server start-admin start-no-watch _run-auth-server _run-admin kill-auth-server
 
 generate:
 	pnpm --filter @sassy-auth/db run db:generate
@@ -38,6 +38,17 @@ _run-auth-server:
 
 _run-admin:
 	pnpm --filter @sassy-auth/admin run start
+
+# Kills whatever is bound to auth-server's port (:3010) — a leftover
+# `pnpm start`/`nest start --watch` process that didn't exit cleanly and is
+# now holding the port, blocking a fresh start-auth-server/start-no-watch run.
+# Windows-only (uses PowerShell's Get-NetTCPConnection); no-op with a message
+# if nothing is listening.
+kill-auth-server:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-port.ps1 -Port 3010
+
+kill-admin:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-port.ps1 -Port 3001
 
 # Assumes the stack is already running and seeded (see apps/admin-e2e/README.md):
 #   pnpm dev  (Postgres + admin + auth-server), plus the platform-admin seed.

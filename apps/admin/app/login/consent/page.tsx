@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { AuthCard } from '@sassy-auth/ui'
 import { getTranslations } from 'next-intl/server'
 import { redirect } from 'next/navigation'
@@ -7,6 +8,17 @@ import { validateNextUrl } from '@/lib/safe-next'
 import { ConsentGateClient } from './ConsentGateClient'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ appPublicId?: string }>
+}): Promise<Metadata> {
+  const { appPublicId } = await searchParams
+  if (!appPublicId) return {}
+  const { favicon } = await fetchAppBranding(appPublicId)
+  return favicon ? { icons: { icon: favicon } } : {}
+}
 
 export default async function LoginConsentPage({
   searchParams,
@@ -35,6 +47,7 @@ export default async function LoginConsentPage({
   return (
     <AuthCard
       title={t('loginConsent.title')}
+      logoUrl={branding.logo}
       className="max-w-md"
       pageLightBackgroundColor={branding.pageLightBackgroundColor}
       pageDarkBackgroundColor={branding.pageDarkBackgroundColor}

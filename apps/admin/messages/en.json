@@ -158,6 +158,14 @@
       "passwordPolicyMinNumbers": "Minimum numbers",
       "passwordPolicyMinSpecial": "Minimum special characters"
     },
+    "sections": {
+      "general": "General",
+      "branding": "Branding",
+      "security": "Sign-in & Security",
+      "access": "Org Defaults & Social",
+      "credentials": "Credentials & Webhooks",
+      "legal": "Legal & Email"
+    },
     "actions": {
       "view": "View",
       "edit": "Edit",
@@ -566,6 +574,7 @@
   },
   "forgotPassword": {
     "title": "Reset your password",
+    "logoAlt": "Company logo",
     "subtitle": "Enter your email and we'll send you a reset link.",
     "email": "Email Address",
     "submit": "Send reset link",
@@ -645,11 +654,17 @@
     "subtitleDefaultOrg": "Let's start by signing up.",
     "invalidLink": "This signup link has expired or is invalid. Contact the app you're signing up for to get a new one.",
     "firstName": "First Name",
+    "firstNamePlaceholder": "Type your first name...",
     "lastName": "Last Name",
+    "lastNamePlaceholder": "Type your last name...",
     "companyName": "Company Name",
+    "companyNamePlaceholder": "Type your company name...",
     "email": "Email Address",
+    "emailPlaceholder": "Type your email...",
     "password": "Password",
+    "passwordPlaceholder": "Type your password...",
     "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Type your password again...",
     "acceptPrivacyPolicy": "I have read and accept the <link>Privacy Policy</link>",
     "acceptTerms": "I have read and accept the <link>Terms and Conditions</link>",
     "acceptGdpr": "I have read and accept the <link>GDPR Disclosure</link>",
@@ -657,6 +672,14 @@
     "continue": "Continue",
     "marketingOptIn": "Please keep me updated on products, news, events & offers",
     "backToLogin": "Back to sign in",
+    "setPassword": {
+      "title": "Set your password",
+      "subtitle": "Create a strong password for your account"
+    },
+    "setName": {
+      "title": "How should we call you?",
+      "subtitle": "It's always nicer to know who we're talking to, no?"
+    },
     "passwordStrength": {
       "weak": "Weak",
       "fair": "Fair",
@@ -681,6 +704,7 @@
       "codeLabel": "Enter code:",
       "digitAriaLabel": "Digit {position} of {total}",
       "verifying": "Verifying...",
+      "verifyButton": "Verify",
       "didntReceiveIt": "Didn't receive it?",
       "resendButton": "Resend code",
       "resendCooldown": "Resend in {seconds}s",

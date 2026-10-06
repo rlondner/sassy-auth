@@ -85,8 +85,24 @@ function validateStartupEnv(): void {
 
 async function bootstrap() {
   validateStartupEnv();
-  const isDev = process.env.NODE_ENV !== 'production';
-  const httpsOptions = resolveHttpsOptions(isDev, path.join(__dirname, '..', 'secrets'));
+  // `AUTH_SERVER_HTTPS` overrides the NODE_ENV-based default. Needed because
+  // `pnpm start` (the production-style run used by `make start-no-watch` /
+  // `start-auth-server`, both documented as running "behind Caddy") forces
+  // NODE_ENV=production above to exercise prod-only behavior (cookie
+  // security, etc.) locally — but Caddyfile unconditionally proxies to this
+  // server over TLS using the mkcert dev cert, "it is never plain HTTP in
+  // dev." With no override, that NODE_ENV flip also silently turned off the
+  // dev TLS listener, so Caddy's TLS dial to :3010 hit a plaintext server
+  // and failed with "tls: first record does not look like a TLS handshake"
+  // (502), surfacing to users as a generic "Invalid email or password" with
+  // no corresponding auth-server log line. Render never sets this var, so
+  // real production (NODE_ENV=production via render.yaml, no npm wrapper)
+  // keeps today's behavior unchanged.
+  const serveHttps =
+    process.env.AUTH_SERVER_HTTPS !== undefined
+      ? process.env.AUTH_SERVER_HTTPS === 'true'
+      : process.env.NODE_ENV !== 'production';
+  const httpsOptions = resolveHttpsOptions(serveHttps, path.join(__dirname, '..', 'secrets'));
   const expressApp = express();
 
   // Render terminates TLS/HTTP at its edge and proxies to this app over one

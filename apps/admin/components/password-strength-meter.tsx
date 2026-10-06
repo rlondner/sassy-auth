@@ -19,6 +19,7 @@ export function PasswordStrengthMeter({ password, policy }: { password: string; 
   const met = results.filter((r) => r.met).length
   const segments = password.length === 0 ? 0 : Math.max(1, Math.round((met / results.length) * 5))
   const levelIndex = Math.min(LEVEL_KEYS.length - 1, Math.max(0, segments - 1))
+  const fillColor = segments >= 5 ? 'bg-green-500' : segments >= 3 ? 'bg-orange-500' : 'bg-red-500'
 
   return (
     <div className="flex flex-col gap-1">
@@ -27,7 +28,7 @@ export function PasswordStrengthMeter({ password, policy }: { password: string; 
           <div
             key={i}
             data-testid={`strength-segment-${i}`}
-            className={`h-1 flex-1 rounded ${i < segments ? 'bg-[var(--primary)]' : 'bg-muted'}`}
+            className={`h-1 flex-1 rounded ${i < segments ? fillColor : 'bg-muted'}`}
           />
         ))}
       </div>

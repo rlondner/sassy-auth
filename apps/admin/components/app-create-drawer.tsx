@@ -12,6 +12,7 @@ import {
   SheetTitle,
   Button,
   ButtonGroup,
+  CollapsibleSection,
   Input,
   Label,
   Select,
@@ -21,6 +22,7 @@ import {
   SelectValue,
 } from '@sassy-auth/ui'
 import { createAppAction } from '@/app/(admin)/apps/actions'
+import { useSectionPersistence } from '@/lib/use-section-persistence'
 import type { RedirectUri } from '@/lib/types'
 import { RedirectUriRowsEditor } from './redirect-uri-rows-editor'
 import { AppLogoField } from './app-logo-field'
@@ -35,6 +37,7 @@ interface Props {
 
 export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
   const t = useTranslations()
+  const { isOpen, setOpen } = useSectionPersistence('create', {})
   const [name, setName] = React.useState('')
   const [url, setUrl] = React.useState('')
   const [logo, setLogo] = React.useState<string | null>(null)
@@ -111,6 +114,11 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
         </SheetHeader>
         <SheetBody>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <CollapsibleSection
+              title={t('apps.sections.general')}
+              open={isOpen('general')}
+              onOpenChange={(open) => setOpen('general', open)}
+            >
             <div>
               <Label htmlFor="appName">{t('apps.fields.name')}</Label>
               <Input
@@ -134,6 +142,12 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                 {t('apps.fields.urlHint')}
               </p>
             </div>
+            </CollapsibleSection> {/* general */}
+            <CollapsibleSection
+              title={t('apps.sections.branding')}
+              open={isOpen('branding')}
+              onOpenChange={(open) => setOpen('branding', open)}
+            >
             <div>
               <AppLogoField value={logo} onValueChange={setLogo} />
             </div>
@@ -176,6 +190,12 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                 hint={t('apps.fields.cardDarkBackgroundColorHint')}
               />
             </div>
+            </CollapsibleSection> {/* branding */}
+            <CollapsibleSection
+              title={t('apps.sections.security')}
+              open={isOpen('security')}
+              onOpenChange={(open) => setOpen('security', open)}
+            >
             <div>
               <Label>{t('apps.fields.redirectUris')}</Label>
               <p className="mt-1 text-body-sm text-muted-foreground">
@@ -238,6 +258,7 @@ export function AppCreateDrawer({ open, onOpenChange, onSuccess }: Props) {
                 {t('apps.fields.requireTwoFactorHint')}
               </p>
             </div>
+            </CollapsibleSection> {/* security */}
             <div className="rounded border border-border bg-muted p-3 text-body-sm text-muted-foreground">
               <span className="material-symbols-outlined align-middle text-[16px] text-primary">
                 info
