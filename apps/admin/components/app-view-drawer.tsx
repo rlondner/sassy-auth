@@ -2,8 +2,9 @@
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
-import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, Button, ButtonGroup, Badge } from '@sassy-auth/ui'
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, Button, ButtonGroup, Badge, CollapsibleSection } from '@sassy-auth/ui'
 import { useCopyFeedback } from '@/lib/use-copy-feedback'
+import { useSectionPersistence } from '@/lib/use-section-persistence'
 import { getAppAction, getSocialProviderSettingsAction } from '@/app/(admin)/apps/actions'
 import { listOrgsAction } from '@/app/(admin)/orgs/actions'
 import { listRolesAction } from '@/app/(admin)/roles/actions'
@@ -20,6 +21,7 @@ interface Props {
 export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Props) {
   const t = useTranslations()
   const { copiedKey: copied, copy } = useCopyFeedback()
+  const { isOpen, setOpen } = useSectionPersistence('view', {})
 
   // The list `app` is sourced from can be stale for anything that changes
   // outside the save/dirty flow — most notably a client-secret or
@@ -95,6 +97,11 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
           </div>
         </SheetHeader>
         <SheetBody className="space-y-6">
+          <CollapsibleSection
+            title={t('apps.sections.general')}
+            open={isOpen('general')}
+            onOpenChange={(open) => setOpen('general', open)}
+          >
           <DetailRow
             label={t('apps.fields.url')}
             value={displayApp.url}
@@ -102,6 +109,12 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             copied={copied === 'url'}
             copyLabel={t('apps.actions.copy')}
           />
+          </CollapsibleSection> {/* general */}
+          <CollapsibleSection
+            title={t('apps.sections.branding')}
+            open={isOpen('branding')}
+            onOpenChange={(open) => setOpen('branding', open)}
+          >
           <div>
             <p className="text-label-sm font-bold uppercase tracking-wider text-muted-foreground">{t('apps.fields.logo')}</p>
             <div className="mt-1 flex items-center rounded border border-border bg-card px-3 py-2">
@@ -151,6 +164,12 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
               </div>
             </div>
           )}
+          </CollapsibleSection> {/* branding */}
+          <CollapsibleSection
+            title={t('apps.sections.security')}
+            open={isOpen('security')}
+            onOpenChange={(open) => setOpen('security', open)}
+          >
           <RedirectUriGroup
             label={t('apps.fields.loginRedirectUris')}
             uris={(displayApp.redirectUris ?? []).filter((r) => r.kind === 'login')}
@@ -217,6 +236,12 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
               </div>
             )}
           </div>
+          </CollapsibleSection> {/* security */}
+          <CollapsibleSection
+            title={t('apps.sections.access')}
+            open={isOpen('access')}
+            onOpenChange={(open) => setOpen('access', open)}
+          >
           <TextRow label={t('apps.fields.defaultOrg')} value={defaultOrgName ?? t('apps.fields.defaultOrgNone')} />
           <TextRow label={t('apps.fields.defaultRole')} value={defaultRoleName ?? t('apps.fields.defaultRoleNone')} />
           <div>
@@ -237,6 +262,12 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
               )}
             </div>
           </div>
+          </CollapsibleSection> {/* access */}
+          <CollapsibleSection
+            title={t('apps.sections.credentials')}
+            open={isOpen('credentials')}
+            onOpenChange={(open) => setOpen('credentials', open)}
+          >
           <DetailRow
             label={t('apps.fields.publicId')}
             value={displayApp.publicId}
@@ -261,6 +292,7 @@ export function AppViewDrawer({ app, open, onOpenChange, onEdit, onDelete }: Pro
             label={t('apps.fields.webhookSecret')}
             value={displayApp.hasActivationWebhookSecret ? t('apps.fields.webhookSecretConfigured') : t('apps.fields.noWebhookSecret')}
           />
+          </CollapsibleSection> {/* credentials */}
         </SheetBody>
       </SheetContent>
     </Sheet>

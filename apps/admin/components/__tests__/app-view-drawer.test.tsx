@@ -59,6 +59,7 @@ function withIntl(node: React.ReactNode) {
 describe('AppViewDrawer', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    window.localStorage.clear()
     ;(actions.getAppAction as jest.Mock).mockResolvedValue({ app })
     ;(actions.getSocialProviderSettingsAction as jest.Mock).mockResolvedValue({ available: [], enabled: [] })
     ;(orgsActions.listOrgsAction as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 })
