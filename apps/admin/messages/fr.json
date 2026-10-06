@@ -646,11 +646,17 @@
     "subtitleDefaultOrg": "Commençons par vous inscrire.",
     "invalidLink": "Ce lien d'inscription a expiré ou est invalide. Contactez l'application concernée pour en obtenir un nouveau.",
     "firstName": "Prénom",
+    "firstNamePlaceholder": "Saisissez votre prénom...",
     "lastName": "Nom",
+    "lastNamePlaceholder": "Saisissez votre nom...",
     "companyName": "Nom de l'entreprise",
+    "companyNamePlaceholder": "Saisissez le nom de votre entreprise...",
     "email": "Adresse e-mail",
+    "emailPlaceholder": "Saisissez votre e-mail...",
     "password": "Mot de passe",
+    "passwordPlaceholder": "Saisissez votre mot de passe...",
     "confirmPassword": "Confirmer le mot de passe",
+    "confirmPasswordPlaceholder": "Saisissez à nouveau votre mot de passe...",
     "acceptPrivacyPolicy": "J'ai lu et j'accepte la <link>politique de confidentialité</link>",
     "acceptTerms": "J'ai lu et j'accepte les <link>conditions générales</link>",
     "acceptGdpr": "J'ai lu et j'accepte la <link>déclaration RGPD</link>",
@@ -658,6 +664,14 @@
     "continue": "Continuer",
     "marketingOptIn": "Merci de me tenir informé(e) des produits, actualités, événements et offres",
     "backToLogin": "Retour à la connexion",
+    "setPassword": {
+      "title": "Définissez votre mot de passe",
+      "subtitle": "Créez un mot de passe fort pour votre compte"
+    },
+    "setName": {
+      "title": "Comment devons-nous vous appeler ?",
+      "subtitle": "C'est toujours plus agréable de savoir à qui l'on parle, non ?"
+    },
     "passwordStrength": {
       "weak": "Faible",
       "fair": "Moyen",
@@ -682,6 +696,7 @@
       "codeLabel": "Entrez le code :",
       "digitAriaLabel": "Chiffre {position} sur {total}",
       "verifying": "Vérification en cours...",
+      "verifyButton": "Vérifier",
       "didntReceiveIt": "Vous ne l'avez pas reçu ?",
       "resendButton": "Renvoyer le code",
       "resendCooldown": "Renvoyer dans {seconds}s",

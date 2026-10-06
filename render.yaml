@@ -22,7 +22,7 @@ envVarGroups:
       - key: RSA_PUBLIC_KEY
         sync: false
       - key: JWT_KEY_ID
-        value: sassy-auth-1
+        sync: false
 
       # ── BetterAuth session secret (32+ random chars, stable across deploys)
       - key: BETTER_AUTH_SECRET
@@ -41,16 +41,16 @@ envVarGroups:
 
       # ── Public URLs (must match custom domains + TLS) ───────────────────
       - key: BETTER_AUTH_URL
-        value: https://auth-api.milissai.com
+        sync: false
       - key: AUTH_SERVER_URL
-        value: https://auth-api.milissai.com
+        sync: false
       - key: ADMIN_URL
-        value: https://auth.milissai.com
+        sync: false
 
       # BetterAuth CSRF + Nest CORS. Include every browser origin that talks
       # to the auth-server (admin console).
       - key: TRUSTED_ORIGINS
-        value: https://auth.milissai.com
+        sync: false
 
       # Shared parent domain of auth.milissai.com (admin) and auth-api.milissai.com
       # (this server). Enables BetterAuth's crossSubDomainCookies so the session
@@ -60,7 +60,7 @@ envVarGroups:
       # /oauth/authorize until throttled. The same gap also bounces federated
       # (Google/Microsoft/Apple) sign-in back to /login. See DEPLOYMENT.md §4 and §9.
       - key: COOKIE_DOMAIN
-        value: .milissai.com
+        sync: false
 
       # bug-0293: left unset here deliberately — production keeps BetterAuth's
       # default cookie prefix ("better-auth") so this change doesn't silently
@@ -75,7 +75,7 @@ envVarGroups:
       - key: LOG_LEVEL
         value: info
       - key: EMAIL_FROM
-        value: no-reply@milissai.com
+        sync: false
 
 services:
   # ── Auth server (NestJS + BetterAuth) ───────────────────────────────────
@@ -130,11 +130,11 @@ services:
       - key: VIBECAST_ACTIVATION_EMAIL_FROM_NAME
         value: Raphael from VibeCast
       - key: VIBECAST_ACTIVATION_EMAIL_FROM_ADDRESS
-        value: rl@getvibecast.com
+        value: hello@getvibecast.com
       - key: VIBECAST_ACTIVATION_EMAIL_SUBJECT
         value: "Please verify your {{appName}} email address"
       - key: VIBECAST_ACTIVATION_EMAIL_MESSAGE
-        value: "We're so glad to have you join the growing ranks of VibeCasters! Click on the button (or the link) below to activate your VibeCast account:"
+        value: "We're so glad to have you join the growing ranks of VibeCasters! Enter the 6-digit code below in the VibeCast app to activate your account:"
       # Outbound mail — set RESEND_API_KEY (recommended) or SMTP vars.
       - key: RESEND_API_KEY
         sync: false

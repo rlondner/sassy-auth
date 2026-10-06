@@ -69,6 +69,13 @@ export function SignupWizard({
   const [error, setError] = React.useState<string | null>(null)
   const [resendStatus, setResendStatus] = React.useState<ResendStatus>('idle')
   const [resendCooldown, setResendCooldown] = React.useState(0)
+  // Once a submitted code comes back wrong, stop auto-verifying on every
+  // keystroke: with all 6 boxes already filled, correcting even one digit
+  // keeps the otp string at length 6 the whole time, so the auto-verify
+  // effect below fired again after every single digit edit — resubmitting
+  // a still-partially-wrong code before the user finished fixing it.
+  // Require an explicit Verify click instead until a fresh code is issued.
+  const [codeAutoSubmit, setCodeAutoSubmit] = React.useState(true)
 
   React.useEffect(() => {
     if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
@@ -104,6 +111,7 @@ export function SignupWizard({
         setError(t(`errors.${result.error}`))
         return
       }
+      setCodeAutoSubmit(true)
       setStep('code')
     } catch {
       setError(t('errors.validationError'))
@@ -119,6 +127,7 @@ export function SignupWizard({
       const result = await verifyRegistrationCodeAction({ email, otp: code })
       if ('error' in result) {
         setError(t(VERIFY_CODE_ERROR_KEY[result.error] ?? 'verifyCode.errorGeneric'))
+        setCodeAutoSubmit(false)
         return
       }
       setStep('password')
@@ -130,14 +139,16 @@ export function SignupWizard({
   }
 
   // Auto-verify as soon as all 6 digits are entered — no separate submit
-  // button on this step. Re-fires whenever `otp` changes back to a full
-  // 6-digit value (e.g. after correcting a wrong code), but not on every
-  // render, since it's only a dependency-change effect.
+  // button needed on the first attempt. Re-fires whenever `otp` changes
+  // back to a full 6-digit value, but not on every render, since it's only
+  // a dependency-change effect. Disabled after a wrong code (see
+  // codeAutoSubmit above), where verification instead waits for an
+  // explicit Verify click.
   React.useEffect(() => {
-    if (step !== 'code' || otp.length !== 6) return
+    if (step !== 'code' || otp.length !== 6 || !codeAutoSubmit) return
     void verifyCode(otp)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, otp])
+  }, [step, otp, codeAutoSubmit])
 
   async function handleResend() {
     if (resendCooldown > 0 || resendStatus === 'sending') return
@@ -168,6 +179,7 @@ export function SignupWizard({
         return
       }
       setOtp('')
+      setCodeAutoSubmit(true)
       setResendStatus('sent')
       setResendCooldown(RESEND_COOLDOWN_SECONDS)
     } catch {
@@ -234,6 +246,7 @@ export function SignupWizard({
             }
           }
           setOtp('')
+          setCodeAutoSubmit(true)
           setError(t('verifyCode.errorExpired'))
           setStep('code')
           return
@@ -261,6 +274,7 @@ export function SignupWizard({
           type="email"
           autoComplete="email"
           label={t('email')}
+          placeholder={t('emailPlaceholder')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -291,7 +305,10 @@ export function SignupWizard({
           data-testid="otp"
           label={t('verifyCode.codeLabel')}
           value={otp}
-          onChange={setOtp}
+          onChange={(value) => {
+            setOtp(value)
+            if (error) setError(null)
+          }}
           autoFocus
           disabled={submitting}
           digitAriaLabel={(position, total) => t('verifyCode.digitAriaLabel', { position: String(position), total: String(total) })}
@@ -326,6 +343,17 @@ export function SignupWizard({
             {error}
           </p>
         )}
+        {!codeAutoSubmit && (
+          <Button
+            type="button"
+            className="w-full"
+            loading={submitting}
+            disabled={submitting || otp.length !== 6}
+            onClick={() => void verifyCode(otp)}
+          >
+            {t('verifyCode.verifyButton')}
+          </Button>
+        )}
         {submitting && (
           <p data-testid="verify-pending" className="text-body-sm text-muted-foreground">
             {t('verifyCode.verifying')}
@@ -343,6 +371,7 @@ export function SignupWizard({
             id="password"
             type="password"
             label={t('password')}
+            placeholder={t('passwordPlaceholder')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             showPasswordLabel={tCommon('showPassword')}
@@ -355,6 +384,7 @@ export function SignupWizard({
         <FormField
           id="confirm-password"
           label={t('confirmPassword')}
+          placeholder={t('confirmPasswordPlaceholder')}
           type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
@@ -378,11 +408,32 @@ export function SignupWizard({
   return (
     <form onSubmit={handleNameSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
-        <FormField id="firstName" label={t('firstName')} value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-        <FormField id="lastName" label={t('lastName')} value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+        <FormField
+          id="firstName"
+          label={t('firstName')}
+          placeholder={t('firstNamePlaceholder')}
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          required
+        />
+        <FormField
+          id="lastName"
+          label={t('lastName')}
+          placeholder={t('lastNamePlaceholder')}
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+          required
+        />
       </div>
       {!hasDefaultOrg && (
-        <FormField id="companyName" label={t('companyName')} value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
+        <FormField
+          id="companyName"
+          label={t('companyName')}
+          placeholder={t('companyNamePlaceholder')}
+          value={companyName}
+          onChange={(e) => setCompanyName(e.target.value)}
+          required
+        />
       )}
       <label className="flex items-start gap-2 text-body-sm text-foreground">
         <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} />

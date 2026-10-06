@@ -42,9 +42,26 @@ export function SignupWizardCard({
   const t = useTranslations('signup')
   const [step, setStep] = React.useState<Step>('email')
 
-  const title = step === 'code' ? t('verifyCode.title') : appName ? t('titleWithApp', { appName }) : t('title')
+  const title =
+    step === 'code'
+      ? t('verifyCode.title')
+      : step === 'password'
+        ? t('setPassword.title')
+        : step === 'name'
+          ? t('setName.title')
+          : appName
+            ? t('titleWithApp', { appName })
+            : t('title')
   const subtitle =
-    step === 'code' ? t('verifyCode.headerSubtitle') : hasDefaultOrg ? t('subtitleDefaultOrg') : t('subtitle')
+    step === 'code'
+      ? t('verifyCode.headerSubtitle')
+      : step === 'password'
+        ? t('setPassword.subtitle')
+        : step === 'name'
+          ? t('setName.subtitle')
+          : hasDefaultOrg
+            ? t('subtitleDefaultOrg')
+            : t('subtitle')
 
   return (
     <AuthCard
