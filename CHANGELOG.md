@@ -4,6 +4,51 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-08
+
+Quiet review: zero commits in the last 24 hours (last activity was
+`f682927`/PR #449, merged 2026-10-06T11:16 — the dev→master sync), and
+the scheduled daily review itself appears to have had a gap between
+2026-09-30 and today (no `TODO_*`/`BUGS_*` files for 2026-10-01 through
+2026-10-07). To avoid silently skipping that window, this run also
+spot-checked the unreviewed 2026-10-06 commits rather than treating the
+literal "last 24 hours" as the full scope — see below.
+
+**First genuinely clean infra snapshot in this review's history:**
+`gh pr list --state open` returns **0 open PRs** (down from 13 on
+2026-09-15, 7–16 across August) and `dev`'s CI (`typecheck`, `unit
+tests`, `e2e`, `AI Semantic Security Review`, `Dependency & CVE Scan`)
+is fully green on the latest commit. `dev` and `master` have identical
+content (the only commits on one side of the other are the two
+dev→master merge commits themselves).
+
+**Unreviewed window (2026-10-06): app-drawer collapsible sections +
+small CI fixes, both checked and found sound.** `7ad3bdc`…`6e37bcc`
+grouped the Create/Edit/View app-drawer forms' fields into themed,
+independently-collapsible `CollapsibleSection`s (new `packages/ui`
+primitive + an admin-only `useSectionPersistence` hook that remembers
+each section's open/closed state per drawer type in `localStorage`),
+with i18n for the new section titles and a French-copy correction
+(`7332eda`) folded in. Read the hook, its 6-case test file, and all
+three drawers' `credentials`/`security` sections (the sensitive ones)
+end to end — no secret values are rendered, only status/dates, and the
+hook's `localStorage` key is scoped per drawer type with try/catch
+guards on both read and write. `95c53fd` added `cross-env` so
+`OTEL_SDK_DISABLED=true` actually sets the variable on Windows runners;
+`cb4f80e` widened `packages/ui/tsconfig.ci.json`'s test exclusion to
+`src/**/__tests__` (a nested test folder was slipping into the CI
+typecheck); `ac5a485` added a `kill-admin` Make target to match the
+existing `kill-auth-server`; `de7b09f` removed a dead `PUBLIC_AUTH_SERVER`
+reference from two signup pages in favor of the single `AUTH_SERVER_URL`
+convention `login/page.tsx` already documents and uses. No issues found
+in any of the five — no new bugs filed today.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-08.md](./docs/history/todo/TODO_2026-10-08.md). No new
+bugs this run — see
+[BUGS_2026-10-08.md](./docs/history/bugs/BUGS_2026-10-08.md).
+
 ## [Unreleased] — 2026-09-30
 
 A password-visibility toggle rolled out across every auth form, a signup
