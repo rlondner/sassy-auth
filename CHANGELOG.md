@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-09
+
+Quiet review window — zero commits landed on `dev` or `master` in the 24h
+period ending 2026-10-09T13:20Z. The most recent activity on `dev` remains
+`f682927` (2026-10-06T10:57Z, the app-drawer `CollapsibleSection` merge +
+CI fixes), already covered by the 2026-10-08 daily review
+([CR_2026-10-08.md](docs/history/code_reviews/CR_2026-10-08.md)).
+
+- CI health check: `typecheck`, `unit tests`, `e2e`, `Dependency & CVE Scan
+  (Trivy)`, and `AI Semantic Security Review` are all green on `dev`'s
+  latest commit; `typecheck`/`unit tests`/`e2e`/`Deploy to Render` are all
+  green on `master`'s latest commit (`6e1797d`). No silent-red-suite
+  regression found (see the 2026-08-19/08-27 incidents this check exists
+  to catch).
+- Open-PR backlog: 1 (`#450`, the 2026-10-08 daily-review bundle against
+  `dev`, still unmerged — its `CR_2026-10-08.md` writeup was written but
+  never committed to the branch; committed it today as `ab59537` so the
+  PR carries the complete bundle).
+- No new bugs filed. Spot-checked the still-open `bug-0292` (GDPR
+  geo-detection) follow-up — `GEOIP_DB_PATH` remains correctly unset in
+  `render.yaml`/`render.staging.yaml`, matching the documented "stays
+  correct only while unset" guidance; no change needed. Also traced a
+  hydration-mismatch hypothesis on `useSectionPersistence`
+  (`apps/admin/lib/use-section-persistence.ts`) and confirmed it's a
+  non-issue: the drawers using it are always mounted, but Radix's
+  `Dialog.Content` renders nothing while closed, so the computed section
+  state never reaches the DOM on the server or first client render. See
+  [BUGS_2026-10-09.md](docs/history/bugs/BUGS_2026-10-09.md) and
+  [TODO_2026-10-09.md](docs/history/todo/TODO_2026-10-09.md).
+
 ## [Unreleased] — 2026-09-30
 
 A password-visibility toggle rolled out across every auth form, a signup
