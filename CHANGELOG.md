@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-12
+
+Fourth consecutive quiet review window — zero commits landed on `dev` or
+`master` in the 24h period ending 2026-10-12T12:00Z (and none since
+2026-10-06T10:57Z, `f682927`, already reviewed in CR_2026-10-08.md
+through CR_2026-10-11.md on their respective unmerged branches).
+
+- CI health check: `typecheck`, `unit tests`, `e2e`, and `Dependency &
+  CVE Scan (Trivy)` are all green on `dev`'s latest commit (`f682927`);
+  `typecheck`/`unit tests`/`e2e`/`Deploy to Render` are all green on
+  `master`'s latest commit (`6e1797d`). No silent-red-suite regression
+  found.
+- Open-PR backlog: 3 (`#450`, `#451`, `#452` — the 2026-10-08/09/11
+  daily-review bundles against `dev`, all still unmerged), growing to 4
+  with this run's PR. Flagged again in TODO — this is now the primary
+  process risk, not a code risk.
+- Documentation fix: `EMAIL_VERIFICATION_EXPIRES_IN_SECONDS` (used in
+  `apps/auth-server/src/auth/auth.config.ts:517`, present in
+  `.env.example`, default `3600`) was missing from the README's
+  Environment Variables reference — added to the Email (optional) table.
+- No new bugs filed. Re-verified `bug-0292` (GDPR geo-detection) —
+  `GEOIP_DB_PATH` remains correctly unset in `render.yaml`/
+  `render.staging.yaml`. See
+  [BUGS_2026-10-12.md](docs/history/bugs/BUGS_2026-10-12.md) and
+  [TODO_2026-10-12.md](docs/history/todo/TODO_2026-10-12.md).
+
 ## [Unreleased] — 2026-09-30
 
 A password-visibility toggle rolled out across every auth form, a signup
