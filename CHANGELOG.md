@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-11
+
+Quiet review window — zero commits landed on `dev` or `master` in the 24h
+period ending 2026-10-11T13:20Z (the third consecutive quiet window,
+after 2026-10-08 and 2026-10-09). The most recent code activity remains
+`f682927` (2026-10-06T10:57Z, the app-drawer `CollapsibleSection` merge +
+CI fixes), already covered by
+[CR_2026-10-08.md](docs/history/code_reviews/CR_2026-10-08.md).
+
+- CI health check: `typecheck`, `unit tests`, `e2e`, and `Dependency &
+  CVE Scan (Trivy)` are all green on `dev`'s latest commit; `typecheck`/
+  `unit tests`/`e2e`/`Deploy to Render` are all green on `master`'s
+  latest commit (`6e1797d`). No silent-red-suite regression found.
+- Open-PR backlog grew from 1 to 2 (PR #450 from 2026-10-08, PR #451 from
+  2026-10-09, both green and mergeable against `dev`); this run adds a
+  third. Flagged as a process gap, not a code defect — see
+  [TODO_2026-10-11.md](docs/history/todo/TODO_2026-10-11.md).
+- No new bugs filed. Re-verified `bug-0292` (GDPR geo-detection) still
+  correctly mitigated (`GEOIP_DB_PATH` unset in both Render blueprints).
+  Spot-checked `README.md`'s Getting Started, Environment Variables, and
+  Known Limitations sections against current code — still accurate, no
+  changes needed. See
+  [BUGS_2026-10-11.md](docs/history/bugs/BUGS_2026-10-11.md) and
+  [TODO_2026-10-11.md](docs/history/todo/TODO_2026-10-11.md).
+
 ## [Unreleased] — 2026-09-30
 
 A password-visibility toggle rolled out across every auth form, a signup
