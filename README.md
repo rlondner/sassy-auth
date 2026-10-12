@@ -682,6 +682,7 @@ Transport is chosen by priority: `RESEND_API_KEY` > `EMAIL_SMTP_HOST` > console.
 | `EMAIL_SMTP_SECURE`   | `true` to use implicit TLS. Default: `false`                             |
 | `EMAIL_SMTP_USER`     | SMTP auth username, if required by the provider                          |
 | `EMAIL_SMTP_PASS`     | SMTP auth password, if required by the provider                          |
+| `EMAIL_VERIFICATION_EXPIRES_IN_SECONDS` | How long a signup email-verification OTP/link stays valid. Default: `3600` (1 hour) |
 
 ### Test credentials (optional)
 
