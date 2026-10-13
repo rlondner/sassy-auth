@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-13
+
+Fifth consecutive quiet day on `dev`/`master` — zero commits since
+`f682927` on 2026-10-06. No new bugs. This review closed out a
+long-carried documentation task and found one real (small) README gap,
+re-applied below.
+
+**Legacy bug-0001/0002/0003 reconciliation.** The original 2026-05
+"Risky patterns / missing tests" section at the end of this file still
+listed these three as blocking, contradicting a later entry claiming
+bug-0001 was fixed — flagged as unreconciled since 2026-08-21 without
+being checked. Verified against current `dev` code: bug-0001 and
+bug-0003 are fixed; bug-0002 is fixed for its structured-log vector
+(the Sentry-breadcrumb vector is unverified, carried to
+`TODO_2026-10-13.md`). See the annotated entry further down and
+[BUGS_2026-10-13.md](./docs/history/bugs/BUGS_2026-10-13.md).
+
+**README env var gap.** `EMAIL_VERIFICATION_EXPIRES_IN_SECONDS` was
+documented in `.env.example` but missing from the README's Environment
+Variables tables; added under "Email (optional)".
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-13.md](./docs/history/todo/TODO_2026-10-13.md) for
+follow-ups and [BUGS_2026-10-13.md](./docs/history/bugs/BUGS_2026-10-13.md)
+for this run's verification catalog. No new bugs filed — the open-PR
+backlog (now 5 unmerged docs-only bundles, `#450`–`#453` plus this run)
+is the standing risk item; see TODO.
+
 ## [Unreleased] — 2026-09-30
 
 A password-visibility toggle rolled out across every auth form, a signup
@@ -1874,8 +1903,19 @@ Heavy feature day across the monorepo (63 commits, all on `master`, local only �
 
 ### Risky patterns / missing tests
 
-See [TODO.md](./TODO.md) for the prioritized follow-up list and [BUGs.md](./BUGs.md) for the bug catalog. Three Critical-severity items must be resolved before this branch is shippable:
+See [TODO.md](./TODO.md) for the prioritized follow-up list and [BUGs.md](./BUGs.md) for the bug catalog. Three Critical-severity items were flagged here at the start of the project as blocking:
 
 - **bug-0001** — RBAC isolation broken across orgs in `checkPermission`.
 - **bug-0002** — Invitation tokens leak via request URL logs (and Sentry).
 - **bug-0003** — Admin Next.js middleware accepts any non-empty cookie value.
+
+> **Reconciled 2026-10-13:** this list contradicted a later "Fixed" entry
+> above (`b62d543`) claiming bug-0001 was resolved, and had stood
+> unreconciled since at least 2026-08-21. Checked all three against
+> current code: bug-0001 and bug-0003 are fixed (`check-permission.ts`'s
+> mandatory `targetOrgId` scoping; `apps/admin/middleware.ts` round-trips
+> every session cookie to the auth-server). bug-0002 is fixed for its
+> structured-log vector (`sanitizeUrlForLog` in
+> `request-logging.middleware.ts`); the Sentry-breadcrumb vector is
+> unverified — see `docs/history/todo/TODO_2026-10-13.md`. Full detail in
+> `docs/history/bugs/BUGS_2026-10-13.md`.
