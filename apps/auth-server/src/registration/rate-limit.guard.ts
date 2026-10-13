@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, HttpException, Injectable } from '@nestjs/common';
 import { recordRegistrationRateLimited } from '../telemetry/auth-metrics';
+import { resolveClientIp } from '../common/net/resolve-client-ip';
 
 interface WindowEntry {
   count: number;
@@ -36,8 +37,8 @@ export class RateLimitGuard implements CanActivate {
     const limit = this.limit;
     if (!limit) return true; // unlimited when 0 or unset
 
-    const req = context.switchToHttp().getRequest<{ ip?: string; socket?: { remoteAddress?: string }; headers?: Record<string, string> }>();
-    const ip = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
+    const req = context.switchToHttp().getRequest<{ ips?: string[]; ip?: string }>();
+    const ip = resolveClientIp(req);
 
     const now = Date.now();
     const windowMs = this.windowMs;
