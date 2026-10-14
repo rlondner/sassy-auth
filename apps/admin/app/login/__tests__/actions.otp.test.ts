@@ -20,6 +20,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }))
 jest.mock('@/lib/auth-origin', () => ({ getForwardedOrigin: jest.fn() }))
+jest.mock('@/lib/forward-client-ip', () => ({ getForwardedClientIpHeader: jest.fn().mockResolvedValue({}) }))
 jest.mock('../../account/security/actions', () => ({
   forwardNamedCookie: jest.fn(),
   forwardNamedCookieWithMaxAge: jest.fn(),
@@ -39,6 +40,7 @@ const mockCookies = cookies as jest.MockedFunction<any>
 let mockForwardNamedCookie: jest.MockedFunction<any>
 let mockExtractClientId: jest.MockedFunction<any>
 let mockFetchOutstandingConsent: jest.MockedFunction<any>
+let mockGetForwardedClientIpHeader: jest.MockedFunction<any>
 
 const SESSION_COOKIE =
   'better-auth.session_token=abc123; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800'
@@ -87,6 +89,10 @@ beforeEach(async () => {
   ;(authOrigin.getForwardedOrigin as jest.MockedFunction<any>).mockResolvedValue(
     'https://admin.example.com',
   )
+  const forwardClientIp = await import('@/lib/forward-client-ip')
+  mockGetForwardedClientIpHeader =
+    forwardClientIp.getForwardedClientIpHeader as jest.MockedFunction<any>
+  mockGetForwardedClientIpHeader.mockResolvedValue({})
   const securityActions = await import('../../account/security/actions')
   mockForwardNamedCookie = securityActions.forwardNamedCookie as jest.MockedFunction<any>
   const consent = await import('@/lib/consent')
@@ -164,6 +170,31 @@ describe('requestOtp', () => {
     expect((init.headers as Record<string, string>)['Origin']).toBe(
       'https://admin.example.com',
     )
+  })
+})
+
+// bug-0297: see the matching note in actions.signin.test.ts.
+describe('requestOtp and verifyOtp client-IP forwarding', () => {
+  it('requestOtp forwards the X-Forwarded-For header returned by getForwardedClientIpHeader', async () => {
+    mockGetForwardedClientIpHeader.mockResolvedValue({ 'X-Forwarded-For': '203.0.113.7' })
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(200))
+
+    await requestOtp(formData({ email: 'a@b.io' }))
+
+    const init = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['X-Forwarded-For']).toBe('203.0.113.7')
+  })
+
+  it('verifyOtp forwards the X-Forwarded-For header returned by getForwardedClientIpHeader', async () => {
+    mockGetForwardedClientIpHeader.mockResolvedValue({ 'X-Forwarded-For': '203.0.113.7' })
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(401))
+
+    await verifyOtp(formData({ email: 'a@b.io', otp: '123456' }))
+
+    const init = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['X-Forwarded-For']).toBe('203.0.113.7')
   })
 })
 
