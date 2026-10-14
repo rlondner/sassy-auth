@@ -11,6 +11,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }))
 jest.mock('@/lib/auth-origin', () => ({ getForwardedOrigin: jest.fn() }))
+jest.mock('@/lib/forward-client-ip', () => ({ getForwardedClientIpHeader: jest.fn().mockResolvedValue({}) }))
 
 function upstream(status: number, body: unknown = {}) {
   return {
@@ -27,6 +28,7 @@ function formData(fields: Record<string, string>) {
 let resetPasswordSubmitAction: any
 let requestPasswordResetAction: any
 let captureException: jest.MockedFunction<any>
+let mockGetForwardedClientIpHeader: jest.MockedFunction<any>
 
 beforeEach(async () => {
   jest.clearAllMocks()
@@ -36,6 +38,10 @@ beforeEach(async () => {
   ;(authOrigin.getForwardedOrigin as jest.MockedFunction<any>).mockResolvedValue(
     'https://admin.example.com',
   )
+  const forwardClientIp = await import('@/lib/forward-client-ip')
+  mockGetForwardedClientIpHeader =
+    forwardClientIp.getForwardedClientIpHeader as jest.MockedFunction<any>
+  mockGetForwardedClientIpHeader.mockResolvedValue({})
   const sentry = await import('@sentry/nextjs')
   captureException = sentry.captureException as jest.MockedFunction<any>
   resetPasswordSubmitAction = (await import('../actions')).resetPasswordSubmitAction
@@ -110,6 +116,24 @@ describe('resetPasswordSubmitAction', () => {
   })
 })
 
+// bug-0297: /reset-password and /forget-password are both SENSITIVE_PREFIXES
+// in auth-rate-limit.ts, keyed on resolveClientIp. Without re-sending the
+// browser's real X-Forwarded-For on this server-to-server call, every
+// password-reset attempt proxied through admin shares one bucket keyed on
+// the admin server's own egress address.
+describe('resetPasswordSubmitAction client-IP forwarding', () => {
+  it('forwards the X-Forwarded-For header returned by getForwardedClientIpHeader', async () => {
+    mockGetForwardedClientIpHeader.mockResolvedValue({ 'X-Forwarded-For': '203.0.113.7' })
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(400))
+
+    await resetPasswordSubmitAction('tok', 'Str0ngPassw0rd!')
+
+    const init = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['X-Forwarded-For']).toBe('203.0.113.7')
+  })
+})
+
 describe('requestPasswordResetAction', () => {
   it.each([200, 400, 404, 429, 500])(
     'returns the same neutral result regardless of upstream %d',
@@ -153,6 +177,17 @@ describe('requestPasswordResetAction', () => {
       email: 'a@b.io',
       redirectTo: 'http://localhost:3001/reset-password',
     })
+  })
+
+  it('forwards the X-Forwarded-For header returned by getForwardedClientIpHeader', async () => {
+    mockGetForwardedClientIpHeader.mockResolvedValue({ 'X-Forwarded-For': '203.0.113.7' })
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(200))
+
+    await requestPasswordResetAction(formData({ email: 'a@b.io' }))
+
+    const init = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['X-Forwarded-For']).toBe('203.0.113.7')
   })
 
   it('coerces a missing email field to an empty string rather than throwing', async () => {
