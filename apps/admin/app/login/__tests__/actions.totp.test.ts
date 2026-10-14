@@ -17,6 +17,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }))
 jest.mock('@/lib/auth-origin', () => ({ getForwardedOrigin: jest.fn() }))
+jest.mock('@/lib/forward-client-ip', () => ({ getForwardedClientIpHeader: jest.fn().mockResolvedValue({}) }))
 jest.mock('../../account/security/actions', () => ({
   forwardNamedCookie: jest.fn(),
   forwardNamedCookieWithMaxAge: jest.fn(),
@@ -35,6 +36,7 @@ let mockForwardNamedCookie: jest.MockedFunction<any>
 let mockForwardNamedCookieWithMaxAge: jest.MockedFunction<any>
 let mockExtractClientId: jest.MockedFunction<any>
 let mockFetchOutstandingConsent: jest.MockedFunction<any>
+let mockGetForwardedClientIpHeader: jest.MockedFunction<any>
 
 const SESSION_COOKIE =
   'better-auth.session_token=abc123; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800'
@@ -85,6 +87,10 @@ beforeEach(async () => {
   ;(authOrigin.getForwardedOrigin as jest.MockedFunction<any>).mockResolvedValue(
     'https://admin.example.com',
   )
+  const forwardClientIp = await import('@/lib/forward-client-ip')
+  mockGetForwardedClientIpHeader =
+    forwardClientIp.getForwardedClientIpHeader as jest.MockedFunction<any>
+  mockGetForwardedClientIpHeader.mockResolvedValue({})
   const securityActions = await import('../../account/security/actions')
   mockForwardNamedCookie = securityActions.forwardNamedCookie as jest.MockedFunction<any>
   mockForwardNamedCookieWithMaxAge =
@@ -263,6 +269,24 @@ describe.each([
     const result = await getFn()(formData({ code: '123456' }))
 
     expect(result).toEqual({ error: 'tooManyRequests' })
+  })
+})
+
+// bug-0297: see the matching note in actions.signin.test.ts — verify-totp
+// and verify-backup-code are both SENSITIVE_PREFIXES in auth-rate-limit.ts.
+describe.each([
+  ['verifyTotp', () => verifyTotp],
+  ['verifyBackupCode', () => verifyBackupCode],
+])('%s client-IP forwarding', (_name, getFn) => {
+  it('forwards the X-Forwarded-For header returned by getForwardedClientIpHeader', async () => {
+    mockGetForwardedClientIpHeader.mockResolvedValue({ 'X-Forwarded-For': '203.0.113.7' })
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(401))
+
+    await getFn()(formData({ code: '123456' }))
+
+    const init = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['X-Forwarded-For']).toBe('203.0.113.7')
   })
 })
 
