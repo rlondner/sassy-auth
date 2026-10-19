@@ -7,7 +7,9 @@ set -euo pipefail
 
 log() { printf '→ %s\n' "$*"; }
 
-if [ -n "${DATABASE_URL:-}" ]; then
+if [ "${SKIP_MIGRATIONS:-}" = "1" ]; then
+  log "SKIP_MIGRATIONS=1 — skipping migrations (run by the deploy pipeline)"
+elif [ -n "${DATABASE_URL:-}" ]; then
   log "Applying database migrations"
   cd /app/packages/db
   npx prisma migrate deploy
