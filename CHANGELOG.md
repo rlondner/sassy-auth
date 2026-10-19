@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-14
+
+Reviewed two commits landed since yesterday's review (`110ce7a`'s signup
+rate-limiter fix, and its merge). That fix was correct and well-tested on
+its own terms, but reviewing it surfaced a sibling gap in code it didn't
+touch: the same "admin console proxies to auth-server without forwarding
+the real client IP" pattern it fixed for `GET /api/register/app` was still
+present on every other credential-bearing BetterAuth endpoint reached
+through the admin console. Filed and fixed as bug-0297.
+
+**bug-0297 (high).** `apps/auth-server/src/auth/auth-rate-limit.ts`'s
+shared rate-limit bucket for `/sign-in`, `/forget-password`,
+`/reset-password`, `/email-otp`, and `/two-factor` keys on
+`resolveClientIp()`, which only recovers the real visitor when the caller
+re-sends `X-Forwarded-For`. `apps/admin/app/login/actions.ts` (`signIn`,
+`requestOtp`, `verifyOtp`, `verifyTotp`, `verifyBackupCode`),
+`apps/admin/app/forgot-password/actions.ts`, and
+`apps/admin/app/reset-password/actions.ts` never did — unlike
+`signup`/`consent`/`wizard` actions, which already call
+`getForwardedClientIpHeader()` (`593e82c`). Net effect: every visitor
+logging in, verifying an OTP/TOTP/backup-code, or resetting a password
+through the admin console shared one rate-limit bucket keyed on the admin
+server's own egress address, so one visitor's (or an attacker's) attempts
+could throttle a completely different visitor's legitimate login. Fixed by
+wiring the same header-forwarding helper into all three files. See
+[BUGS_2026-10-14.md](./docs/history/bugs/BUGS_2026-10-14.md) and PR
+[#456](https://github.com/rlondner/sassy-auth/pull/456) (not yet merged as
+of this writing).
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-14.md](./docs/history/todo/TODO_2026-10-14.md) for
+follow-ups — notably the same forwarding gap in
+`apps/admin/app/account/security/actions.ts` (lower severity: those calls
+require an existing session) and a possibly-stale README note on bug-0292
+— and [BUGS_2026-10-14.md](./docs/history/bugs/BUGS_2026-10-14.md) for
+this run's bug catalog. The open-PR backlog is now 6 (`#450`–`#453`, this
+run's `#456` fix, and this docs bundle); see TODO item 1.
+
 ## [Unreleased] — 2026-10-13
 
 Fifth consecutive quiet day on `dev`/`master` — zero commits since
