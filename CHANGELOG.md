@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-19
+
+First commit on `dev` since `4151407` landed directly (not through a
+reviewed daily-review branch) five days after the last entry in this
+file — `6ecd4e2`/`705e22f` (2026-10-14, bug-0297) still haven't been
+recorded here because their own bundle, PR #457, is still unmerged; see
+"Risky patterns / missing tests" below.
+
+**Manual Cloud Run deployment alongside Render (`4151407`).** Adds
+`.github/workflows/deploy-gcp.yml` (`workflow_dispatch`-only — never
+triggered by push, never touches DNS or Render), `gcp/env.*.yaml`
+non-secret env files mirroring `render.yaml`, two new `Dockerfile.admin`
+build args (`NEXT_PUBLIC_AUTH_SERVER_URL`,
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY`) so the admin image can be built outside
+Render, a `SKIP_MIGRATIONS` opt-out in
+`docker/entrypoint-auth-server-prod.sh` (set by GCP's env file, left
+unset — and therefore inert — in `render.yaml`, so Render's own
+migrate-on-boot behavior is unchanged), and
+[`docs/gcp-deployment.md`](docs/gcp-deployment.md) documenting one-time
+GCP setup, secrets (reused from Render, not regenerated — preserves
+existing sessions/JWTs across a future cutover), deploy/smoke-test, the
+manual DNS cutover, and Render retirement. Both stacks share the same
+Neon database and public domains; switching traffic is a DNS change, not
+a redeploy. README's Deployment section now links to it.
+
+**bug-0296 (GCP VibeCast activation branding drift) — found and fixed.**
+`gcp/env.auth-server.yaml`'s `VIBECAST_ACTIVATION_EMAIL_FROM_ADDRESS` and
+`VIBECAST_ACTIVATION_EMAIL_MESSAGE` didn't match `render.yaml`, despite
+`docs/gcp-deployment.md` stating the two are kept identical. The message
+also described a button/link rather than the 6-digit OTP code the app
+actually sends. See
+[BUGS_2026-10-19.md](./docs/history/bugs/BUGS_2026-10-19.md) and PR #459.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-19.md](./docs/history/todo/TODO_2026-10-19.md) for
+follow-ups. No test coverage was added or exists for
+`deploy-gcp.yml` or the `entrypoint-auth-server-prod.sh` `SKIP_MIGRATIONS`
+branch — expected for deploy-pipeline shell/YAML, but it's exactly the
+kind of config that only gets exercised by a real deploy, which is how
+bug-0296 shipped unnoticed. The open-PR backlog (now 7 unmerged,
+docs/config-only bundles — see TODO) remains the standing risk item.
+
 ## [Unreleased] — 2026-10-13
 
 Fifth consecutive quiet day on `dev`/`master` — zero commits since
