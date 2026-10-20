@@ -208,6 +208,10 @@ For production deployment to Render with Neon Postgres — including custom doma
 [`render.yaml`](render.yaml) Blueprint, production Dockerfiles, and a local mock
 layout on custom ports — see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
+A manual, `workflow_dispatch`-only Cloud Run deployment path also exists
+alongside Render (same Neon database, same env values) — see
+**[docs/gcp-deployment.md](docs/gcp-deployment.md)**.
+
 If the admin console and auth server live on sibling subdomains (the normal
 case in production), set [`COOKIE_DOMAIN`](#cross-subdomain-cookies-required-for-live-deployments) —
 without it, third-party sign-in loops forever between `/login` and

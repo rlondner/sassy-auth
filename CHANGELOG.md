@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-20
+
+Zero new commits on `dev` since `4151407` ("feat(deploy): add manual
+Cloud Run deployment alongside Render", 2026-10-19). That commit was
+already reviewed by yesterday's run — see
+[BUGS_2026-10-20.md](./docs/history/bugs/BUGS_2026-10-20.md) — so there
+is nothing new to summarize here. No new bugs filed.
+
+**README gap found and fixed.** The Deployment section pointed only at
+`DEPLOYMENT.md` (Render); it didn't mention `docs/gcp-deployment.md`,
+added in `4151407` alongside the Cloud Run workflow. Added a pointer so
+both deployment paths are discoverable from the README.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-20.md](./docs/history/todo/TODO_2026-10-20.md). The
+standing risk item is still the unmerged daily-review PR backlog, which
+has grown rather than shrunk: `#450`, `#451`, `#452`, `#453`, `#457`,
+`#459`, `#460` are all still open against `dev`, including this run's
+own predecessor bundle (`#460`, 2026-10-19) and the still-unmerged
+`bug-0296` fix (`#459`). None of those PRs' CHANGELOG/BUGS/TODO content
+has landed on `dev` yet, so this entry restates context (like
+bug-0296's status) that already exists, unmerged, in other open PRs.
+
 ## [Unreleased] — 2026-10-13
 
 Fifth consecutive quiet day on `dev`/`master` — zero commits since
