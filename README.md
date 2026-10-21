@@ -213,6 +213,12 @@ case in production), set [`COOKIE_DOMAIN`](#cross-subdomain-cookies-required-for
 without it, third-party sign-in loops forever between `/login` and
 `/oauth/authorize`.
 
+A parallel, manual-only Cloud Run deployment path also exists alongside
+Render (same Neon database, same public domains — the cutover is a DNS
+change, not a data migration); see
+**[docs/gcp-deployment.md](docs/gcp-deployment.md)**. Render remains the
+live deployment until that cutover happens by hand.
+
 ## Quick Start (Flox)
 
 If you have [Flox](https://flox.dev) installed, this is the whole thing — it provisions Node.js, pnpm, PostgreSQL, Python, and uv, writes a `.env.local` with freshly generated RSA keys, migrates the database, and seeds platform data:

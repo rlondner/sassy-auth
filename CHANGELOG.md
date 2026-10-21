@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-10-21
+
+Zero commits landed on `dev` since the last review (`4151407`,
+2026-10-19 — a manual GCP/Cloud Run deployment path, unchanged). With
+nothing to diff, checked CI health directly and found `unit-tests`
+silently red on `dev` since that same push, for a reason unrelated to
+its own diff.
+
+**bug-0298 — fixed.** Three `RefreshTokenService.rotate()` tests in
+`refresh-token.service.spec.ts` compared a hardcoded
+`expiresAt: new Date('2026-10-17T00:00:00Z')` fixture against the real
+system clock; once the real date passed 2026-10-17 the fixture read as
+permanently expired, failing all three "valid token" tests with
+`invalid_grant` instead of exercising the behavior each one intended.
+Fixed by pinning fake system time for the whole `rotate` describe block.
+See [bug-0298.md](./docs/history/bugs/bug-0298.md).
+
+Also recovered two untracked same-day review drafts
+(`CR_2026-10-19.md`, `CR_2026-10-20.md`) that an earlier incomplete run
+had left uncommitted, and committed them as part of this bundle.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-21.md](./docs/history/todo/TODO_2026-10-21.md) for
+follow-ups (including a recommended habit for catching clock-dependent
+test fixtures before they go red) and
+[BUGS_2026-10-21.md](./docs/history/bugs/BUGS_2026-10-21.md) for the
+full verification catalog. Open-PR backlog is now 9 — unchanged
+"merging is the bottleneck" risk item, not re-escalated this run.
+
 ## [Unreleased] — 2026-10-13
 
 Fifth consecutive quiet day on `dev`/`master` — zero commits since
