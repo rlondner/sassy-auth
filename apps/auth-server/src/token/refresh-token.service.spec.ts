@@ -93,6 +93,18 @@ describe('RefreshTokenService', () => {
   });
 
   describe('rotate', () => {
+    // Pin the clock before existingRow's expiresAt/absoluteExpiresAt so the
+    // "valid token" fixtures below stay valid regardless of real wall-clock
+    // date (bug-0298: these tests went red once the real date passed the
+    // hardcoded 2026-10-17 expiresAt, since `rotate()` compares against
+    // `new Date()`, not a mockable clock).
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-01T00:00:00Z'));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     const existingRow = {
       tokenHash: 'irrelevant',
       familyId: 'fam-1',
