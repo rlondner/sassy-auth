@@ -33,6 +33,8 @@ COPY packages/db/migrations packages/db/migrations
 COPY packages/db/tsconfig.json packages/db/
 COPY packages/types/package.json packages/types/
 COPY packages/types/tsconfig.json packages/types/
+COPY packages/telemetry/package.json packages/telemetry/
+COPY packages/telemetry/tsconfig.json packages/telemetry/
 
 ARG DATABASE_URL="postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder"
 
@@ -44,8 +46,9 @@ FROM deps AS build
 COPY apps/auth-server apps/auth-server
 COPY packages/db packages/db
 COPY packages/types packages/types
+COPY packages/telemetry packages/telemetry
 
-RUN pnpm --filter @sassy-auth/db --filter @sassy-auth/types build \
+RUN pnpm --filter @sassy-auth/db --filter @sassy-auth/types --filter @sassy-auth/telemetry build \
  && pnpm --filter @sassy-auth/auth-server build
 
 # ── Runtime ───────────────────────────────────────────────────────────────────
@@ -61,6 +64,8 @@ COPY --from=build /app/apps/auth-server/package.json ./apps/auth-server/package.
 COPY --from=build /app/packages/db ./packages/db
 COPY --from=build /app/packages/types/dist ./packages/types/dist
 COPY --from=build /app/packages/types/package.json ./packages/types/package.json
+COPY --from=build /app/packages/telemetry/dist ./packages/telemetry/dist
+COPY --from=build /app/packages/telemetry/package.json ./packages/telemetry/package.json
 
 COPY docker/entrypoint-auth-server-prod.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
