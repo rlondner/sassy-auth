@@ -68,3 +68,4 @@ packages/types/dist/
 
 .superpowers/
 .env.production
+designs/social-auth/atlassian/
