@@ -32,6 +32,8 @@ COPY packages/ui/globals.css packages/ui/
 COPY packages/ui/tailwind.config.ts packages/ui/
 COPY packages/telemetry/package.json packages/telemetry/
 COPY packages/telemetry/tsconfig.json packages/telemetry/
+COPY packages/types/package.json packages/types/
+COPY packages/types/tsconfig.json packages/types/
 
 RUN pnpm install --frozen-lockfile
 
@@ -41,8 +43,9 @@ FROM deps AS build
 COPY apps/admin apps/admin
 COPY packages/ui packages/ui
 COPY packages/telemetry packages/telemetry
+COPY packages/types packages/types
 
-RUN pnpm --filter @sassy-auth/telemetry build
+RUN pnpm --filter @sassy-auth/telemetry --filter @sassy-auth/types build
 
 # Next.js inlines NEXT_PUBLIC_* at build time when present.
 ARG NEXT_PUBLIC_ADMIN_CONTACT_EMAIL=""
@@ -73,12 +76,14 @@ COPY --from=build /app/apps/admin/i18n ./apps/admin/i18n
 COPY --from=build /app/apps/admin/messages ./apps/admin/messages
 COPY --from=build /app/apps/admin/middleware.ts ./apps/admin/middleware.ts
 COPY --from=build /app/apps/admin/instrumentation.ts ./apps/admin/instrumentation.ts
-COPY --from=build /app/apps/admin/sentry.client.config.ts ./apps/admin/sentry.client.config.ts
+COPY --from=build /app/apps/admin/instrumentation-client.ts ./apps/admin/instrumentation-client.ts
 COPY --from=build /app/apps/admin/sentry.server.config.ts ./apps/admin/sentry.server.config.ts
 COPY --from=build /app/apps/admin/sentry.edge.config.ts ./apps/admin/sentry.edge.config.ts
 COPY --from=build /app/packages/ui ./packages/ui
 COPY --from=build /app/packages/telemetry/dist ./packages/telemetry/dist
 COPY --from=build /app/packages/telemetry/package.json ./packages/telemetry/package.json
+COPY --from=build /app/packages/types/dist ./packages/types/dist
+COPY --from=build /app/packages/types/package.json ./packages/types/package.json
 
 WORKDIR /app/apps/admin
 
