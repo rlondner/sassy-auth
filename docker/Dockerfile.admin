@@ -82,6 +82,12 @@ COPY --from=build /app/apps/admin/sentry.edge.config.ts ./apps/admin/sentry.edge
 COPY --from=build /app/packages/ui ./packages/ui
 COPY --from=build /app/packages/telemetry/dist ./packages/telemetry/dist
 COPY --from=build /app/packages/telemetry/package.json ./packages/telemetry/package.json
+COPY --from=build /app/packages/telemetry/node_modules ./packages/telemetry/node_modules
+# pnpm's isolated node_modules only hoists root-level deps to /app/node_modules;
+# package-specific deps (next's own bin, react, react-dom, dotenv, ...) live as
+# symlinks under apps/admin/node_modules, which must be copied too or `npx next
+# start` silently fetches a mismatched `next` from the registry instead.
+COPY --from=build /app/apps/admin/node_modules ./apps/admin/node_modules
 COPY --from=build /app/packages/types/dist ./packages/types/dist
 COPY --from=build /app/packages/types/package.json ./packages/types/package.json
 

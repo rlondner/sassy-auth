@@ -61,11 +61,16 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build /app/apps/auth-server/dist ./apps/auth-server/dist
 COPY --from=build /app/apps/auth-server/package.json ./apps/auth-server/package.json
+# pnpm's isolated node_modules only hoists root-level deps to /app/node_modules;
+# package-specific deps (e.g. dotenv) live as symlinks under the package's own
+# node_modules, which must be copied too or `require()` fails at runtime.
+COPY --from=build /app/apps/auth-server/node_modules ./apps/auth-server/node_modules
 COPY --from=build /app/packages/db ./packages/db
 COPY --from=build /app/packages/types/dist ./packages/types/dist
 COPY --from=build /app/packages/types/package.json ./packages/types/package.json
 COPY --from=build /app/packages/telemetry/dist ./packages/telemetry/dist
 COPY --from=build /app/packages/telemetry/package.json ./packages/telemetry/package.json
+COPY --from=build /app/packages/telemetry/node_modules ./packages/telemetry/node_modules
 
 COPY docker/entrypoint-auth-server-prod.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
