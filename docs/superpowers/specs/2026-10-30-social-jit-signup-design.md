@@ -101,23 +101,73 @@ early enough to still compensate before the browser sees anything.
    c. **Eligible:** creates the `SaUser` synchronously (see §4).
    d. **Ineligible** (unresolvable `client_id`, or app missing either
       default field): deletes the just-created `User` row (cascades to its
-      `Account` row) — a compensating delete, same pattern
-      `registration.service.ts` already uses on its own failure path. No
-      `SaUser` is created, so this is indistinguishable from today's
-      `disableSignUp: true` refusal: the existing session-create gate
-      (`evaluateSessionGate`) finds no `SaUser`, throws `FORBIDDEN`, and the
-      browser lands on `/oauth-error?code=social_no_account`, exactly as
-      before this feature existed. **No orphan `User`/`Account` row is left
-      behind for any app that doesn't opt in** — the one property the
-      original design cared most about is preserved for everyone except the
-      apps that explicitly opted in via `defaultOrgId`/`defaultRoleId`.
-4. BetterAuth's normal post-callback flow continues: `databaseHooks.session.create.before`
-   re-runs `evaluateSessionGate` (now finds the freshly-created, active
-   `SaUser` for an eligible app and allows the session), the existing social
-   consent gate (§5) fires, and `/authorize` re-runs its existing checks and
-   issues the code. No new authorization logic is added downstream of
-   session creation — a JIT-provisioned user is, from that point on,
-   indistinguishable from an invited one.
+      `Account` row) — a compensating delete, see §3a for why this must be an
+      explicit delete rather than a transaction rollback — then throws, which
+      §3a describes producing a dedicated, friendly redirect rather than
+      today's generic `social_no_account` refusal. **No orphan `User`/
+      `Account` row is left behind for any app that doesn't opt in** — the
+      one property the original design cared most about is preserved for
+      everyone except the apps that explicitly opted in via `defaultOrgId`/
+      `defaultRoleId`.
+4. BetterAuth's normal post-callback flow continues for an eligible app:
+   `databaseHooks.session.create.before` re-runs `evaluateSessionGate` (now
+   finds the freshly-created, active `SaUser` and allows the session), the
+   existing social consent gate (§5) fires, and `/authorize` re-runs its
+   existing checks and issues the code. No new authorization logic is added
+   downstream of session creation — a JIT-provisioned user is, from that
+   point on, indistinguishable from an invited one. For an ineligible app,
+   the thrown error in step 3d short-circuits this entirely — see §3a.
+
+### 3a. The ineligible-app redirect — verified against the installed BetterAuth source
+
+The ineligible-app case needs its own error page ("you can't sign up for this
+app this way"), distinct from the existing generic `social_no_account` —
+that code means "you personally have no account," this means "this app
+doesn't support signup at all," which is true for every visitor, not a
+property of who's asking.
+
+Producing a real `FOUND` redirect (not a raw error status) for a failure
+originating in *our own* hook — rather than BetterAuth's own account-linking
+refusal — looked uncertain at design time. Reading the installed
+`better-auth@1.6.11` / `@better-auth/core@1.6.11` source resolved it:
+
+- `databaseHooks.<model>.create.after` hooks are not awaited inline by
+  `createWithHooks` (`db/with-hooks.mjs`) — they're registered via
+  `queueAfterTransactionHook(...)` (`@better-auth/core`'s
+  `context/transaction.mjs`), which **defers them until after the enclosing
+  DB transaction commits**, then runs them **synchronously, awaited, still
+  inside `runWithTransaction`'s own call frame**, before that frame returns
+  to its caller.
+- `oauth2/link-account.mjs`'s signup branch calls
+  `c.context.internalAdapter.createOAuthUser(...)` (which wraps both the
+  `User` and `Account` inserts in one `runWithTransaction`) inside a
+  `try { ... } catch (e) { if (isAPIError(e)) return { error: e.message, ... }; ... }`.
+  Because our `user.create.after` hook runs *inside* that same await chain
+  (per the point above), **anything it throws propagates straight into this
+  catch block** — not lost, not swallowed, not an unhandled rejection.
+- `isAPIError` accepts any `better-auth/api` `APIError` instance — exactly
+  the class `auth.config.ts` already imports and already throws from another
+  hook (the `/reset-password` policy check). So our hook can
+  `throw new APIError('BAD_REQUEST', { message: 'social_signup_unavailable' })`
+  and `link-account.mjs` turns that into `{ error: 'social_signup_unavailable' }`.
+- `api/routes/callback.mjs` then does
+  `return redirectOnError(result.error.split(' ').join('_'))` — the **exact
+  same mechanism** `signup_disabled` and `account_not_linked` already ride
+  today — producing a native `FOUND` redirect to
+  `<errorCallbackURL>?error=social_signup_unavailable`. `classify-callback-
+  outcome.ts` already reads this `error` query param; it needs one new,
+  unconditional mapping entry for this code (no `classifyRejection`
+  matchedUser/emailVerified nuance applies here — every visitor to an
+  ineligible app gets the same message).
+
+Because the transaction has already committed by the time our hook runs, the
+compensating delete (§2d) is still required — this mechanism gets us a clean
+redirect, not a free rollback. Delete the rows, *then* throw.
+
+A new `/oauth-error` code, `social_signup_unavailable`, is added alongside
+the existing ones in `apps/admin/app/oauth-error`'s `KNOWN_CODES` set and
+`messages/en.json`/`messages/fr.json`, with copy that reads as an app-level
+fact ("Sign-up isn't available for this app"), not a personal rejection.
 
 ## 4. Provisioning a new `SaUser`
 
@@ -167,6 +217,34 @@ user were missing consent for a newly-added policy. This is pure reuse of an
 already-shipped mechanism — no new page, no new route, no new consent-record
 logic.
 
+## 5a. Showing the button on `/signup`, gated on eligibility
+
+Today, `/login`'s `SocialButtons` are shown whenever an app has any enabled
+providers, regardless of this feature — they serve **returning** users
+(account-linking sign-in, which works via BetterAuth's own linking rule on
+any app, invite-only or not) as much as first-time ones. Hiding them there
+based on `defaultOrgId`/`defaultRoleId` would wrongly block already-invited
+users from using Google/Microsoft/Apple to sign in to an invite-only app —
+unrelated to this feature, and a real regression. `/login` is unchanged.
+
+Instead, the dedicated `/signup` page (`apps/admin/app/signup/signup-form.tsx`
+and its code-verification sibling `signup-wizard-card.tsx`) — today
+email/password only, with no social option at all — gains the same
+`SocialButtons` component (extracted to a shared location rather than
+duplicated), rendered **only** when the app is JIT-signup-eligible
+(`defaultOrgId !== null && defaultRoleId !== null`). This is a new capability
+on `/signup`, not a conditional hide of something that exists there today.
+
+`RegistrationService.getAppName` (the `/signup` page's existing data source,
+exposing `hasDefaultOrg`) is extended to also select `defaultRoleId` and
+return the combined eligibility boolean (e.g. `canSocialSignup`). The enabled
+provider list itself comes from the same discovery call `/login` already
+makes (`fetchSocialProviders` → `GET /api/social-providers?client_id=...`) —
+no new endpoint. `/signup` renders the buttons only when both
+`canSocialSignup` is true and that list is non-empty; everything else about
+the page (companyName capture when there's no default org, consent
+checkboxes, password form) is unchanged and unaffected by this addition.
+
 ## 6. What does NOT change
 
 - `evaluateSessionGate`, the 2FA enrollment interception at
@@ -210,8 +288,12 @@ logic.
   with a working code — the mirror image of the original design's
   security-critical "creates no `User` row" assertion for an *ineligible* app,
   which must still hold: **a first-time identity against an app with no
-  `defaultOrgId`/`defaultRoleId` creates no `User` row and no `SaUser`**,
-  exactly as today.
+  `defaultOrgId`/`defaultRoleId` ends with no `User` row and no `SaUser`
+  persisted** (the compensating delete in §2d/§3a actually removes what the
+  transaction committed), and the browser lands specifically on
+  `/oauth-error?code=social_signup_unavailable` — not the generic
+  `social_no_account` a truly-unknown identity against an invite-only app
+  would have produced before this feature existed.
 - An eligible app with `privacyPolicyUrl` set: first social sign-in bounces
   to `/login/consent` before the OAuth code is issued, and accepting there
   completes the flow.
@@ -223,7 +305,9 @@ logic.
 `rs-social-round-trip.spec.ts`'s existing suite: unknown stub identity against
 a newly-eligible demo app signs up, lands authenticated on the RS, and shows
 `amr: ext`, `idp: stub` — same claim assertions as the existing linked-user
-case, proving a JIT-provisioned user is indistinguishable downstream.
+case, proving a JIT-provisioned user is indistinguishable downstream. A
+second test covers the `/signup` page: the social button is present for an
+eligible app's `client_id` and absent for an ineligible one.
 
 ## 8. Out of scope
 
