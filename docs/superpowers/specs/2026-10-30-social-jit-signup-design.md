@@ -82,20 +82,35 @@ early enough to still compensate before the browser sees anything.
 3. **New:** if neither matches, `disableSignUp: false` now lets BetterAuth
    create a `User` + `Account` row (instead of refusing). The new
    `databaseHooks.user.create.after(user, context)` hook fires immediately:
-   a. Recovers the target app's `client_id` from the in-flight OAuth state —
-      the same `callbackURL`-recovery approach `recoverAuthorizeParams`
-      (`registration.service.ts`) already uses for email signup, adapted to
-      whatever BetterAuth exposes on `context` for a database hook (as
-      opposed to the `createAuthMiddleware` hook, which exposes
-      `ctx.context.returned`/`responseHeaders` directly). **Open item,
-      verify during implementation:** confirm the exact shape BetterAuth
-      hands a `databaseHooks.user.create.after` callback for an in-progress
-      OAuth callback request — `@better-auth/core`'s `GenericEndpointContext`
-      type is shared across hook kinds, but which fields are actually
-      populated for this specific hook has not been read against the
-      installed source yet. This is the same category of risk the original
-      design flagged for Apple's cookie scoping — a verified fact to pin down
-      in the plan, not a guess to make now.
+   a. Recovers the target app's `client_id` — **verified mechanism**, not an
+      open item: a new `hooks.before` branch (in the same `createAuthMiddleware`
+      matcher `auth.config.ts` already has) matches `/callback/:id`, reads
+      the `state` query/body param, and calls
+      `ctx.context.internalAdapter.findVerificationValue(state)` — a
+      **read-only** lookup of the same `Verification` row BetterAuth's own
+      `parseState` will consume moments later. This must be read-only: this
+      deployment's `storeStateStrategy` resolves to `"database"` (BetterAuth
+      defaults to `"database"` whenever `options.database` is set and
+      `options.account.storeStateStrategy` isn't overridden, which is this
+      config's situation — confirmed in `@better-auth/core`'s
+      `create-context.mjs`), and that strategy's `parseGenericState` calls
+      `internalAdapter.deleteVerificationByIdentifier(state)` — calling
+      BetterAuth's own `parseState` ourselves a second time, instead of
+      reading the row directly, would delete it before BetterAuth's real
+      callback handler gets to, breaking every social sign-in. The found
+      row's `value` is `JSON.stringify({ callbackURL, ... })`
+      (`oauth2/state.mjs`'s `generateGenericState`); `JSON.parse` it, read
+      `callbackURL`, and extract `client_id` via
+      `new URL(callbackURL).searchParams.get('client_id')` — the same shape
+      `recoverAuthorizeParams` (`registration.service.ts`) already parses
+      for email signup. The result is captured into a new AsyncLocalStorage
+      module (e.g. `social-signup-app-context.ts`, mirroring the existing
+      `apple-private-relay-context.ts`/`social-consent-context.ts` pattern)
+      so the later `databaseHooks.user.create.after` hook — which runs
+      within the same request's async context but has no direct access to
+      `ctx.query`/`ctx.body` itself — can read it back. A missing/unparsable
+      state, row, or `client_id` captures `null`, which §3's step (b)
+      already treats as "unresolvable `client_id`" → the ineligible path.
    b. Resolves the `SaApp` row for that `client_id` and checks
       `defaultOrgId !== null && defaultRoleId !== null`.
    c. **Eligible:** creates the `SaUser` synchronously (see §4).
