@@ -103,8 +103,9 @@ early enough to still compensate before the browser sees anything.
       `callbackURL`, and extract `client_id` via
       `new URL(callbackURL).searchParams.get('client_id')` — the same shape
       `recoverAuthorizeParams` (`registration.service.ts`) already parses
-      for email signup. The result is captured into a new AsyncLocalStorage
-      module (e.g. `social-signup-app-context.ts`, mirroring the existing
+      for email signup. The result is captured into the same shared
+      `social-signup-context.ts` AsyncLocalStorage module §4 introduces for
+      the name-derivation capture (mirroring the existing
       `apple-private-relay-context.ts`/`social-consent-context.ts` pattern)
       so the later `databaseHooks.user.create.after` hook — which runs
       within the same request's async context but has no direct access to
@@ -199,12 +200,27 @@ a social sign-in implies:
   `app.defaultRoleId` — identical to `finishRegistration`'s existing
   `if (app.defaultRoleId) { tx.saUserRole.create(...) }` branch.
 - `firstName`/`lastName`: use the provider's `given_name`/`family_name`
-  claims when present (Google reliably supplies these); otherwise split the
-  profile's single `name` field on the first space, everything after the
-  first space becoming `lastName` (a lone single-word name yields an empty
-  `lastName`). Applied uniformly regardless of provider — this is a
-  best-effort fallback for Microsoft/Apple, not provider-specific branching
-  beyond "did this provider give us given_name/family_name."
+  claims when present; otherwise split the profile's single `name` field on
+  the first space, everything after the first space becoming `lastName` (a
+  lone single-word name yields an empty `lastName`).
+
+  **Mechanism, verified against the installed provider source:** by the time
+  `databaseHooks.user.create.after` sees the `User` row, `given_name`/
+  `family_name` are already gone — `@better-auth/core`'s `google.mjs` and
+  `microsoft-entra-id.mjs` both collapse the decoded profile down to a
+  single `name: user.name` before `createOAuthUser` is ever called, and
+  neither the raw claims nor the split survive onto the row. The only place
+  that still sees the full raw profile is `mapProfileToUser` — the same
+  per-provider hook Apple's config already uses (`build-social-providers.ts`)
+  to capture `is_private_email` into `apple-private-relay-context.ts`'s
+  `AsyncLocalStorage`. Google's and Microsoft's provider configs each gain
+  their own `mapProfileToUser` that captures `given_name`/`family_name` the
+  identical way, into a new shared `social-signup-context.ts` (alongside the
+  `client_id` capture from §3a — one `AsyncLocalStorage` store, multiple
+  fields, mirroring `social-consent-context.ts`'s `{ip, userId}` shape)
+  rather than two separate stores. Apple's existing `mapProfileToUser`
+  already returns `{}` for a reason (§6 of the original design) and is left
+  untouched; Apple-originated signups always fall back to splitting `name`.
 - `publicId`: same convention as `finishRegistration`
   (`baUserId.slice(0, 12)`).
 - No `SaUserConsent` rows are written here — see §5, the existing consent
