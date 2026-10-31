@@ -29,6 +29,8 @@ import { resolveAppForResetToken } from './resolve-app-for-reset-token';
 import { notifyActivation } from '../activation/notify-activation';
 import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
 import { envInt, AUTH_THROTTLE } from '../common/config/rate-limit-config';
+import { readSocialSignupContext, captureSocialSignupClientId } from '../social/social-signup-context';
+import { provisionSocialSignupUser } from '../social/provision-social-signup-user';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -221,6 +223,40 @@ export const auth = betterAuth({
   // orphaned from an SaUser (bug-0151) — one BetterAuth user with
   // no SaUser is a no-op that must not fail the sign-in.
   databaseHooks: {
+    user: {
+      create: {
+        after: async (
+          user: { id: string; email: string; name: string },
+          ctx?: { path?: string; params?: Record<string, string> } | null,
+        ) => {
+          const { clientId, givenName, familyName } = readSocialSignupContext();
+          // Only a social-provider signup reaches this with a non-null
+          // clientId (captured in hooks.before above, scoped to
+          // /callback/:id). Email/password signup provisions its SaUser
+          // itself (registration.service.ts) and never goes through this
+          // path with a captured clientId, so this hook is a no-op for it.
+          if (!clientId) return;
+          // Real provider id, reusing the same route-template
+          // reconstruction + validation chain task-4's
+          // session.create.before hook already relies on
+          // (resolveHookRoutePath -> signInMethodFromPath ->
+          // providerFromSignInMethod). Falls back to the 'social'
+          // placeholder only if that chain can't resolve a provider from
+          // this hook's context, which should not happen for a genuine
+          // /callback/:id request.
+          const provider = providerFromSignInMethod(signInMethodFromPath(resolveHookRoutePath(ctx))) ?? 'social';
+          await provisionSocialSignupUser(prisma, {
+            betterAuthUserId: user.id,
+            email: user.email,
+            name: user.name,
+            provider,
+            clientId,
+            givenName,
+            familyName,
+          });
+        },
+      },
+    },
     session: {
       create: {
         before: async (
@@ -305,6 +341,38 @@ export const auth = betterAuth({
       if (ctx.path === '/sign-in/email') {
         const email = (ctx.body as { email?: string } | undefined)?.email;
         console.log(`[auth-server] Sign-in attempt for ${email ?? 'unknown'}`);
+      }
+
+      // JIT social signup (design doc 2026-10-30, §3a): recover which app
+      // this callback targets, so the later databaseHooks.user.create.after
+      // hook (which has no direct access to ctx.query/ctx.body) can decide
+      // eligibility. MUST be read-only — this deployment's
+      // storeStateStrategy resolves to "database" (set whenever
+      // options.database is set and options.account.storeStateStrategy
+      // isn't overridden, per @better-auth/core's create-context.mjs; true
+      // here), and that strategy's own parseState call (made later, by
+      // BetterAuth's real /callback/:id handler) DELETES the Verification
+      // row it reads — calling parseState ourselves a second time here
+      // would delete it first and break every social sign-in on the second,
+      // real call. findVerificationValue is a plain read.
+      if (ctx.path === '/callback/:id') {
+        const state = (ctx.query as { state?: string } | undefined)?.state
+          ?? (ctx.body as { state?: string } | undefined)?.state;
+        let clientId: string | null = null;
+        if (state) {
+          try {
+            const row = await ctx.context.internalAdapter.findVerificationValue(state);
+            if (row) {
+              const parsed = JSON.parse(row.value) as { callbackURL?: string };
+              if (parsed.callbackURL) {
+                clientId = new URL(parsed.callbackURL).searchParams.get('client_id');
+              }
+            }
+          } catch {
+            clientId = null;
+          }
+        }
+        captureSocialSignupClientId(clientId);
       }
 
       // task-7: /reset-password has no server-side complexity check by
