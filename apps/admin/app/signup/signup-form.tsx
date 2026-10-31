@@ -7,6 +7,7 @@ import { Button, FormField } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
 import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
 import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
+import { SocialButtons } from '@/components/social-buttons'
 import { Turnstile } from '@marsidev/react-turnstile'
 import { registerAction } from './actions'
 
@@ -14,6 +15,9 @@ interface SignupFormProps {
   clientId: string
   next: string
   hasDefaultOrg: boolean
+  canSocialSignup?: boolean
+  providers?: string[]
+  authServerUrl?: string
   passwordPolicy: PasswordPolicy | null
   privacyPolicyUrl: string | null
   termsUrl: string | null
@@ -29,7 +33,10 @@ const KNOWN_ERRORS = [
   'validationError',
 ] as const
 
-export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, privacyPolicyUrl, termsUrl, gdprUrl }: SignupFormProps) {
+export function SignupForm({
+  clientId, next, hasDefaultOrg, canSocialSignup = false, providers = [], authServerUrl = '',
+  passwordPolicy, privacyPolicyUrl, termsUrl, gdprUrl,
+}: SignupFormProps) {
   const t = useTranslations()
   const router = useRouter()
   const [firstName, setFirstName] = React.useState('')
@@ -115,7 +122,11 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <>
+      {canSocialSignup && providers.length > 0 && (
+        <SocialButtons providers={providers} next={next} authServerUrl={authServerUrl} />
+      )}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
         <FormField
           id="firstName"
@@ -257,6 +268,7 @@ export function SignupForm({ clientId, next, hasDefaultOrg, passwordPolicy, priv
       >
         {t('signup.submit')}
       </Button>
-    </form>
+      </form>
+    </>
   )
 }
