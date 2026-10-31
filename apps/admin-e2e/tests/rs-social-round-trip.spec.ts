@@ -29,7 +29,7 @@ import { execFileSync } from 'node:child_process'
 import type { APIRequestContext } from '@playwright/test'
 import { test, expect } from '../lib/fixtures'
 import { SocialLoginPage } from '../pages/social-login.page'
-import { AUTH_SERVER_URL } from '../lib/oauth-fixtures'
+import { ADMIN_URL, AUTH_SERVER_URL } from '../lib/oauth-fixtures'
 
 const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
 const STUB_IDP_URL = process.env.E2E_STUB_IDP_URL ?? 'http://localhost:9099'
@@ -362,5 +362,47 @@ test.describe('FastAPI RS federated round-trip', () => {
 
     const after = countUsersWithEmail(email)
     expect(after, 'the compensating delete must leave no User row behind').toBe(0)
+  })
+
+  test('/signup shows the social button only once the app is JIT-signup-eligible', async ({ page }) => {
+    const rsClientId = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
+    expect(rsClientId, 'RS_CLIENT_ID / SASSY_CLIENT_ID must be set').toBeTruthy()
+
+    await page.goto(`${ADMIN_URL}/signup?client_id=${encodeURIComponent(rsClientId)}`)
+    await expect(page.getByRole('button', { name: /test idp/i })).toHaveCount(0)
+
+    const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
+    try {
+      // Same pagination shape as the JIT-provisioning test above —
+      // { items, total, page, pageSize }, not a bare orgs/roles array.
+      const orgsRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/orgs?q=Citadel`)
+      expect(orgsRes.ok(), `GET /api/orgs failed: ${orgsRes.status()}`).toBeTruthy()
+      const { items: orgItems } = (await orgsRes.json()) as { items: Array<{ publicId: string; name: string }> }
+      const citadelOrg = orgItems.find((o) => o.name === 'Citadel')
+      expect(citadelOrg, 'Citadel org (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+      const rolesRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/roles?q=${encodeURIComponent('Citadel Inspectors')}`)
+      expect(rolesRes.ok(), `GET /api/roles failed: ${rolesRes.status()}`).toBeTruthy()
+      const { items: roleItems } = (await rolesRes.json()) as { items: Array<{ publicId: string; name: string }> }
+      const inspectorsRole = roleItems.find((r) => r.name === 'Citadel Inspectors')
+      expect(inspectorsRole, 'Citadel Inspectors role (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+      try {
+        const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: citadelOrg!.publicId, defaultRoleId: inspectorsRole!.publicId },
+        })
+        expect(patchRes.ok(), `failed to set default org/role: ${patchRes.status()}`).toBeTruthy()
+
+        await page.goto(`${ADMIN_URL}/signup?client_id=${encodeURIComponent(rsClientId)}`)
+        await expect(page.getByRole('button', { name: /test idp/i })).toBeVisible()
+      } finally {
+        const restoreRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: null, defaultRoleId: null },
+        })
+        expect(restoreRes.ok(), `failed to restore default org/role: ${restoreRes.status()}`).toBeTruthy()
+      }
+    } finally {
+      await superCtx.close()
+    }
   })
 })
