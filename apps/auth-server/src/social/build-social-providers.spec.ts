@@ -86,9 +86,9 @@ describe('availableSocialProviders', () => {
 });
 
 describe('buildSocialProviders', () => {
-  it('sets disableSignUp on every provider so federation stays invite-only', () => {
+  it('leaves disableSignUp off on every provider so JIT social signup can run', () => {
     const built = buildSocialProviders(GOOGLE) as Record<string, { disableSignUp: boolean }>;
-    expect(built.google.disableSignUp).toBe(true);
+    expect(built.google.disableSignUp).toBe(false);
   });
 
   it('passes the credentials through', () => {
@@ -124,7 +124,7 @@ describe('buildSocialProviders', () => {
 
     expect(typeof built.apple.clientSecret).toBe('string');
     expect(built.apple.clientSecret.split('.')).toHaveLength(3);
-    expect(built.apple.disableSignUp).toBe(true);
+    expect(built.apple.disableSignUp).toBe(false);
   });
 
   // task-8 fix round 1 (review finding 1): mapProfileToUser is the ONLY
