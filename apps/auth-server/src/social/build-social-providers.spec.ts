@@ -1,5 +1,6 @@
 import { availableSocialProviders, buildSocialProviders } from './build-social-providers';
 import { runWithPrivateRelayCapture, readIsPrivateEmail } from './apple-private-relay-context';
+import { runWithSocialSignupContext, readSocialSignupContext } from './social-signup-context';
 
 function appleEnv() {
   const crypto = require('node:crypto') as typeof import('node:crypto');
@@ -166,6 +167,109 @@ describe('buildSocialProviders', () => {
       let mapped: Record<string, unknown> | undefined;
       expect(() => {
         mapped = built.apple.mapProfileToUser({ is_private_email: true });
+      }).not.toThrow();
+      expect(mapped).toEqual({});
+    });
+  });
+
+  // Design doc §4: given_name/family_name never survive onto the User row
+  // BetterAuth hands the after-hook — Google's and Microsoft's
+  // mapProfileToUser capture them into the same request-scoped
+  // AsyncLocalStorage Apple's is_private_email capture above uses. These
+  // tests mirror that group: capture when present, default to null when
+  // missing, return {} (don't alter the mapped fields), and don't throw
+  // outside a capture scope.
+  describe('google mapProfileToUser (given_name/family_name capture)', () => {
+    type NameProviderConfig = {
+      mapProfileToUser: (profile: {
+        given_name?: string;
+        family_name?: string;
+      }) => Record<string, unknown>;
+    };
+
+    it('captures given_name and family_name without altering the mapped fields', async () => {
+      const built = buildSocialProviders(GOOGLE) as Record<string, NameProviderConfig>;
+
+      const { mapped, captured } = await runWithSocialSignupContext(async () => {
+        const mapped = built.google.mapProfileToUser({
+          given_name: 'Ada',
+          family_name: 'Lovelace',
+        });
+        return { mapped, captured: readSocialSignupContext() };
+      });
+
+      expect(mapped).toEqual({});
+      expect(captured.givenName).toBe('Ada');
+      expect(captured.familyName).toBe('Lovelace');
+    });
+
+    it('defaults given_name/family_name to null when missing from the profile', async () => {
+      const built = buildSocialProviders(GOOGLE) as Record<string, NameProviderConfig>;
+
+      const { mapped, captured } = await runWithSocialSignupContext(async () => {
+        const mapped = built.google.mapProfileToUser({});
+        return { mapped, captured: readSocialSignupContext() };
+      });
+
+      expect(mapped).toEqual({});
+      expect(captured.givenName).toBeNull();
+      expect(captured.familyName).toBeNull();
+    });
+
+    it('does nothing observable outside a capture scope (no throw, still returns {})', () => {
+      const built = buildSocialProviders(GOOGLE) as Record<string, NameProviderConfig>;
+      let mapped: Record<string, unknown> | undefined;
+      expect(() => {
+        mapped = built.google.mapProfileToUser({ given_name: 'Ada', family_name: 'Lovelace' });
+      }).not.toThrow();
+      expect(mapped).toEqual({});
+    });
+  });
+
+  describe('microsoft mapProfileToUser (given_name/family_name capture)', () => {
+    type NameProviderConfig = {
+      mapProfileToUser: (profile: {
+        given_name?: string;
+        family_name?: string;
+      }) => Record<string, unknown>;
+    };
+
+    const MICROSOFT = { MICROSOFT_CLIENT_ID: 'mid', MICROSOFT_CLIENT_SECRET: 'msecret' };
+
+    it('captures given_name and family_name without altering the mapped fields', async () => {
+      const built = buildSocialProviders(MICROSOFT) as Record<string, NameProviderConfig>;
+
+      const { mapped, captured } = await runWithSocialSignupContext(async () => {
+        const mapped = built.microsoft.mapProfileToUser({
+          given_name: 'Grace',
+          family_name: 'Hopper',
+        });
+        return { mapped, captured: readSocialSignupContext() };
+      });
+
+      expect(mapped).toEqual({});
+      expect(captured.givenName).toBe('Grace');
+      expect(captured.familyName).toBe('Hopper');
+    });
+
+    it('defaults given_name/family_name to null when missing from the profile', async () => {
+      const built = buildSocialProviders(MICROSOFT) as Record<string, NameProviderConfig>;
+
+      const { mapped, captured } = await runWithSocialSignupContext(async () => {
+        const mapped = built.microsoft.mapProfileToUser({});
+        return { mapped, captured: readSocialSignupContext() };
+      });
+
+      expect(mapped).toEqual({});
+      expect(captured.givenName).toBeNull();
+      expect(captured.familyName).toBeNull();
+    });
+
+    it('does nothing observable outside a capture scope (no throw, still returns {})', () => {
+      const built = buildSocialProviders(MICROSOFT) as Record<string, NameProviderConfig>;
+      let mapped: Record<string, unknown> | undefined;
+      expect(() => {
+        mapped = built.microsoft.mapProfileToUser({ given_name: 'Grace', family_name: 'Hopper' });
       }).not.toThrow();
       expect(mapped).toEqual({});
     });
