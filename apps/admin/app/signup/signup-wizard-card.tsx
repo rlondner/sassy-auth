@@ -10,6 +10,9 @@ interface SignupWizardCardProps {
   clientId: string
   next: string
   hasDefaultOrg: boolean
+  canSocialSignup: boolean
+  providers: string[]
+  authServerUrl: string
   passwordPolicy: PasswordPolicy | null
   privacyPolicyUrl: string | null
   termsUrl: string | null
@@ -27,6 +30,9 @@ export function SignupWizardCard({
   clientId,
   next,
   hasDefaultOrg,
+  canSocialSignup,
+  providers,
+  authServerUrl,
   passwordPolicy,
   privacyPolicyUrl,
   termsUrl,
@@ -79,6 +85,9 @@ export function SignupWizardCard({
         clientId={clientId}
         next={next}
         hasDefaultOrg={hasDefaultOrg}
+        canSocialSignup={canSocialSignup}
+        providers={providers}
+        authServerUrl={authServerUrl}
         passwordPolicy={passwordPolicy}
         privacyPolicyUrl={privacyPolicyUrl}
         termsUrl={termsUrl}

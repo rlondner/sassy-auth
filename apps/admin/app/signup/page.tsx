@@ -72,6 +72,9 @@ export default async function SignupPage({
         clientId={clientId}
         next={nextSafe}
         hasDefaultOrg={hasDefaultOrg}
+        canSocialSignup={canSocialSignup}
+        providers={providers}
+        authServerUrl={AUTH_SERVER}
         passwordPolicy={passwordPolicy}
         privacyPolicyUrl={privacyPolicyUrl}
         termsUrl={termsUrl}
