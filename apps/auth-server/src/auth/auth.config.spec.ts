@@ -22,6 +22,13 @@ jest.mock('./otp-sender', () => ({ sendSignInOtp: jest.fn() }));
 jest.mock('../activation/notify-activation', () => ({
   notifyActivation: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('../social/social-signup-context', () => ({
+  captureSocialSignupClientId: jest.fn(),
+  readSocialSignupContext: jest.fn(() => ({ clientId: null, givenName: null, familyName: null })),
+}));
+jest.mock('../social/provision-social-signup-user', () => ({
+  provisionSocialSignupUser: jest.fn().mockResolvedValue(undefined),
+}));
 
 describe('auth.config — twoFactor plugin', () => {
   it('includes the twoFactor plugin in the plugins array', async () => {
@@ -605,5 +612,172 @@ describe('auth.config — session gate FORBIDDEN code (real invocation)', () => 
     prisma.saUser.findUnique = jest.fn().mockResolvedValue({ status: 'inactive' });
     const before = await loadSessionCreateBefore();
     await expect(before({ userId: 'ba-1' })).rejects.toMatchObject({ body: { code: 'ACCOUNT_INACTIVE' } });
+  });
+});
+
+// Design doc 2026-10-30 §3a: the /callback/:id capture branch. This is a
+// read-only probe of the Verification row BetterAuth's own /callback/:id
+// handler will later consume for real (via parseState, which deletes the
+// row) — see the long comment above this branch in auth.config.ts for why
+// this must stay a plain findVerificationValue read. Every failure path
+// (no state, no row, malformed JSON, no callbackURL, no client_id) must
+// degrade to captureSocialSignupClientId(null) rather than throwing, since
+// this runs inside hooks.before ahead of BetterAuth's own handler.
+describe('auth.config — hooks.before (/callback/:id JIT social signup client_id capture)', () => {
+  async function loadBeforeHook() {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const hooks = options['hooks'] as Record<string, unknown>;
+    return hooks['before'] as (ctx: {
+      path?: string;
+      query?: { state?: string };
+      body?: { state?: string };
+      context?: { internalAdapter: { findVerificationValue: (state: string) => Promise<{ value: string } | null> } };
+    }) => Promise<void>;
+  }
+
+  function ctxWithState(state: string | undefined, findVerificationValue: jest.Mock) {
+    return {
+      path: '/callback/:id',
+      query: state ? { state } : undefined,
+      context: { internalAdapter: { findVerificationValue } },
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('captures the client_id extracted from the verification row\'s callbackURL', async () => {
+    const before = await loadBeforeHook();
+    const { captureSocialSignupClientId } = require('../social/social-signup-context');
+    const findVerificationValue = jest.fn().mockResolvedValue({
+      value: JSON.stringify({ callbackURL: 'https://admin.example/callback?client_id=app_123' }),
+    });
+    await before(ctxWithState('state-abc', findVerificationValue));
+    expect(findVerificationValue).toHaveBeenCalledWith('state-abc');
+    expect(captureSocialSignupClientId).toHaveBeenCalledWith('app_123');
+  });
+
+  it('captures null when there is no state param (no verification lookup attempted)', async () => {
+    const before = await loadBeforeHook();
+    const { captureSocialSignupClientId } = require('../social/social-signup-context');
+    const findVerificationValue = jest.fn();
+    await before(ctxWithState(undefined, findVerificationValue));
+    expect(findVerificationValue).not.toHaveBeenCalled();
+    expect(captureSocialSignupClientId).toHaveBeenCalledWith(null);
+  });
+
+  it('captures null when the verification row cannot be found', async () => {
+    const before = await loadBeforeHook();
+    const { captureSocialSignupClientId } = require('../social/social-signup-context');
+    const findVerificationValue = jest.fn().mockResolvedValue(null);
+    await before(ctxWithState('state-abc', findVerificationValue));
+    expect(captureSocialSignupClientId).toHaveBeenCalledWith(null);
+  });
+
+  it('captures null when the verification row value is malformed JSON', async () => {
+    const before = await loadBeforeHook();
+    const { captureSocialSignupClientId } = require('../social/social-signup-context');
+    const findVerificationValue = jest.fn().mockResolvedValue({ value: 'not-json{{{' });
+    await before(ctxWithState('state-abc', findVerificationValue));
+    expect(captureSocialSignupClientId).toHaveBeenCalledWith(null);
+  });
+
+  it('captures null when the parsed row value has no callbackURL', async () => {
+    const before = await loadBeforeHook();
+    const { captureSocialSignupClientId } = require('../social/social-signup-context');
+    const findVerificationValue = jest.fn().mockResolvedValue({ value: JSON.stringify({}) });
+    await before(ctxWithState('state-abc', findVerificationValue));
+    expect(captureSocialSignupClientId).toHaveBeenCalledWith(null);
+  });
+
+  it('captures null when the callbackURL has no client_id query param', async () => {
+    const before = await loadBeforeHook();
+    const { captureSocialSignupClientId } = require('../social/social-signup-context');
+    const findVerificationValue = jest.fn().mockResolvedValue({
+      value: JSON.stringify({ callbackURL: 'https://admin.example/callback' }),
+    });
+    await before(ctxWithState('state-abc', findVerificationValue));
+    expect(captureSocialSignupClientId).toHaveBeenCalledWith(null);
+  });
+
+  it('does not attempt a capture for a non-callback path', async () => {
+    const before = await loadBeforeHook();
+    const { captureSocialSignupClientId } = require('../social/social-signup-context');
+    const findVerificationValue = jest.fn();
+    await before({ path: '/sign-in/email', context: { internalAdapter: { findVerificationValue } } });
+    expect(findVerificationValue).not.toHaveBeenCalled();
+    expect(captureSocialSignupClientId).not.toHaveBeenCalled();
+  });
+});
+
+// Design doc 2026-10-30 §3a/§4: databaseHooks.user.create.after is the hook
+// that actually provisions (or rejects) a first-time social signup, reading
+// the clientId captured by the hooks.before branch above via
+// readSocialSignupContext(). Email/password signup provisions its SaUser
+// itself (registration.service.ts) and never reaches this hook with a
+// non-null clientId, so the null-clientId case must be a strict no-op.
+describe('auth.config — databaseHooks.user.create.after (JIT social signup provisioning)', () => {
+  async function loadUserCreateAfter() {
+    const { auth } = await import('./auth.config');
+    const options = (auth as unknown as { options: Record<string, unknown> }).options;
+    const databaseHooks = options['databaseHooks'] as {
+      user: {
+        create: {
+          after: (
+            user: { id: string; email: string; name: string },
+            ctx?: { path?: string; params?: Record<string, string> } | null,
+          ) => Promise<void>;
+        };
+      };
+    };
+    return databaseHooks.user.create.after;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('is a no-op when no client_id was captured (e.g. an email/password signup)', async () => {
+    const { readSocialSignupContext } = require('../social/social-signup-context');
+    readSocialSignupContext.mockReturnValue({ clientId: null, givenName: null, familyName: null });
+    const { provisionSocialSignupUser } = require('../social/provision-social-signup-user');
+    const after = await loadUserCreateAfter();
+    await after({ id: 'ba-1', email: 'jane@example.com', name: 'Jane Doe' }, { path: '/sign-up/email' });
+    expect(provisionSocialSignupUser).not.toHaveBeenCalled();
+  });
+
+  it('provisions with the real resolved provider when the hook context matches /callback/:id', async () => {
+    const { readSocialSignupContext } = require('../social/social-signup-context');
+    readSocialSignupContext.mockReturnValue({ clientId: 'app_123', givenName: 'Jane', familyName: 'Doe' });
+    const { provisionSocialSignupUser } = require('../social/provision-social-signup-user');
+    const { prisma } = require('@sassy-auth/db');
+    const after = await loadUserCreateAfter();
+    await after(
+      { id: 'ba-1', email: 'jane@example.com', name: 'Jane Doe' },
+      { path: '/callback/:id', params: { id: 'google' } },
+    );
+    expect(provisionSocialSignupUser).toHaveBeenCalledWith(prisma, {
+      betterAuthUserId: 'ba-1',
+      email: 'jane@example.com',
+      name: 'Jane Doe',
+      provider: 'google',
+      clientId: 'app_123',
+      givenName: 'Jane',
+      familyName: 'Doe',
+    });
+  });
+
+  it('falls back to the "social" placeholder provider when the route cannot be resolved', async () => {
+    const { readSocialSignupContext } = require('../social/social-signup-context');
+    readSocialSignupContext.mockReturnValue({ clientId: 'app_123', givenName: null, familyName: null });
+    const { provisionSocialSignupUser } = require('../social/provision-social-signup-user');
+    const after = await loadUserCreateAfter();
+    await after({ id: 'ba-2', email: 'joe@example.com', name: 'Joe Doe' }, null);
+    expect(provisionSocialSignupUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ provider: 'social', clientId: 'app_123' }),
+    );
   });
 });
