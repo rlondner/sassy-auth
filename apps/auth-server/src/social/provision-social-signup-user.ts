@@ -3,6 +3,7 @@ import { resolveSocialSignupEligibility } from './resolve-social-signup-eligibil
 import { deriveSignupName } from './derive-signup-name';
 import { recordFederationEvent } from './record-federation-event';
 import { createAppLogger } from '../common/logger/winston.config';
+import { SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE } from './classify-callback-outcome';
 
 export interface ProvisionSocialSignupDb {
   saApp: {
@@ -47,7 +48,7 @@ const logger = createAppLogger();
  * row (see design doc §3a) — a delete here is a compensating delete, never
  * a rollback.
  *
- * Throws an APIError('BAD_REQUEST', { message: 'social_signup_unavailable' })
+ * Throws an APIError('BAD_REQUEST', { message: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE })
  * on the ineligible path — see design doc §3a for why this specific message
  * string, unchanged by better-auth's callback.mjs error-code transform,
  * reaches classify-callback-outcome.ts as a real FOUND redirect rather than
@@ -69,7 +70,7 @@ export async function provisionSocialSignupUser(
         err: String(err),
       });
     }
-    throw new APIError('BAD_REQUEST', { message: 'social_signup_unavailable' });
+    throw new APIError('BAD_REQUEST', { message: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE });
   }
 
   const { firstName, lastName } = deriveSignupName({

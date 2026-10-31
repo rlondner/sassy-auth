@@ -65,6 +65,16 @@ export interface CallbackOutcome {
   canRedirect: boolean;
 }
 
+/**
+ * Shared source of truth for the ineligible-social-signup code: thrown as
+ * `APIError('BAD_REQUEST', { message: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE })`
+ * by provision-social-signup-user.ts, and matched against here when that
+ * message survives better-auth's callback.mjs redirect untouched (see the
+ * file header above). Kept as one constant so a future rename can't silently
+ * desync the throw site from this comparison.
+ */
+export const SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE = 'social_signup_unavailable';
+
 const BETTER_AUTH_ERROR_TO_INPUT: Record<string, { matchedUser: boolean; emailVerified: boolean }> = {
   signup_disabled: { matchedUser: false, emailVerified: true },
   account_not_linked: { matchedUser: true, emailVerified: false },
@@ -118,8 +128,12 @@ export function classifyCallbackOutcome(
   }
   if (!betterAuthError) return null;
 
-  if (betterAuthError === 'social_signup_unavailable') {
-    return { reason: 'social_signup_unavailable', code: 'social_signup_unavailable', canRedirect: true };
+  if (betterAuthError === SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE) {
+    return {
+      reason: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE,
+      code: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE,
+      canRedirect: true,
+    };
   }
 
   const input = BETTER_AUTH_ERROR_TO_INPUT[betterAuthError];
