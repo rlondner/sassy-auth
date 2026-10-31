@@ -290,4 +290,77 @@ test.describe('FastAPI RS federated round-trip', () => {
       await superCtx.close()
     }
   })
+
+  test('a first-time unknown identity JIT-provisions and completes sign-in for an eligible app', async ({ page, request }) => {
+    const rsClientId = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
+    expect(rsClientId, 'RS_CLIENT_ID / SASSY_CLIENT_ID must be set').toBeTruthy()
+
+    const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
+    try {
+      // /api/orgs and /api/roles are paginated list endpoints that return
+      // { items, total, page, pageSize } — not a bare `orgs`/`roles` array —
+      // see OrgsService.listOrgs / RolesService.listRoles. Filtering by `q`
+      // finds the seeded row regardless of how many other orgs/roles exist.
+      const orgsRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/orgs?q=Citadel`)
+      expect(orgsRes.ok(), `GET /api/orgs failed: ${orgsRes.status()}`).toBeTruthy()
+      const { items: orgItems } = (await orgsRes.json()) as { items: Array<{ publicId: string; name: string }> }
+      const citadelOrg = orgItems.find((o) => o.name === 'Citadel')
+      expect(citadelOrg, 'Citadel org (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+      const rolesRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/roles?q=${encodeURIComponent('Citadel Inspectors')}`)
+      expect(rolesRes.ok(), `GET /api/roles failed: ${rolesRes.status()}`).toBeTruthy()
+      const { items: roleItems } = (await rolesRes.json()) as { items: Array<{ publicId: string; name: string }> }
+      const inspectorsRole = roleItems.find((r) => r.name === 'Citadel Inspectors')
+      expect(inspectorsRole, 'Citadel Inspectors role (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+      const email = `jit-e2e-${Date.now()}@example.com`
+      const before = countUsersWithEmail(email)
+      expect(before, 'precondition: no leftover row from a previous run').toBe(0)
+
+      try {
+        const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: citadelOrg!.publicId, defaultRoleId: inspectorsRole!.publicId },
+        })
+        expect(patchRes.ok(), `failed to set default org/role: ${patchRes.status()}`).toBeTruthy()
+
+        const social = new SocialLoginPage(page)
+        await social.setIdentity(request, { sub: `jit-e2e-sub-${Date.now()}`, email, email_verified: true })
+
+        await page.goto(`${RS_BASE_URL}/auth/login`)
+        await social.clickTestIdp()
+
+        await expect(page).toHaveURL(new RegExp(`^${RS_BASE_URL}/auth/callback`))
+        await expect(page.getByRole('heading', { name: 'Signed in' })).toBeVisible()
+        await expect(page.getByTestId('claim-amr')).toHaveText('ext')
+
+        const after = countUsersWithEmail(email)
+        expect(after, 'JIT signup must create exactly one User row').toBe(1)
+      } finally {
+        const restoreRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: null, defaultRoleId: null },
+        })
+        expect(restoreRes.ok(), `failed to restore default org/role: ${restoreRes.status()}`).toBeTruthy()
+      }
+    } finally {
+      await superCtx.close()
+    }
+  })
+
+  test('an unknown identity against an ineligible app is redirected to social_signup_unavailable and creates no user', async ({ page, request }) => {
+    const social = new SocialLoginPage(page)
+    const email = `nojit-e2e-${Date.now()}@example.com`
+    const before = countUsersWithEmail(email)
+    expect(before, 'precondition: no leftover row from a previous run').toBe(0)
+
+    await social.setIdentity(request, { sub: `nojit-e2e-sub-${Date.now()}`, email, email_verified: true })
+
+    await page.goto(`${RS_BASE_URL}/auth/login`)
+    await social.clickTestIdp()
+
+    await expect(page).toHaveURL(/\/oauth-error\?code=social_signup_unavailable/)
+    await expect(page.getByText("Sign-up isn't available for this app")).toBeVisible()
+
+    const after = countUsersWithEmail(email)
+    expect(after, 'the compensating delete must leave no User row behind').toBe(0)
+  })
 })
