@@ -118,6 +118,10 @@ export function classifyCallbackOutcome(
   }
   if (!betterAuthError) return null;
 
+  if (betterAuthError === 'social_signup_unavailable') {
+    return { reason: 'social_signup_unavailable', code: 'social_signup_unavailable', canRedirect: true };
+  }
+
   const input = BETTER_AUTH_ERROR_TO_INPUT[betterAuthError];
   if (!input) return null;
 

@@ -32,6 +32,21 @@ describe('classifyCallbackOutcome', () => {
     ).toEqual({ reason: 'email_unverified', code: 'social_email_unverified', canRedirect: true });
   });
 
+  it('maps social_signup_unavailable (ineligible app) to its own code, unconditionally', () => {
+    expect(
+      classifyCallbackOutcome(redirectError('https://auth.example/error?error=social_signup_unavailable')),
+    ).toEqual({ reason: 'social_signup_unavailable', code: 'social_signup_unavailable', canRedirect: true });
+  });
+
+  it('maps social_signup_unavailable the same way regardless of isPrivateEmail', () => {
+    expect(
+      classifyCallbackOutcome(
+        redirectError('https://auth.example/error?error=social_signup_unavailable'),
+        true,
+      ),
+    ).toEqual({ reason: 'social_signup_unavailable', code: 'social_signup_unavailable', canRedirect: true });
+  });
+
   it('maps the session gate FORBIDDEN throw to the generic no-account code, and marks it non-redirectable', () => {
     expect(classifyCallbackOutcome(forbiddenError())).toEqual({
       reason: 'sauser_not_active',
