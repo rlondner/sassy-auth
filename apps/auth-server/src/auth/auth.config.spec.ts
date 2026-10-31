@@ -197,6 +197,29 @@ describe('auth.config — hooks.after handler body (task-8 fix round 1, review f
     );
   });
 
+  it('a refused callback via the genericOAuth stub-IdP template (/oauth2/callback/:providerId) still sets the error redirect', async () => {
+    const after = await loadAfterHook();
+    const { recordFederationEvent } = require('../social/record-federation-event');
+    const responseHeaders = new Headers();
+
+    await after({
+      path: '/oauth2/callback/:providerId',
+      params: { providerId: 'stub' },
+      context: { returned: redirectReturned('signup_disabled'), responseHeaders },
+    });
+
+    const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    expect(responseHeaders.get('location')).toBe(`${adminUrl}/oauth-error?code=social_no_account`);
+    expect(recordFederationEvent).toHaveBeenCalledWith(
+      expect.objectContaining({}),
+      expect.objectContaining({
+        type: 'social.signin.rejected',
+        provider: 'stub',
+        reason: 'no_sauser_for_verified_email',
+      }),
+    );
+  });
+
   it('a canRedirect: false outcome (session-gate FORBIDDEN) sets NO location header but still records an audit event', async () => {
     const after = await loadAfterHook();
     const { recordFederationEvent } = require('../social/record-federation-event');
@@ -630,15 +653,22 @@ describe('auth.config — hooks.before (/callback/:id JIT social signup client_i
     const hooks = options['hooks'] as Record<string, unknown>;
     return hooks['before'] as (ctx: {
       path?: string;
+      params?: Record<string, string>;
       query?: { state?: string };
       body?: { state?: string };
       context?: { internalAdapter: { findVerificationValue: (state: string) => Promise<{ value: string } | null> } };
     }) => Promise<void>;
   }
 
-  function ctxWithState(state: string | undefined, findVerificationValue: jest.Mock) {
+  function ctxWithState(
+    state: string | undefined,
+    findVerificationValue: jest.Mock,
+    path = '/callback/:id',
+    params: Record<string, string> = { id: 'google' },
+  ) {
     return {
-      path: '/callback/:id',
+      path,
+      params,
       query: state ? { state } : undefined,
       context: { internalAdapter: { findVerificationValue } },
     };
@@ -709,6 +739,17 @@ describe('auth.config — hooks.before (/callback/:id JIT social signup client_i
     await before({ path: '/sign-in/email', context: { internalAdapter: { findVerificationValue } } });
     expect(findVerificationValue).not.toHaveBeenCalled();
     expect(captureSocialSignupClientId).not.toHaveBeenCalled();
+  });
+
+  it('captures the client_id for the genericOAuth stub-IdP callback template (/oauth2/callback/:providerId)', async () => {
+    const before = await loadBeforeHook();
+    const { captureSocialSignupClientId } = require('../social/social-signup-context');
+    const findVerificationValue = jest.fn().mockResolvedValue({
+      value: JSON.stringify({ callbackURL: 'https://admin.example/callback?client_id=app_123' }),
+    });
+    await before(ctxWithState('state-abc', findVerificationValue, '/oauth2/callback/:providerId', { providerId: 'stub' }));
+    expect(findVerificationValue).toHaveBeenCalledWith('state-abc');
+    expect(captureSocialSignupClientId).toHaveBeenCalledWith('app_123');
   });
 });
 

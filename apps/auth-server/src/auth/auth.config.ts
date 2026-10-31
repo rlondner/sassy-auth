@@ -355,7 +355,17 @@ export const auth = betterAuth({
       // row it reads — calling parseState ourselves a second time here
       // would delete it first and break every social sign-in on the second,
       // real call. findVerificationValue is a plain read.
-      if (ctx.path === '/callback/:id') {
+      //
+      // `ctx.path` is the route TEMPLATE (see resolveHookRoutePath above),
+      // and BetterAuth's bundled socialProviders callback and the
+      // genericOAuth plugin's callback (used by the e2e stub IdP) are
+      // registered at two different templates — `/callback/:id` and
+      // `/oauth2/callback/:providerId` respectively. A literal `===`
+      // against only the first silently skips this capture for every
+      // genericOAuth-based provider, so this reuses the same
+      // resolveHookRoutePath -> signInMethodFromPath composition used
+      // elsewhere in this file to recognize either template.
+      if (signInMethodFromPath(resolveHookRoutePath(ctx))?.startsWith('ext:')) {
         const state = (ctx.query as { state?: string } | undefined)?.state
           ?? (ctx.body as { state?: string } | undefined)?.state;
         let clientId: string | null = null;
@@ -402,9 +412,18 @@ export const auth = betterAuth({
       // task-8: only the OAuth callback route is in scope here. Matched by
       // route TEMPLATE + params, same reconstruction task-4 already
       // established for databaseHooks (see resolveHookRoutePath) — `ctx.path`
-      // is `/callback/:id` (callback.mjs:20), never the literal request path.
-      if (ctx.path !== '/callback/:id') return;
-      const providerId = (ctx.params as Record<string, string> | undefined)?.id;
+      // is a route template (`/callback/:id` for BetterAuth's bundled
+      // socialProviders, or `/oauth2/callback/:providerId` for the
+      // genericOAuth plugin used by the e2e stub IdP), never the literal
+      // request path. A literal `===` against only `/callback/:id` would
+      // skip this entire gate for genericOAuth-driven sign-ins, so this
+      // reuses the same resolveHookRoutePath -> signInMethodFromPath
+      // composition used elsewhere in this file to recognize either
+      // template.
+      const resolvedAfterPath = resolveHookRoutePath(ctx);
+      if (!signInMethodFromPath(resolvedAfterPath)?.startsWith('ext:')) return;
+      const providerId = (ctx.params as Record<string, string> | undefined)?.id
+        ?? (ctx.params as Record<string, string> | undefined)?.providerId;
 
       // task-8: classifyCallbackOutcome reads BetterAuth's OWN redirect/error
       // from ctx.context.returned — see classify-callback-outcome.ts for the
