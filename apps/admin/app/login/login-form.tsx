@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { AuthCard, Button, FormField } from '@sassy-auth/ui'
 import { clientIdFromNext } from '@/lib/client-id-from-next'
 import { signIn } from './actions'
-import { SocialButtons } from './social-buttons'
+import { SocialButtons } from '@/components/social-buttons'
 
 export function LoginForm({
   next,

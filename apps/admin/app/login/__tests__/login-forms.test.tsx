@@ -20,7 +20,7 @@ jest.mock('../actions', () => ({
 }))
 // SocialButtons has its own spec and pulls in the provider list; it is not
 // what these cases are about.
-jest.mock('../social-buttons', () => ({ SocialButtons: () => null }))
+jest.mock('@/components/social-buttons', () => ({ SocialButtons: () => null }))
 
 const mockSignIn = signIn as jest.MockedFunction<any>
 const mockRequestOtp = requestOtp as jest.MockedFunction<any>

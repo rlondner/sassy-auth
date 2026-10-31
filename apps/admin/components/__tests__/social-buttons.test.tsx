@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '@/messages/en.json'
-import { SocialButtons } from '@/app/login/social-buttons'
+import { SocialButtons } from '@/components/social-buttons'
 
 const DEFAULT_AUTH_SERVER_URL = 'https://auth.example.com'
 
