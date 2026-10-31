@@ -405,4 +405,91 @@ test.describe('FastAPI RS federated round-trip', () => {
       await superCtx.close()
     }
   })
+
+  test('a first-time unknown identity against an app with a Privacy Policy is bounced to /login/consent before completing sign-in', async ({ page, request }) => {
+    // Design spec (2026-10-30-social-jit-signup-design.md, §5/§7): no new
+    // interstitial was built for consent on a JIT signup — auth.config.ts's
+    // hooks.after already runs resolveOutstandingConsent + appendConsentRedirect
+    // for every successful social sign-in (new or returning) and redirects to
+    // /login/consent before the browser ever reaches the RS's /auth/callback.
+    // A JIT-provisioned user has zero SaUserConsent rows at the moment this
+    // gate runs, so resolveOutstandingConsent naturally returns every
+    // required document as outstanding. This test exercises that promise
+    // end-to-end through the stub IdP, using the same
+    // defaultOrgId/defaultRoleId JIT-eligibility PATCH as the test above,
+    // plus a privacyPolicyUrl (the real DTO field — see
+    // apps/auth-server/src/apps/dto/update-app.dto.ts) on the same app.
+    //
+    // The consent-acceptance UI pattern (checkbox per outstanding document,
+    // "Continue" button gated on all being checked) is read directly from
+    // apps/admin/app/login/consent/ConsentGateClient.tsx and its labels from
+    // apps/admin/messages/en.json's signup.acceptPrivacyPolicy / loginConsent.
+    // No prior Playwright spec drives this page — lib/app-fixtures.ts's
+    // createAppWithConsentDocuments + signup.spec.ts's "Privacy Policy /
+    // Terms consent" describe block cover the checkbox-and-URL fixture
+    // pattern, but only for the in-wizard self-serve signup form, not this
+    // post-sign-in /login/consent gate.
+    const rsClientId = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
+    expect(rsClientId, 'RS_CLIENT_ID / SASSY_CLIENT_ID must be set').toBeTruthy()
+
+    const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
+    try {
+      const orgsRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/orgs?q=Citadel`)
+      expect(orgsRes.ok(), `GET /api/orgs failed: ${orgsRes.status()}`).toBeTruthy()
+      const { items: orgItems } = (await orgsRes.json()) as { items: Array<{ publicId: string; name: string }> }
+      const citadelOrg = orgItems.find((o) => o.name === 'Citadel')
+      expect(citadelOrg, 'Citadel org (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+      const rolesRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/roles?q=${encodeURIComponent('Citadel Inspectors')}`)
+      expect(rolesRes.ok(), `GET /api/roles failed: ${rolesRes.status()}`).toBeTruthy()
+      const { items: roleItems } = (await rolesRes.json()) as { items: Array<{ publicId: string; name: string }> }
+      const inspectorsRole = roleItems.find((r) => r.name === 'Citadel Inspectors')
+      expect(inspectorsRole, 'Citadel Inspectors role (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+      const email = `jit-consent-e2e-${Date.now()}@example.com`
+      const before = countUsersWithEmail(email)
+      expect(before, 'precondition: no leftover row from a previous run').toBe(0)
+
+      try {
+        const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: {
+            defaultOrgId: citadelOrg!.publicId,
+            defaultRoleId: inspectorsRole!.publicId,
+            privacyPolicyUrl: 'https://example.com/privacy',
+          },
+        })
+        expect(patchRes.ok(), `failed to set default org/role/privacyPolicyUrl: ${patchRes.status()}`).toBeTruthy()
+
+        const social = new SocialLoginPage(page)
+        await social.setIdentity(request, { sub: `jit-consent-e2e-sub-${Date.now()}`, email, email_verified: true })
+
+        await page.goto(`${RS_BASE_URL}/auth/login`)
+        await social.clickTestIdp()
+
+        // Lands on /login/consent — not directly on the RS's /auth/callback —
+        // before the OAuth code is issued.
+        await expect(page).toHaveURL(new RegExp(`^${ADMIN_URL}/login/consent\\?appPublicId=`))
+        await expect(page).not.toHaveURL(new RegExp(`^${RS_BASE_URL}/auth/callback`))
+
+        const privacyCheckbox = page.getByRole('checkbox', { name: /privacy policy/i })
+        await expect(privacyCheckbox).toBeVisible()
+        await privacyCheckbox.check()
+        await page.getByRole('button', { name: /continue/i }).click()
+
+        await expect(page).toHaveURL(new RegExp(`^${RS_BASE_URL}/auth/callback`))
+        await expect(page.getByRole('heading', { name: 'Signed in' })).toBeVisible()
+        await expect(page.getByTestId('claim-amr')).toHaveText('ext')
+
+        const after = countUsersWithEmail(email)
+        expect(after, 'JIT signup must create exactly one User row').toBe(1)
+      } finally {
+        const restoreRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: null, defaultRoleId: null, privacyPolicyUrl: null },
+        })
+        expect(restoreRes.ok(), `failed to restore default org/role/privacyPolicyUrl: ${restoreRes.status()}`).toBeTruthy()
+      }
+    } finally {
+      await superCtx.close()
+    }
+  })
 })
