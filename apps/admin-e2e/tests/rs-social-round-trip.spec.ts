@@ -194,8 +194,26 @@ test.describe('FastAPI RS federated round-trip', () => {
     await page.goto(`${RS_BASE_URL}/auth/login`)
     await social.clickTestIdp()
 
-    await expect(page).toHaveURL(/\/oauth-error\?code=social_no_account/)
-    await expect(page.getByText("We couldn't sign you in")).toBeVisible()
+    // This test predates JIT social signup, when every provider had
+    // `disableSignUp: true` (build-social-providers.ts) and BetterAuth's own
+    // `handleOAuthUserInfo` refused an unrecognized identity BEFORE creating
+    // any User row, surfacing as the generic `social_no_account` code. The
+    // JIT feature flips `disableSignUp: false` for every provider so a
+    // first-time identity's User/Account row is always created, and a new
+    // `databaseHooks.user.create.after` hook decides eligibility instead
+    // (see classify-callback-outcome.ts, provision-social-signup-user.ts).
+    // The RS demo app used throughout this file has no defaultOrgId/
+    // defaultRoleId, so it is NOT JIT-signup-eligible — an unknown identity
+    // against it now takes the new ineligible-app path and gets
+    // `social_signup_unavailable` instead, confirmed live. This is the
+    // intentional, documented behavior change (design doc §3a: "every
+    // visitor to an ineligible app gets the same message"), not a
+    // regression — see the dedicated
+    // "an unknown identity against an ineligible app is redirected to
+    // social_signup_unavailable" test below, which now covers the exact
+    // same real-world scenario this test does.
+    await expect(page).toHaveURL(/\/oauth-error\?code=social_signup_unavailable/)
+    await expect(page.getByText("Sign-up isn't available for this app")).toBeVisible()
 
     const after = countUsersWithEmail(email)
     expect(after, 'a refused sign-in must not create a User row').toBe(0)
@@ -203,7 +221,23 @@ test.describe('FastAPI RS federated round-trip', () => {
 
   test('an unverified provider email is refused with the specific message', async ({ page, request }) => {
     const social = new SocialLoginPage(page)
-    await social.setIdentity(request, { sub: 'stub-sub-1', email: SOCIAL_EMAIL, email_verified: false })
+    // Deliberately NOT 'stub-sub-1': that sub is already linked to
+    // SOCIAL_EMAIL by the two tests above, and better-auth's
+    // handleOAuthUserInfo (link-account.mjs) never re-checks emailVerified
+    // for an identity that is already linked (see the "linkedAccount" branch
+    // vs. the "no linkedAccount yet" implicit-linking branch) — confirmed
+    // live: reusing 'stub-sub-1' here just signs the user back in instead of
+    // refusing. A fresh sub against the SAME, already-registered
+    // SOCIAL_EMAIL instead hits better-auth's implicit-account-linking path
+    // (dbUser matched by email, no linked Account yet for this
+    // providerId/accountId), which DOES still check emailVerified
+    // (requireLocalEmailVerified / untrusted-provider gate) and refuses with
+    // better-auth's own "account not linked" error — classified below by
+    // classify-callback-outcome.ts's unchanged 'account_not_linked' mapping.
+    // This path is untouched by the JIT feature's disableSignUp flip (that
+    // only affects the "no matching user at all" branch), so the expected
+    // code/copy here is unchanged.
+    await social.setIdentity(request, { sub: 'stub-sub-unverified-1', email: SOCIAL_EMAIL, email_verified: false })
 
     await page.goto(`${RS_BASE_URL}/auth/login`)
     await social.clickTestIdp()
