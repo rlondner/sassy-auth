@@ -122,7 +122,15 @@ export function classifyCallbackOutcome(
 
   let betterAuthError: string | null;
   try {
-    betterAuthError = new URL(location).searchParams.get('error');
+    // `location` is not guaranteed to be absolute: a relative Location
+    // header (e.g. '/oauth-error?error=...') is valid HTTP, and is exactly
+    // what social-buttons.tsx's `errorCallbackURL: '/oauth-error'` produces
+    // via better-auth's own redirectOnError. `new URL(location)` with no
+    // base throws on a relative string; the base below is only there to
+    // satisfy the constructor — it's discarded, since we only read
+    // `searchParams`, never the resolved URL itself. It's a no-op for an
+    // already-absolute `location`.
+    betterAuthError = new URL(location, 'http://localhost').searchParams.get('error');
   } catch {
     return null;
   }
