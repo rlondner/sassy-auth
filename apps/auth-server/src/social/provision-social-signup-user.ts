@@ -53,6 +53,14 @@ const logger = createAppLogger();
  * string, unchanged by better-auth's callback.mjs error-code transform,
  * reaches classify-callback-outcome.ts as a real FOUND redirect rather than
  * a raw error status.
+ *
+ * The same compensating delete + APIError also fires on the eligible path if
+ * either `db.saUser.create` or `db.saUserRole.create` throws (DB constraint
+ * violation, transient error, etc) — eligibility was already confirmed, but
+ * the orphaned BetterAuth User/Account row still needs cleaning up. The
+ * `recordFederationEvent` audit call that runs after both creates succeed is
+ * NOT covered by this compensation: an audit-only failure after successful
+ * provisioning is a separate, already-accepted fire-and-forget failure mode.
  */
 export async function provisionSocialSignupUser(
   db: ProvisionSocialSignupDb,
@@ -79,18 +87,43 @@ export async function provisionSocialSignupUser(
     familyName: input.familyName,
   });
 
-  const saUser = await db.saUser.create({
-    data: {
-      publicId: input.betterAuthUserId.slice(0, 12),
-      betterAuthUserId: input.betterAuthUserId,
-      orgId: app.defaultOrgId!,
-      firstName,
-      lastName,
-      status: 'active',
-    },
-  });
+  let saUser: { id: number; publicId: string };
+  try {
+    saUser = await db.saUser.create({
+      data: {
+        publicId: input.betterAuthUserId.slice(0, 12),
+        betterAuthUserId: input.betterAuthUserId,
+        orgId: app.defaultOrgId!,
+        firstName,
+        lastName,
+        status: 'active',
+      },
+    });
 
-  await db.saUserRole.create({ data: { userId: saUser.id, roleId: app.defaultRoleId! } });
+    await db.saUserRole.create({ data: { userId: saUser.id, roleId: app.defaultRoleId! } });
+  } catch (err: unknown) {
+    // Eligibility was already confirmed, but one of the two provisioning
+    // writes failed (DB constraint violation, transient error, etc). The
+    // BetterAuth User/Account row was already committed before this
+    // function ran (design doc §3a) — without this compensation it would
+    // be left orphaned with no SaUser. Degrade to the same safe,
+    // already-tested outcome as the ineligible path rather than a raw 500.
+    logger.error('Eligible-path provisioning write failed; compensating', {
+      context: 'provision-social-signup-user',
+      betterAuthUserId: input.betterAuthUserId,
+      err: String(err),
+    });
+    try {
+      await db.user.delete({ where: { id: input.betterAuthUserId } });
+    } catch (deleteErr: unknown) {
+      logger.warn('Compensating delete failed after an eligible-path provisioning failure', {
+        context: 'provision-social-signup-user',
+        betterAuthUserId: input.betterAuthUserId,
+        err: String(deleteErr),
+      });
+    }
+    throw new APIError('BAD_REQUEST', { message: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE });
+  }
 
   await recordFederationEvent(
     { db, logger },

@@ -105,4 +105,34 @@ describe('provisionSocialSignupUser', () => {
       'social_signup_unavailable',
     );
   });
+
+  it('compensates with a delete and throws the shared APIError when db.saUser.create throws', async () => {
+    const db = makeDb();
+    db.saApp.findUnique.mockResolvedValue({
+      id: 1, publicId: 'sq_app1', defaultOrgId: 10, defaultRoleId: 20,
+    });
+    db.saUser.create.mockRejectedValue(new Error('unique constraint violation'));
+
+    await expect(provisionSocialSignupUser(db, BASE_INPUT)).rejects.toThrow(APIError);
+    await expect(provisionSocialSignupUser(db, BASE_INPUT)).rejects.toThrow('social_signup_unavailable');
+
+    expect(db.user.delete).toHaveBeenCalledWith({ where: { id: 'ba-user-1' } });
+    expect(db.saUserRole.create).not.toHaveBeenCalled();
+    expect(db.saAuditEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('compensates with a delete and throws the shared APIError when db.saUserRole.create throws', async () => {
+    const db = makeDb();
+    db.saApp.findUnique.mockResolvedValue({
+      id: 1, publicId: 'sq_app1', defaultOrgId: 10, defaultRoleId: 20,
+    });
+    db.saUser.create.mockResolvedValue({ id: 100, publicId: 'ba-user-1'.slice(0, 12) });
+    db.saUserRole.create.mockRejectedValue(new Error('fk constraint violation'));
+
+    await expect(provisionSocialSignupUser(db, BASE_INPUT)).rejects.toThrow(APIError);
+    await expect(provisionSocialSignupUser(db, BASE_INPUT)).rejects.toThrow('social_signup_unavailable');
+
+    expect(db.user.delete).toHaveBeenCalledWith({ where: { id: 'ba-user-1' } });
+    expect(db.saAuditEvent.create).not.toHaveBeenCalled();
+  });
 });
