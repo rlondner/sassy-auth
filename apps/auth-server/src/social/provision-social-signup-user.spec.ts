@@ -4,7 +4,7 @@ import { provisionSocialSignupUser } from './provision-social-signup-user';
 function makeDb(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     saApp: { findUnique: jest.fn() },
-    saUser: { create: jest.fn() },
+    saUser: { create: jest.fn(), delete: jest.fn() },
     saUserRole: { create: jest.fn() },
     user: { delete: jest.fn() },
     saAuditEvent: { create: jest.fn() },
@@ -121,7 +121,7 @@ describe('provisionSocialSignupUser', () => {
     expect(db.saAuditEvent.create).not.toHaveBeenCalled();
   });
 
-  it('compensates with a delete and throws the shared APIError when db.saUserRole.create throws', async () => {
+  it('compensates by deleting SaUser then User, and throws the shared APIError, when db.saUserRole.create throws', async () => {
     const db = makeDb();
     db.saApp.findUnique.mockResolvedValue({
       id: 1, publicId: 'sq_app1', defaultOrgId: 10, defaultRoleId: 20,
@@ -129,10 +129,41 @@ describe('provisionSocialSignupUser', () => {
     db.saUser.create.mockResolvedValue({ id: 100, publicId: 'ba-user-1'.slice(0, 12) });
     db.saUserRole.create.mockRejectedValue(new Error('fk constraint violation'));
 
+    const callOrder: string[] = [];
+    db.saUser.delete.mockImplementation(async () => {
+      callOrder.push('saUser.delete');
+    });
+    db.user.delete.mockImplementation(async () => {
+      callOrder.push('user.delete');
+    });
+
     await expect(provisionSocialSignupUser(db, BASE_INPUT)).rejects.toThrow(APIError);
     await expect(provisionSocialSignupUser(db, BASE_INPUT)).rejects.toThrow('social_signup_unavailable');
 
+    expect(db.saUser.delete).toHaveBeenCalledWith({ where: { id: 100 } });
     expect(db.user.delete).toHaveBeenCalledWith({ where: { id: 'ba-user-1' } });
+    expect(callOrder.indexOf('saUser.delete')).toBeLessThan(callOrder.indexOf('user.delete'));
     expect(db.saAuditEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('still deletes SaUser first, still logs, and still throws the shared APIError when the compensating db.user.delete itself fails (simulated FK-RESTRICT violation)', async () => {
+    const db = makeDb();
+    db.saApp.findUnique.mockResolvedValue({
+      id: 1, publicId: 'sq_app1', defaultOrgId: 10, defaultRoleId: 20,
+    });
+    db.saUser.create.mockResolvedValue({ id: 100, publicId: 'ba-user-1'.slice(0, 12) });
+    db.saUserRole.create.mockRejectedValue(new Error('fk constraint violation'));
+    // Simulates the real Postgres failure mode: User->SaUser is ON DELETE
+    // RESTRICT, so if the SaUser delete did not actually happen first (or
+    // itself failed), the User delete would reject like this in production.
+    db.user.delete.mockRejectedValue(
+      new Error('update or delete on table "User" violates foreign key constraint "SaUser_betterAuthUserId_fkey"'),
+    );
+
+    await expect(provisionSocialSignupUser(db, BASE_INPUT)).rejects.toThrow(APIError);
+    await expect(provisionSocialSignupUser(db, BASE_INPUT)).rejects.toThrow('social_signup_unavailable');
+
+    expect(db.saUser.delete).toHaveBeenCalledWith({ where: { id: 100 } });
+    expect(db.user.delete).toHaveBeenCalledWith({ where: { id: 'ba-user-1' } });
   });
 });

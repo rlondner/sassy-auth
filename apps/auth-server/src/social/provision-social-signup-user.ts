@@ -16,6 +16,7 @@ export interface ProvisionSocialSignupDb {
   };
   saUser: {
     create(args: { data: Record<string, unknown> }): Promise<{ id: number; publicId: string }>;
+    delete(args: { where: { id: number } }): Promise<unknown>;
   };
   saUserRole: {
     create(args: { data: { userId: number; roleId: number } }): Promise<unknown>;
@@ -54,13 +55,26 @@ const logger = createAppLogger();
  * reaches classify-callback-outcome.ts as a real FOUND redirect rather than
  * a raw error status.
  *
- * The same compensating delete + APIError also fires on the eligible path if
+ * The same compensating-delete + APIError also fires on the eligible path if
  * either `db.saUser.create` or `db.saUserRole.create` throws (DB constraint
  * violation, transient error, etc) — eligibility was already confirmed, but
- * the orphaned BetterAuth User/Account row still needs cleaning up. The
- * `recordFederationEvent` audit call that runs after both creates succeed is
- * NOT covered by this compensation: an audit-only failure after successful
- * provisioning is a separate, already-accepted fire-and-forget failure mode.
+ * the orphaned BetterAuth User/Account row still needs cleaning up.
+ *
+ * Compensation order matters here: `SaUser.betterAuthUserId` has an
+ * `ON DELETE RESTRICT` FK to `User` (see
+ * packages/db/migrations/20260526054018_betterauth_init/migration.sql), so a
+ * `User` row cannot be deleted while a referencing `SaUser` row still exists.
+ * If `db.saUser.create` has already succeeded by the time something fails
+ * (i.e. `db.saUserRole.create` throws), the `SaUser` row must be deleted
+ * FIRST, before the compensating `db.user.delete`, or the latter would
+ * itself fail with an FK violation and leave the User/Account/SaUser rows
+ * all orphaned. `SaUserRole.userId` is `ON DELETE CASCADE` to `SaUser`, so
+ * deleting `SaUser` is never itself blocked by a surviving `SaUserRole` row
+ * — moot here anyway, since a throwing `saUserRole.create` never persisted
+ * one. The `recordFederationEvent` audit call that runs after both creates
+ * succeed is NOT covered by this compensation: an audit-only failure after
+ * successful provisioning is a separate, already-accepted fire-and-forget
+ * failure mode.
  */
 export async function provisionSocialSignupUser(
   db: ProvisionSocialSignupDb,
@@ -99,20 +113,48 @@ export async function provisionSocialSignupUser(
         status: 'active',
       },
     });
-
-    await db.saUserRole.create({ data: { userId: saUser.id, roleId: app.defaultRoleId! } });
   } catch (err: unknown) {
-    // Eligibility was already confirmed, but one of the two provisioning
-    // writes failed (DB constraint violation, transient error, etc). The
-    // BetterAuth User/Account row was already committed before this
-    // function ran (design doc §3a) — without this compensation it would
-    // be left orphaned with no SaUser. Degrade to the same safe,
-    // already-tested outcome as the ineligible path rather than a raw 500.
+    // Eligibility was already confirmed, but SaUser provisioning itself
+    // failed (DB constraint violation, transient error, etc). No SaUser row
+    // exists yet, so the compensating User delete can run directly — there
+    // is nothing to conflict with the User->SaUser RESTRICT FK.
     logger.error('Eligible-path provisioning write failed; compensating', {
       context: 'provision-social-signup-user',
       betterAuthUserId: input.betterAuthUserId,
       err: String(err),
     });
+    try {
+      await db.user.delete({ where: { id: input.betterAuthUserId } });
+    } catch (deleteErr: unknown) {
+      logger.warn('Compensating delete failed after an eligible-path provisioning failure', {
+        context: 'provision-social-signup-user',
+        betterAuthUserId: input.betterAuthUserId,
+        err: String(deleteErr),
+      });
+    }
+    throw new APIError('BAD_REQUEST', { message: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE });
+  }
+
+  try {
+    await db.saUserRole.create({ data: { userId: saUser.id, roleId: app.defaultRoleId! } });
+  } catch (err: unknown) {
+    // SaUser was already created, so the compensating User delete would hit
+    // the ON DELETE RESTRICT FK from SaUser.betterAuthUserId -> User.id
+    // unless the SaUser row is removed first. Delete SaUser, THEN User.
+    logger.error('Eligible-path provisioning write failed; compensating', {
+      context: 'provision-social-signup-user',
+      betterAuthUserId: input.betterAuthUserId,
+      err: String(err),
+    });
+    try {
+      await db.saUser.delete({ where: { id: saUser.id } });
+    } catch (deleteErr: unknown) {
+      logger.warn('Compensating SaUser delete failed after an eligible-path provisioning failure', {
+        context: 'provision-social-signup-user',
+        betterAuthUserId: input.betterAuthUserId,
+        err: String(deleteErr),
+      });
+    }
     try {
       await db.user.delete({ where: { id: input.betterAuthUserId } });
     } catch (deleteErr: unknown) {
