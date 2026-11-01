@@ -16,7 +16,11 @@ import { sendSignInOtp } from './otp-sender';
 import { otpTestStore } from './otp-test-store';
 import { buildSocialProviders } from '../social/build-social-providers';
 import { stubProviderConfig } from '../social/stub-provider';
-import { providerFromSignInMethod, signInMethodFromPath } from '../social/sign-in-method';
+import {
+  providerFromSignInMethod,
+  resolveProviderForSocialSignup,
+  signInMethodFromPath,
+} from '../social/sign-in-method';
 import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
 import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
@@ -238,13 +242,13 @@ export const auth = betterAuth({
           if (!clientId) return;
           // Real provider id, reusing the same route-template
           // reconstruction + validation chain task-4's
-          // session.create.before hook already relies on
-          // (resolveHookRoutePath -> signInMethodFromPath ->
-          // providerFromSignInMethod). Falls back to the 'social'
+          // session.create.before hook already relies on (resolveHookRoutePath
+          // -> signInMethodFromPath -> providerFromSignInMethod, composed in
+          // resolveProviderForSocialSignup). Falls back to the 'social'
           // placeholder only if that chain can't resolve a provider from
           // this hook's context, which should not happen for a genuine
           // /callback/:id request.
-          const provider = providerFromSignInMethod(signInMethodFromPath(resolveHookRoutePath(ctx))) ?? 'social';
+          const provider = resolveProviderForSocialSignup(ctx);
           await provisionSocialSignupUser(prisma, {
             betterAuthUserId: user.id,
             email: user.email,
