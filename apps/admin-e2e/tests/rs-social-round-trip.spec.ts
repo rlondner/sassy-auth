@@ -45,6 +45,35 @@ function configured(): boolean {
 }
 
 /**
+ * Resolves the seeded "Citadel" org and "Citadel Inspectors" role to their
+ * publicIds via the super-admin-authenticated /api/orgs and /api/roles list
+ * endpoints, for the three JIT-eligibility tests below that need to PATCH an
+ * app's defaultOrgId/defaultRoleId. Both endpoints return
+ * { items, total, page, pageSize } — not a bare orgs/roles array — see
+ * OrgsService.listOrgs / RolesService.listRoles; filtering by `q` finds the
+ * seeded row regardless of how many other orgs/roles exist. Throws (via
+ * `expect`) if either isn't found, so callers don't need to re-assert
+ * `toBeTruthy()` themselves.
+ */
+async function resolveCitadelOrgAndRole(
+  request: APIRequestContext,
+): Promise<{ orgId: string; roleId: string }> {
+  const orgsRes = await request.get(`${AUTH_SERVER_URL}/api/orgs?q=Citadel`)
+  expect(orgsRes.ok(), `GET /api/orgs failed: ${orgsRes.status()}`).toBeTruthy()
+  const { items: orgItems } = (await orgsRes.json()) as { items: Array<{ publicId: string; name: string }> }
+  const citadelOrg = orgItems.find((o) => o.name === 'Citadel')
+  expect(citadelOrg, 'Citadel org (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+  const rolesRes = await request.get(`${AUTH_SERVER_URL}/api/roles?q=${encodeURIComponent('Citadel Inspectors')}`)
+  expect(rolesRes.ok(), `GET /api/roles failed: ${rolesRes.status()}`).toBeTruthy()
+  const { items: roleItems } = (await rolesRes.json()) as { items: Array<{ publicId: string; name: string }> }
+  const inspectorsRole = roleItems.find((r) => r.name === 'Citadel Inspectors')
+  expect(inspectorsRole, 'Citadel Inspectors role (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+  return { orgId: citadelOrg!.publicId, roleId: inspectorsRole!.publicId }
+}
+
+/**
  * Counts rows in "User" for a given email by shelling out to `psql`, using
  * DATABASE_URL exactly as the invoking process set it (task-13 correction:
  * the ambient shell on this machine exports a DATABASE_URL pointing at an
@@ -297,21 +326,7 @@ test.describe('FastAPI RS federated round-trip', () => {
 
     const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
     try {
-      // /api/orgs and /api/roles are paginated list endpoints that return
-      // { items, total, page, pageSize } — not a bare `orgs`/`roles` array —
-      // see OrgsService.listOrgs / RolesService.listRoles. Filtering by `q`
-      // finds the seeded row regardless of how many other orgs/roles exist.
-      const orgsRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/orgs?q=Citadel`)
-      expect(orgsRes.ok(), `GET /api/orgs failed: ${orgsRes.status()}`).toBeTruthy()
-      const { items: orgItems } = (await orgsRes.json()) as { items: Array<{ publicId: string; name: string }> }
-      const citadelOrg = orgItems.find((o) => o.name === 'Citadel')
-      expect(citadelOrg, 'Citadel org (seeded by demo-resource-server.ts) must exist').toBeTruthy()
-
-      const rolesRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/roles?q=${encodeURIComponent('Citadel Inspectors')}`)
-      expect(rolesRes.ok(), `GET /api/roles failed: ${rolesRes.status()}`).toBeTruthy()
-      const { items: roleItems } = (await rolesRes.json()) as { items: Array<{ publicId: string; name: string }> }
-      const inspectorsRole = roleItems.find((r) => r.name === 'Citadel Inspectors')
-      expect(inspectorsRole, 'Citadel Inspectors role (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+      const { orgId: citadelOrgId, roleId: inspectorsRoleId } = await resolveCitadelOrgAndRole(superCtx.request)
 
       const email = `jit-e2e-${Date.now()}@example.com`
       const before = countUsersWithEmail(email)
@@ -319,7 +334,7 @@ test.describe('FastAPI RS federated round-trip', () => {
 
       try {
         const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
-          data: { defaultOrgId: citadelOrg!.publicId, defaultRoleId: inspectorsRole!.publicId },
+          data: { defaultOrgId: citadelOrgId, defaultRoleId: inspectorsRoleId },
         })
         expect(patchRes.ok(), `failed to set default org/role: ${patchRes.status()}`).toBeTruthy()
 
@@ -373,23 +388,11 @@ test.describe('FastAPI RS federated round-trip', () => {
 
     const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
     try {
-      // Same pagination shape as the JIT-provisioning test above —
-      // { items, total, page, pageSize }, not a bare orgs/roles array.
-      const orgsRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/orgs?q=Citadel`)
-      expect(orgsRes.ok(), `GET /api/orgs failed: ${orgsRes.status()}`).toBeTruthy()
-      const { items: orgItems } = (await orgsRes.json()) as { items: Array<{ publicId: string; name: string }> }
-      const citadelOrg = orgItems.find((o) => o.name === 'Citadel')
-      expect(citadelOrg, 'Citadel org (seeded by demo-resource-server.ts) must exist').toBeTruthy()
-
-      const rolesRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/roles?q=${encodeURIComponent('Citadel Inspectors')}`)
-      expect(rolesRes.ok(), `GET /api/roles failed: ${rolesRes.status()}`).toBeTruthy()
-      const { items: roleItems } = (await rolesRes.json()) as { items: Array<{ publicId: string; name: string }> }
-      const inspectorsRole = roleItems.find((r) => r.name === 'Citadel Inspectors')
-      expect(inspectorsRole, 'Citadel Inspectors role (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+      const { orgId: citadelOrgId, roleId: inspectorsRoleId } = await resolveCitadelOrgAndRole(superCtx.request)
 
       try {
         const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
-          data: { defaultOrgId: citadelOrg!.publicId, defaultRoleId: inspectorsRole!.publicId },
+          data: { defaultOrgId: citadelOrgId, defaultRoleId: inspectorsRoleId },
         })
         expect(patchRes.ok(), `failed to set default org/role: ${patchRes.status()}`).toBeTruthy()
 
@@ -434,17 +437,7 @@ test.describe('FastAPI RS federated round-trip', () => {
 
     const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
     try {
-      const orgsRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/orgs?q=Citadel`)
-      expect(orgsRes.ok(), `GET /api/orgs failed: ${orgsRes.status()}`).toBeTruthy()
-      const { items: orgItems } = (await orgsRes.json()) as { items: Array<{ publicId: string; name: string }> }
-      const citadelOrg = orgItems.find((o) => o.name === 'Citadel')
-      expect(citadelOrg, 'Citadel org (seeded by demo-resource-server.ts) must exist').toBeTruthy()
-
-      const rolesRes = await superCtx.request.get(`${AUTH_SERVER_URL}/api/roles?q=${encodeURIComponent('Citadel Inspectors')}`)
-      expect(rolesRes.ok(), `GET /api/roles failed: ${rolesRes.status()}`).toBeTruthy()
-      const { items: roleItems } = (await rolesRes.json()) as { items: Array<{ publicId: string; name: string }> }
-      const inspectorsRole = roleItems.find((r) => r.name === 'Citadel Inspectors')
-      expect(inspectorsRole, 'Citadel Inspectors role (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+      const { orgId: citadelOrgId, roleId: inspectorsRoleId } = await resolveCitadelOrgAndRole(superCtx.request)
 
       const email = `jit-consent-e2e-${Date.now()}@example.com`
       const before = countUsersWithEmail(email)
@@ -453,8 +446,8 @@ test.describe('FastAPI RS federated round-trip', () => {
       try {
         const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
           data: {
-            defaultOrgId: citadelOrg!.publicId,
-            defaultRoleId: inspectorsRole!.publicId,
+            defaultOrgId: citadelOrgId,
+            defaultRoleId: inspectorsRoleId,
             privacyPolicyUrl: 'https://example.com/privacy',
           },
         })
