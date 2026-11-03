@@ -30,11 +30,6 @@ describe('SocialButtons', () => {
     expect(screen.queryByRole('button', { name: /apple/i })).not.toBeInTheDocument()
   })
 
-  it('renders the divider only when there is at least one provider', () => {
-    renderWith(['google'])
-    expect(screen.getByText(messages.login.socialDivider)).toBeInTheDocument()
-  })
-
   // task-13: BetterAuth's /sign-in/social endpoint is POST-only (verified
   // live against a real auth-server: a GET 404s, a POST returns
   // `{ url, redirect: true }`). This test used to assert a synchronous GET
@@ -117,8 +112,27 @@ describe('SocialButtons', () => {
     expect(screen.getAllByRole('button')).toHaveLength(2)
   })
 
-  it('renders nothing (no divider) when every provider id is unknown', () => {
+  it('renders nothing when every provider id is unknown', () => {
     const { container } = renderWith(['unknown-future-provider'])
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders buttons with the outline variant (bordered, not filled)', () => {
+    renderWith(['google'])
+    expect(screen.getByRole('button', { name: /google/i })).toHaveClass('border')
+  })
+
+  it('renders a brand icon inside the google, microsoft, and apple buttons', () => {
+    renderWith(['google', 'microsoft', 'apple'])
+    const buttons = screen.getAllByRole('button')
+    expect(buttons[0].querySelector('img')).toHaveAttribute('src', '/icons/google.svg')
+    expect(buttons[1].querySelector('img')).toHaveAttribute('src', '/icons/microsoft.svg')
+    // Apple renders two <img> tags (light/dark theme variants)
+    expect(buttons[2].querySelectorAll('img')).toHaveLength(2)
+  })
+
+  it('renders no icon for the stub test-IdP provider', () => {
+    renderWith(['stub'])
+    expect(screen.getByRole('button', { name: /test idp/i }).querySelector('img')).toBeNull()
   })
 })
