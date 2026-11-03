@@ -98,28 +98,37 @@ translation work.
 
 ### New: provider icon components
 
-A new file (e.g. `apps/admin/components/provider-icons.tsx`) exporting
-`GoogleIcon`, `MicrosoftIcon`, `AppleIcon` — thin wrappers around the new
-`@icons-pack/react-simple-icons` dependency (see §4), so `social-buttons.tsx` maps
-`provider → icon component` without depending on the npm package's exact export
-names directly (keeps that dependency swappable later without touching
-`social-buttons.tsx`).
+A new file, `apps/admin/components/provider-icons.tsx`, exporting `GoogleIcon`,
+`MicrosoftIcon`, `AppleIcon` as inline-SVG React components built from the brand
+assets described in §4 — so `social-buttons.tsx` maps `provider → icon component`
+through one small, local file rather than depending on the shape of an external
+package.
 
-## 4. New dependency: `@icons-pack/react-simple-icons`
+## 4. Icon source: provided brand assets, no new dependency
 
-Adds React-component wrappers around the `simple-icons` brand SVG set, including
-official multi-color marks (Google's four-color "G" needs multiple fill colors, not a
-single tintable path — this package ships the correct multi-path version; Microsoft's
-four-square mark and Apple's glyph render in their own brand colors too, matching the
-reference). Installed in `apps/admin/package.json` (and `packages/ui/package.json` if
-the icon wrappers end up living there instead — a call made at implementation time
-based on whether any other app in the monorepo could plausibly reuse them; currently
-only `apps/admin` renders social buttons).
+Four official brand SVGs are provided in `designs/social/` at the repo root:
+`google.svg` (Google's 2025 gradient "G" mark), `microsoft.svg` (the four-square
+mark, flat brand colors), `apple_light.svg` and `apple_dark.svg` (the Apple glyph,
+black-fill and white-fill respectively, for light/dark theme backgrounds). These are
+copied into a new, hand-authored `apps/admin/components/provider-icons.tsx`, each as
+an inline JSX `<svg>` component (`GoogleIcon`, `MicrosoftIcon`, `AppleIcon`) rather
+than referenced as static `<img>` assets — inline SVG lets `Button`'s existing
+`[&_svg]:size-4 [&_svg]:shrink-0` CSS size and constrain them consistently with how
+`lucide-react` icons are already sized elsewhere in this button, which only targets
+inline `<svg>` children, not `<img>` tags.
 
-No provider beyond Google/Microsoft/Apple needs an icon for this work — the existing
-`stub` provider (e2e test IdP) keeps its current text-only button, since it's
-test-only infrastructure, not a real branded identity provider a user would
-recognize.
+`AppleIcon` renders both the light and dark variants together, toggled with Tailwind's
+`dark:`/`hidden` classes (`darkMode: 'class'` is already configured in
+`packages/ui/tailwind.config.ts`) — the same CSS-only, no-JS, no-hydration-flash
+pattern already relied on elsewhere for theme-aware rendering (e.g.
+`auth-card.tsx`'s `.dark`-scoped `<style>` block), rather than a client-side
+`useTheme()` hook that would need a mount guard and could flash the wrong variant
+before hydration.
+
+No new npm dependency is added. No provider beyond Google/Microsoft/Apple needs an
+icon for this work — the existing `stub` provider (e2e test IdP) keeps its current
+text-only button, since it's test-only infrastructure, not a real branded identity
+provider a user would recognize.
 
 ## 5. What does NOT change
 
