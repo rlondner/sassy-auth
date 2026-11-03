@@ -208,6 +208,16 @@ describe('LoginForm', () => {
     const link = screen.getByText(messages.login.forgotPassword).closest('a')
     expect(link).toHaveAttribute('href', '/forgot-password')
   })
+
+  it('shows the "or continue with" divider above the social buttons when providers are configured', () => {
+    wrap(<LoginForm next="" authServerUrl="https://auth.test" providers={['google']} />)
+    expect(screen.getByText(messages.login.socialDivider)).toBeInTheDocument()
+  })
+
+  it('does not show the divider when no providers are configured', () => {
+    wrap(<LoginForm next="" authServerUrl="https://auth.test" />)
+    expect(screen.queryByText(messages.login.socialDivider)).not.toBeInTheDocument()
+  })
 })
 
 describe('LoginOtpForm', () => {
