@@ -29,7 +29,7 @@ import { execFileSync } from 'node:child_process'
 import type { APIRequestContext } from '@playwright/test'
 import { test, expect } from '../lib/fixtures'
 import { SocialLoginPage } from '../pages/social-login.page'
-import { AUTH_SERVER_URL } from '../lib/oauth-fixtures'
+import { ADMIN_URL, AUTH_SERVER_URL } from '../lib/oauth-fixtures'
 
 const RS_BASE_URL = process.env.RS_BASE_URL ?? 'http://localhost:8010'
 const STUB_IDP_URL = process.env.E2E_STUB_IDP_URL ?? 'http://localhost:9099'
@@ -42,6 +42,35 @@ async function resetStubIdentity(request: APIRequestContext): Promise<void> {
 
 function configured(): boolean {
   return !!(process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID) && !!process.env.E2E_STUB_IDP_URL
+}
+
+/**
+ * Resolves the seeded "Citadel" org and "Citadel Inspectors" role to their
+ * publicIds via the super-admin-authenticated /api/orgs and /api/roles list
+ * endpoints, for the three JIT-eligibility tests below that need to PATCH an
+ * app's defaultOrgId/defaultRoleId. Both endpoints return
+ * { items, total, page, pageSize } — not a bare orgs/roles array — see
+ * OrgsService.listOrgs / RolesService.listRoles; filtering by `q` finds the
+ * seeded row regardless of how many other orgs/roles exist. Throws (via
+ * `expect`) if either isn't found, so callers don't need to re-assert
+ * `toBeTruthy()` themselves.
+ */
+async function resolveCitadelOrgAndRole(
+  request: APIRequestContext,
+): Promise<{ orgId: string; roleId: string }> {
+  const orgsRes = await request.get(`${AUTH_SERVER_URL}/api/orgs?q=Citadel`)
+  expect(orgsRes.ok(), `GET /api/orgs failed: ${orgsRes.status()}`).toBeTruthy()
+  const { items: orgItems } = (await orgsRes.json()) as { items: Array<{ publicId: string; name: string }> }
+  const citadelOrg = orgItems.find((o) => o.name === 'Citadel')
+  expect(citadelOrg, 'Citadel org (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+  const rolesRes = await request.get(`${AUTH_SERVER_URL}/api/roles?q=${encodeURIComponent('Citadel Inspectors')}`)
+  expect(rolesRes.ok(), `GET /api/roles failed: ${rolesRes.status()}`).toBeTruthy()
+  const { items: roleItems } = (await rolesRes.json()) as { items: Array<{ publicId: string; name: string }> }
+  const inspectorsRole = roleItems.find((r) => r.name === 'Citadel Inspectors')
+  expect(inspectorsRole, 'Citadel Inspectors role (seeded by demo-resource-server.ts) must exist').toBeTruthy()
+
+  return { orgId: citadelOrg!.publicId, roleId: inspectorsRole!.publicId }
 }
 
 /**
@@ -165,8 +194,26 @@ test.describe('FastAPI RS federated round-trip', () => {
     await page.goto(`${RS_BASE_URL}/auth/login`)
     await social.clickTestIdp()
 
-    await expect(page).toHaveURL(/\/oauth-error\?code=social_no_account/)
-    await expect(page.getByText("We couldn't sign you in")).toBeVisible()
+    // This test predates JIT social signup, when every provider had
+    // `disableSignUp: true` (build-social-providers.ts) and BetterAuth's own
+    // `handleOAuthUserInfo` refused an unrecognized identity BEFORE creating
+    // any User row, surfacing as the generic `social_no_account` code. The
+    // JIT feature flips `disableSignUp: false` for every provider so a
+    // first-time identity's User/Account row is always created, and a new
+    // `databaseHooks.user.create.after` hook decides eligibility instead
+    // (see classify-callback-outcome.ts, provision-social-signup-user.ts).
+    // The RS demo app used throughout this file has no defaultOrgId/
+    // defaultRoleId, so it is NOT JIT-signup-eligible — an unknown identity
+    // against it now takes the new ineligible-app path and gets
+    // `social_signup_unavailable` instead, confirmed live. This is the
+    // intentional, documented behavior change (design doc §3a: "every
+    // visitor to an ineligible app gets the same message"), not a
+    // regression — see the dedicated
+    // "an unknown identity against an ineligible app is redirected to
+    // social_signup_unavailable" test below, which now covers the exact
+    // same real-world scenario this test does.
+    await expect(page).toHaveURL(/\/oauth-error\?code=social_signup_unavailable/)
+    await expect(page.getByText("Sign-up isn't available for this app")).toBeVisible()
 
     const after = countUsersWithEmail(email)
     expect(after, 'a refused sign-in must not create a User row').toBe(0)
@@ -174,7 +221,23 @@ test.describe('FastAPI RS federated round-trip', () => {
 
   test('an unverified provider email is refused with the specific message', async ({ page, request }) => {
     const social = new SocialLoginPage(page)
-    await social.setIdentity(request, { sub: 'stub-sub-1', email: SOCIAL_EMAIL, email_verified: false })
+    // Deliberately NOT 'stub-sub-1': that sub is already linked to
+    // SOCIAL_EMAIL by the two tests above, and better-auth's
+    // handleOAuthUserInfo (link-account.mjs) never re-checks emailVerified
+    // for an identity that is already linked (see the "linkedAccount" branch
+    // vs. the "no linkedAccount yet" implicit-linking branch) — confirmed
+    // live: reusing 'stub-sub-1' here just signs the user back in instead of
+    // refusing. A fresh sub against the SAME, already-registered
+    // SOCIAL_EMAIL instead hits better-auth's implicit-account-linking path
+    // (dbUser matched by email, no linked Account yet for this
+    // providerId/accountId), which DOES still check emailVerified
+    // (requireLocalEmailVerified / untrusted-provider gate) and refuses with
+    // better-auth's own "account not linked" error — classified below by
+    // classify-callback-outcome.ts's unchanged 'account_not_linked' mapping.
+    // This path is untouched by the JIT feature's disableSignUp flip (that
+    // only affects the "no matching user at all" branch), so the expected
+    // code/copy here is unchanged.
+    await social.setIdentity(request, { sub: 'stub-sub-unverified-1', email: SOCIAL_EMAIL, email_verified: false })
 
     await page.goto(`${RS_BASE_URL}/auth/login`)
     await social.clickTestIdp()
@@ -285,6 +348,172 @@ test.describe('FastAPI RS federated round-trip', () => {
           data: { requireTwoFactor: false },
         })
         expect(disableRes.ok(), `failed to restore requireTwoFactor: ${disableRes.status()}`).toBeTruthy()
+      }
+    } finally {
+      await superCtx.close()
+    }
+  })
+
+  test('a first-time unknown identity JIT-provisions and completes sign-in for an eligible app', async ({ page, request }) => {
+    const rsClientId = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
+    expect(rsClientId, 'RS_CLIENT_ID / SASSY_CLIENT_ID must be set').toBeTruthy()
+
+    const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
+    try {
+      const { orgId: citadelOrgId, roleId: inspectorsRoleId } = await resolveCitadelOrgAndRole(superCtx.request)
+
+      const email = `jit-e2e-${Date.now()}@example.com`
+      const before = countUsersWithEmail(email)
+      expect(before, 'precondition: no leftover row from a previous run').toBe(0)
+
+      try {
+        const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: citadelOrgId, defaultRoleId: inspectorsRoleId },
+        })
+        expect(patchRes.ok(), `failed to set default org/role: ${patchRes.status()}`).toBeTruthy()
+
+        const social = new SocialLoginPage(page)
+        await social.setIdentity(request, { sub: `jit-e2e-sub-${Date.now()}`, email, email_verified: true })
+
+        await page.goto(`${RS_BASE_URL}/auth/login`)
+        await social.clickTestIdp()
+
+        await expect(page).toHaveURL(new RegExp(`^${RS_BASE_URL}/auth/callback`))
+        await expect(page.getByRole('heading', { name: 'Signed in' })).toBeVisible()
+        await expect(page.getByTestId('claim-amr')).toHaveText('ext')
+
+        const after = countUsersWithEmail(email)
+        expect(after, 'JIT signup must create exactly one User row').toBe(1)
+      } finally {
+        const restoreRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: null, defaultRoleId: null },
+        })
+        expect(restoreRes.ok(), `failed to restore default org/role: ${restoreRes.status()}`).toBeTruthy()
+      }
+    } finally {
+      await superCtx.close()
+    }
+  })
+
+  test('an unknown identity against an ineligible app is redirected to social_signup_unavailable and creates no user', async ({ page, request }) => {
+    const social = new SocialLoginPage(page)
+    const email = `nojit-e2e-${Date.now()}@example.com`
+    const before = countUsersWithEmail(email)
+    expect(before, 'precondition: no leftover row from a previous run').toBe(0)
+
+    await social.setIdentity(request, { sub: `nojit-e2e-sub-${Date.now()}`, email, email_verified: true })
+
+    await page.goto(`${RS_BASE_URL}/auth/login`)
+    await social.clickTestIdp()
+
+    await expect(page).toHaveURL(/\/oauth-error\?code=social_signup_unavailable/)
+    await expect(page.getByText("Sign-up isn't available for this app")).toBeVisible()
+
+    const after = countUsersWithEmail(email)
+    expect(after, 'the compensating delete must leave no User row behind').toBe(0)
+  })
+
+  test('/signup shows the social button only once the app is JIT-signup-eligible', async ({ page }) => {
+    const rsClientId = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
+    expect(rsClientId, 'RS_CLIENT_ID / SASSY_CLIENT_ID must be set').toBeTruthy()
+
+    await page.goto(`${ADMIN_URL}/signup?client_id=${encodeURIComponent(rsClientId)}`)
+    await expect(page.getByRole('button', { name: /test idp/i })).toHaveCount(0)
+
+    const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
+    try {
+      const { orgId: citadelOrgId, roleId: inspectorsRoleId } = await resolveCitadelOrgAndRole(superCtx.request)
+
+      try {
+        const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: citadelOrgId, defaultRoleId: inspectorsRoleId },
+        })
+        expect(patchRes.ok(), `failed to set default org/role: ${patchRes.status()}`).toBeTruthy()
+
+        await page.goto(`${ADMIN_URL}/signup?client_id=${encodeURIComponent(rsClientId)}`)
+        await expect(page.getByRole('button', { name: /test idp/i })).toBeVisible()
+      } finally {
+        const restoreRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: null, defaultRoleId: null },
+        })
+        expect(restoreRes.ok(), `failed to restore default org/role: ${restoreRes.status()}`).toBeTruthy()
+      }
+    } finally {
+      await superCtx.close()
+    }
+  })
+
+  test('a first-time unknown identity against an app with a Privacy Policy is bounced to /login/consent before completing sign-in', async ({ page, request }) => {
+    // Design spec (2026-10-30-social-jit-signup-design.md, §5/§7): no new
+    // interstitial was built for consent on a JIT signup — auth.config.ts's
+    // hooks.after already runs resolveOutstandingConsent + appendConsentRedirect
+    // for every successful social sign-in (new or returning) and redirects to
+    // /login/consent before the browser ever reaches the RS's /auth/callback.
+    // A JIT-provisioned user has zero SaUserConsent rows at the moment this
+    // gate runs, so resolveOutstandingConsent naturally returns every
+    // required document as outstanding. This test exercises that promise
+    // end-to-end through the stub IdP, using the same
+    // defaultOrgId/defaultRoleId JIT-eligibility PATCH as the test above,
+    // plus a privacyPolicyUrl (the real DTO field — see
+    // apps/auth-server/src/apps/dto/update-app.dto.ts) on the same app.
+    //
+    // The consent-acceptance UI pattern (checkbox per outstanding document,
+    // "Continue" button gated on all being checked) is read directly from
+    // apps/admin/app/login/consent/ConsentGateClient.tsx and its labels from
+    // apps/admin/messages/en.json's signup.acceptPrivacyPolicy / loginConsent.
+    // No prior Playwright spec drives this page — lib/app-fixtures.ts's
+    // createAppWithConsentDocuments + signup.spec.ts's "Privacy Policy /
+    // Terms consent" describe block cover the checkbox-and-URL fixture
+    // pattern, but only for the in-wizard self-serve signup form, not this
+    // post-sign-in /login/consent gate.
+    const rsClientId = process.env.RS_CLIENT_ID ?? process.env.SASSY_CLIENT_ID ?? ''
+    expect(rsClientId, 'RS_CLIENT_ID / SASSY_CLIENT_ID must be set').toBeTruthy()
+
+    const superCtx = await page.context().browser()!.newContext({ storageState: '.auth/super-admin.json' })
+    try {
+      const { orgId: citadelOrgId, roleId: inspectorsRoleId } = await resolveCitadelOrgAndRole(superCtx.request)
+
+      const email = `jit-consent-e2e-${Date.now()}@example.com`
+      const before = countUsersWithEmail(email)
+      expect(before, 'precondition: no leftover row from a previous run').toBe(0)
+
+      try {
+        const patchRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: {
+            defaultOrgId: citadelOrgId,
+            defaultRoleId: inspectorsRoleId,
+            privacyPolicyUrl: 'https://example.com/privacy',
+          },
+        })
+        expect(patchRes.ok(), `failed to set default org/role/privacyPolicyUrl: ${patchRes.status()}`).toBeTruthy()
+
+        const social = new SocialLoginPage(page)
+        await social.setIdentity(request, { sub: `jit-consent-e2e-sub-${Date.now()}`, email, email_verified: true })
+
+        await page.goto(`${RS_BASE_URL}/auth/login`)
+        await social.clickTestIdp()
+
+        // Lands on /login/consent — not directly on the RS's /auth/callback —
+        // before the OAuth code is issued.
+        await expect(page).toHaveURL(new RegExp(`^${ADMIN_URL}/login/consent\\?appPublicId=`))
+        await expect(page).not.toHaveURL(new RegExp(`^${RS_BASE_URL}/auth/callback`))
+
+        const privacyCheckbox = page.getByRole('checkbox', { name: /privacy policy/i })
+        await expect(privacyCheckbox).toBeVisible()
+        await privacyCheckbox.check()
+        await page.getByRole('button', { name: /continue/i }).click()
+
+        await expect(page).toHaveURL(new RegExp(`^${RS_BASE_URL}/auth/callback`))
+        await expect(page.getByRole('heading', { name: 'Signed in' })).toBeVisible()
+        await expect(page.getByTestId('claim-amr')).toHaveText('ext')
+
+        const after = countUsersWithEmail(email)
+        expect(after, 'JIT signup must create exactly one User row').toBe(1)
+      } finally {
+        const restoreRes = await superCtx.request.patch(`${AUTH_SERVER_URL}/api/apps/${rsClientId}`, {
+          data: { defaultOrgId: null, defaultRoleId: null, privacyPolicyUrl: null },
+        })
+        expect(restoreRes.ok(), `failed to restore default org/role/privacyPolicyUrl: ${restoreRes.status()}`).toBeTruthy()
       }
     } finally {
       await superCtx.close()

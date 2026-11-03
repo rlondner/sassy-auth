@@ -2,6 +2,7 @@ import type { AppleProfile } from 'better-auth/social-providers';
 import type { SocialProviderId } from './resolve-enabled-providers';
 import { createAppleClientSecretFactory } from './apple-client-secret';
 import { captureIsPrivateEmail } from './apple-private-relay-context';
+import { captureSocialSignupProfileName } from './social-signup-context';
 
 /**
  * bug-0175 kept: a provider is configured only when BOTH halves of its
@@ -54,10 +55,13 @@ export function availableSocialProviders(env: NodeJS.ProcessEnv): SocialProvider
 /**
  * Build BetterAuth's `socialProviders` config.
  *
- * `disableSignUp: true` on every provider is what makes federation
- * invite-only: BetterAuth's callback returns BEFORE creating a User row when
- * no account or verified-email match exists (callback.mjs:157 →
- * link-account.mjs:74), so a refused sign-in leaves no orphan.
+ * As of the JIT social signup feature (design doc 2026-10-30),
+ * `disableSignUp` is false on every provider — BetterAuth always creates a
+ * User/Account row for a first-time identity, and auth.config.ts's
+ * databaseHooks.user.create.after hook decides, per-request, whether that
+ * identity's target app is eligible (has defaultOrgId + defaultRoleId) to
+ * keep it, or must compensate-delete it and redirect to
+ * social_signup_unavailable. See provision-social-signup-user.ts.
  *
  * DELIBERATE NON-ACTION: none of these providers is added to
  * `trustedProviders`. Implicit linking requires `userInfo.emailVerified`
@@ -72,7 +76,19 @@ export function buildSocialProviders(env: NodeJS.ProcessEnv): Record<string, unk
     providers.google = {
       clientId: env.GOOGLE_CLIENT_ID!,
       clientSecret: env.GOOGLE_CLIENT_SECRET!,
-      disableSignUp: true,
+      // JIT social signup (design doc 2026-10-30): BetterAuth now always
+      // creates a User row for a first-time identity; the real eligibility
+      // decision — and, when ineligible, the compensating delete — happens
+      // in auth.config.ts's databaseHooks.user.create.after hook.
+      disableSignUp: false,
+      // Design doc §4: given_name/family_name never survive onto the User
+      // row BetterAuth hands that hook — capture them here, from the raw
+      // decoded profile, the same way Apple's config already captures
+      // is_private_email below.
+      mapProfileToUser: (profile: { given_name?: string; family_name?: string }) => {
+        captureSocialSignupProfileName(profile.given_name ?? null, profile.family_name ?? null);
+        return {};
+      },
     };
   }
 
@@ -85,7 +101,19 @@ export function buildSocialProviders(env: NodeJS.ProcessEnv): Record<string, unk
       // work around Entra not emitting the verified-email claims BetterAuth
       // reads (microsoft-entra-id.mjs:97). See the spec, §6.
       tenantId: env.MICROSOFT_TENANT_ID ?? 'common',
-      disableSignUp: true,
+      // JIT social signup (design doc 2026-10-30): BetterAuth now always
+      // creates a User row for a first-time identity; the real eligibility
+      // decision — and, when ineligible, the compensating delete — happens
+      // in auth.config.ts's databaseHooks.user.create.after hook.
+      disableSignUp: false,
+      // Design doc §4: given_name/family_name never survive onto the User
+      // row BetterAuth hands that hook — capture them here, from the raw
+      // decoded profile, the same way Apple's config already captures
+      // is_private_email below.
+      mapProfileToUser: (profile: { given_name?: string; family_name?: string }) => {
+        captureSocialSignupProfileName(profile.given_name ?? null, profile.family_name ?? null);
+        return {};
+      },
     };
   }
 
@@ -99,7 +127,7 @@ export function buildSocialProviders(env: NodeJS.ProcessEnv): Record<string, unk
       get clientSecret() {
         return appleSecret();
       },
-      disableSignUp: true,
+      disableSignUp: false,
       // task-8 fix round 1 (review finding 1): capture Apple's
       // `is_private_email` claim into request-scoped AsyncLocalStorage so
       // the /callback/:id after-hook can tell a Hide My Email relay user

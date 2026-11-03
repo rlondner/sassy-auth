@@ -139,6 +139,32 @@ describe('RateLimitGuard', () => {
     expect(() => appLookupGuard.canActivate(ctx)).toThrow(HttpException);
   });
 
+  // Regression test for the bug this fixes: when the request arrives via two
+  // proxy hops (browser -> admin server -> Render edge -> auth-server, as
+  // happens for every signup page load proxied through the admin console),
+  // Express's trust-proxy-aware req.ip resolves to the nearest trusted hop
+  // (the admin server's own egress IP), not the real visitor. Using req.ip
+  // directly collapses every distinct visitor onto one shared budget keyed
+  // by the admin server's IP. resolveClientIp's left-most X-Forwarded-For
+  // entry recovers the real, distinct visitor IP instead.
+  it('keys the limit on the left-most X-Forwarded-For entry, not req.ip, for proxied requests', () => {
+    process.env.REGISTER_RATE_LIMIT = '1';
+    process.env.REGISTER_RATE_WINDOW_MS = '3600000';
+    const guard = new AppLookupRateLimitGuard();
+    const adminServerIp = '10.0.0.100';
+    const makeProxiedCtx = (visitorIp: string): ExecutionContext =>
+      ({
+        switchToHttp: () => ({
+          getRequest: () => ({ ip: adminServerIp, ips: [visitorIp, adminServerIp] }),
+        }),
+      }) as unknown as ExecutionContext;
+
+    expect(guard.canActivate(makeProxiedCtx('203.0.113.1'))).toBe(true);
+    // A different visitor, proxied through the same admin server, must get
+    // its own budget rather than inheriting the first visitor's exhausted one.
+    expect(guard.canActivate(makeProxiedCtx('203.0.113.2'))).toBe(true);
+  });
+
   it('gives each of the three code-first-signup guards its own independent budget', () => {
     process.env.REGISTER_RATE_LIMIT = '1';
     process.env.REGISTER_RATE_WINDOW_MS = '3600000';
