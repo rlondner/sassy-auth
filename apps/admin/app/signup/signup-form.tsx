@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Button, FormField } from '@sassy-auth/ui'
+import { AuthDivider, Button, FormField } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
 import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
 import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
@@ -122,9 +122,12 @@ export function SignupForm({
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
       {canSocialSignup && providers.length > 0 && (
-        <SocialButtons providers={providers} next={next} authServerUrl={authServerUrl} />
+        <div className="flex flex-col gap-4">
+          <SocialButtons providers={providers} next={next} authServerUrl={authServerUrl} />
+          <AuthDivider label={t('login.socialDivider')} />
+        </div>
       )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
@@ -269,6 +272,6 @@ export function SignupForm({
         {t('signup.submit')}
       </Button>
       </form>
-    </>
+    </div>
   )
 }
