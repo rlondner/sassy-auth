@@ -99,25 +99,30 @@ translation work.
 ### New: provider icon components
 
 A new file, `apps/admin/components/provider-icons.tsx`, exporting `GoogleIcon`,
-`MicrosoftIcon`, `AppleIcon` as inline-SVG React components built from the brand
-assets described in §4 — so `social-buttons.tsx` maps `provider → icon component`
-through one small, local file rather than depending on the shape of an external
-package.
+`MicrosoftIcon`, `AppleIcon` as small `<img>`-based React components pointing at the
+static assets described in §4 — so `social-buttons.tsx` maps `provider → icon
+component` through one small, local file.
 
 ## 4. Icon source: provided brand assets, no new dependency
 
 Four official brand SVGs are provided in `designs/social/` at the repo root:
-`google.svg` (Google's 2025 gradient "G" mark), `microsoft.svg` (the four-square
-mark, flat brand colors), `apple_light.svg` and `apple_dark.svg` (the Apple glyph,
-black-fill and white-fill respectively, for light/dark theme backgrounds). These are
-copied into a new, hand-authored `apps/admin/components/provider-icons.tsx`, each as
-an inline JSX `<svg>` component (`GoogleIcon`, `MicrosoftIcon`, `AppleIcon`) rather
-than referenced as static `<img>` assets — inline SVG lets `Button`'s existing
-`[&_svg]:size-4 [&_svg]:shrink-0` CSS size and constrain them consistently with how
-`lucide-react` icons are already sized elsewhere in this button, which only targets
-inline `<svg>` children, not `<img>` tags.
+`google.svg` (Google's 2025 gradient "G" mark — a genuinely complex file: multiple
+radial/linear gradients, Gaussian-blur filters, a clip-path, ~8.5KB), `microsoft.svg`
+(the four-square mark, four flat-color rects), `apple_light.svg` and
+`apple_dark.svg` (the Apple glyph, a single path, black-fill and white-fill
+respectively, for light/dark theme backgrounds).
 
-`AppleIcon` renders both the light and dark variants together, toggled with Tailwind's
+Given `google.svg`'s complexity, these are served as **static assets**
+(`apps/admin/public/icons/google.svg`, `microsoft.svg`, `apple-light.svg`,
+`apple-dark.svg` — copied byte-for-byte, no hand-transcription into JSX, which
+would risk a transcription error silently breaking the gradient/filter markup) and
+rendered via `<img>` in a new `apps/admin/components/provider-icons.tsx`
+(`GoogleIcon`, `MicrosoftIcon`, `AppleIcon`), sized directly via `className` (e.g.
+`h-4 w-4`) on the `<img>` itself — this does **not** rely on `Button`'s
+`[&_svg]:size-4` cascade (which only targets inline `<svg>` descendants, not `<img>`
+tags), so each icon component owns its own sizing.
+
+`AppleIcon` renders two `<img>` tags (one per theme variant) toggled with Tailwind's
 `dark:`/`hidden` classes (`darkMode: 'class'` is already configured in
 `packages/ui/tailwind.config.ts`) — the same CSS-only, no-JS, no-hydration-flash
 pattern already relied on elsewhere for theme-aware rendering (e.g.
