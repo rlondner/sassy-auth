@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Button, FormField, OtpInput } from '@sassy-auth/ui'
+import { AuthDivider, Button, FormField, OtpInput } from '@sassy-auth/ui'
 import { evaluatePasswordPolicy } from '@sassy-auth/types'
 import { FALLBACK_PASSWORD_POLICY, type PasswordPolicy } from '@/lib/types'
 import { PasswordRequirementsChecklist } from '@/components/password-requirements-checklist'
@@ -53,6 +53,10 @@ export function SignupWizard({
 }: SignupWizardProps) {
   const t = useTranslations('signup')
   const tCommon = useTranslations('common')
+  // The "or continue with" divider copy lives under the 'login' namespace
+  // (social-buttons.tsx's existing SocialButtons consumer convention) —
+  // reused here rather than duplicating the string under 'signup'.
+  const tLogin = useTranslations('login')
   const router = useRouter()
   const [step, setStep] = React.useState<Step>('email')
 
@@ -275,11 +279,8 @@ export function SignupWizard({
 
   if (step === 'email') {
     return (
-      <>
-        {canSocialSignup && providers.length > 0 && (
-          <SocialButtons providers={providers} next={next} authServerUrl={authServerUrl} />
-        )}
-        <form onSubmit={handleEmailSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
+        <form id="signup-email-form" onSubmit={handleEmailSubmit} className="flex flex-col gap-4">
           <FormField
             id="email"
             type="email"
@@ -300,11 +301,25 @@ export function SignupWizard({
               {error}
             </p>
           )}
-          <Button type="submit" className="w-full" loading={submitting} disabled={submitting || email.length === 0}>
-            {t('continue')}
-          </Button>
         </form>
-      </>
+
+        {canSocialSignup && providers.length > 0 && (
+          <div className="flex flex-col gap-4">
+            <AuthDivider label={tLogin('socialDivider')} />
+            <SocialButtons providers={providers} next={next} authServerUrl={authServerUrl} />
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          form="signup-email-form"
+          className="w-full"
+          loading={submitting}
+          disabled={submitting || email.length === 0}
+        >
+          {t('continue')}
+        </Button>
+      </div>
     )
   }
 
