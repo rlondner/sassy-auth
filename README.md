@@ -208,6 +208,10 @@ For production deployment to Render with Neon Postgres — including custom doma
 [`render.yaml`](render.yaml) Blueprint, production Dockerfiles, and a local mock
 layout on custom ports — see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
+Render is the live deployment. A manual, `workflow_dispatch`-only Cloud Run
+alternative that deploys the same images alongside Render without touching DNS
+is documented in **[docs/gcp-deployment.md](docs/gcp-deployment.md)**.
+
 If the admin console and auth server live on sibling subdomains (the normal
 case in production), set [`COOKIE_DOMAIN`](#cross-subdomain-cookies-required-for-live-deployments) —
 without it, third-party sign-in loops forever between `/login` and
