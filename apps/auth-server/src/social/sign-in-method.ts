@@ -1,4 +1,5 @@
 import { PROVIDER_ORDER } from './resolve-enabled-providers';
+import { resolveHookRoutePath } from './resolve-hook-route-path';
 
 /**
  * Derive how a session was created from the BetterAuth route that created it.
@@ -36,4 +37,20 @@ export function signInMethodFromPath(path: string | undefined): string | null {
 export function providerFromSignInMethod(signInMethod: string | null | undefined): string | null {
   if (!signInMethod?.startsWith('ext:')) return null;
   return signInMethod.slice('ext:'.length);
+}
+
+/**
+ * Compose resolveHookRoutePath -> signInMethodFromPath -> providerFromSignInMethod
+ * to recover the real provider name (e.g. 'google') from a databaseHooks
+ * context, falling back to the 'social' placeholder baked in here when any
+ * link in that chain can't resolve one (null ctx, or a route this chain
+ * doesn't recognise). Exists so this three-function composition — the only
+ * thing standing between a genuine /callback/:id request and a mislabeled
+ * provider — is itself a single, directly-testable unit instead of being
+ * re-inlined at each call site.
+ */
+export function resolveProviderForSocialSignup(
+  ctx: { path?: string; params?: Record<string, string> } | null | undefined,
+): string {
+  return providerFromSignInMethod(signInMethodFromPath(resolveHookRoutePath(ctx))) ?? 'social';
 }

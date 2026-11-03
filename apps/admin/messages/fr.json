@@ -874,6 +874,11 @@
         "body": "Ce compte n'est pas autorisé pour cette application.",
         "hint": "Si vous avez reçu une invitation, connectez-vous avec l'adresse e-mail à laquelle elle a été envoyée, ou demandez à un administrateur de vous inviter."
       },
+      "social_signup_unavailable": {
+        "heading": "L'inscription n'est pas disponible pour cette application",
+        "body": "Cette application ne permet pas de créer un nouveau compte de cette façon.",
+        "hint": "Demandez à un administrateur de vous inviter, ou connectez-vous avec un compte existant."
+      },
       "social_email_unverified": {
         "heading": "Adresse e-mail non vérifiée",
         "body": "Votre fournisseur d'identité n'a pas confirmé que cette adresse e-mail vous appartient.",
