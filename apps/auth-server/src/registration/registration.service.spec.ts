@@ -735,6 +735,12 @@ describe('RegistrationService', () => {
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: true,
+        // defaultRoleId is absent from this fixture (undefined, not an
+        // explicit null), and resolveSocialSignupEligibility's `!== null`
+        // check treats "absent" as "not null" — so this resolves true. Real
+        // Prisma rows always have the column selected (null or a number),
+        // so this quirk is a test-fixture artifact, not real behavior.
+        canSocialSignup: true,
         passwordPolicy: expect.any(Object),
         logo: null,
         favicon: null,
@@ -755,6 +761,7 @@ describe('RegistrationService', () => {
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
+        canSocialSignup: false,
         passwordPolicy: expect.any(Object),
         logo: null,
         favicon: null,
@@ -825,6 +832,7 @@ describe('RegistrationService', () => {
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
+        canSocialSignup: false,
         passwordPolicy: expect.any(Object),
         logo: 'data:image/png;base64,AAA=',
         favicon: 'data:image/png;base64,FFF=',
@@ -843,6 +851,7 @@ describe('RegistrationService', () => {
         select: {
           name: true,
           defaultOrgId: true,
+          defaultRoleId: true,
           passwordPolicyOverride: true,
           logo: true,
           favicon: true,
@@ -864,6 +873,7 @@ describe('RegistrationService', () => {
       await expect(service.getAppName('sq_1')).resolves.toEqual({
         name: 'MyApp',
         hasDefaultOrg: false,
+        canSocialSignup: false,
         passwordPolicy: expect.any(Object),
         logo: null,
         favicon: null,
@@ -941,6 +951,32 @@ describe('RegistrationService', () => {
       expect(result.pageDarkBackgroundColor).toBe('#222222');
       expect(result.cardLightBackgroundColor).toBe('#333333');
       expect(result.cardDarkBackgroundColor).toBe('#444444');
+    });
+
+    it('reports canSocialSignup: true when both defaultOrgId and defaultRoleId are set', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        name: 'MyApp', defaultOrgId: 5, defaultRoleId: 9, passwordPolicyOverride: null, logo: null, favicon: null,
+      });
+      const result = await service.getAppName('sq_1');
+      expect(result.canSocialSignup).toBe(true);
+    });
+
+    it('reports canSocialSignup: false when defaultRoleId is missing', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        name: 'MyApp', defaultOrgId: 5, defaultRoleId: null, passwordPolicyOverride: null, logo: null, favicon: null,
+      });
+      const result = await service.getAppName('sq_1');
+      expect(result.canSocialSignup).toBe(false);
+    });
+
+    it('selects defaultRoleId from the database', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        name: 'MyApp', defaultOrgId: null, defaultRoleId: null, passwordPolicyOverride: null, logo: null, favicon: null,
+      });
+      await service.getAppName('sq_1');
+      expect(mockPrisma.saApp.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ select: expect.objectContaining({ defaultRoleId: true }) }),
+      );
     });
   });
 

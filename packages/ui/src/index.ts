@@ -64,6 +64,7 @@ export { DataTable } from './components/data-table'
 export { FormField } from './components/form-field'
 export { OtpInput, type OtpInputProps } from './components/otp-input'
 export { AuthCard, type AuthCardProps } from './components/auth-card'
+export { AuthDivider, type AuthDividerProps } from './components/auth-divider'
 
 // Backward-compat wrapper — kept so existing call sites and tests don't churn.
 export { ConfirmDialog, type ConfirmDialogProps } from './components/confirm-dialog'

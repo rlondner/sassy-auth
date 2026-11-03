@@ -5,7 +5,7 @@ import { getForwardedClientIpHeader } from './forward-client-ip'
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export interface AppInfo {
-  name: string | null; hasDefaultOrg: boolean; passwordPolicy: PasswordPolicy | null; logo: string | null;
+  name: string | null; hasDefaultOrg: boolean; canSocialSignup: boolean; passwordPolicy: PasswordPolicy | null; logo: string | null;
   favicon: string | null;
   privacyPolicyUrl: string | null; termsUrl: string | null; gdprUrl: string | null; gdprRequired: boolean;
   emailVerificationMethod: 'link' | 'code';
@@ -16,7 +16,7 @@ export interface AppInfo {
 }
 
 const FAILSAFE: AppInfo = {
-  name: null, hasDefaultOrg: false, passwordPolicy: null, logo: null, favicon: null,
+  name: null, hasDefaultOrg: false, canSocialSignup: false, passwordPolicy: null, logo: null, favicon: null,
   privacyPolicyUrl: null, termsUrl: null, gdprUrl: null, gdprRequired: false,
   emailVerificationMethod: 'link',
   pageLightBackgroundColor: null, pageDarkBackgroundColor: null,
@@ -39,7 +39,7 @@ export async function fetchAppInfo(clientId: string): Promise<AppInfo> {
       return FAILSAFE
     }
     const body = (await res.json()) as {
-      name?: string; hasDefaultOrg?: boolean; passwordPolicy?: PasswordPolicy; logo?: string | null; favicon?: string | null;
+      name?: string; hasDefaultOrg?: boolean; canSocialSignup?: boolean; passwordPolicy?: PasswordPolicy; logo?: string | null; favicon?: string | null;
       privacyPolicyUrl?: string | null; termsUrl?: string | null; gdprUrl?: string | null; gdprRequired?: boolean;
       emailVerificationMethod?: 'link' | 'code';
       pageLightBackgroundColor?: string | null; pageDarkBackgroundColor?: string | null;
@@ -48,6 +48,7 @@ export async function fetchAppInfo(clientId: string): Promise<AppInfo> {
     return {
       name: typeof body.name === 'string' ? body.name : null,
       hasDefaultOrg: body.hasDefaultOrg === true,
+      canSocialSignup: body.canSocialSignup === true,
       passwordPolicy: body.passwordPolicy ?? null,
       logo: typeof body.logo === 'string' ? body.logo : null,
       favicon: typeof body.favicon === 'string' ? body.favicon : null,

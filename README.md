@@ -1014,16 +1014,21 @@ Setup steps (provider console configuration, env vars) are in
 [`docs/social-auth-setup.md`](docs/social-auth-setup.md); this section covers
 the behavior.
 
-**Invite-only — not a signup method.** Social sign-in only ever *links* to an
-existing, active `SaUser`; it never creates one. A user must already have been
-provisioned (by an admin, or via an accepted invitation) before their first
-"Sign in with Google/Microsoft/Apple" click will work. An unrecognised
-identity is refused, with no `User`, `SaUser`, or org row created as a side
-effect. First sign-in matches on `(providerId, sub)` if a link already exists,
-and otherwise on an email address the provider asserts is verified.
-Just-in-time provisioning and domain-claimed orgs (an org auto-admitting users
-whose email domain matches) are both deliberately out of scope — see
-[Known Limitations](#known-limitations).
+**Invite-only by default — a signup method only for JIT-eligible apps.**
+Social sign-in only ever *links* to an existing, active `SaUser` unless the
+app has both `defaultOrgId` and `defaultRoleId` configured, in which case an
+unrecognised identity is provisioned into that default org/role instead of
+being refused. For an app without that configuration, a user must already
+have been provisioned (by an admin, or via an accepted invitation) before
+their first "Sign in with Google/Microsoft/Apple" click will work, and an
+unrecognised identity is refused with no `User`, `SaUser`, or org row created
+as a side effect. First sign-in matches on `(providerId, sub)` if a link
+already exists, and otherwise on an email address the provider asserts is
+verified. Domain-claimed orgs (an org auto-admitting users whose email domain
+matches) remain out of scope — see [Known Limitations](#known-limitations).
+See
+[`docs/superpowers/specs/2026-10-30-social-jit-signup-design.md`](docs/superpowers/specs/2026-10-30-social-jit-signup-design.md)
+for the just-in-time signup design.
 
 **Credentials are deployment-global.** One `clientId`/`clientSecret` pair per
 provider is configured for the whole deployment via environment variables;
@@ -1498,8 +1503,8 @@ Deleting a user only removes the `SaUser` row — the BetterAuth `User`, `Accoun
 **LIKE wildcard characters not escaped in search.**
 The `q` parameter across all list endpoints does not escape `%` and `_` wildcards in LIKE queries. Users can inject LIKE patterns. Tracked as **bug-0188**.
 
-**Social sign-in is invite-only, with no self-service alternative.**
-Google/Microsoft/Apple sign-in only links to an existing, active `SaUser` — there is no just-in-time provisioning of a new user or org, and no domain-claimed orgs (an org auto-admitting users whose email matches a verified domain). A user who has not been provisioned by an admin or an invitation cannot get in via a social button, no matter how legitimate their identity. Both are deliberately deferred; the linking logic is centralized so they can be added later without rework. See [`docs/social-auth-setup.md`](docs/social-auth-setup.md) and the [Social Sign-In](#social-sign-in) section.
+**Social sign-in is invite-only except for apps configured for just-in-time signup.**
+Google/Microsoft/Apple sign-in only links to an existing, active `SaUser`, unless the app has both `defaultOrgId` and `defaultRoleId` set, in which case an unrecognised identity is provisioned into that default org/role on first sign-in instead of being refused. For an app without that configuration, a user who has not been provisioned by an admin or an invitation cannot get in via a social button, no matter how legitimate their identity. Domain-claimed orgs (an org auto-admitting users whose email matches a verified domain) remain deliberately deferred. See [`docs/social-auth-setup.md`](docs/social-auth-setup.md), [`docs/superpowers/specs/2026-10-30-social-jit-signup-design.md`](docs/superpowers/specs/2026-10-30-social-jit-signup-design.md), and the [Social Sign-In](#social-sign-in) section.
 
 **Social provider credentials are deployment-global, not per-app.**
 Each of Google/Microsoft/Apple has one `clientId`/`clientSecret` pair for the whole deployment. Individual apps can opt a configured provider in or out, but cannot register their own OAuth client. Per-app credentials (with the encryption-at-rest and key-rotation work that requires) are deferred; the data model is shaped to add them later.

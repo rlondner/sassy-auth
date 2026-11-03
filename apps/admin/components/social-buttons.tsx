@@ -1,13 +1,27 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Button, Separator } from '@sassy-auth/ui'
+import { Button } from '@sassy-auth/ui'
+import { GoogleIcon, MicrosoftIcon, AppleIcon } from './provider-icons'
 
 const LABEL_KEY: Record<string, string> = {
   google: 'socialGoogle',
   microsoft: 'socialMicrosoft',
   apple: 'socialApple',
   stub: 'socialStub',
+}
+
+function ProviderIcon({ provider }: { provider: string }) {
+  switch (provider) {
+    case 'google':
+      return <GoogleIcon />
+    case 'microsoft':
+      return <MicrosoftIcon />
+    case 'apple':
+      return <AppleIcon />
+    default:
+      return null
+  }
 }
 
 /**
@@ -103,24 +117,18 @@ export function SocialButtons({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2">
-        {known.map((provider) => (
-          <Button
-            key={provider}
-            type="button"
-            variant="secondary"
-            onClick={() => start(provider)}
-          >
-            {t(LABEL_KEY[provider] as 'socialGoogle')}
-          </Button>
-        ))}
-      </div>
-      <div className="flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-body-sm text-muted-foreground">{t('socialDivider')}</span>
-        <Separator className="flex-1" />
-      </div>
+    <div className="flex flex-col gap-2">
+      {known.map((provider) => (
+        <Button
+          key={provider}
+          type="button"
+          variant="outline"
+          onClick={() => start(provider)}
+        >
+          <ProviderIcon provider={provider} />
+          {t(LABEL_KEY[provider] as 'socialGoogle')}
+        </Button>
+      ))}
     </div>
   )
 }

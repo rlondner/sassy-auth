@@ -30,6 +30,7 @@ import { recordConsent } from '../consent/record-consent';
 import { resolveCountryFromIp } from '../common/geoip/geoip.service';
 import { assertRedirectUriAllowed } from '../token/redirect-uri';
 import { OAUTH_AUTHORIZE_PATH } from '../token/oauth-metadata';
+import { resolveSocialSignupEligibility } from '../social/resolve-social-signup-eligibility';
 
 /**
  * BetterAuth (v1.6.x) throws an APIError instance when sign-up fails.
@@ -575,6 +576,10 @@ export class RegistrationService {
   ): Promise<{
     name: string;
     hasDefaultOrg: boolean;
+    // Design doc §5a: the same signal /signup uses to decide whether to show
+    // social buttons at all — not just the login page's "do we skip the
+    // companyName field" question hasDefaultOrg already answers.
+    canSocialSignup: boolean;
     passwordPolicy: PasswordPolicy;
     logo: string | null;
     favicon: string | null;
@@ -594,6 +599,7 @@ export class RegistrationService {
       select: {
         name: true,
         defaultOrgId: true,
+        defaultRoleId: true,
         passwordPolicyOverride: true,
         logo: true,
         favicon: true,
@@ -612,6 +618,7 @@ export class RegistrationService {
     return {
       name: app.name,
       hasDefaultOrg: app.defaultOrgId !== null,
+      canSocialSignup: resolveSocialSignupEligibility(app),
       passwordPolicy: resolvePasswordPolicy(app),
       logo: app.logo ?? null,
       favicon: app.favicon ?? null,

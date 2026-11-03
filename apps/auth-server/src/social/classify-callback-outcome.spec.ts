@@ -32,6 +32,21 @@ describe('classifyCallbackOutcome', () => {
     ).toEqual({ reason: 'email_unverified', code: 'social_email_unverified', canRedirect: true });
   });
 
+  it('maps social_signup_unavailable (ineligible app) to its own code, unconditionally', () => {
+    expect(
+      classifyCallbackOutcome(redirectError('https://auth.example/error?error=social_signup_unavailable')),
+    ).toEqual({ reason: 'social_signup_unavailable', code: 'social_signup_unavailable', canRedirect: true });
+  });
+
+  it('maps social_signup_unavailable the same way regardless of isPrivateEmail', () => {
+    expect(
+      classifyCallbackOutcome(
+        redirectError('https://auth.example/error?error=social_signup_unavailable'),
+        true,
+      ),
+    ).toEqual({ reason: 'social_signup_unavailable', code: 'social_signup_unavailable', canRedirect: true });
+  });
+
   it('maps the session gate FORBIDDEN throw to the generic no-account code, and marks it non-redirectable', () => {
     expect(classifyCallbackOutcome(forbiddenError())).toEqual({
       reason: 'sauser_not_active',
@@ -58,6 +73,37 @@ describe('classifyCallbackOutcome', () => {
     const headers = new Headers();
     headers.set('location', 'not a url');
     expect(classifyCallbackOutcome({ status: 'FOUND', headers })).toBeNull();
+  });
+
+  // Regression: better-auth's own redirectOnError sets a RELATIVE Location
+  // header when errorCallbackURL is relative (social-buttons.tsx passes
+  // '/oauth-error' specifically so this file's rewrite-to-admin-URL
+  // mechanism can run). `new URL(location)` with no base throws on a
+  // relative string, which used to be swallowed by the catch block and
+  // silently treated as "no error" — see this file's task notes. These
+  // cases prove a relative location is still classified correctly.
+  describe('relative Location header (errorCallbackURL is a relative path)', () => {
+    it('maps a relative social_signup_unavailable redirect to its own code', () => {
+      expect(
+        classifyCallbackOutcome(redirectError('/oauth-error?error=social_signup_unavailable')),
+      ).toEqual({ reason: 'social_signup_unavailable', code: 'social_signup_unavailable', canRedirect: true });
+    });
+
+    it('maps a relative signup_disabled redirect to the generic no-account code', () => {
+      expect(
+        classifyCallbackOutcome(redirectError('/oauth-error?error=signup_disabled')),
+      ).toEqual({ reason: 'no_sauser_for_verified_email', code: 'social_no_account', canRedirect: true });
+    });
+
+    it('maps a relative account_not_linked redirect to the unverified-email code', () => {
+      expect(
+        classifyCallbackOutcome(redirectError('/oauth-error?error=account_not_linked')),
+      ).toEqual({ reason: 'email_unverified', code: 'social_email_unverified', canRedirect: true });
+    });
+
+    it('returns null for a relative redirect with no error param (successful sign-in)', () => {
+      expect(classifyCallbackOutcome(redirectError('/dashboard?callback=1'))).toBeNull();
+    });
   });
 
   // task-8 fix round 1 (review finding 1): isPrivateEmail is captured

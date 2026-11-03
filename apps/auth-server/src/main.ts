@@ -21,6 +21,7 @@ import { auth, TRUSTED_ORIGINS } from './auth/auth.config';
 import { createDefaultAuthRateLimiter } from './auth/auth-rate-limit';
 import { runWithPrivateRelayCapture } from './social/apple-private-relay-context';
 import { runWithSocialConsentCapture } from './social/social-consent-context';
+import { runWithSocialSignupContext } from './social/social-signup-context';
 import { resolveClientIp } from './common/net/resolve-client-ip';
 import { configureNestApp } from './configure-nest-app';
 import { LoggerService } from './common/logger/logger.service';
@@ -179,7 +180,9 @@ async function bootstrap() {
   };
   expressApp.all('/api/auth/*', authCors, createDefaultAuthRateLimiter(), (req, res) =>
     runWithPrivateRelayCapture(() =>
-      runWithSocialConsentCapture(resolveClientIp(req), () => authNodeHandler(req, res)),
+      runWithSocialConsentCapture(resolveClientIp(req), () =>
+        runWithSocialSignupContext(() => authNodeHandler(req, res)),
+      ),
     ),
   );
 

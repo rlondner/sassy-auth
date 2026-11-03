@@ -16,7 +16,11 @@ import { sendSignInOtp } from './otp-sender';
 import { otpTestStore } from './otp-test-store';
 import { buildSocialProviders } from '../social/build-social-providers';
 import { stubProviderConfig } from '../social/stub-provider';
-import { providerFromSignInMethod, signInMethodFromPath } from '../social/sign-in-method';
+import {
+  providerFromSignInMethod,
+  resolveProviderForSocialSignup,
+  signInMethodFromPath,
+} from '../social/sign-in-method';
 import { resolveHookRoutePath } from '../social/resolve-hook-route-path';
 import { classifyCallbackOutcome } from '../social/classify-callback-outcome';
 import { recordFederationEvent } from '../social/record-federation-event';
@@ -29,6 +33,8 @@ import { resolveAppForResetToken } from './resolve-app-for-reset-token';
 import { notifyActivation } from '../activation/notify-activation';
 import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
 import { envInt, AUTH_THROTTLE } from '../common/config/rate-limit-config';
+import { readSocialSignupContext, captureSocialSignupClientId } from '../social/social-signup-context';
+import { provisionSocialSignupUser } from '../social/provision-social-signup-user';
 
 // Front-ends allowed to proxy BetterAuth calls (sign-in, sign-out, etc.).
 // Undici's default `Sec-Fetch-Mode: cors` makes server-to-server calls look
@@ -221,6 +227,40 @@ export const auth = betterAuth({
   // orphaned from an SaUser (bug-0151) — one BetterAuth user with
   // no SaUser is a no-op that must not fail the sign-in.
   databaseHooks: {
+    user: {
+      create: {
+        after: async (
+          user: { id: string; email: string; name: string },
+          ctx?: { path?: string; params?: Record<string, string> } | null,
+        ) => {
+          const { clientId, givenName, familyName } = readSocialSignupContext();
+          // Only a social-provider signup reaches this with a non-null
+          // clientId (captured in hooks.before above, scoped to
+          // /callback/:id). Email/password signup provisions its SaUser
+          // itself (registration.service.ts) and never goes through this
+          // path with a captured clientId, so this hook is a no-op for it.
+          if (!clientId) return;
+          // Real provider id, reusing the same route-template
+          // reconstruction + validation chain task-4's
+          // session.create.before hook already relies on (resolveHookRoutePath
+          // -> signInMethodFromPath -> providerFromSignInMethod, composed in
+          // resolveProviderForSocialSignup). Falls back to the 'social'
+          // placeholder only if that chain can't resolve a provider from
+          // this hook's context, which should not happen for a genuine
+          // /callback/:id request.
+          const provider = resolveProviderForSocialSignup(ctx);
+          await provisionSocialSignupUser(prisma, {
+            betterAuthUserId: user.id,
+            email: user.email,
+            name: user.name,
+            provider,
+            clientId,
+            givenName,
+            familyName,
+          });
+        },
+      },
+    },
     session: {
       create: {
         before: async (
@@ -307,6 +347,48 @@ export const auth = betterAuth({
         console.log(`[auth-server] Sign-in attempt for ${email ?? 'unknown'}`);
       }
 
+      // JIT social signup (design doc 2026-10-30, §3a): recover which app
+      // this callback targets, so the later databaseHooks.user.create.after
+      // hook (which has no direct access to ctx.query/ctx.body) can decide
+      // eligibility. MUST be read-only — this deployment's
+      // storeStateStrategy resolves to "database" (set whenever
+      // options.database is set and options.account.storeStateStrategy
+      // isn't overridden, per @better-auth/core's create-context.mjs; true
+      // here), and that strategy's own parseState call (made later, by
+      // BetterAuth's real /callback/:id handler) DELETES the Verification
+      // row it reads — calling parseState ourselves a second time here
+      // would delete it first and break every social sign-in on the second,
+      // real call. findVerificationValue is a plain read.
+      //
+      // `ctx.path` is the route TEMPLATE (see resolveHookRoutePath above),
+      // and BetterAuth's bundled socialProviders callback and the
+      // genericOAuth plugin's callback (used by the e2e stub IdP) are
+      // registered at two different templates — `/callback/:id` and
+      // `/oauth2/callback/:providerId` respectively. A literal `===`
+      // against only the first silently skips this capture for every
+      // genericOAuth-based provider, so this reuses the same
+      // resolveHookRoutePath -> signInMethodFromPath composition used
+      // elsewhere in this file to recognize either template.
+      if (signInMethodFromPath(resolveHookRoutePath(ctx))?.startsWith('ext:')) {
+        const state = (ctx.query as { state?: string } | undefined)?.state
+          ?? (ctx.body as { state?: string } | undefined)?.state;
+        let clientId: string | null = null;
+        if (state) {
+          try {
+            const row = await ctx.context.internalAdapter.findVerificationValue(state);
+            if (row) {
+              const parsed = JSON.parse(row.value) as { callbackURL?: string };
+              if (parsed.callbackURL) {
+                clientId = new URL(parsed.callbackURL).searchParams.get('client_id');
+              }
+            }
+          } catch {
+            clientId = null;
+          }
+        }
+        captureSocialSignupClientId(clientId);
+      }
+
       // task-7: /reset-password has no server-side complexity check by
       // default — BetterAuth only enforces minPasswordLength/
       // maxPasswordLength (the top-level `password` option above). This
@@ -334,9 +416,18 @@ export const auth = betterAuth({
       // task-8: only the OAuth callback route is in scope here. Matched by
       // route TEMPLATE + params, same reconstruction task-4 already
       // established for databaseHooks (see resolveHookRoutePath) — `ctx.path`
-      // is `/callback/:id` (callback.mjs:20), never the literal request path.
-      if (ctx.path !== '/callback/:id') return;
-      const providerId = (ctx.params as Record<string, string> | undefined)?.id;
+      // is a route template (`/callback/:id` for BetterAuth's bundled
+      // socialProviders, or `/oauth2/callback/:providerId` for the
+      // genericOAuth plugin used by the e2e stub IdP), never the literal
+      // request path. A literal `===` against only `/callback/:id` would
+      // skip this entire gate for genericOAuth-driven sign-ins, so this
+      // reuses the same resolveHookRoutePath -> signInMethodFromPath
+      // composition used elsewhere in this file to recognize either
+      // template.
+      const resolvedAfterPath = resolveHookRoutePath(ctx);
+      if (!signInMethodFromPath(resolvedAfterPath)?.startsWith('ext:')) return;
+      const providerId = (ctx.params as Record<string, string> | undefined)?.id
+        ?? (ctx.params as Record<string, string> | undefined)?.providerId;
 
       // task-8: classifyCallbackOutcome reads BetterAuth's OWN redirect/error
       // from ctx.context.returned — see classify-callback-outcome.ts for the
