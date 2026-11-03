@@ -1,0 +1,89 @@
+name: Deploy to GCP (Cloud Run)
+
+# Manual only. Render remains the live deployment until DNS is switched by hand
+# (see docs/gcp-deployment.md). Running this workflow deploys to Cloud Run but
+# does not touch DNS or Render.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-gcp-production
+  cancel-in-progress: false
+
+env:
+  REGION: ${{ vars.GCP_REGION }}
+  REPO: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/sassy-auth
+  TAG: ${{ github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: gcp-production
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push images
+        run: |
+          docker build -f docker/Dockerfile.auth-server -t "$REPO/auth-server:$TAG" .
+          docker build -f docker/Dockerfile.admin \
+            --build-arg NEXT_PUBLIC_AUTH_SERVER_URL=https://auth-api.milissai.com \
+            --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY="${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}" \
+            -t "$REPO/admin:$TAG" .
+          docker push "$REPO/auth-server:$TAG"
+          docker push "$REPO/admin:$TAG"
+
+      # Jobs reuse the auth-server image: the seed scripts are compiled into dist/.
+      - name: Migrate database
+        run: |
+          gcloud run jobs deploy sassy-auth-migrate \
+            --image "$REPO/auth-server:$TAG" --region "$REGION" \
+            --set-secrets DATABASE_URL=DATABASE_URL:latest \
+            --command sh --args="-c,cd /app/packages/db && npx prisma migrate deploy" \
+            --max-retries 0 --task-timeout 10m
+          gcloud run jobs execute sassy-auth-migrate --region "$REGION" --wait
+
+      - name: Deploy auth-server
+        run: |
+          gcloud run deploy sassy-auth-server \
+            --image "$REPO/auth-server:$TAG" --region "$REGION" \
+            --port 3010 --allow-unauthenticated \
+            --min-instances 1 --cpu 1 --memory 1Gi \
+            --env-vars-file gcp/env.auth-server.yaml \
+            --set-secrets "DATABASE_URL=DATABASE_URL:latest,RSA_PRIVATE_KEY=RSA_PRIVATE_KEY:latest,RSA_PUBLIC_KEY=RSA_PUBLIC_KEY:latest,BETTER_AUTH_SECRET=BETTER_AUTH_SECRET:latest,RESEND_API_KEY=RESEND_API_KEY:latest,TURNSTILE_SECRET_KEY=TURNSTILE_SECRET_KEY:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,MICROSOFT_CLIENT_ID=MICROSOFT_CLIENT_ID:latest,MICROSOFT_CLIENT_SECRET=MICROSOFT_CLIENT_SECRET:latest,MICROSOFT_TENANT_ID=MICROSOFT_TENANT_ID:latest"
+
+      - name: Deploy admin
+        run: |
+          gcloud run deploy sassy-auth-admin \
+            --image "$REPO/admin:$TAG" --region "$REGION" \
+            --port 3001 --allow-unauthenticated \
+            --min-instances 1 --cpu 1 --memory 1Gi \
+            --env-vars-file gcp/env.admin.yaml \
+            --set-secrets "DATABASE_URL=DATABASE_URL:latest,BETTER_AUTH_SECRET=BETTER_AUTH_SECRET:latest"
+
+      - name: Seed
+        run: |
+          for spec in "sassy-auth-seed:dist/seed/seed.js" "sassy-auth-seed-vibecast:dist/seed/vibecast-migration.js"; do
+            job="${spec%%:*}"; script="${spec#*:}"
+            gcloud run jobs deploy "$job" \
+              --image "$REPO/auth-server:$TAG" --region "$REGION" \
+              --env-vars-file gcp/env.auth-server.yaml \
+              --set-secrets "DATABASE_URL=DATABASE_URL:latest,RSA_PRIVATE_KEY=RSA_PRIVATE_KEY:latest,RSA_PUBLIC_KEY=RSA_PUBLIC_KEY:latest,BETTER_AUTH_SECRET=BETTER_AUTH_SECRET:latest,SEED_ADMIN_PASSWORD=SEED_ADMIN_PASSWORD:latest,RESEND_API_KEY=RESEND_API_KEY:latest" \
+              --command sh --args="-c,cd /app/apps/auth-server && node $script" \
+              --max-retries 0 --task-timeout 10m
+            gcloud run jobs execute "$job" --region "$REGION" --wait
+          done

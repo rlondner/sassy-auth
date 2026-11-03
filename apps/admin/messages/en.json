@@ -874,6 +874,11 @@
         "body": "That account isn't set up for this application.",
         "hint": "If you were invited, sign in with the email address the invitation was sent to, or ask an administrator to invite you."
       },
+      "social_signup_unavailable": {
+        "heading": "Sign-up isn't available for this app",
+        "body": "This application doesn't support creating a new account this way.",
+        "hint": "Ask an administrator to invite you, or sign in with an existing account instead."
+      },
       "social_email_unverified": {
         "heading": "Email address not verified",
         "body": "Your identity provider did not confirm that this email address belongs to you.",
