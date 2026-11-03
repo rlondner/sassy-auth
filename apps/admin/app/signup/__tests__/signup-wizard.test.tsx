@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SignupWizard } from '../signup-wizard'
 import { startRegistrationAction, verifyRegistrationCodeAction, completeRegistrationAction } from '../wizard-actions'
@@ -50,10 +51,17 @@ const BASE_PROPS = {
   clientId: 'sq_1',
   next: '',
   hasDefaultOrg: true,
+  canSocialSignup: false,
+  providers: [] as string[],
+  authServerUrl: '',
   passwordPolicy: POLICY,
   privacyPolicyUrl: null,
   termsUrl: null,
   gdprUrl: null,
+}
+
+function renderWizard(overrides: Partial<React.ComponentProps<typeof SignupWizard>> = {}) {
+  return render(<SignupWizard {...BASE_PROPS} {...overrides} />)
 }
 
 beforeEach(() => {
@@ -364,5 +372,15 @@ describe('SignupWizard', () => {
       expect(screen.getByTestId('signup-error')).toHaveTextContent('errors.captchaRequired')
       expect(screen.getByLabelText('email')).toHaveValue('alice@example.com')
     })
+  })
+
+  it('renders SocialButtons on the email step when canSocialSignup is true and providers are non-empty', () => {
+    renderWizard({ canSocialSignup: true, providers: ['google'], authServerUrl: 'https://auth.example.com' })
+    expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument()
+  })
+
+  it('does not render SocialButtons on the email step when canSocialSignup is false', () => {
+    renderWizard({ canSocialSignup: false, providers: ['google'], authServerUrl: 'https://auth.example.com' })
+    expect(screen.queryByRole('button', { name: /google/i })).not.toBeInTheDocument()
   })
 })

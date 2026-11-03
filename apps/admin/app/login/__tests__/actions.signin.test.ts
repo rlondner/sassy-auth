@@ -18,6 +18,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }))
 jest.mock('@/lib/auth-origin', () => ({ getForwardedOrigin: jest.fn() }))
+jest.mock('@/lib/forward-client-ip', () => ({ getForwardedClientIpHeader: jest.fn().mockResolvedValue({}) }))
 jest.mock('../../account/security/actions', () => ({
   forwardNamedCookie: jest.fn(),
   forwardNamedCookieWithMaxAge: jest.fn(),
@@ -32,6 +33,7 @@ import { getForwardedOrigin } from '@/lib/auth-origin'
 
 const mockCookies = cookies as jest.MockedFunction<any>
 const mockGetForwardedOrigin = getForwardedOrigin as jest.MockedFunction<any>
+let mockGetForwardedClientIpHeader: jest.MockedFunction<any>
 
 // Re-resolved in beforeEach: jest.resetModules() hands the dynamically
 // imported module under test a fresh copy of the mock registry, so a
@@ -85,6 +87,10 @@ beforeEach(async () => {
   mockCookies.mockResolvedValue(jar)
   mockGetForwardedOrigin.mockResolvedValue('https://admin.example.com')
   global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>
+  const forwardClientIp = await import('@/lib/forward-client-ip')
+  mockGetForwardedClientIpHeader =
+    forwardClientIp.getForwardedClientIpHeader as jest.MockedFunction<any>
+  mockGetForwardedClientIpHeader.mockResolvedValue({})
   const securityActions = await import('../../account/security/actions')
   mockForwardNamedCookie = securityActions.forwardNamedCookie as jest.MockedFunction<any>
   const consent = await import('@/lib/consent')
@@ -206,6 +212,35 @@ describe('signIn two-factor challenge', () => {
       expect.anything(),
       expect.anything(),
     )
+  })
+})
+
+// bug-0297: sign-in/email is one of auth-rate-limit.ts's SENSITIVE_PREFIXES,
+// keyed on resolveClientIp. Server-to-server calls from admin carry the
+// admin server's own egress address unless the browser's real
+// X-Forwarded-For is explicitly re-sent, which would collapse every visitor
+// logging in through the admin console onto one shared rate-limit bucket.
+describe('signIn client-IP forwarding', () => {
+  it('forwards the X-Forwarded-For header returned by getForwardedClientIpHeader', async () => {
+    mockGetForwardedClientIpHeader.mockResolvedValue({ 'X-Forwarded-For': '203.0.113.7' })
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(401))
+
+    await signIn(formData({ email: 'a@b.io', password: 'pw' }))
+
+    const init = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['X-Forwarded-For']).toBe('203.0.113.7')
+  })
+
+  it('omits the header when no incoming X-Forwarded-For was present', async () => {
+    mockGetForwardedClientIpHeader.mockResolvedValue({})
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(upstream(401))
+
+    await signIn(formData({ email: 'a@b.io', password: 'pw' }))
+
+    const init = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+      .calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['X-Forwarded-For']).toBeUndefined()
   })
 })
 

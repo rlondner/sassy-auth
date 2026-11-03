@@ -409,6 +409,60 @@ describe('SignupForm', () => {
     expect(payload).not.toHaveProperty('acceptedGdpr')
   })
 
+  it('renders SocialButtons when canSocialSignup is true and providers are non-empty', () => {
+    render(
+      <SignupForm
+        clientId="sq_1"
+        next=""
+        hasDefaultOrg={false}
+        canSocialSignup
+        providers={['google']}
+        authServerUrl="https://auth.example.com"
+        passwordPolicy={POLICY}
+        privacyPolicyUrl={null}
+        termsUrl={null}
+        gdprUrl={null}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument()
+  })
+
+  it('does not render SocialButtons when canSocialSignup is false', () => {
+    render(
+      <SignupForm
+        clientId="sq_1"
+        next=""
+        hasDefaultOrg={false}
+        canSocialSignup={false}
+        providers={['google']}
+        authServerUrl="https://auth.example.com"
+        passwordPolicy={POLICY}
+        privacyPolicyUrl={null}
+        termsUrl={null}
+        gdprUrl={null}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /google/i })).not.toBeInTheDocument()
+  })
+
+  it('does not render SocialButtons when the provider list is empty', () => {
+    render(
+      <SignupForm
+        clientId="sq_1"
+        next=""
+        hasDefaultOrg={false}
+        canSocialSignup
+        providers={[]}
+        authServerUrl="https://auth.example.com"
+        passwordPolicy={POLICY}
+        privacyPolicyUrl={null}
+        termsUrl={null}
+        gdprUrl={null}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /google/i })).not.toBeInTheDocument()
+  })
+
   describe('missing NEXT_PUBLIC_TURNSTILE_SITE_KEY diagnostic', () => {
     const originalSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
     let warnSpy: jest.SpyInstance
