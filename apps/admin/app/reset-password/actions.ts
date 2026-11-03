@@ -2,6 +2,7 @@
 
 import * as Sentry from '@sentry/nextjs'
 import { getForwardedOrigin } from '@/lib/auth-origin'
+import { getForwardedClientIpHeader } from '@/lib/forward-client-ip'
 
 const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
@@ -10,11 +11,12 @@ export async function resetPasswordSubmitAction(
   newPassword: string,
 ): Promise<{ ok: true } | { error: string }> {
   const origin = await getForwardedOrigin()
+  const forwardedIp = await getForwardedClientIpHeader()
   let res: Response
   try {
     res = await fetch(`${AUTH_SERVER}/api/auth/reset-password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(origin && { Origin: origin }) },
+      headers: { 'Content-Type': 'application/json', ...(origin && { Origin: origin }), ...forwardedIp },
       body: JSON.stringify({ token, newPassword }),
     })
   } catch (err) {

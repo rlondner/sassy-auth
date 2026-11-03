@@ -18,7 +18,7 @@ describe('stubProviderConfig', () => {
     }) as { providerId: string; discoveryUrl: string; disableSignUp: boolean }[];
     expect(config.providerId).toBe('stub');
     expect(config.discoveryUrl).toBe('http://localhost:9099/.well-known/openid-configuration');
-    expect(config.disableSignUp).toBe(true);
+    expect(config.disableSignUp).toBe(false);
   });
 
   // Positive-allowlist coverage (task-11 controller ruling): a `!==

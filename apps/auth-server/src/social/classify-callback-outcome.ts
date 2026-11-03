@@ -65,6 +65,16 @@ export interface CallbackOutcome {
   canRedirect: boolean;
 }
 
+/**
+ * Shared source of truth for the ineligible-social-signup code: thrown as
+ * `APIError('BAD_REQUEST', { message: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE })`
+ * by provision-social-signup-user.ts, and matched against here when that
+ * message survives better-auth's callback.mjs redirect untouched (see the
+ * file header above). Kept as one constant so a future rename can't silently
+ * desync the throw site from this comparison.
+ */
+export const SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE = 'social_signup_unavailable';
+
 const BETTER_AUTH_ERROR_TO_INPUT: Record<string, { matchedUser: boolean; emailVerified: boolean }> = {
   signup_disabled: { matchedUser: false, emailVerified: true },
   account_not_linked: { matchedUser: true, emailVerified: false },
@@ -112,11 +122,27 @@ export function classifyCallbackOutcome(
 
   let betterAuthError: string | null;
   try {
-    betterAuthError = new URL(location).searchParams.get('error');
+    // `location` is not guaranteed to be absolute: a relative Location
+    // header (e.g. '/oauth-error?error=...') is valid HTTP, and is exactly
+    // what social-buttons.tsx's `errorCallbackURL: '/oauth-error'` produces
+    // via better-auth's own redirectOnError. `new URL(location)` with no
+    // base throws on a relative string; the base below is only there to
+    // satisfy the constructor — it's discarded, since we only read
+    // `searchParams`, never the resolved URL itself. It's a no-op for an
+    // already-absolute `location`.
+    betterAuthError = new URL(location, 'http://localhost').searchParams.get('error');
   } catch {
     return null;
   }
   if (!betterAuthError) return null;
+
+  if (betterAuthError === SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE) {
+    return {
+      reason: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE,
+      code: SOCIAL_SIGNUP_UNAVAILABLE_ERROR_CODE,
+      canRedirect: true,
+    };
+  }
 
   const input = BETTER_AUTH_ERROR_TO_INPUT[betterAuthError];
   if (!input) return null;

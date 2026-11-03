@@ -31,6 +31,7 @@ describe('fetchAppInfo', () => {
     await expect(fetchAppInfo('sq_1')).resolves.toEqual({
       name: 'Acme',
       hasDefaultOrg: true,
+      canSocialSignup: false,
       passwordPolicy: POLICY,
       logo: null,
       favicon: null,
@@ -55,6 +56,7 @@ describe('fetchAppInfo', () => {
     await expect(fetchAppInfo('sq_1')).resolves.toEqual({
       name: 'Acme',
       hasDefaultOrg: true,
+      canSocialSignup: false,
       passwordPolicy: null,
       logo: null,
       favicon: null,
@@ -79,6 +81,7 @@ describe('fetchAppInfo', () => {
     await expect(fetchAppInfo('sq_1')).resolves.toEqual({
       name: null,
       hasDefaultOrg: false,
+      canSocialSignup: false,
       passwordPolicy: null,
       logo: null,
       favicon: null,
@@ -100,6 +103,7 @@ describe('fetchAppInfo', () => {
     await expect(fetchAppInfo('sq_1')).resolves.toEqual({
       name: null,
       hasDefaultOrg: false,
+      canSocialSignup: false,
       passwordPolicy: null,
       logo: null,
       favicon: null,
@@ -124,6 +128,7 @@ describe('fetchAppInfo', () => {
     await expect(fetchAppInfo('sq_1')).resolves.toEqual({
       name: 'Acme',
       hasDefaultOrg: true,
+      canSocialSignup: false,
       passwordPolicy: POLICY,
       logo: null,
       favicon: 'data:image/png;base64,FFF=',
@@ -176,5 +181,32 @@ describe('fetchAppInfo', () => {
     const result = await fetchAppInfo('client-1')
     expect(result.pageLightBackgroundColor).toBeNull()
     expect(result.cardDarkBackgroundColor).toBeNull()
+  })
+
+  it('passes through canSocialSignup: true from the auth-server response', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ name: 'MyApp', hasDefaultOrg: true, canSocialSignup: true }),
+    } as Response)
+
+    const result = await fetchAppInfo('sq_1')
+    expect(result.canSocialSignup).toBe(true)
+  })
+
+  it('defaults canSocialSignup to false on a non-boolean or missing value', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ name: 'MyApp', hasDefaultOrg: true }),
+    } as Response)
+
+    const result = await fetchAppInfo('sq_1')
+    expect(result.canSocialSignup).toBe(false)
+  })
+
+  it('fails safe to canSocialSignup: false on a non-ok response', async () => {
+    ;(global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({ ok: false } as Response)
+
+    const result = await fetchAppInfo('sq_1')
+    expect(result.canSocialSignup).toBe(false)
   })
 })

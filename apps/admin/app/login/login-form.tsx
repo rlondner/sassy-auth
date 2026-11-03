@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useActionState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AuthCard, Button, FormField } from '@sassy-auth/ui'
+import { AuthCard, AuthDivider, Button, FormField } from '@sassy-auth/ui'
 import { clientIdFromNext } from '@/lib/client-id-from-next'
 import { signIn } from './actions'
-import { SocialButtons } from './social-buttons'
+import { SocialButtons } from '@/components/social-buttons'
 
 export function LoginForm({
   next,
@@ -75,9 +75,8 @@ export function LoginForm({
         ) : undefined
       }
     >
-      <SocialButtons providers={providers} next={next} authServerUrl={authServerUrl} />
-
-      <form action={formAction} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
+        <form action={formAction} className="flex flex-col gap-4">
         <input type="hidden" name="next" value={next} />
 
         <FormField id="email" name="email" type="email" autoComplete="email" required label={t('email')} />
@@ -121,7 +120,15 @@ export function LoginForm({
         <Button type="submit" className="w-full" loading={isPending}>
           {t('submit')}
         </Button>
-      </form>
+        </form>
+
+        {providers.length > 0 && (
+          <div className="flex flex-col gap-4">
+            <AuthDivider label={t('socialDivider')} />
+            <SocialButtons providers={providers} next={next} authServerUrl={authServerUrl} />
+          </div>
+        )}
+      </div>
     </AuthCard>
   )
 }
