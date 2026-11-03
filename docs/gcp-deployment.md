@@ -7,23 +7,39 @@ a DNS change.
 
 ## 1. One-time GCP setup
 
-1. Create/choose a project; enable `run`, `artifactregistry`, `secretmanager`, `iamcredentials`.
-2. Artifact Registry Docker repo named `sassy-auth` in your region (suggest `us-east4`).
-3. Workload Identity Federation pool/provider trusting `rlondner/sassy-auth`, and a
-   deployer service account with: Cloud Run Admin, Artifact Registry Writer,
-   Service Account User (on the runtime SA), Secret Manager Secret Accessor.
-   The runtime service account also needs Secret Manager Secret Accessor.
-4. GitHub Environment `gcp-production` with **variables**: `GCP_PROJECT_ID`, `GCP_REGION`,
-   `GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+Run `gcp/setup.sh <PROJECT_ID> <REGION> [GITHUB_REPO] [--configure-github]` against an
+existing GCP project (e.g. `gcp/setup.sh my-project us-east4 rlondner/sassy-auth --configure-github`).
+It's idempotent — safe to re-run after a partial failure. It:
+
+1. Enables `run`, `artifactregistry`, `secretmanager`, `iamcredentials`.
+2. Creates the Artifact Registry Docker repo `sassy-auth` in `REGION`.
+3. Creates a Workload Identity Federation pool/provider trusting `GITHUB_REPO`, and a
+   deployer service account (`sassy-auth-deployer`) with: Cloud Run Admin, Artifact
+   Registry Writer, Secret Manager Secret Accessor, and Service Account User on the
+   Cloud Run runtime service account (the project's default compute SA, since the
+   workflow doesn't set `--service-account`). Grants that runtime SA Secret Manager
+   Secret Accessor too.
+4. Creates placeholder Secret Manager secrets (value `CHANGEME`) for everything listed
+   in step 2 below, so you only need to add real versions, not create the secrets.
+5. Prints the values for the GitHub Environment `gcp-production` **variables**:
+   `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`,
+   `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Pass `--configure-github` to also create the
+   environment and set the first four via `gh` (requires an authenticated `gh` CLI);
+   `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is always left for you to set by hand.
 
 ## 2. Secrets — copy the *current* Render values
 
-Create these in Secret Manager, taking values from the Render dashboard
-(Environment tab) — GitHub secrets are write-only, so Render is the source:
+`gcp/setup.sh` already created these in Secret Manager with a `CHANGEME` placeholder
+version. Add the real versions, taking values from the Render dashboard (Environment
+tab) — GitHub secrets are write-only, so Render is the source:
 
 `DATABASE_URL`, `RSA_PRIVATE_KEY`, `RSA_PUBLIC_KEY`, `BETTER_AUTH_SECRET`,
 `SEED_ADMIN_PASSWORD`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, and the
-`GOOGLE_*` / `MICROSOFT_*` secrets (create empty-string versions if unused).
+`GOOGLE_*` / `MICROSOFT_*` secrets (leave the placeholder if unused):
+
+```
+printf '<value>' | gcloud secrets versions add DATABASE_URL --data-file=-
+```
 
 **Do not generate new RSA keys or `BETTER_AUTH_SECRET`**: reusing them keeps issued
 JWTs and existing sessions valid across the cutover.

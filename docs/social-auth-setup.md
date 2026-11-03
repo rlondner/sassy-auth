@@ -9,13 +9,20 @@ why Apple's secret has no static env var — see
 
 ## Before you start
 
-- **Social sign-in is invite-only.** It is a login method, never a signup
-  method. A user must already exist as an active `SaUser` (provisioned by an
-  admin or via an accepted invitation) before they can sign in with Google,
-  Microsoft, or Apple. An unrecognised identity is refused; no user, org, or
-  account row is created. First social sign-in *links* the provider identity
-  to the existing `SaUser`, matched on `(providerId, sub)` first, and
-  otherwise on an email the provider asserts as verified.
+- **Social sign-in is invite-only by default.** It is a login method, not a
+  signup method, for any app without a configured `defaultOrgId`/
+  `defaultRoleId`. A user must already exist as an active `SaUser`
+  (provisioned by an admin or via an accepted invitation) before they can
+  sign in with Google, Microsoft, or Apple. An unrecognised identity is
+  refused; no user, org, or account row is created. First social sign-in
+  *links* the provider identity to the existing `SaUser`, matched on
+  `(providerId, sub)` first, and otherwise on an email the provider asserts
+  as verified.
+  For an app that *does* have `defaultOrgId`/`defaultRoleId` set, an
+  unrecognised identity instead triggers just-in-time signup: a new `SaUser`
+  is provisioned into that default org/role on first social sign-in. See
+  [`docs/superpowers/specs/2026-10-30-social-jit-signup-design.md`](superpowers/specs/2026-10-30-social-jit-signup-design.md)
+  for the eligibility rules and provisioning flow.
 - **Credentials are deployment-global, not per-app.** Each provider's
   `clientId`/`clientSecret` pair is one set of environment variables shared by
   the whole deployment. Apps individually opt in or out of *showing* a

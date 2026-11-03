@@ -9,7 +9,8 @@ export type FederationEventType =
   | 'social.link.created'
   | 'social.signin.ok'
   | 'social.signin.rejected'
-  | 'social.link.removed';
+  | 'social.link.removed'
+  | 'social.signup.created';
 
 export interface FederationEvent {
   type: FederationEventType;

@@ -27,6 +27,86 @@ own predecessor bundle (`#460`, 2026-10-19) and the still-unmerged
 `bug-0296` fix (`#459`). None of those PRs' CHANGELOG/BUGS/TODO content
 has landed on `dev` yet, so this entry restates context (like
 bug-0296's status) that already exists, unmerged, in other open PRs.
+## [Unreleased] — 2026-10-19
+
+First commit on `dev` since `4151407` landed directly (not through a
+reviewed daily-review branch) five days after the last entry in this
+file — `6ecd4e2`/`705e22f` (2026-10-14, bug-0297) still haven't been
+recorded here because their own bundle, PR #457, is still unmerged; see
+"Risky patterns / missing tests" below.
+
+**Manual Cloud Run deployment alongside Render (`4151407`).** Adds
+`.github/workflows/deploy-gcp.yml` (`workflow_dispatch`-only — never
+triggered by push, never touches DNS or Render), `gcp/env.*.yaml`
+non-secret env files mirroring `render.yaml`, two new `Dockerfile.admin`
+build args (`NEXT_PUBLIC_AUTH_SERVER_URL`,
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY`) so the admin image can be built outside
+Render, a `SKIP_MIGRATIONS` opt-out in
+`docker/entrypoint-auth-server-prod.sh` (set by GCP's env file, left
+unset — and therefore inert — in `render.yaml`, so Render's own
+migrate-on-boot behavior is unchanged), and
+[`docs/gcp-deployment.md`](docs/gcp-deployment.md) documenting one-time
+GCP setup, secrets (reused from Render, not regenerated — preserves
+existing sessions/JWTs across a future cutover), deploy/smoke-test, the
+manual DNS cutover, and Render retirement. Both stacks share the same
+Neon database and public domains; switching traffic is a DNS change, not
+a redeploy. README's Deployment section now links to it.
+
+**bug-0296 (GCP VibeCast activation branding drift) — found and fixed.**
+`gcp/env.auth-server.yaml`'s `VIBECAST_ACTIVATION_EMAIL_FROM_ADDRESS` and
+`VIBECAST_ACTIVATION_EMAIL_MESSAGE` didn't match `render.yaml`, despite
+`docs/gcp-deployment.md` stating the two are kept identical. The message
+also described a button/link rather than the 6-digit OTP code the app
+actually sends. See
+[BUGS_2026-10-19.md](./docs/history/bugs/BUGS_2026-10-19.md) and PR #459.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-19.md](./docs/history/todo/TODO_2026-10-19.md) for
+follow-ups. No test coverage was added or exists for
+`deploy-gcp.yml` or the `entrypoint-auth-server-prod.sh` `SKIP_MIGRATIONS`
+branch — expected for deploy-pipeline shell/YAML, but it's exactly the
+kind of config that only gets exercised by a real deploy, which is how
+bug-0296 shipped unnoticed. The open-PR backlog (now 7 unmerged,
+docs/config-only bundles — see TODO) remains the standing risk item.
+## [Unreleased] — 2026-10-14
+
+Reviewed two commits landed since yesterday's review (`110ce7a`'s signup
+rate-limiter fix, and its merge). That fix was correct and well-tested on
+its own terms, but reviewing it surfaced a sibling gap in code it didn't
+touch: the same "admin console proxies to auth-server without forwarding
+the real client IP" pattern it fixed for `GET /api/register/app` was still
+present on every other credential-bearing BetterAuth endpoint reached
+through the admin console. Filed and fixed as bug-0297.
+
+**bug-0297 (high).** `apps/auth-server/src/auth/auth-rate-limit.ts`'s
+shared rate-limit bucket for `/sign-in`, `/forget-password`,
+`/reset-password`, `/email-otp`, and `/two-factor` keys on
+`resolveClientIp()`, which only recovers the real visitor when the caller
+re-sends `X-Forwarded-For`. `apps/admin/app/login/actions.ts` (`signIn`,
+`requestOtp`, `verifyOtp`, `verifyTotp`, `verifyBackupCode`),
+`apps/admin/app/forgot-password/actions.ts`, and
+`apps/admin/app/reset-password/actions.ts` never did — unlike
+`signup`/`consent`/`wizard` actions, which already call
+`getForwardedClientIpHeader()` (`593e82c`). Net effect: every visitor
+logging in, verifying an OTP/TOTP/backup-code, or resetting a password
+through the admin console shared one rate-limit bucket keyed on the admin
+server's own egress address, so one visitor's (or an attacker's) attempts
+could throttle a completely different visitor's legitimate login. Fixed by
+wiring the same header-forwarding helper into all three files. See
+[BUGS_2026-10-14.md](./docs/history/bugs/BUGS_2026-10-14.md) and PR
+[#456](https://github.com/rlondner/sassy-auth/pull/456) (not yet merged as
+of this writing).
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-14.md](./docs/history/todo/TODO_2026-10-14.md) for
+follow-ups — notably the same forwarding gap in
+`apps/admin/app/account/security/actions.ts` (lower severity: those calls
+require an existing session) and a possibly-stale README note on bug-0292
+— and [BUGS_2026-10-14.md](./docs/history/bugs/BUGS_2026-10-14.md) for
+this run's bug catalog. The open-PR backlog is now 6 (`#450`–`#453`, this
+run's `#456` fix, and this docs bundle); see TODO item 1.
 
 ## [Unreleased] — 2026-10-13
 
@@ -48,14 +128,128 @@ bug-0003 are fixed; bug-0002 is fixed for its structured-log vector
 **README env var gap.** `EMAIL_VERIFICATION_EXPIRES_IN_SECONDS` was
 documented in `.env.example` but missing from the README's Environment
 Variables tables; added under "Email (optional)".
+## [Unreleased] — 2026-10-12
+
+Fourth consecutive quiet review window — zero commits landed on `dev` or
+`master` in the 24h period ending 2026-10-12T12:00Z (and none since
+2026-10-06T10:57Z, `f682927`, already reviewed in CR_2026-10-08.md
+through CR_2026-10-11.md on their respective unmerged branches).
+
+- CI health check: `typecheck`, `unit tests`, `e2e`, and `Dependency &
+  CVE Scan (Trivy)` are all green on `dev`'s latest commit (`f682927`);
+  `typecheck`/`unit tests`/`e2e`/`Deploy to Render` are all green on
+  `master`'s latest commit (`6e1797d`). No silent-red-suite regression
+  found.
+- Open-PR backlog: 3 (`#450`, `#451`, `#452` — the 2026-10-08/09/11
+  daily-review bundles against `dev`, all still unmerged), growing to 4
+  with this run's PR. Flagged again in TODO — this is now the primary
+  process risk, not a code risk.
+- Documentation fix: `EMAIL_VERIFICATION_EXPIRES_IN_SECONDS` (used in
+  `apps/auth-server/src/auth/auth.config.ts:517`, present in
+  `.env.example`, default `3600`) was missing from the README's
+  Environment Variables reference — added to the Email (optional) table.
+- No new bugs filed. Re-verified `bug-0292` (GDPR geo-detection) —
+  `GEOIP_DB_PATH` remains correctly unset in `render.yaml`/
+  `render.staging.yaml`. See
+  [BUGS_2026-10-12.md](docs/history/bugs/BUGS_2026-10-12.md) and
+  [TODO_2026-10-12.md](docs/history/todo/TODO_2026-10-12.md).
+## [Unreleased] — 2026-10-11
+
+Quiet review window — zero commits landed on `dev` or `master` in the 24h
+period ending 2026-10-11T13:20Z (the third consecutive quiet window,
+after 2026-10-08 and 2026-10-09). The most recent code activity remains
+`f682927` (2026-10-06T10:57Z, the app-drawer `CollapsibleSection` merge +
+CI fixes), already covered by
+[CR_2026-10-08.md](docs/history/code_reviews/CR_2026-10-08.md).
+
+- CI health check: `typecheck`, `unit tests`, `e2e`, and `Dependency &
+  CVE Scan (Trivy)` are all green on `dev`'s latest commit; `typecheck`/
+  `unit tests`/`e2e`/`Deploy to Render` are all green on `master`'s
+  latest commit (`6e1797d`). No silent-red-suite regression found.
+- Open-PR backlog grew from 1 to 2 (PR #450 from 2026-10-08, PR #451 from
+  2026-10-09, both green and mergeable against `dev`); this run adds a
+  third. Flagged as a process gap, not a code defect — see
+  [TODO_2026-10-11.md](docs/history/todo/TODO_2026-10-11.md).
+- No new bugs filed. Re-verified `bug-0292` (GDPR geo-detection) still
+  correctly mitigated (`GEOIP_DB_PATH` unset in both Render blueprints).
+  Spot-checked `README.md`'s Getting Started, Environment Variables, and
+  Known Limitations sections against current code — still accurate, no
+  changes needed. See
+  [BUGS_2026-10-11.md](docs/history/bugs/BUGS_2026-10-11.md) and
+  [TODO_2026-10-11.md](docs/history/todo/TODO_2026-10-11.md).
+## [Unreleased] — 2026-10-09
+
+Quiet review window — zero commits landed on `dev` or `master` in the 24h
+period ending 2026-10-09T13:20Z. The most recent activity on `dev` remains
+`f682927` (2026-10-06T10:57Z, the app-drawer `CollapsibleSection` merge +
+CI fixes), already covered by the 2026-10-08 daily review
+([CR_2026-10-08.md](docs/history/code_reviews/CR_2026-10-08.md)).
+
+- CI health check: `typecheck`, `unit tests`, `e2e`, `Dependency & CVE Scan
+  (Trivy)`, and `AI Semantic Security Review` are all green on `dev`'s
+  latest commit; `typecheck`/`unit tests`/`e2e`/`Deploy to Render` are all
+  green on `master`'s latest commit (`6e1797d`). No silent-red-suite
+  regression found (see the 2026-08-19/08-27 incidents this check exists
+  to catch).
+- Open-PR backlog: 1 (`#450`, the 2026-10-08 daily-review bundle against
+  `dev`, still unmerged — its `CR_2026-10-08.md` writeup was written but
+  never committed to the branch; committed it today as `ab59537` so the
+  PR carries the complete bundle).
+- No new bugs filed. Spot-checked the still-open `bug-0292` (GDPR
+  geo-detection) follow-up — `GEOIP_DB_PATH` remains correctly unset in
+  `render.yaml`/`render.staging.yaml`, matching the documented "stays
+  correct only while unset" guidance; no change needed. Also traced a
+  hydration-mismatch hypothesis on `useSectionPersistence`
+  (`apps/admin/lib/use-section-persistence.ts`) and confirmed it's a
+  non-issue: the drawers using it are always mounted, but Radix's
+  `Dialog.Content` renders nothing while closed, so the computed section
+  state never reaches the DOM on the server or first client render. See
+  [BUGS_2026-10-09.md](docs/history/bugs/BUGS_2026-10-09.md) and
+  [TODO_2026-10-09.md](docs/history/todo/TODO_2026-10-09.md).
+## [Unreleased] — 2026-10-08
+
+Quiet review: zero commits in the last 24 hours (last activity was
+`f682927`/PR #449, merged 2026-10-06T11:16 — the dev→master sync), and
+the scheduled daily review itself appears to have had a gap between
+2026-09-30 and today (no `TODO_*`/`BUGS_*` files for 2026-10-01 through
+2026-10-07). To avoid silently skipping that window, this run also
+spot-checked the unreviewed 2026-10-06 commits rather than treating the
+literal "last 24 hours" as the full scope — see below.
+
+**First genuinely clean infra snapshot in this review's history:**
+`gh pr list --state open` returns **0 open PRs** (down from 13 on
+2026-09-15, 7–16 across August) and `dev`'s CI (`typecheck`, `unit
+tests`, `e2e`, `AI Semantic Security Review`, `Dependency & CVE Scan`)
+is fully green on the latest commit. `dev` and `master` have identical
+content (the only commits on one side of the other are the two
+dev→master merge commits themselves).
+
+**Unreviewed window (2026-10-06): app-drawer collapsible sections +
+small CI fixes, both checked and found sound.** `7ad3bdc`…`6e37bcc`
+grouped the Create/Edit/View app-drawer forms' fields into themed,
+independently-collapsible `CollapsibleSection`s (new `packages/ui`
+primitive + an admin-only `useSectionPersistence` hook that remembers
+each section's open/closed state per drawer type in `localStorage`),
+with i18n for the new section titles and a French-copy correction
+(`7332eda`) folded in. Read the hook, its 6-case test file, and all
+three drawers' `credentials`/`security` sections (the sensitive ones)
+end to end — no secret values are rendered, only status/dates, and the
+hook's `localStorage` key is scoped per drawer type with try/catch
+guards on both read and write. `95c53fd` added `cross-env` so
+`OTEL_SDK_DISABLED=true` actually sets the variable on Windows runners;
+`cb4f80e` widened `packages/ui/tsconfig.ci.json`'s test exclusion to
+`src/**/__tests__` (a nested test folder was slipping into the CI
+typecheck); `ac5a485` added a `kill-admin` Make target to match the
+existing `kill-auth-server`; `de7b09f` removed a dead `PUBLIC_AUTH_SERVER`
+reference from two signup pages in favor of the single `AUTH_SERVER_URL`
+convention `login/page.tsx` already documents and uses. No issues found
+in any of the five — no new bugs filed today.
 
 ### Risky patterns / missing tests
 
-See [TODO_2026-10-13.md](./docs/history/todo/TODO_2026-10-13.md) for
-follow-ups and [BUGS_2026-10-13.md](./docs/history/bugs/BUGS_2026-10-13.md)
-for this run's verification catalog. No new bugs filed — the open-PR
-backlog (now 5 unmerged docs-only bundles, `#450`–`#453` plus this run)
-is the standing risk item; see TODO.
+See [TODO_2026-10-08.md](./docs/history/todo/TODO_2026-10-08.md). No new
+bugs this run — see
+[BUGS_2026-10-08.md](./docs/history/bugs/BUGS_2026-10-08.md).
 
 ## [Unreleased] — 2026-09-30
 
