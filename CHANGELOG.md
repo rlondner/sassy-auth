@@ -28,6 +28,79 @@ CI fixes), already covered by
   changes needed. See
   [BUGS_2026-10-11.md](docs/history/bugs/BUGS_2026-10-11.md) and
   [TODO_2026-10-11.md](docs/history/todo/TODO_2026-10-11.md).
+## [Unreleased] — 2026-10-09
+
+Quiet review window — zero commits landed on `dev` or `master` in the 24h
+period ending 2026-10-09T13:20Z. The most recent activity on `dev` remains
+`f682927` (2026-10-06T10:57Z, the app-drawer `CollapsibleSection` merge +
+CI fixes), already covered by the 2026-10-08 daily review
+([CR_2026-10-08.md](docs/history/code_reviews/CR_2026-10-08.md)).
+
+- CI health check: `typecheck`, `unit tests`, `e2e`, `Dependency & CVE Scan
+  (Trivy)`, and `AI Semantic Security Review` are all green on `dev`'s
+  latest commit; `typecheck`/`unit tests`/`e2e`/`Deploy to Render` are all
+  green on `master`'s latest commit (`6e1797d`). No silent-red-suite
+  regression found (see the 2026-08-19/08-27 incidents this check exists
+  to catch).
+- Open-PR backlog: 1 (`#450`, the 2026-10-08 daily-review bundle against
+  `dev`, still unmerged — its `CR_2026-10-08.md` writeup was written but
+  never committed to the branch; committed it today as `ab59537` so the
+  PR carries the complete bundle).
+- No new bugs filed. Spot-checked the still-open `bug-0292` (GDPR
+  geo-detection) follow-up — `GEOIP_DB_PATH` remains correctly unset in
+  `render.yaml`/`render.staging.yaml`, matching the documented "stays
+  correct only while unset" guidance; no change needed. Also traced a
+  hydration-mismatch hypothesis on `useSectionPersistence`
+  (`apps/admin/lib/use-section-persistence.ts`) and confirmed it's a
+  non-issue: the drawers using it are always mounted, but Radix's
+  `Dialog.Content` renders nothing while closed, so the computed section
+  state never reaches the DOM on the server or first client render. See
+  [BUGS_2026-10-09.md](docs/history/bugs/BUGS_2026-10-09.md) and
+  [TODO_2026-10-09.md](docs/history/todo/TODO_2026-10-09.md).
+## [Unreleased] — 2026-10-08
+
+Quiet review: zero commits in the last 24 hours (last activity was
+`f682927`/PR #449, merged 2026-10-06T11:16 — the dev→master sync), and
+the scheduled daily review itself appears to have had a gap between
+2026-09-30 and today (no `TODO_*`/`BUGS_*` files for 2026-10-01 through
+2026-10-07). To avoid silently skipping that window, this run also
+spot-checked the unreviewed 2026-10-06 commits rather than treating the
+literal "last 24 hours" as the full scope — see below.
+
+**First genuinely clean infra snapshot in this review's history:**
+`gh pr list --state open` returns **0 open PRs** (down from 13 on
+2026-09-15, 7–16 across August) and `dev`'s CI (`typecheck`, `unit
+tests`, `e2e`, `AI Semantic Security Review`, `Dependency & CVE Scan`)
+is fully green on the latest commit. `dev` and `master` have identical
+content (the only commits on one side of the other are the two
+dev→master merge commits themselves).
+
+**Unreviewed window (2026-10-06): app-drawer collapsible sections +
+small CI fixes, both checked and found sound.** `7ad3bdc`…`6e37bcc`
+grouped the Create/Edit/View app-drawer forms' fields into themed,
+independently-collapsible `CollapsibleSection`s (new `packages/ui`
+primitive + an admin-only `useSectionPersistence` hook that remembers
+each section's open/closed state per drawer type in `localStorage`),
+with i18n for the new section titles and a French-copy correction
+(`7332eda`) folded in. Read the hook, its 6-case test file, and all
+three drawers' `credentials`/`security` sections (the sensitive ones)
+end to end — no secret values are rendered, only status/dates, and the
+hook's `localStorage` key is scoped per drawer type with try/catch
+guards on both read and write. `95c53fd` added `cross-env` so
+`OTEL_SDK_DISABLED=true` actually sets the variable on Windows runners;
+`cb4f80e` widened `packages/ui/tsconfig.ci.json`'s test exclusion to
+`src/**/__tests__` (a nested test folder was slipping into the CI
+typecheck); `ac5a485` added a `kill-admin` Make target to match the
+existing `kill-auth-server`; `de7b09f` removed a dead `PUBLIC_AUTH_SERVER`
+reference from two signup pages in favor of the single `AUTH_SERVER_URL`
+convention `login/page.tsx` already documents and uses. No issues found
+in any of the five — no new bugs filed today.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-10-08.md](./docs/history/todo/TODO_2026-10-08.md). No new
+bugs this run — see
+[BUGS_2026-10-08.md](./docs/history/bugs/BUGS_2026-10-08.md).
 
 ## [Unreleased] — 2026-09-30
 
@@ -1899,8 +1972,19 @@ Heavy feature day across the monorepo (63 commits, all on `master`, local only �
 
 ### Risky patterns / missing tests
 
-See [TODO.md](./TODO.md) for the prioritized follow-up list and [BUGs.md](./BUGs.md) for the bug catalog. Three Critical-severity items must be resolved before this branch is shippable:
+See [TODO.md](./TODO.md) for the prioritized follow-up list and [BUGs.md](./BUGs.md) for the bug catalog. Three Critical-severity items were flagged here at the start of the project as blocking:
 
 - **bug-0001** — RBAC isolation broken across orgs in `checkPermission`.
 - **bug-0002** — Invitation tokens leak via request URL logs (and Sentry).
 - **bug-0003** — Admin Next.js middleware accepts any non-empty cookie value.
+
+> **Reconciled 2026-10-13:** this list contradicted a later "Fixed" entry
+> above (`b62d543`) claiming bug-0001 was resolved, and had stood
+> unreconciled since at least 2026-08-21. Checked all three against
+> current code: bug-0001 and bug-0003 are fixed (`check-permission.ts`'s
+> mandatory `targetOrgId` scoping; `apps/admin/middleware.ts` round-trips
+> every session cookie to the auth-server). bug-0002 is fixed for its
+> structured-log vector (`sanitizeUrlForLog` in
+> `request-logging.middleware.ts`); the Sentry-breadcrumb vector is
+> unverified — see `docs/history/todo/TODO_2026-10-13.md`. Full detail in
+> `docs/history/bugs/BUGS_2026-10-13.md`.

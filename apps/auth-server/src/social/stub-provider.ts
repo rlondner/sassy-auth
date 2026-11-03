@@ -25,7 +25,12 @@ export function stubProviderConfig(env: NodeJS.ProcessEnv): object[] {
       clientSecret: 'stub-secret',
       discoveryUrl: `${url.replace(/\/$/, '')}/.well-known/openid-configuration`,
       scopes: ['openid', 'email', 'profile'],
-      disableSignUp: true,
+      // JIT social signup (design doc 2026-10-30): the e2e suite needs to
+      // exercise the real provisioning path through the stub. Fixture apps
+      // without a defaultOrgId/defaultRoleId stay ineligible exactly as
+      // before — now via the compensating-delete path instead of a refusal
+      // before creation.
+      disableSignUp: false,
     },
   ];
 }

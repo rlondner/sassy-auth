@@ -1,4 +1,8 @@
-import { providerFromSignInMethod, signInMethodFromPath } from './sign-in-method';
+import {
+  providerFromSignInMethod,
+  resolveProviderForSocialSignup,
+  signInMethodFromPath,
+} from './sign-in-method';
 
 describe('signInMethodFromPath', () => {
   it('maps a social callback to ext:<provider>', () => {
@@ -43,5 +47,30 @@ describe('providerFromSignInMethod', () => {
     expect(providerFromSignInMethod(null)).toBeNull();
     expect(providerFromSignInMethod(undefined)).toBeNull();
     expect(providerFromSignInMethod('')).toBeNull();
+  });
+});
+
+describe('resolveProviderForSocialSignup', () => {
+  it('resolves the real provider from a /callback/:id-shaped ctx', () => {
+    expect(
+      resolveProviderForSocialSignup({ path: '/callback/:id', params: { id: 'google' } }),
+    ).toBe('google');
+  });
+
+  it('resolves the real provider from a /oauth2/callback/:providerId-shaped ctx (the e2e stub)', () => {
+    expect(
+      resolveProviderForSocialSignup({
+        path: '/oauth2/callback/:providerId',
+        params: { providerId: 'stub' },
+      }),
+    ).toBe('stub');
+  });
+
+  it('falls back to "social" for a null ctx', () => {
+    expect(resolveProviderForSocialSignup(null)).toBe('social');
+  });
+
+  it('falls back to "social" for a ctx whose route cannot be resolved', () => {
+    expect(resolveProviderForSocialSignup({ path: '/sign-up/email' })).toBe('social');
   });
 });

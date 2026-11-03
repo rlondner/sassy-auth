@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/nextjs'
 import { trace } from '@opentelemetry/api'
 import { getBetterAuthCookieName, isSecureCookieEnv } from '@sassy-auth/types'
 import { getForwardedOrigin } from '@/lib/auth-origin'
+import { getForwardedClientIpHeader } from '@/lib/forward-client-ip'
 import { validateNextUrl } from '@/lib/safe-next'
 import { AUTH_SERVER_URL } from '@/lib/config'
 import { extractClientId, fetchOutstandingConsent } from '@/lib/consent'
@@ -239,6 +240,7 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
   console.log(`[admin] Sign-in attempt for ${email}`)
 
   const origin = await getForwardedOrigin()
+  const forwardedIp = await getForwardedClientIpHeader()
 
   // Forward the trust-device cookie, and only that one. BetterAuth decides
   // whether to raise a TOTP challenge while handling sign-in, and it reads that
@@ -258,6 +260,7 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
       headers: {
         'Content-Type': 'application/json',
         ...(origin && { Origin: origin }),
+        ...forwardedIp,
         ...(trustCookie && {
           Cookie: `${TRUST_DEVICE_COOKIE_NAME}=${trustCookie.value}`,
         }),
@@ -399,6 +402,7 @@ export async function requestOtp(formData: FormData): Promise<{ sent: true } | {
   if (!email) return { error: 'invalidCredentials' }
 
   const origin = await getForwardedOrigin()
+  const forwardedIp = await getForwardedClientIpHeader()
   try {
     // Fire the request; the response status is intentionally ignored for the
     // client result. Whether the account exists/is active or not, the caller
@@ -406,7 +410,7 @@ export async function requestOtp(formData: FormData): Promise<{ sent: true } | {
     // failure is surfaced, so the operator knows to retry.
     await fetch(`${AUTH_SERVER_URL}/api/auth/email-otp/send-verification-otp`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(origin && { Origin: origin }) },
+      headers: { 'Content-Type': 'application/json', ...(origin && { Origin: origin }), ...forwardedIp },
       body: JSON.stringify({ email, type: 'sign-in' }),
     })
   } catch (err) {
@@ -422,11 +426,12 @@ export async function verifyOtp(formData: FormData): Promise<{ error?: string } 
   if (!email || !otp) return { error: 'invalidCode' }
 
   const origin = await getForwardedOrigin()
+  const forwardedIp = await getForwardedClientIpHeader()
   let res: Response
   try {
     res = await fetch(`${AUTH_SERVER_URL}/api/auth/sign-in/email-otp`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(origin && { Origin: origin }) },
+      headers: { 'Content-Type': 'application/json', ...(origin && { Origin: origin }), ...forwardedIp },
       body: JSON.stringify({ email, otp }),
     })
   } catch (err) {
@@ -545,6 +550,7 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
   if (!code) return { error: 'invalidCode' }
 
   const origin = await getForwardedOrigin()
+  const forwardedIp = await getForwardedClientIpHeader()
   const cookieStore = await cookies()
   // Forward all cookies so BetterAuth can validate the better-auth.two_factor temp cookie.
   const cookieHeader = cookieStore.toString()
@@ -557,6 +563,7 @@ export async function verifyTotp(formData: FormData): Promise<{ error?: string }
         'Content-Type': 'application/json',
         Cookie: cookieHeader,
         ...(origin && { Origin: origin }),
+        ...forwardedIp,
       },
       body: JSON.stringify({ code, trustDevice }),
     })
@@ -597,6 +604,7 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
   if (!code) return { error: 'invalidCode' }
 
   const origin = await getForwardedOrigin()
+  const forwardedIp = await getForwardedClientIpHeader()
   const cookieStore = await cookies()
   const cookieHeader = cookieStore.toString()
 
@@ -608,6 +616,7 @@ export async function verifyBackupCode(formData: FormData): Promise<{ error?: st
         'Content-Type': 'application/json',
         Cookie: cookieHeader,
         ...(origin && { Origin: origin }),
+        ...forwardedIp,
       },
       body: JSON.stringify({ code, trustDevice }),
     })
