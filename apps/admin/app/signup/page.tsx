@@ -3,8 +3,14 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { AuthCard } from '@sassy-auth/ui'
 import { fetchAppInfo } from '@/lib/app-info'
+import { fetchSocialProviders } from '@/lib/social-providers'
 import { SignupForm } from './signup-form'
 import { SignupWizardCard } from './signup-wizard-card'
+
+// Browser-facing social sign-in needs a publicly reachable origin — see
+// app/login/page.tsx's AUTH_SERVER comment for why this reuses
+// AUTH_SERVER_URL rather than a separate public-facing override.
+const AUTH_SERVER = process.env.AUTH_SERVER_URL ?? 'https://localhost:3010'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,10 +48,14 @@ export default async function SignupPage({
   }
 
   const {
-    name: appName, hasDefaultOrg, passwordPolicy, logo, privacyPolicyUrl, termsUrl, gdprUrl, gdprRequired,
+    name: appName, hasDefaultOrg, canSocialSignup, passwordPolicy, logo, privacyPolicyUrl, termsUrl, gdprUrl, gdprRequired,
     emailVerificationMethod,
     pageLightBackgroundColor, pageDarkBackgroundColor, cardLightBackgroundColor, cardDarkBackgroundColor,
   } = await fetchAppInfo(clientId)
+  // This synthetic `/signup?...` URL isn't the real `next` — fetchSocialProviders
+  // only reads its client_id query param to look up the provider list; branding
+  // for this page already comes from fetchAppInfo above.
+  const { providers } = await fetchSocialProviders(`/signup?client_id=${encodeURIComponent(clientId)}`)
   const nextSafe = next ?? ''
   const footer = (
     <Link
@@ -62,6 +72,9 @@ export default async function SignupPage({
         clientId={clientId}
         next={nextSafe}
         hasDefaultOrg={hasDefaultOrg}
+        canSocialSignup={canSocialSignup}
+        providers={providers}
+        authServerUrl={AUTH_SERVER}
         passwordPolicy={passwordPolicy}
         privacyPolicyUrl={privacyPolicyUrl}
         termsUrl={termsUrl}
@@ -93,6 +106,9 @@ export default async function SignupPage({
         clientId={clientId}
         next={nextSafe}
         hasDefaultOrg={hasDefaultOrg}
+        canSocialSignup={canSocialSignup}
+        providers={providers}
+        authServerUrl={AUTH_SERVER}
         passwordPolicy={passwordPolicy}
         privacyPolicyUrl={privacyPolicyUrl}
         termsUrl={termsUrl}
