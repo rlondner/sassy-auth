@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-05
+
+Zero commits landed on `dev` since 2026-11-03 (`b481bc2`, merge of PR
+#463) — nothing to diff. Checked CI health and the open-PR backlog
+directly instead.
+
+**Good news:** the open-PR backlog flagged as a standing risk in every
+review from 2026-10-19 through 2026-10-21 (8-9 open PRs, oldest 13+
+days) is now fully merged — `gh pr list --state open` returns nothing.
+CI (`e2e`, `typecheck`, `unit tests`, scheduled Trivy scan) is green on
+`dev`.
+
+**README gap found and fixed.** `.env.example` defines
+`AUTH_SERVER_HTTPS` (overrides the TLS-listener default independent of
+`NODE_ENV`, in `apps/auth-server/src/main.ts`), but it had no entry in
+`README.md`. Added a short paragraph to the "Local HTTPS certificates"
+section.
+
+Re-checked the `bug-0298` pattern (hardcoded test-fixture dates compared
+against the real wall clock) across all current `apps/**/*.spec.ts` /
+`*.test.ts` files — the original fix is still in place, and every other
+hardcoded-date fixture found passes `now` explicitly rather than reading
+the real clock, so none are at risk of going red as the calendar
+advances. No new bugs filed.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-11-05.md](./docs/history/todo/TODO_2026-11-05.md) for
+follow-ups (stale `.worktrees/` copies worth pruning, a suggested CI
+check for `.env.example` ⇄ README drift) and
+[BUGS_2026-11-05.md](./docs/history/bugs/BUGS_2026-11-05.md) for the
+full verification catalog.
+
 ## [Unreleased] — 2026-10-21
 
 Zero commits landed on `dev` since the last review (`4151407`,

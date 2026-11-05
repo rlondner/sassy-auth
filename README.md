@@ -456,6 +456,14 @@ dev`.
 self-generates its own certificate (the `next dev --experimental-https`
 flag was dropped once the Caddy proxy below took over that role).
 
+`AUTH_SERVER_HTTPS` (`true`/`false`, optional) overrides whether
+`auth-server` listens over TLS, independent of `NODE_ENV`. By default
+the server serves HTTPS unless `NODE_ENV=production`; set this
+explicitly when a `NODE_ENV=production` run still needs the dev TLS
+listener (e.g. `pnpm start` behind the Caddy proxy below, which always
+proxies over TLS). Render never sets this var, so real production
+deploys are unaffected.
+
 ### 6b. Optional — Caddy proxy for prod-like hostnames (Windows only)
 
 To exercise the app under the same hostnames used in production
