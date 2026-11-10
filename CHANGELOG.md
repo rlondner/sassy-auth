@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-10
+
+Zero new commits landed on `dev` in the last 24h — `dev` has been at
+`b481bc2` (2026-11-03) for a week. The only open PR, #467
+(`daily-review-2026-11-05`), has sat unmerged for five days.
+
+**bug-0299 — found and fixed.** Four packages pinned in `pnpm-lock.yaml`
+carry published **CRITICAL** CVEs that have never caused a visible CI
+failure on `dev` itself: `@sentry/nextjs@10.54.0` (CVE-2026-114139),
+`better-auth@1.6.11` (CVE-2026-114607 — an OAuth `state` value usable as
+a Magic Link to sign in as another user), transitive `dompurify@3.4.15`
+via `redoc` (GHSA-cg2g-xh64-v4q7), and `next@15.5.25` (GHSA-2464-fhr4-w9xw
+— unauthenticated RCE via the Image Optimization API for SVGs). This went
+unnoticed because `.github/workflows/trivy.yml`'s only hard-fail step was
+gated `if: github.event_name == 'pull_request'`, so the daily `schedule`
+run — added specifically to catch newly-disclosed CVEs against an
+unchanged lockfile — never actually failed the build; it only re-uploaded
+a SARIF to the Security tab. (This exact blind spot was independently
+flagged by the 2026-11-06 review, which blocked PR #467 on it without
+realizing it was a pre-existing `dev` issue; it sat unfixed for 4 more
+days.) Fixed in [PR #468](https://github.com/rlondner/sassy-auth/pull/468):
+bumped all four dependencies to patched versions and changed the Trivy
+workflow to also hard-fail on the schedule trigger. See
+[bug-0299.md](./docs/history/bugs/bug-0299.md).
+
+**README gap found and fixed.** `AUTH_SERVER_HTTPS` (defined in
+`.env.example`, read in `apps/auth-server/src/main.ts`) had no mention in
+`README.md`. This is the same gap PR #467 already fixes (still unmerged
+after 5 days), so the identical paragraph was added directly to `README.md`
+in this bundle rather than waiting on that PR.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-11-10.md](./docs/history/todo/TODO_2026-11-10.md) and
+[BUGS_2026-11-10.md](./docs/history/bugs/BUGS_2026-11-10.md). Standing
+risk item: PR #467 is now 5 days stale despite being mergeable docs-only
+content — merging is the recurring bottleneck for this daily-review
+habit, not finding things to report.
+
 ## [Unreleased] — 2026-10-21
 
 Zero commits landed on `dev` since the last review (`4151407`,
