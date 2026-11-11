@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-11
+
+Zero new commits landed on `dev` (unchanged since `b481bc2`, 2026-11-03).
+With nothing to diff, checked the open-PR backlog and the CI status of
+each pending PR directly, which is what surfaced bug-0300.
+
+**bug-0300 — found, partially fixed.** PR #468 (`bug-0299`, the
+critical-CVE dependency bump merged into neither `dev` nor flagged as
+broken by yesterday's review) has had failing `unit-tests` and
+`admin-e2e` checks since the moment it was opened. Two independent
+causes: bumping `better-auth` from `1.6.11` to `1.7.7` pulls in
+`@better-auth/utils@0.5.1`, whose dependency `@noble/hashes@2.2.0` is
+ESM-only and crashes Jest's CJS test runner — **fixed and pushed
+directly to the `bug-0299` branch in this run** via a `@noble/hashes`
+pnpm override, verified to turn the crashing spec green. Separately, the
+bump also drops/renames `auth.api.createVerificationOTP`,
+`checkVerificationOTP`, `verifyEmailOTP`, and `generateOpenAPISchema` —
+breaking `nest build` itself (`TS2339`) — **left unfixed**, since the
+correct replacement calls need verification against better-auth 1.7.7's
+actual installed type definitions rather than a guess in an
+OTP-verification code path. Yesterday's review (TODO_2026-11-10.md)
+marked bug-0299 "closed out" based on the PR description's claim of a
+verified build; that claim never matched the PR's own CI. See
+[bug-0300.md](./docs/history/bugs/bug-0300.md) for the full writeup.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-11-11.md](./docs/history/todo/TODO_2026-11-11.md) for
+follow-ups and [BUGS_2026-11-11.md](./docs/history/bugs/BUGS_2026-11-11.md)
+for the full verification catalog. Open-PR backlog against `dev` is now
+**3** (`#467`, 6 days stale; `#468`, broken on CI since creation; `#469`,
+1 day) — escalated this run since it now includes a blocked
+security-critical fix, not just docs.
+
 ## [Unreleased] — 2026-10-21
 
 Zero commits landed on `dev` since the last review (`4151407`,
