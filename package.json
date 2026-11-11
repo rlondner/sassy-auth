@@ -22,7 +22,8 @@
   },
   "pnpm": {
     "overrides": {
-      "dompurify": ">=3.4.17"
+      "dompurify": ">=3.4.17",
+      "@noble/hashes": "^1.8.0"
     }
   }
 }
