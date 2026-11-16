@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-16
+
+Zero commits landed on `dev` since 2026-11-11 (`abc675c`, merge of PR
+#467) — 5 days, nothing to diff. Did a targeted code scan instead of
+relying on the backlog narrative alone (logging in auth-server/admin,
+2FA-prompt interval logic), since the last two reviews had already
+covered the open-PR-backlog angle.
+
+**Three bugs found and fixed, each with its own PR against `dev`:**
+
+- 🔴 **bug-0301 (High):** `issueAccessToken`/`issueIdToken` in
+  `token.service.ts` logged the full signed RS256 JWT plus claims on
+  every mint, unconditionally — including production. Removed both
+  `console.log` calls. ([#471](https://github.com/rlondner/sassy-auth/pull/471))
+- 🟡 **bug-0302 (Medium):** auth-server's `/sign-in/email` hook and the
+  admin console's `signInInner` action logged the plaintext submitted
+  email on every attempt with no environment guard, unlike the sibling
+  magic-link logger in the same file. Gated both behind
+  `NODE_ENV !== 'production'`. ([#472](https://github.com/rlondner/sassy-auth/pull/472))
+- 🟡 **bug-0303 (Medium):** `shouldPromptTwoFactor`'s `intervalDays = 0`
+  "always prompt" sentinel returned `false` when `promptedAt` and `now`
+  land on the exact same millisecond, contradicting its documented
+  contract. Added an explicit short-circuit + regression test.
+  ([#473](https://github.com/rlondner/sassy-auth/pull/473))
+
+**PR backlog:** 3 PRs still open against `dev` (#468, #469, #470).
+PR #468 (CVE patches) has been CI-red for 6 days — the `better-auth`
+1.7.x API drift from `bug-0300` is still unresolved and the 4 CRITICAL
+CVEs it patches remain live. PR #469 and #470 are now mutually
+conflicting (both touch `CHANGELOG.md`/`README.md`). See
+[TODO_2026-11-16.md](./docs/history/todo/TODO_2026-11-16.md) for
+suggested merge order and
+[BUGS_2026-11-16.md](./docs/history/bugs/BUGS_2026-11-16.md) for full
+details.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-11-16.md](./docs/history/todo/TODO_2026-11-16.md) for
+follow-ups and [BUGS_2026-11-16.md](./docs/history/bugs/BUGS_2026-11-16.md)
+for the full bug catalog.
+
 ## [Unreleased] — 2026-11-05
 
 Zero commits landed on `dev` since 2026-11-03 (`b481bc2`, merge of PR
