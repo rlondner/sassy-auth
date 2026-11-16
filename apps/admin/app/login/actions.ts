@@ -237,7 +237,9 @@ async function signInInner(formData: FormData): Promise<{ error?: string } | { t
     return { error: 'Email and password are required.' }
   }
 
-  console.log(`[admin] Sign-in attempt for ${email}`)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[admin] Sign-in attempt for ${email}`)
+  }
 
   const origin = await getForwardedOrigin()
   const forwardedIp = await getForwardedClientIpHeader()
