@@ -60,6 +60,7 @@ describe('apps actions', () => {
     ['API error 409: name taken', 'apps.errors.nameExists'],
     ['API error 403: platform app', 'apps.errors.platformProtected'],
     ['API error 400: url insecure', 'apps.errors.urlInsecure'],
+    ['API error 400: Redirect URI scheme must be http(s) or reverse-domain (e.g. com.example.app): vibecast://auth', 'apps.errors.redirectUriInvalid'],
     ['API error 500: boom', 'apps.errors.generic'],
   ])('maps %s to %s on create', async (message, key) => {
     mockedApi.createApp.mockRejectedValue(new Error(message))

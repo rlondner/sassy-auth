@@ -196,6 +196,7 @@
       "generic": "Une erreur est survenue. Veuillez réessayer.",
       "urlInvalid": "Veuillez saisir une URL valide.",
       "urlInsecure": "Veuillez saisir une URL valide. En production, les URL d’application et de rappel doivent utiliser https et un hôte public.",
+      "redirectUriInvalid": "Veuillez saisir une URI de redirection valide. Les schémas personnalisés doivent utiliser la notation de domaine inversé, par ex. com.example.app://callback.",
       "logoInvalidType": "Veuillez choisir une image PNG, JPEG, WebP ou SVG.",
       "logoTooLarge": "Cette image est trop volumineuse. Veuillez en choisir une de moins de 250 Ko.",
       "invalidHexColor": "Saisissez une couleur hexadécimale à 6 chiffres (ex. #0F172A).",

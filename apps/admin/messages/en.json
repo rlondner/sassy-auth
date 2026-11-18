@@ -196,6 +196,7 @@
       "generic": "Something went wrong. Please try again.",
       "urlInvalid": "Please enter a valid URL.",
       "urlInsecure": "Please enter a valid URL. In production, app and callback URLs must use https and a public host.",
+      "redirectUriInvalid": "Please enter a valid redirect URI. Custom schemes must use reverse-domain notation, e.g. com.example.app://callback.",
       "logoInvalidType": "Please choose a PNG, JPEG, WebP, or SVG image.",
       "logoTooLarge": "That image is too large. Please choose one under 250KB.",
       "invalidHexColor": "Enter a 6-digit hex color (e.g. #0F172A).",

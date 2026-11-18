@@ -25,6 +25,14 @@ function mapError(message: string, kind: 'create' | 'update' | 'delete'): string
   if (message.includes('activationEmailOverride.')) {
     return 'apps.errors.activationEmailInvalid'
   }
+  // apps.service.ts's assertValidRedirectUris rejects invalid/duplicate/
+  // wrong-scheme redirect URIs with a message that always starts with
+  // "Redirect URI" or "Invalid redirect URI" or "Duplicate redirect URI" —
+  // none of these are the isAppUrlAllowed https/public-host policy that
+  // urlInsecure describes, so they must not fall into that generic bucket.
+  if (message.includes('Redirect URI') || message.includes('redirect URI')) {
+    return 'apps.errors.redirectUriInvalid'
+  }
   if (message.includes('400')) {
     return 'apps.errors.urlInsecure'
   }
