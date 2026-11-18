@@ -10,6 +10,22 @@ function reject(): never {
   throw new BadRequestException(TokenErrorCode.INVALID_REDIRECT_URI);
 }
 
+/**
+ * Whether `uri`'s scheme is anything other than http/https — i.e. a
+ * mobile/native custom-scheme redirect (e.g. `com.example.app://auth`).
+ * An unparseable URI is not a custom scheme for this purpose: callers that
+ * use this to decide whether PKCE is mandatory still reject the URI via
+ * the normal exact-match/parse-failure path immediately afterward.
+ */
+export function isCustomSchemeRedirect(uri: string): boolean {
+  try {
+    const { protocol } = new URL(uri);
+    return protocol !== 'http:' && protocol !== 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function isExactMatch(redirectUri: string, callbackUrl: string): boolean {
   let a: URL;
   let b: URL;
