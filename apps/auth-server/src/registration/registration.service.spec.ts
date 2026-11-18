@@ -273,6 +273,28 @@ describe('RegistrationService', () => {
       expect(result.redirectUrl).toBe('https://relying-party.example.com/callback?code=signup-code-123');
     });
 
+    it('omits redirectUrl when the app is confidential but its only registered login redirect URI is a custom scheme', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, clientSecretHash: 'hashed-secret' });
+      mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
+      mockPrisma.saOrg.update.mockResolvedValue(finalOrgRow);
+      mockSignUpEmail.mockResolvedValue({ user: { id: baUserId } });
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          saOrg: mockPrisma.saOrg,
+          saUser: { create: jest.fn().mockResolvedValue({ id: 42, publicId: 'ba-user-id-a' }) },
+          saUserRole: mockPrisma.saUserRole,
+        }),
+      );
+      mockPrisma.saAppRedirectUri.findMany.mockResolvedValue([
+        { uri: 'com.vibecast.app://auth', kind: 'login' },
+      ]);
+
+      const result = await service.register(baseDto);
+
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+      expect(result.redirectUrl).toBeUndefined();
+    });
+
     it('omits redirectUrl when the app has no registered login redirect URI', async () => {
       mockPrisma.saApp.findUnique.mockResolvedValue({ ...appRow, clientSecretHash: 'hashed-secret' });
       mockPrisma.saOrg.create.mockResolvedValue(draftOrgRow);
