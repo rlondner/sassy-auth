@@ -44,7 +44,7 @@
       "name": "Nom de l’application",
       "url": "URL de l’application",
       "redirectUris": "URI de redirection",
-      "redirectUrisHint": "URI de connexion et de déconnexion explicites vers lesquelles cette application est autorisée à rediriger.",
+      "redirectUrisHint": "URI de connexion et de déconnexion explicites vers lesquelles cette application est autorisée à rediriger. Pour les applications mobiles, utilisez un schéma personnalisé en notation de domaine inversé (par ex. com.example.app://auth) au lieu de https.",
       "redirectUriPlaceholder": "https://app.example.com/auth/callback",
       "redirectUriKindLabel": "Type d’URI de redirection",
       "redirectUriKindLogin": "Connexion",
