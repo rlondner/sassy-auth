@@ -69,3 +69,6 @@ packages/types/dist/
 .superpowers/
 .env.production
 designs/social-auth/atlassian/
+
+# Credential-shaped temp files dropped by local gh-auth tooling
+.gh-pat-tmp
