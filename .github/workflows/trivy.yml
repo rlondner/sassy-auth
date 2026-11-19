@@ -45,8 +45,12 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-      - name: Enforce PR Block on Critical CVEs
-        if: github.event_name == 'pull_request'
+      - name: Fail build on Critical CVEs
+        # Also runs on the daily schedule: without this, a critical CVE that
+        # lands on `dev` between PRs (new CVE published for an unchanged
+        # dependency) never shows up as a failing check — only as a Security
+        # tab alert nobody is watching. See bug-0299.
+        if: github.event_name == 'pull_request' || github.event_name == 'schedule'
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
