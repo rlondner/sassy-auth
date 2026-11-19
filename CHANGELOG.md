@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-19
+
+Zero commits landed on `dev` in the last 24h — `dev` is still at `abc675c`
+(merge of PR #467, 2026-11-11), now **8 days** without a merge. CI on
+`dev` itself remains green (scheduled Trivy scan, `typecheck`, `unit
+tests` all passing on `abc675c` through this morning's run).
+
+**Open-PR backlog: 8 (#468–#475), oldest now 9 days (#468/#469,
+2026-11-10).** Three ready-to-merge security/privacy fixes (#471, #472,
+#473) and one CVE patch blocked on red CI (#468) are unchanged from the
+2026-11-18 review — see `CR_2026-11-18.md` for the full per-PR
+breakdown and recommended landing order. Not re-escalating with new
+urgency per the 2026-08-30 note (repeating the ask hasn't moved it);
+just recording that it's still climbing.
+
+**Local WIP observed (not on `dev`, no PR yet):** a local-only branch
+(`worktree-custom-scheme-redirect-uris`, 8 commits, 2026-11-18) adds
+RFC 8252 §7.1 reverse-domain custom-scheme redirect URIs
+(`com.example.app://callback`) and makes PKCE mandatory for them even
+on confidential clients. The work looks sound overall (PKCE forced at
+`/authorize`, `/token`, and the social-signup code-issuance path; a
+previously-generic app-URL error mapping was correctly split out so
+custom-scheme validation errors no longer get mislabeled as the
+https/public-host policy error). One ordering risk worth fixing before
+it's PR'd — see
+[TODO_2026-11-19.md](./docs/history/todo/TODO_2026-11-19.md). Also: the
+branch forked before the 2026-08-19 `docs/history` reorg, so it is very
+stale and will need a rebase onto current `dev` before it can be
+opened as a PR. No bug filed — this code doesn't exist on `dev` yet,
+so there's nothing there to fix.
+
+No README gap found this run (every `.env.example` variable is already
+documented).
+
+### Risky patterns / missing tests
+
+See [TODO_2026-11-19.md](./docs/history/todo/TODO_2026-11-19.md) and
+[BUGS_2026-11-19.md](./docs/history/bugs/BUGS_2026-11-19.md).
+
 ## [Unreleased] — 2026-11-05
 
 Zero commits landed on `dev` since 2026-11-03 (`b481bc2`, merge of PR
