@@ -1397,6 +1397,21 @@ describe('TokenController', () => {
       expect(res.body?.message).not.toBe('invalid_request');
     });
 
+    it('/authorize refuses to omit PKCE for a confidential app using a custom-scheme redirect', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: 'scrypt-hash',
+        redirectUris: [{ uri: 'com.vibecast.app://auth', kind: 'login' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/authorize')
+        .query({ client_id: 'a_7', redirect_uri: 'com.vibecast.app://auth', scope: 'openid' });
+
+      expect(res.status).toBe(400);
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+    });
+
     // Exercises the /authorize-side check only: it would fail (400 becomes
     // something else, or a code gets issued) if that check were removed,
     // independent of whatever /token does.

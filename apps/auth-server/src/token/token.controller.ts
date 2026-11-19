@@ -49,7 +49,7 @@ import { OauthTokenExchangeDto } from './dto/oauth-token-exchange.dto';
 import { OauthService } from './oauth.service';
 import { TokenService } from './token.service';
 import { RefreshTokenService } from './refresh-token.service';
-import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed } from './redirect-uri';
+import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed, isCustomSchemeRedirect } from './redirect-uri';
 import { buildClientErrorRedirectUrl, buildOauthErrorRedirectUrl, extractTokenErrorCode } from './oauth-error-redirect';
 import { AUTH_THROTTLE } from '../common/config/rate-limit-config';
 import { LoggerService } from '../common/logger/logger.service';
@@ -174,11 +174,17 @@ export class TokenController {
       // sent, must still be S256. This must run after the app lookup, since
       // whether PKCE can be omitted depends on the app's client type.
       const isConfidential = app.clientSecretHash !== null;
+      // A custom-scheme redirect is always treated as public for PKCE
+      // purposes — a client secret embedded in a distributed app binary
+      // can't be kept confidential, so the confidential-client exemption
+      // from PKCE must not apply to it even if the app also has a secret
+      // configured for other flows.
+      const pkceRequired = !isConfidential || isCustomSchemeRedirect(redirectUri);
       if (codeChallenge) {
         if (codeChallengeMethod !== 'S256') {
           throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
         }
-      } else if (!isConfidential) {
+      } else if (pkceRequired) {
         throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
       }
 

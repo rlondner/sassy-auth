@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { TokenErrorCode } from '@sassy-auth/types';
-import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed } from './redirect-uri';
+import { assertRedirectUriAllowed, assertPostLogoutRedirectUriAllowed, isCustomSchemeRedirect } from './redirect-uri';
 
 describe('assertRedirectUriAllowed — no registered URIs: origin fallback', () => {
   it('accepts exact origin with any path', () => {
@@ -111,5 +111,20 @@ describe('assertPostLogoutRedirectUriAllowed', () => {
     const app = { url: 'https://app.example.com', redirectUris: [] };
 
     expect(() => assertPostLogoutRedirectUriAllowed('https://app.example.com/bye', app)).toThrow();
+  });
+});
+
+describe('isCustomSchemeRedirect', () => {
+  it('returns false for http(s) URIs', () => {
+    expect(isCustomSchemeRedirect('https://app.example.com/cb')).toBe(false);
+    expect(isCustomSchemeRedirect('http://app.example.com/cb')).toBe(false);
+  });
+
+  it('returns true for a custom-scheme URI', () => {
+    expect(isCustomSchemeRedirect('com.vibecast.app://auth')).toBe(true);
+  });
+
+  it('returns false for an unparseable URI', () => {
+    expect(isCustomSchemeRedirect('not a url')).toBe(false);
   });
 });

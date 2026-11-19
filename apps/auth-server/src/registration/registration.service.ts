@@ -28,7 +28,7 @@ import { OauthService } from '../token/oauth.service';
 import { resolveRequiredConsent } from '../consent/resolve-required-consent';
 import { recordConsent } from '../consent/record-consent';
 import { resolveCountryFromIp } from '../common/geoip/geoip.service';
-import { assertRedirectUriAllowed } from '../token/redirect-uri';
+import { assertRedirectUriAllowed, isCustomSchemeRedirect } from '../token/redirect-uri';
 import { OAUTH_AUTHORIZE_PATH } from '../token/oauth-metadata';
 import { resolveSocialSignupEligibility } from '../social/resolve-social-signup-eligibility';
 
@@ -346,7 +346,11 @@ export class RegistrationService {
       // A public client's code must carry a PKCE challenge to be
       // redeemable; a confidential client's client secret substitutes for
       // one.
-      if (redirectUri && (codeChallenge || isConfidential)) {
+      // Same custom-scheme-forces-PKCE rule as /authorize (token.controller.ts):
+      // a confidential app's client secret doesn't substitute for PKCE when
+      // the redirect itself is a mobile/native custom scheme.
+      const pkceRequired = !isConfidential || (redirectUri !== null && isCustomSchemeRedirect(redirectUri));
+      if (redirectUri && (codeChallenge || !pkceRequired)) {
         const code = await this.oauthService.generateCode(
           saUserPublicId,
           app.publicId,

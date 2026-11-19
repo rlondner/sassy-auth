@@ -1000,6 +1000,29 @@ describe('AppsService', () => {
     ).rejects.toThrow();
   });
 
+  it('accepts a reverse-domain custom-scheme redirect URI', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+    mockPrisma.saApp.update.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    await service.updateApp('admin-ba-id', 'a_7', {
+      redirectUris: [{ uri: 'com.vibecast.app://auth', kind: 'login' }],
+    });
+
+    expect(mockPrisma.saAppRedirectUri.createMany).toHaveBeenCalledWith({
+      data: [{ appId: 7, uri: 'com.vibecast.app://auth', kind: 'login' }],
+    });
+  });
+
+  it('rejects a bare-word custom scheme (no reverse-domain dot)', async () => {
+    mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
+
+    await expect(
+      service.updateApp('admin-ba-id', 'a_7', {
+        redirectUris: [{ uri: 'vibecast://auth', kind: 'login' }],
+      }),
+    ).rejects.toThrow('Redirect URI scheme must be http(s) or reverse-domain');
+  });
+
   it('updateApp rejects a duplicate {uri, kind} pair with a distinct BadRequestException, not the app-name-conflict message, and never touches the DB', async () => {
     mockPrisma.saApp.findUnique.mockResolvedValue({ id: 7, publicId: 'a_7', isPlatform: false });
 

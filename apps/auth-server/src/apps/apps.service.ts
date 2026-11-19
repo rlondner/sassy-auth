@@ -71,7 +71,18 @@ function formatApp(a: AppRow) {
   };
 }
 
-/** Redirect URIs must be absolute http(s) URLs — no javascript:, data:, or relative paths. */
+// At least two dot-separated labels (e.g. "com.example.app") — RFC 8252
+// §7.1 reverse-domain custom-scheme notation.
+const CUSTOM_SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+-]*(\.[a-zA-Z][a-zA-Z0-9+-]*)+$/;
+
+/**
+ * Redirect URIs must be absolute http(s) URLs, or a reverse-domain
+ * custom scheme (e.g. com.example.app://auth) for mobile/native apps per
+ * RFC 8252 §7.1 — never javascript:, data:, a bare-word scheme, or a
+ * relative path. A bare-word scheme (no dot) is rejected because it can be
+ * claimed by more than one app on a device, letting another app intercept
+ * the authorization code.
+ */
 function assertValidRedirectUris(uris: Array<{ uri: string; kind: string }>): void {
   const seen = new Set<string>();
   for (const r of uris) {
@@ -81,8 +92,12 @@ function assertValidRedirectUris(uris: Array<{ uri: string; kind: string }>): vo
     } catch {
       throw new BadRequestException(`Invalid redirect URI: ${r.uri}`);
     }
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      throw new BadRequestException(`Redirect URI must be http(s): ${r.uri}`);
+    const schemeName = parsed.protocol.slice(0, -1);
+    const isHttpLike = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    if (!isHttpLike && !CUSTOM_SCHEME_RE.test(schemeName)) {
+      throw new BadRequestException(
+        `Redirect URI scheme must be http(s) or reverse-domain (e.g. com.example.app): ${r.uri}`,
+      );
     }
     if (r.kind !== 'login' && r.kind !== 'post_logout') {
       throw new BadRequestException(`Invalid redirect URI kind: ${r.kind}`);

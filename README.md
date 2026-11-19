@@ -780,6 +780,7 @@ How the `redirect_uri` is validated depends on whether the app has any registere
 
 - **Default (no `login` URI registered for the app):** the `redirect_uri` must share an origin (scheme + host + port) with the app's registered `url`. Any path under that origin is accepted. This is the pre-OIDC behavior, preserved so existing apps keep working unchanged.
 - **One or more `login` URIs registered:** the `redirect_uri` must exactly match one of them (scheme + host + port + path + query). A single trailing-slash difference in the path is tolerated; everything else must match byte-for-byte.
+- **Custom (mobile/native) schemes:** a registered redirect URI may use a non-http(s) scheme for mobile/native apps, provided the scheme is reverse-domain notation (e.g. `com.example.app://auth`, per RFC 8252 §7.1) rather than a bare word. Any redirect to a custom-scheme URI requires a PKCE `code_challenge` at `/authorize` — the confidential-client exemption from PKCE does not apply to a custom-scheme redirect, even for an app that also has a client secret.
 
 A `redirect_uri` that doesn't satisfy the applicable rule returns `400 invalid_redirect_uri`. Note that registering an app whose `url` or a registered redirect URI uses `http` or a `localhost`/loopback host requires the auth server to run with `SASSY_AUTH_ALLOW_INSECURE_APP_URLS=true`; by default both must be `https` with a public host (see [Environment Variables](#environment-variables)).
 
