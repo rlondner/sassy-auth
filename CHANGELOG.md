@@ -4,6 +4,57 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-18
+
+Zero commits landed on `dev` in the last 24h — `dev` is still at
+`3a5d200` (merge of the 2026-11-17 custom-scheme design-spec doc).
+All real activity in the window is on the unmerged
+`worktree-custom-scheme-redirect-uris` branch (`a8387f7`, `d20c06c`,
+`dc7aa0d`), executing the first 3 of 7 tasks in
+[`docs/superpowers/plans/2026-11-17-custom-scheme-redirect-uris.md`](./docs/superpowers/plans/2026-11-17-custom-scheme-redirect-uris.md):
+
+- **`isCustomSchemeRedirect` helper** (`apps/auth-server/src/token/redirect-uri.ts`) —
+  predicate distinguishing a custom (mobile/native) redirect scheme from
+  http(s); unparseable URIs are treated as non-custom, deferring rejection
+  to the existing exact-match/parse-failure path.
+- **Reverse-domain custom schemes now accepted at registration**
+  (`apps/auth-server/src/apps/apps.service.ts`) — `assertValidRedirectUris`
+  now allows a non-http(s) scheme for an app's redirect URI only if it has
+  ≥2 dot-separated labels (RFC 8252 §7.1, e.g. `com.example.app://auth`),
+  rejecting bare-word schemes (`vibecast://auth`) that more than one app on
+  a device could claim.
+- **PKCE now mandatory for custom-scheme redirects at `/authorize`**
+  (`apps/auth-server/src/token/token.controller.ts`) — a confidential
+  app's client-secret exemption from PKCE no longer applies when the
+  redirect is a custom scheme, since a secret embedded in a distributed
+  app binary isn't actually confidential.
+
+### Risky pattern / missing coverage
+
+Tasks 4-7 of the plan are **not yet done** on that branch: the same
+PKCE-bypass gap this closed at `/authorize` still exists in the
+signup-flow redirect (`registration.service.ts`, Task 4) — a
+confidential app registering only a custom-scheme login URI can still
+skip PKCE and get an auto-redirect with an auth code during self-serve
+signup. The admin-UI error-message fix (Task 5) and README/copy updates
+(Tasks 6-7) are also pending. **Do not merge this branch past Task 3
+without Task 4** — doing so would reopen the exact gap Task 3 just
+closed, via a different code path. See
+[TODO_2026-11-18.md](./docs/history/todo/TODO_2026-11-18.md).
+
+### Standing risk carried forward — unmerged fix/PR backlog
+
+Re-confirmed directly against `dev` (not just from prior review notes):
+`apps/auth-server/package.json`/`apps/admin/package.json` still pin the
+pre-CVE-patch versions (`better-auth ^1.0.0`, `next ^15.5.24`,
+`@sentry/nextjs ^10.54.0`), and `token.service.ts:174,236` still
+`console.log`s the fully-signed access/ID JWT (with claims) on every
+mint. Both already have ready fixes sitting unmerged: PR #468
+(bug-0299, CVEs) and PR #471 (bug-0301, JWT logging, CI green). No new
+bug filed for either — see
+[BUGS_2026-11-18.md](./docs/history/bugs/BUGS_2026-11-18.md) for the
+full verification.
+
 ## [Unreleased] — 2026-11-05
 
 Zero commits landed on `dev` since 2026-11-03 (`b481bc2`, merge of PR
