@@ -30,6 +30,7 @@ export function shouldPromptTwoFactor({
   if (!promptEnabled) return false;
   if (twoFactorEnabled) return false;
   if (promptedAt === null) return true;
+  if (intervalDays === 0) return true;
   const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
   const elapsedMs = now.getTime() - promptedAt.getTime();
   return elapsedMs > intervalMs;
