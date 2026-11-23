@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-23
+
+Zero commits landed on `dev` since 2026-11-19 (`2215689`, merge of PR
+#478 — custom-scheme redirect URIs for mobile/native apps) — nothing
+to diff. CI (`e2e`, `typecheck`, `unit tests`, daily Trivy scan) is
+fully green on `dev`.
+
+**Found and fixed a real bug in PR #478's merged code.** `/authorize`
+decided whether PKCE is mandatory by reading the raw, unvalidated
+`redirect_uri` query parameter *before* confirming that URI is actually
+registered to the app. An unregistered custom-scheme `redirect_uri`
+with no PKCE challenge therefore surfaced the generic PKCE
+`invalid_request` instead of `INVALID_REDIRECT_URI` — not an
+exploitable bypass (still fails closed), but a real correctness bug
+with no test coverage. Fixed in **bug-0305** (PR #479): reordered the
+checks, added a regression test, and fixed two existing PKCE tests to
+expect the (now correct) client-redirect behavior for a PKCE failure.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-11-23.md](./docs/history/todo/TODO_2026-11-23.md) for
+follow-ups (open-PR backlog back up to 12, uncommitted two-factor-
+lockout WIP found in the working tree and left untouched, stale
+`.worktrees/` copies) and
+[BUGS_2026-11-23.md](./docs/history/bugs/BUGS_2026-11-23.md) for the
+full verification catalog.
+
 ## [Unreleased] — 2026-11-05
 
 Zero commits landed on `dev` since 2026-11-03 (`b481bc2`, merge of PR
