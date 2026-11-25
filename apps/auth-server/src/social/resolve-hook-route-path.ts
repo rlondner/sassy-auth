@@ -14,7 +14,7 @@
 // This helper reconstructs a signInMethodFromPath-shaped literal path from
 // the template + params so the pure function's regex still matches.
 export function resolveHookRoutePath(
-  ctx: { path?: string; params?: Record<string, string> } | null | undefined,
+  ctx: { path?: string; params?: Record<string, string | undefined> } | null | undefined,
 ): string | undefined {
   if (!ctx) return undefined;
   const template = ctx.path;

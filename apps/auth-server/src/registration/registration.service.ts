@@ -11,6 +11,7 @@ import { PasswordPolicy } from '@sassy-auth/types';
 import type { ActivationEmailBranding } from '@sassy-auth/types';
 import { randomBytes, randomUUID } from 'crypto';
 import { auth } from '../auth/auth.config';
+import type { AuthApiExtras } from '../auth/auth-api-extras';
 import { SqidService } from '../common/sqid/sqid.service';
 import { generatePendingPublicId } from '../common/pending-public-id';
 import { resolvePasswordPolicy, validatePasswordOrThrow } from '../auth/password-policy';
@@ -450,7 +451,10 @@ export class RegistrationService {
 
     const branding = (app.activationEmailOverride ?? undefined) as ActivationEmailBranding | undefined;
     await sendVerificationCode(
-      { createOtp: (d) => auth.api.createVerificationOTP({ body: d }), emailer: getEmailer() },
+      {
+        createOtp: (d) => (auth.api as unknown as AuthApiExtras).createVerificationOTP({ body: d }),
+        emailer: getEmailer(),
+      },
       { email: dto.email, firstName: 'there', appName: app.name, branding },
     );
 
@@ -476,7 +480,7 @@ export class RegistrationService {
 
   async verifyRegistrationCode(dto: VerifyRegistrationCodeDto): Promise<{ ok: true }> {
     try {
-      await auth.api.checkVerificationOTP({
+      await (auth.api as unknown as AuthApiExtras).checkVerificationOTP({
         body: { email: dto.email, type: 'email-verification', otp: dto.otp },
       });
     } catch (e: unknown) {
@@ -527,7 +531,9 @@ export class RegistrationService {
     // pass the non-consuming checkVerificationOTP check earlier).
     let baUserId: string;
     try {
-      const result = await auth.api.verifyEmailOTP({ body: { email: dto.email, otp: dto.otp } });
+      const result = await (auth.api as unknown as AuthApiExtras).verifyEmailOTP({
+        body: { email: dto.email, otp: dto.otp },
+      });
       baUserId = result.user.id;
     } catch (e: unknown) {
       throw this.mapOtpError(e);

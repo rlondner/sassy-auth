@@ -18,6 +18,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import { toNodeHandler } from 'better-auth/node';
 import { AppModule } from './app.module';
 import { auth, TRUSTED_ORIGINS } from './auth/auth.config';
+import type { AuthApiExtras } from './auth/auth-api-extras';
 import { createDefaultAuthRateLimiter } from './auth/auth-rate-limit';
 import { runWithPrivateRelayCapture } from './social/apple-private-relay-context';
 import { runWithSocialConsentCapture } from './social/social-consent-context';
@@ -255,7 +256,7 @@ async function bootstrap() {
 
     let mergedDoc = nestDoc;
     try {
-      const betterAuthDoc = await auth.api.generateOpenAPISchema();
+      const betterAuthDoc = await (auth.api as unknown as AuthApiExtras).generateOpenAPISchema();
       // bug-0092: BetterAuth's generateOpenAPISchema() returns an
       // OpenAPI-shape object where `OpenAPIParameter.name` is
       // `string | undefined` (its own internal type), while NestJS's

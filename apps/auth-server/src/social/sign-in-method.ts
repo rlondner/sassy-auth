@@ -50,7 +50,7 @@ export function providerFromSignInMethod(signInMethod: string | null | undefined
  * re-inlined at each call site.
  */
 export function resolveProviderForSocialSignup(
-  ctx: { path?: string; params?: Record<string, string> } | null | undefined,
+  ctx: { path?: string; params?: Record<string, string | undefined> } | null | undefined,
 ): string {
   return providerFromSignInMethod(signInMethodFromPath(resolveHookRoutePath(ctx))) ?? 'social';
 }

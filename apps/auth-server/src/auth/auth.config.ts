@@ -30,6 +30,7 @@ import { resolveOutstandingConsent } from '../consent/resolve-outstanding-consen
 import { resolveCountryFromIp } from '../common/geoip/geoip.service';
 import { appendConsentRedirect } from '../social/resolve-social-consent-redirect';
 import { resolveAppForResetToken } from './resolve-app-for-reset-token';
+import type { AuthApiExtras } from './auth-api-extras';
 import { notifyActivation } from '../activation/notify-activation';
 import { resolvePasswordPolicy, getFailedPasswordRules, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH_FLOOR } from './password-policy';
 import { envInt, AUTH_THROTTLE } from '../common/config/rate-limit-config';
@@ -80,6 +81,68 @@ const authLogger = createAppLogger();
 // ../social/resolve-hook-route-path.ts (moved there in the fix-round-1
 // review pass so it can be unit-tested directly) for the full source
 // evidence and the reconstruction logic.
+
+// task-11: a spread of a conditional array (`...(x ? [plugin] : [])`) widens
+// the whole `plugins` array from a tuple to a plain `Plugin[]` union, which
+// breaks better-auth 1.7's `InferAPI` endpoint inference for every plugin in
+// the array (auth.api.createVerificationOTP and friends stop type-checking
+// even though they still exist at runtime). Building the always-present
+// plugins as a `const`-asserted tuple and spreading it into either branch of
+// a plain ternary keeps both branches genuine tuples, which `InferAPI` can
+// still walk.
+const basePlugins = [
+  magicLink({
+    sendMagicLink: async ({ email, url }) => {
+      // bug-0163: the magic-link URL is a bearer credential —
+      // whoever holds the URL can authenticate as `email`. Console
+      // logging it is fine in dev (visible to the developer running
+      // the server) but in production the log lands in a shared
+      // stream (docker logs, Sentry, Datadog, etc.) that operators
+      // and any log-forwarding pipeline can read — turning every
+      // magic-link send into a credential leak.
+      // Wire the real send in production; dev keeps the log so the
+      // developer flow (click link in terminal) still works.
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[magic-link] ${email} → ${url}`);
+      }
+    },
+  }),
+  emailOTP({
+    otpLength: 6,
+    expiresIn: 300,
+    allowedAttempts: 3,
+    disableSignUp: true,
+    rateLimit: { window: 60, max: 5 },
+    sendVerificationOTP: async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
+      await sendSignInOtp(
+        {
+          db: prisma,
+          emailer: getEmailer(),
+          store: otpTestStore,
+          logger: authLogger,
+          isTest: process.env.NODE_ENV === 'test',
+        },
+        { email, otp, type },
+      );
+    },
+  }),
+  twoFactor({
+    issuer: 'Sassy Auth',
+    // 10 backup codes (matches the spec; default is also 10, explicit for
+    // reviewability).
+    backupCodeOptions: { amount: 10 },
+    // skipVerificationOnEnable stays false (default): 2FA is not active
+    // until the user confirms with a live TOTP code. This prevents lockout
+    // from a mis-scanned QR.
+  }),
+  openAPI({ disableDefaultReference: true }),
+] as const;
+
+// task-11: registers no routes at all unless E2E_STUB_IDP_URL is set AND
+// NODE_ENV is exactly 'test' or 'development' — see stub-provider.ts. Empty
+// in production, and empty on every ambiguous NODE_ENV a blocklist would
+// fail open on (unset, 'Production', '').
+const stubPlugins = stubProviderConfig(process.env);
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -231,7 +294,7 @@ export const auth = betterAuth({
       create: {
         after: async (
           user: { id: string; email: string; name: string },
-          ctx?: { path?: string; params?: Record<string, string> } | null,
+          ctx?: { path?: string; params?: Record<string, string | undefined> } | null,
         ) => {
           const { clientId, givenName, familyName } = readSocialSignupContext();
           // Only a social-provider signup reaches this with a non-null
@@ -265,7 +328,7 @@ export const auth = betterAuth({
       create: {
         before: async (
           session: { userId: string },
-          ctx?: { path?: string; params?: Record<string, string> } | null,
+          ctx?: { path?: string; params?: Record<string, string | undefined> } | null,
         ) => {
           const gate = await evaluateSessionGate(prisma, session.userId);
           if (!gate.allowed) {
@@ -626,7 +689,10 @@ export const auth = betterAuth({
         // only runs on a real request, long after module evaluation (and
         // thus the `auth` binding) has completed.
         await sendVerificationCode(
-          { createOtp: (d) => auth.api.createVerificationOTP({ body: d }), emailer: getEmailer() },
+          {
+            createOtp: (d) => (auth.api as unknown as AuthApiExtras).createVerificationOTP({ body: d }),
+            emailer: getEmailer(),
+          },
           { email: user.email, firstName, appName, branding },
         );
         return;
@@ -673,58 +739,7 @@ export const auth = betterAuth({
   // and deliberately does NOT trust any provider. GitHub is intentionally
   // dropped here: it was never surfaced in any UI and is out of scope.
   socialProviders: buildSocialProviders(process.env),
-  plugins: [
-    magicLink({
-      sendMagicLink: async ({ email, url }) => {
-        // bug-0163: the magic-link URL is a bearer credential —
-        // whoever holds the URL can authenticate as `email`. Console
-        // logging it is fine in dev (visible to the developer running
-        // the server) but in production the log lands in a shared
-        // stream (docker logs, Sentry, Datadog, etc.) that operators
-        // and any log-forwarding pipeline can read — turning every
-        // magic-link send into a credential leak.
-        // Wire the real send in production; dev keeps the log so the
-        // developer flow (click link in terminal) still works.
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`[magic-link] ${email} → ${url}`);
-        }
-      },
-    }),
-    emailOTP({
-      otpLength: 6,
-      expiresIn: 300,
-      allowedAttempts: 3,
-      disableSignUp: true,
-      rateLimit: { window: 60, max: 5 },
-      sendVerificationOTP: async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
-        await sendSignInOtp(
-          {
-            db: prisma,
-            emailer: getEmailer(),
-            store: otpTestStore,
-            logger: authLogger,
-            isTest: process.env.NODE_ENV === 'test',
-          },
-          { email, otp, type },
-        );
-      },
-    }),
-    twoFactor({
-      issuer: 'Sassy Auth',
-      // 10 backup codes (matches the spec; default is also 10, explicit for
-      // reviewability).
-      backupCodeOptions: { amount: 10 },
-      // skipVerificationOnEnable stays false (default): 2FA is not active
-      // until the user confirms with a live TOTP code. This prevents lockout
-      // from a mis-scanned QR.
-    }),
-    openAPI({ disableDefaultReference: true }),
-    // task-11: registers no routes at all unless E2E_STUB_IDP_URL is set AND
-    // NODE_ENV is exactly 'test' or 'development' — see stub-provider.ts.
-    // Empty in production, and empty on every ambiguous NODE_ENV a
-    // blocklist would fail open on (unset, 'Production', '').
-    ...(stubProviderConfig(process.env).length
-      ? [genericOAuth({ config: stubProviderConfig(process.env) as never })]
-      : []),
-  ],
+  plugins: stubPlugins.length
+    ? [...basePlugins, genericOAuth({ config: stubPlugins as never })]
+    : [...basePlugins],
 });
