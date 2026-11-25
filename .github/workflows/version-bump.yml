@@ -19,8 +19,13 @@ concurrency:
 jobs:
   bump:
     # Loop guard: never act on our own bump commit.
-    if: ${{ !contains(github.event.head_commit.message, '[version-bump]') }}
+    # Match our exact commit shape so a human commit merely quoting the marker is not skipped.
+    if: "${{ !(startsWith(github.event.head_commit.message, 'chore: bump ') && contains(github.event.head_commit.message, '[version-bump]')) }}"
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Explicit bash runs with -eo pipefail, so a failing `turbo ls` fails the step.
+        shell: bash
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -49,6 +54,13 @@ jobs:
           names=$(pnpm exec turbo ls --filter="...[$BEFORE...$AFTER]" --output=json | jq -r '.packages.items[].name' | tr '\n' ' ')
           echo "Affected: $names"
           echo "names=$names" >> "$GITHUB_OUTPUT"
+
+      - name: Move to the current tip of dev
+        # A queued run may start after newer pushes (and their bump commits) landed;
+        # bump on top of the real tip, not the event's SHA, or versions would repeat.
+        run: |
+          git fetch origin dev
+          git checkout -B dev origin/dev
 
       - name: Bump versions
         id: bump
