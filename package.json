@@ -6,6 +6,7 @@
     "build": "turbo build",
     "predev": "node ./scripts/predev.mjs",
     "dev": "turbo dev",
+    "start": "turbo start",
     "test": "turbo test",
     "lint": "turbo lint",
     "setup:resource-server-fastapi": "uv sync --directory apps/resource-server-fastapi",
