@@ -52,7 +52,22 @@
         "SASSY_*",
         "SEED_*",
         "SENTRY_*",
-        "NEXT_PUBLIC_*"
+        "NEXT_PUBLIC_*",
+        "COOKIE_SECURE",
+        "COOKIE_DOMAIN",
+        "COOKIE_PREFIX",
+        "AUTH_SERVER_HTTPS",
+        "GEOIP_DB_PATH",
+        "TWO_FACTOR_TRUST_DAYS",
+        "TWO_FACTOR_PROMPT_ENABLED",
+        "TURNSTILE_SECRET_KEY",
+        "DEFAULT_RATE_LIMIT",
+        "DEFAULT_RATE_WINDOW_MS",
+        "AUTH_RATE_LIMIT",
+        "AUTH_RATE_WINDOW_MS",
+        "E2E_ADMIN_EMAIL",
+        "E2E_ADMIN_PASSWORD",
+        "OTEL_*"
       ]
     },
     "dev": {
