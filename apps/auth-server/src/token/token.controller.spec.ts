@@ -1372,7 +1372,12 @@ describe('TokenController', () => {
         .get('/api/token/oauth/authorize')
         .query({ client_id: 'a_7', redirect_uri: 'https://app.example.com/cb', scope: 'openid' });
 
-      expect(res.status).toBe(400);
+      // bug-0305: redirect_uri is valid here (same-origin fallback), so the
+      // PKCE failure is reported back to the client as an OAuth error
+      // redirect (RFC 6749 §4.1.2.1), not a bare JSON 400.
+      expect(res.status).toBe(302);
+      const target = new URL(res.headers.location);
+      expect(target.searchParams.get('error')).toBe('invalid_request');
       expect(mockOauthService.generateCode).not.toHaveBeenCalled();
     });
 
@@ -1408,7 +1413,33 @@ describe('TokenController', () => {
         .get('/api/token/oauth/authorize')
         .query({ client_id: 'a_7', redirect_uri: 'com.vibecast.app://auth', scope: 'openid' });
 
+      // bug-0305: redirect_uri is registered here, so the PKCE failure is
+      // reported back to the client as an OAuth error redirect, not a bare
+      // JSON 400 — same reasoning as the public-app case above.
+      expect(res.status).toBe(302);
+      const target = new URL(res.headers.location);
+      expect(target.searchParams.get('error')).toBe('invalid_request');
+      expect(mockOauthService.generateCode).not.toHaveBeenCalled();
+    });
+
+    // bug-0305: an unregistered custom-scheme redirect_uri with no PKCE
+    // challenge must be rejected as INVALID_REDIRECT_URI (the real problem),
+    // not the generic PKCE invalid_request — which it would be if the PKCE
+    // requirement check (which reads the raw, unvalidated redirect_uri to
+    // decide whether PKCE is mandatory) ran before assertRedirectUriAllowed.
+    it('/authorize reports INVALID_REDIRECT_URI, not a PKCE error, for an unregistered custom-scheme redirect', async () => {
+      mockPrisma.saApp.findUnique.mockResolvedValue({
+        id: 7, publicId: 'a_7', url: 'https://app.example.com',
+        clientSecretHash: 'scrypt-hash',
+        redirectUris: [{ uri: 'com.vibecast.app://auth', kind: 'login' }],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/token/oauth/authorize')
+        .query({ client_id: 'a_7', redirect_uri: 'com.evil.app://auth', scope: 'openid' });
+
       expect(res.status).toBe(400);
+      expect(res.body?.message).toBe(TokenErrorCode.INVALID_REDIRECT_URI);
       expect(mockOauthService.generateCode).not.toHaveBeenCalled();
     });
 

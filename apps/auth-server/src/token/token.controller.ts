@@ -169,6 +169,26 @@ export class TokenController {
         throw new NotFoundException(TokenErrorCode.APP_NOT_FOUND);
       }
 
+      // bug-0305: validate redirect_uri against the app's registry BEFORE
+      // the PKCE-requirement check below. isCustomSchemeRedirect() reads the
+      // raw, attacker-controlled redirect_uri — deciding PKCE requirements
+      // from it first meant an unregistered/malicious redirect_uri could
+      // surface as a generic PKCE `invalid_request` instead of the correct
+      // `INVALID_REDIRECT_URI`, masking the real failure reason (still
+      // fail-closed either way, since this request is never redirected to
+      // an unvalidated redirect_uri regardless of which check fires first).
+      try {
+        assertRedirectUriAllowed(redirectUri, app);
+        redirectUriValidated = true;
+      } catch (err) {
+        this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
+          context: 'TokenController',
+          appId: clientId,
+          attemptedOrigin: (() => { try { return new URL(redirectUri).origin; } catch { return '<unparseable>'; } })(),
+        });
+        throw err;
+      }
+
       // PKCE is mandatory for public clients. Confidential clients may omit it —
       // the client secret provides the same protection — but a challenge, when
       // sent, must still be S256. This must run after the app lookup, since
@@ -186,18 +206,6 @@ export class TokenController {
         }
       } else if (pkceRequired) {
         throw new BadRequestException(TokenErrorCode.INVALID_REQUEST);
-      }
-
-      try {
-        assertRedirectUriAllowed(redirectUri, app);
-        redirectUriValidated = true;
-      } catch (err) {
-        this.logger.getWinstonLogger().warn('oauth.redirect_uri.rejected', {
-          context: 'TokenController',
-          appId: clientId,
-          attemptedOrigin: (() => { try { return new URL(redirectUri).origin; } catch { return '<unparseable>'; } })(),
-        });
-        throw err;
       }
 
       const session = await auth.api.getSession({
