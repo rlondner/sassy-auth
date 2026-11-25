@@ -702,6 +702,7 @@
       "title": "Authentication",
       "headerSubtitle": "Security is crucial for us.",
       "subtitle": "We've sent a message containing a 6-digit code to {email}.",
+      "spamNotice": "Not there? Check your spam folder",
       "codeLabel": "Enter code:",
       "digitAriaLabel": "Digit {position} of {total}",
       "verifying": "Verifying...",

@@ -326,7 +326,11 @@ export function SignupWizard({
   if (step === 'code') {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-body-md text-muted-foreground">{t('verifyCode.subtitle', { email: obfuscateEmail(email) })}</p>
+        <p className="text-body-md text-muted-foreground">
+          {t('verifyCode.subtitle', { email: obfuscateEmail(email) })}
+          <br />
+          <strong>{t('verifyCode.spamNotice')}</strong>
+        </p>
         <OtpInput
           id="otp"
           data-testid="otp"
