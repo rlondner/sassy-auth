@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-25
+
+18 commits landed on `dev` in the last 24 hours (`3920749`..`2c8f837`): five
+pending bug-fix merges (bug-0301 through bug-0305), the long-blocked
+`better-auth` 1.0.0 → 1.7.7 CVE migration (bug-0299/bug-0300), a handful of
+small admin fixes (favicon 404s, a signup spam-folder hint), the first half
+of the two-factor account-lockout feature, and a brand-new CI feature:
+automatic per-app patch-version bumping on every push to `dev`, chaining
+into the staging deploy.
+
+**CI has been red for ~5 hours.** The `better-auth` CVE migration commit
+(`997f614`) landed a `pnpm-lock.yaml` entry that doesn't match
+`package.json`'s specifier, which fails `pnpm install --frozen-lockfile`
+outright — every push to `dev` since has failed `unit tests`, `typecheck`,
+`e2e`, and the new `Version bump` workflow before any real work ran
+(bug-0306). The migration itself is correct: verified locally once the
+lockfile is fixed — typecheck clean, `nest build` clean, and the full
+auth-server suite (110 suites / 1279 tests) passes. Fixed in PR #482.
+
+**The new `start` task silently drops documented production env vars.**
+`turbo.json`'s `start` task (new today, backs the new root `pnpm start`)
+runs under turbo's default strict env mode but copied its allowlist from
+the `dev` task, missing `COOKIE_SECURE`/`COOKIE_DOMAIN`/`COOKIE_PREFIX`/
+`AUTH_SERVER_HTTPS` and others the README explicitly documents as mattering
+for a production-mode run — including the exact var README's own
+Caddy-proxy note names for this exact command (bug-0307). Render's actual
+deployment is unaffected (it never goes through turbo). Fixed in PR #483.
+
+**Good news: the 13-day CVE-patch escalation is resolved**, and **the
+open-PR backlog is clear.** PR #468 (bug-0299, blocked since 2026-11-11 on
+the undone `better-auth` major-version migration) is closed; the migration
+landed directly on `dev` instead. `gh pr list --state open` returned
+nothing before today's two fixes went up.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-11-25.md](./docs/history/todo/TODO_2026-11-25.md) for
+follow-ups (merge order for #482/#483, watching the Version bump workflow's
+first real run, the still-schema-only two-factor lockout fields) and
+[BUGS_2026-11-25.md](./docs/history/bugs/BUGS_2026-11-25.md) for the full
+writeup of bug-0306 and bug-0307.
+
 ## [Unreleased] — 2026-11-24
 
 Zero commits landed on `dev` since 2026-11-19 (`2215689`, merge of PR
