@@ -18,11 +18,14 @@ jest.mock('../sidebar-shell', () => ({
   SidebarShell: ({
     groups,
     children,
+    appVersion,
   }: {
     groups: { label: string; items: { href: string; label: string; icon: string }[] }[]
     children: React.ReactNode
+    appVersion: string
   }) => (
     <div data-testid="sidebar-shell">
+      <span data-testid="app-version">{appVersion}</span>
       {groups.map((g) => (
         <div key={g.label} data-testid={`group-${g.label}`}>
           <span data-testid="group-label">{g.label}</span>
@@ -58,6 +61,13 @@ async function renderShell(perms: string[]) {
 }
 
 describe('AdminShell sidebar', () => {
+  it('passes the admin package.json version to SidebarShell', async () => {
+    await renderShell([])
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { version } = require('../../package.json')
+    expect(screen.getByTestId('app-version')).toHaveTextContent(version)
+  })
+
   it('shows all 5 items for a platform super admin', async () => {
     const perms = [
       'platform.apps.manage',

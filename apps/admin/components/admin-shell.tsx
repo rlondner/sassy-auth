@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 import { SidebarShell, type NavIconName } from './sidebar-shell'
 import type { MeProfile } from '@/lib/types'
+import pkg from '../package.json'
 
 interface AdminShellProps {
   children: React.ReactNode
@@ -46,6 +47,7 @@ export async function AdminShell({
   return (
     <SidebarShell
       groups={groups}
+      appVersion={pkg.version}
       user={user}
       currentLocale={currentLocale}
       availableLocales={availableLocales}

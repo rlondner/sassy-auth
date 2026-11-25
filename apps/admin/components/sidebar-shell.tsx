@@ -28,6 +28,7 @@ interface NavGroup {
 
 interface SidebarShellProps {
   groups: NavGroup[]
+  appVersion: string
   user: { firstName: string; lastName: string; email: string }
   currentLocale: string
   availableLocales: string[]
@@ -38,7 +39,7 @@ interface SidebarShellProps {
 }
 
 export function SidebarShell({
-  groups, user, currentLocale, availableLocales,
+  groups, appVersion, user, currentLocale, availableLocales,
   signOutLabel, lightModeLabel, darkModeLabel, children,
 }: SidebarShellProps) {
   const currentPath = usePathname() ?? ''
@@ -50,7 +51,7 @@ export function SidebarShell({
             <ShieldCheck className="h-6 w-6 text-brand-500" />
             <div className="flex flex-col leading-tight">
               <span className="text-base font-semibold tracking-wide">SassyAuth</span>
-              <span className="text-[10px] font-normal text-sidebar-foreground">Admin Console</span>
+              <span className="text-[10px] font-normal text-sidebar-foreground">Admin Console (v{appVersion})</span>
             </div>
           </Link>
         </SidebarHeader>
