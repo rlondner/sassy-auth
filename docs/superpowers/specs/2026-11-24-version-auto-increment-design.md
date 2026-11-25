@@ -39,28 +39,55 @@ auth-server's Swagger UI.
 - `packages/*` versions are not touched by this policy.
 - No bump on merges to `master` — `master` only receives promotions
   from `dev` and never bumps on its own.
+- `deploy-gcp.yml` (manual `workflow_dispatch` only) is not wired into
+  the bump flow. When someone runs it on `dev` it simply builds
+  whatever version is already committed (its image tag is
+  `github.sha`).
 
 ## CI workflow: `.github/workflows/version-bump.yml`
 
 **Trigger:** `push` to `dev` (this is how a PR merge lands on `dev` in
 this repo's workflow).
 
-**Loop prevention:** The bump itself produces a commit that is pushed
-to `dev`, which would re-trigger this same workflow. Guard against
-that by checking `github.event.head_commit.message` for a fixed
-marker (`[version-bump]`) at the top of the job and exiting early if
-present. Also set a `concurrency` group keyed on the branch
-(`group: version-bump-dev`, `cancel-in-progress: false`) so that rapid
-successive merges queue sequentially instead of two runs racing to
-push based on a stale `before` SHA.
+**Why bump and deploy are chained (important):** pushes made with the
+default `GITHUB_TOKEN` do **not** trigger other workflows (GitHub's
+deliberate loop protection). If `deploy-render-staging.yml` kept its own
+`push: [dev]` trigger, staging would deploy the merge commit carrying
+the *old* version, and the bump commit would sit on `dev` undeployed —
+the version shown in the UI would always lag one merge behind. So the
+bump workflow owns the sequence: bump, push, then explicitly start the
+staging deploy.
+
+**Changes to `deploy-render-staging.yml`:** remove the
+`push: branches: [dev]` trigger; keep `workflow_dispatch`. It is now
+started only by `version-bump.yml` (or manually). The bump workflow
+dispatches it with `gh workflow run deploy-render-staging.yml --ref dev`
+as its final step (needs `actions: write` on the job; dispatches made
+with `GITHUB_TOKEN` are the one permitted exception to the
+no-trigger rule). The deploy runs on `dev` HEAD, i.e. the bump commit
+when one was made, or the merge commit when nothing needed bumping.
+`deploy-render.yml` (master) is unchanged.
+
+**Loop prevention:** The bump commit is pushed to `dev` and would
+re-trigger this workflow if it were pushed with a token that triggers
+workflows. With `GITHUB_TOKEN` it does not, but keep the guard anyway
+(cheap, and protects against a later switch to a PAT/App token): exit
+early if `github.event.head_commit.message` contains `[version-bump]`.
+Set a `concurrency` group (`group: version-bump-dev`,
+`cancel-in-progress: false`) so rapid successive merges queue
+sequentially instead of racing to push from a stale `before` SHA. On an
+early exit from the guard, the workflow still must not skip the deploy
+dispatch for a non-bump push, but a `[version-bump]` push never reaches
+it (nothing else triggers on it).
 
 **Affected-package detection:** Using the push event's `before` and
 `after` SHAs, compute which workspace packages are affected —
 including transitively, through Turborepo's dependency graph — via
 `turbo run build --filter="...[<before>...<after>]" --dry-run=json`.
-This is what makes a change to a shared package like `packages/db`
-correctly flag `auth-server` (and `admin`, if it depends on that
-package too) as needing a bump, without hand-maintained path lists.
+A change to a shared package such as `packages/db` correctly flags
+`auth-server`, and `packages/ui` flags `admin`, without hand-maintained
+path lists. `admin-e2e` has no workspace dependencies, so it bumps only
+when its own files change (intended).
 
 **Bump mechanics:** For each of `apps/admin`, `apps/admin-e2e`,
 `apps/auth-server` that appears in the affected set, run
@@ -69,20 +96,20 @@ Each app bumps independently — `admin` and `auth-server` are expected
 to drift apart over time (e.g. `admin` at `0.6.2` while `auth-server`
 is at `0.5.9`), reflecting that they deploy independently.
 
-**Commit & push:** Stage the changed `package.json` files (and
-`pnpm-lock.yaml`, which records workspace versions) and commit as:
+**Commit & push:** Stage the changed `package.json` files and commit as:
 
 ```
 chore: bump admin to 0.6.2, auth-server to 0.5.9 [version-bump]
 ```
 
 (include only the apps that actually bumped), then push directly to
-`dev` using the default `GITHUB_TOKEN`. `dev` has no branch protection
-blocking this today. This push naturally re-triggers
-`deploy-render-staging.yml` (already configured to deploy on push to
-`dev`), so staging picks up the bumped version — and the
-`[version-bump]` marker makes this workflow correctly no-op on that
-resulting push.
+`dev` using `GITHUB_TOKEN`. `dev` has no branch protection today. If no
+app was affected, skip the commit and just dispatch the deploy.
+
+**Failure behaviour:** if the bump job fails (push rejected, turbo
+error), the run fails visibly and the staging deploy is not dispatched;
+staging stays on the previous build until someone re-runs the workflow
+or dispatches the deploy manually.
 
 ## Admin UI: version next to "Admin Console"
 
@@ -131,6 +158,9 @@ version with no further work.
 - `admin-shell.tsx` → `SidebarShell` prop threading: extend existing
   `apps/admin/components/__tests__/admin-shell.test.tsx` to assert the
   version string renders in the sidebar subtitle.
+- Manual check: after the first merge following rollout, confirm staging
+  was deployed from the bump commit (not the merge commit) and the
+  sidebar shows the new version.
 - Manual check: after the workflow first runs, confirm
   `/api/docs` (Swagger UI, non-production) shows the bumped
   `auth-server` version in its title bar.
@@ -142,10 +172,11 @@ version with no further work.
   edge, an app could ship without a version bump. This is a
   correctness nuisance, not a breakage — worst case, two deploys in a
   row share a version number.
-- **Lockfile churn:** `npm version` only touches the target app's
-  `package.json`; `pnpm-lock.yaml` is regenerated/updated by a
-  `pnpm install --lockfile-only` step before committing, to keep it
-  in sync with the bumped versions.
+- **Lockfile:** pnpm's lockfile should not record a workspace
+  package's own `version`, so no lockfile step is planned. The builder
+  must confirm this by bumping locally and checking
+  `pnpm install --frozen-lockfile` still passes; only if it fails add a
+  `pnpm install --lockfile-only` step and stage `pnpm-lock.yaml`.
 - **First run:** the very first time this workflow runs, every
   affected-app detection will compare against whatever `before` SHA
   GitHub provides for that push — for a normal PR-merge push this is
