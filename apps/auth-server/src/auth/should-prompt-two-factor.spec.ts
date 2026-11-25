@@ -44,6 +44,12 @@ describe('shouldPromptTwoFactor', () => {
     ).toBe(true);
   });
 
+  it('returns true when intervalDays is 0 even if promptedAt is the exact same millisecond as now (bug-0303)', () => {
+    expect(
+      shouldPromptTwoFactor({ twoFactorEnabled: false, promptedAt: NOW, now: NOW, intervalDays: 0, promptEnabled: true }),
+    ).toBe(true);
+  });
+
   it('returns false when promptEnabled is false, even if never prompted', () => {
     expect(
       shouldPromptTwoFactor({ twoFactorEnabled: false, promptedAt: null, now: NOW, intervalDays: INTERVAL_DAYS, promptEnabled: false }),
