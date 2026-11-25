@@ -136,7 +136,9 @@ export async function middleware(request: NextRequest) {
   // prefix list the same way.
   const isPublic =
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
-    pathname.startsWith('/_next/')
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/icons/') ||
+    pathname.startsWith('/favicon/')
 
   if (isPublic) return NextResponse.next()
 
