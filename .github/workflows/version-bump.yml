@@ -1,0 +1,78 @@
+name: Version bump
+
+# On every push to dev: patch-bump the deployed apps that were affected, push the
+# bump commit, then dispatch the staging deploy so it runs on the final version.
+# (Pushes made with GITHUB_TOKEN don't trigger other workflows, hence the explicit
+# dispatch — see deploy-render-staging.yml.)
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: version-bump-dev
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    # Loop guard: never act on our own bump commit.
+    if: ${{ !contains(github.event.head_commit.message, '[version-bump]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Compute affected packages
+        id: affected
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE="$AFTER~1"
+          fi
+          names=$(pnpm exec turbo ls --filter="...[$BEFORE...$AFTER]" --output=json | jq -r '.packages.items[].name' | tr '\n' ' ')
+          echo "Affected: $names"
+          echo "names=$names" >> "$GITHUB_OUTPUT"
+
+      - name: Bump versions
+        id: bump
+        env:
+          NAMES: ${{ steps.affected.outputs.names }}
+        run: |
+          read -ra names <<< "$NAMES"
+          msg=$(node scripts/bump-versions.mjs "${names[@]}")
+          echo "message=$msg" >> "$GITHUB_OUTPUT"
+          echo "Commit message: ${msg:-<none>}"
+
+      - name: Commit and push bump
+        if: steps.bump.outputs.message != ''
+        env:
+          MESSAGE: ${{ steps.bump.outputs.message }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/admin/package.json apps/admin-e2e/package.json apps/auth-server/package.json
+          git commit -m "$MESSAGE"
+          # Another merge may have landed while this job ran: rebase and retry once.
+          git push origin HEAD:dev || { git pull --rebase origin dev && git push origin HEAD:dev; }
+
+      - name: Dispatch staging deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-render-staging.yml --ref dev

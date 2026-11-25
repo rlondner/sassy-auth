@@ -1,8 +1,9 @@
 name: Deploy to Render (staging)
 
+# Not triggered by pushes to dev: version-bump.yml dispatches this workflow after
+# it bumps app versions. Pushes made with GITHUB_TOKEN don't trigger workflows, so
+# a push trigger here would deploy the pre-bump commit and never the bump commit.
 on:
-  push:
-    branches: [dev]
   workflow_dispatch: {}
 
 permissions:
