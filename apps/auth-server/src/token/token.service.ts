@@ -171,7 +171,6 @@ export class TokenService {
         };
 
         const token = jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
-        console.log('[minted access_token]', token, payload);
         recordTokenIssueDuration(Date.now() - start, 'ok');
         return token;
       } catch (err) {
@@ -233,7 +232,6 @@ export class TokenService {
     };
 
     const idToken = jwt.sign(payload, this.privateKey, { algorithm: 'RS256', keyid: this.kid });
-    console.log('[minted id_token]', idToken, payload);
     return idToken;
   }
 
