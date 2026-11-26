@@ -42,6 +42,7 @@ It models four things — **apps**, **orgs**, **users**, and **permissions/roles
     - [Required](#required)
     - [Admin console](#admin-console)
     - [Rate limiting (optional)](#rate-limiting-optional)
+    - [Trust proxy (`TRUST_PROXY_HOPS`)](#trust-proxy-trust_proxy_hops)
     - [Cookie security (`NODE_ENV`, `COOKIE_SECURE`, `COOKIE_PREFIX`, `COOKIE_DOMAIN`)](#cookie-security-node_env-cookie_secure-cookie_prefix-cookie_domain)
     - [Password policy (optional)](#password-policy-optional)
     - [Legal consent — Privacy Policy / Terms / GDPR (optional)](#legal-consent--privacy-policy--terms--gdpr-optional)
@@ -590,6 +591,16 @@ Two NestJS throttler buckets (`@nestjs/throttler`), applied globally, keyed per-
 | `AUTH_RATE_WINDOW_MS`    | Window length in milliseconds for `AUTH_RATE_LIMIT`.                     | `60000` (1 min) |
 
 See also [Self-serve Registration rate limiting](#rate-limiting) for the separate, differently-defaulted `REGISTER_RATE_LIMIT`/`REGISTER_RATE_WINDOW_MS` pair that guards `POST /api/register`.
+
+### Trust proxy (`TRUST_PROXY_HOPS`)
+
+The rate-limit buckets above key on `req.ip`, which Express only resolves to the real client — instead of a reverse proxy's own address — when told how many `X-Forwarded-For` hops to trust (`apps/auth-server/src/main.ts`, `expressApp.set('trust proxy', ...)`). Under-counting this collapses every distinct visitor onto one shared rate-limit bucket.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TRUST_PROXY_HOPS` | Number of trusted reverse-proxy hops in front of this service. | `1` |
+
+`1` is correct for both of this project's deployments today: Render's single internal hop, and Cloud Run via domain mappings (`gcp/env.auth-server.yaml`), which proxies the same way as the default `*.run.app` URL. Only raise this to `2` if a second proxy is added in front — e.g. `gcp/setup-lb.sh`'s external HTTPS Load Balancer (serverless NEG) placed in front of Cloud Run instead of using domain mappings directly.
 
 ### Cookie security (`NODE_ENV`, `COOKIE_SECURE`, `COOKIE_PREFIX`, `COOKIE_DOMAIN`)
 

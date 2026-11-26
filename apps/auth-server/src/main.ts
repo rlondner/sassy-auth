@@ -20,6 +20,7 @@ import { AppModule } from './app.module';
 import { auth, TRUSTED_ORIGINS } from './auth/auth.config';
 import type { AuthApiExtras } from './auth/auth-api-extras';
 import { createDefaultAuthRateLimiter } from './auth/auth-rate-limit';
+import { envInt } from './common/config/rate-limit-config';
 import { runWithPrivateRelayCapture } from './social/apple-private-relay-context';
 import { runWithSocialConsentCapture } from './social/social-consent-context';
 import { runWithSocialSignupContext } from './social/social-signup-context';
@@ -107,19 +108,37 @@ async function bootstrap() {
   const httpsOptions = resolveHttpsOptions(serveHttps, path.join(__dirname, '..', 'secrets'));
   const expressApp = express();
 
-  // Render terminates TLS/HTTP at its edge and proxies to this app over one
-  // internal hop, so `req.ip` is the proxy's address, not the real client's,
-  // unless Express is told to trust that one hop and read X-Forwarded-For.
-  // Without this, every per-client rate limiter that keys on `req.ip` —
-  // @nestjs/throttler's default `ThrottlerGuard` tracker (app.module.ts) and
-  // `auth-rate-limit.ts`'s `clientKey` — collapses all traffic across every
-  // visitor into a single shared bucket, producing sporadic 429s under
-  // combined load that have nothing to do with any individual client's
-  // request rate (see CR_2026-09-02.md finding 🟡 and auth-rate-limit.ts's
-  // `clientKey` doc comment, which already assumed this would be set).
-  // `1` trusts exactly the first hop in front of the app; if a second proxy
-  // is ever added in front of Render's edge, this needs to become `2`.
-  expressApp.set('trust proxy', 1);
+  // The edge terminates TLS/HTTP and proxies to this app over one or more
+  // internal hops, so `req.ip` is a proxy's address, not the real client's,
+  // unless Express is told how many hops to trust and read X-Forwarded-For
+  // through. Without this, every per-client rate limiter that keys on
+  // `req.ip` — @nestjs/throttler's default `ThrottlerGuard` tracker
+  // (app.module.ts) and `auth-rate-limit.ts`'s `clientKey` — collapses all
+  // traffic across every visitor into a single shared bucket, producing
+  // sporadic 429s under combined load that have nothing to do with any
+  // individual client's request rate (see CR_2026-09-02.md finding 🟡 and
+  // auth-rate-limit.ts's `clientKey` doc comment, which already assumed this
+  // would be set).
+  //
+  // The right count depends on what actually fronts this service, and that
+  // has differed across deployments: Render's single internal hop made `1`
+  // correct there; Cloud Run via domain mappings (gcloud beta run
+  // domain-mappings, what `gcp-deployment.md` actually uses) proxies the
+  // same way the default *.run.app URL does — also one hop — so `1` is
+  // still correct. It would stop being correct if `gcp/setup-lb.sh`'s
+  // external HTTPS Load Balancer (serverless NEG) were ever put in front of
+  // Cloud Run instead, which adds a second hop; an under-counted hop in
+  // either topology resolves `req.ip` to a proxy's own address for every
+  // caller instead of the real client, collapsing all distinct users' traffic
+  // onto one shared rate-limit bucket (e.g. the `default` bucket backing
+  // `GET /api/token/oauth/authorize`), producing 429s under ordinary
+  // aggregate load with no connection to any individual client's request
+  // rate. `TRUST_PROXY_HOPS` makes the count a per-deployment env var instead
+  // of a hardcoded assumption, so whichever topology is actually in front —
+  // now or after a future change — can be set correctly without touching code.
+  // Defaults to `1` (Render and Cloud-Run-via-domain-mapping); unset in both
+  // `render.yaml` and `gcp/env.auth-server.yaml` today.
+  expressApp.set('trust proxy', envInt('TRUST_PROXY_HOPS', 1));
 
   // BetterAuth intercepts /api/auth/* before NestJS processes any request.
   //
