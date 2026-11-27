@@ -85,6 +85,10 @@ jobs:
           git push origin HEAD:dev || { git pull --rebase origin dev && git push origin HEAD:dev; }
 
       - name: Dispatch staging deploy
+        # Only when a bump actually happened — otherwise this runs on every push to
+        # dev (docs, CI tweaks, non-deployed packages) and redeploys staging with no
+        # version change.
+        if: steps.bump.outputs.message != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy-render-staging.yml --ref dev
