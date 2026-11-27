@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 2026-11-27
+
+Zero commits landed on `dev` since 2026-11-25 (`2c8f837`) — nothing to diff, same as
+2026-11-26. Checked CI health directly and audited `.github/workflows/version-bump.yml`
+(the new version-bump feature merged into `dev` on 2026-11-25, still largely unreviewed
+because the lockfile break has kept every PR against it from going green).
+
+**`dev`'s CI is now red going on 3 days.** Same root cause as yesterday and the day
+before: `pnpm-lock.yaml`'s `better-auth` specifier mismatch (bug-0306) fails
+`pnpm install --frozen-lockfile` on every push, taking out `unit tests`, `typecheck`,
+`e2e`, and `Version bump` identically on every run since `997f614`
+(2026-11-25 02:55 UTC). The fix has been sitting `MERGEABLE` in PR #482 for ~52 hours.
+
+**Found one new bug while reading the version-bump workflow itself.** Its
+`Dispatch staging deploy` step had no guard, so it ran on every push to `dev` —
+including docs-only commits (this review's own daily-review PRs, once merged) and
+any change outside the three deployed packages — redeploying staging with no version
+change. The commit/push step right above it was already correctly guarded on
+`steps.bump.outputs.message != ''`; the dispatch step just never got the same
+treatment. Fixed by applying the identical guard. See bug-0309 and PR #487.
+
+**README checked against `dev`'s actual code — no gaps found.** The root
+[README](../../README.md) already documents every environment variable read by
+`apps/auth-server` and `apps/admin` on `dev`'s current tip, plus the full local setup
+sequence (clone, env, Postgres, Prisma, seed, HTTPS certs, dev servers). `TRUST_PROXY_HOPS`
+(bug-0308) isn't documented there yet, but that's correct — it only exists in the
+unmerged PR #485, not on `dev`.
+
+### Risky patterns / missing tests
+
+See [TODO_2026-11-27.md](./docs/history/todo/TODO_2026-11-27.md) for follow-ups (merging
+PR #482 is still the single highest-leverage action available, now joined by #483,
+#485, #486, and today's #487) and
+[BUGS_2026-11-27.md](./docs/history/bugs/BUGS_2026-11-27.md) for the full writeup of
+bug-0309.
+
 ## [Unreleased] — 2026-11-24
 
 Zero commits landed on `dev` since 2026-11-19 (`2215689`, merge of PR
